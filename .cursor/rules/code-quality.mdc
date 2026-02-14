@@ -1,0 +1,38 @@
+---
+description: Code-Qualität und DRY-Prinzip
+alwaysApply: true
+---
+
+# Code-Qualität
+
+## DRY – Don't Repeat Yourself
+- Vor dem Schreiben neuer Logik: IMMER prüfen ob in src/lib/ oder src/hooks/ schon etwas Ähnliches existiert
+- Gleiche Logik 2x geschrieben? → Sofort in src/lib/ als wiederverwendbare Funktion auslagern
+- Gleiche UI 2x geschrieben? → Sofort in src/components/ als eigene Komponente auslagern
+- Wenn eine bestehende Funktion erweitert werden muss → Funktion in src/lib/ erweitern, NICHT in der Komponente hardcoden
+
+## Wo gehört was hin?
+
+```
+src/lib/          → Business-Logik, Helper-Funktionen, Konstanten
+src/hooks/        → TanStack Query Hooks, Auth Hook
+src/components/   → Wiederverwendbare UI-Komponenten
+src/pages/        → Seiten (nur Orchestrierung, KEINE Business-Logik)
+src/types/        → TypeScript Types/Interfaces
+```
+
+## Beispiel: RICHTIG vs FALSCH
+
+```tsx
+// FALSCH – Formatierung direkt in der Komponente
+const label = 'KW' + String(kw).padStart(2, '0') + '/' + jahr;
+
+// RICHTIG – Helper in src/lib/utils.ts
+import { formatKWLabel } from '@/lib/utils';
+const label = formatKWLabel(kw, jahr);
+```
+
+## Nach jeder Änderung
+- npm run build → Muss ohne Fehler laufen
+- Neue/geänderte Features → docs/ Dateien aktualisieren
+- Neue Patterns/Regeln → .cursor/rules/ aktualisieren

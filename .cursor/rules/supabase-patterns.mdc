@@ -1,0 +1,31 @@
+---
+description: Supabase-spezifische Patterns
+globs: "**/*.ts"
+alwaysApply: false
+---
+
+# Supabase Patterns
+
+## Client
+- Supabase Client NUR aus @/lib/supabase importieren
+- Typisierung: createClient<Database> mit Types aus @/types/database
+
+## Queries
+- Immer Error prüfen: `if (error) throw error;`
+- Batch Inserts in Chunks von 500 Rows
+- RLS ist aktiv – kein manuelles Filtern nach user_id nötig
+- Bei komplexen Queries: explizite Type-Casts nutzen (data as Profile)
+
+## Auth & Rollen
+- Auth State über useAuth() Hook aus @/hooks/useAuth
+- Drei Rollen: super_admin, admin, user
+- isSuperAdmin = nur super_admin (Inhaber)
+- isAdmin = super_admin ODER admin (Abwärtskompatibel)
+- Login: supabase.auth.signInWithPassword()
+- Personalnummer-Login über RPC: supabase.rpc('lookup_email_by_personalnummer')
+- Einmalpasswort-System: must_change_password Flag in profiles
+
+## Edge Functions
+- User erstellen: supabase.functions.invoke('create-user', { ... })
+- Passwort zurücksetzen: supabase.functions.invoke('reset-password', { ... })
+- Immer Authorization Header mitgeben: session?.access_token

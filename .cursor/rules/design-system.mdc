@@ -1,0 +1,34 @@
+---
+description: Design-System und UI-Richtlinien
+alwaysApply: true
+---
+
+# Design System
+
+## Farbschema
+- Primary: Blau-Töne (professionell, clean) – über shadcn CSS Variables
+- Hintergrund: bg-background (helles Slate), KEIN Dark Mode nötig
+- Karten: bg-card mit shadow-sm und rounded-lg
+- Primary Buttons: bg-primary hover:bg-primary/90
+
+## PLU-Statusfarben (FEST – nicht ändern!)
+- Neues Produkt: bg-plu-new-bg text-plu-new-text – NUR auf PLU-Zelle
+- PLU geändert: bg-plu-changed-bg text-plu-changed-text – NUR auf PLU-Zelle
+- Unverändert: Keine besondere Farbe
+
+## Tabellen
+- Zwei-Spalten-Layout (links PLU+Artikel, Lücke, rechts PLU+Artikel)
+- Zebra-Striping: even:bg-muted/50
+- Buchstaben-Header oder Block-Header je nach Sortierung
+
+## Allgemein
+- Modernes, aufgeräumtes Design mit viel Whitespace
+- shadcn/ui Komponenten als Basis
+- Konsistente Abstände: p-4, p-6, gap-4, gap-6
+- Fokus auf Desktop (1024px+), aber grundlegend responsiv
+- Inter als Schriftart
+
+## Layout – kein übermäßiges Hardcoding!
+- Dialoge/Modals: shadcn-Standards nutzen (max-w-lg, max-w-xl, max-w-2xl, max-w-4xl je nach Inhalt). Nicht zu klein dimensionieren – Platz für Inhalt lassen.
+- Lange Texte: `truncate` sparsam einsetzen. Besser: `break-words` oder ScrollArea mit horizontalem Scroll, damit nichts abgeschnitten wird.
+- Feste Pixel-Höhen nur wo nötig (z.B. ScrollArea). Vorhandene Komponenten/Vorlagen im Projekt als Referenz nutzen – nicht neue Layouts zerschießen.

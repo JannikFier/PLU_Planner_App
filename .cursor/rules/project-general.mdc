@@ -1,0 +1,62 @@
+---
+description: Generelle Projektstandards für den PLU Planner
+alwaysApply: true
+---
+
+# PLU Planner – Allgemeine Regeln
+
+## Sprache
+- Alle Code-Kommentare auf Deutsch
+- Alle UI-Texte, Labels, Tooltips, Fehlermeldungen auf Deutsch
+- Variablen- und Funktionsnamen auf Englisch
+- Kommunikation mit dem User IMMER auf Deutsch
+
+## Tech Stack (NICHT abweichen!)
+- React 18 + Vite + TypeScript (strict mode)
+- Tailwind CSS v4 + shadcn/ui für ALLE UI-Komponenten
+- TanStack Query v5 für ALLE Server-State-Operationen (KEIN useEffect für Daten!)
+- React Router v6 für Navigation
+- Supabase (@supabase/supabase-js) als einziges Backend
+- Zod für Validierung
+- jsPDF für PDF-Export, xlsx für Excel-Parsing
+- sonner für Toast-Notifications, lucide-react für Icons
+- date-fns für Datumsformatierung
+
+## State Management
+- KEIN globaler React Context für Daten
+- KEIN Redux, Zustand, Jotai oder ähnliches
+- Server State → TanStack Query (useQuery + useMutation + invalidateQueries)
+- Lokaler UI State → useState/useReducer nur für UI-Logik (Dialoge, Formulare)
+
+## Architektur
+- Projektstruktur: src/{components,pages,hooks,lib,types,styles}
+- Jede Datendomäne bekommt einen eigenen Custom Hook in src/hooks/
+- Business-Logik gehört in src/lib/ (NICHT in Komponenten!)
+- Supabase Client NUR über src/lib/supabase.ts importieren
+- Path Alias: @/ zeigt auf src/
+
+## Code-Qualität: KEIN Hardcoding!
+- NIEMALS Logik duplizieren. Wenn eine Funktion/ein Helper schon existiert → aus src/lib/ importieren
+- Wenn ein Pattern zum 2. Mal gebraucht wird → in src/lib/ als wiederverwendbare Funktion auslagern
+- Vor dem Schreiben einer neuen Funktion: prüfen ob in src/lib/ oder src/hooks/ schon etwas Ähnliches existiert
+- Konstanten (Farben, Limits, Texte) in zentrale Dateien, nicht inline
+- UI-Patterns die sich wiederholen → als eigene Komponente in src/components/ auslagern
+
+## Error Handling
+- Immer try/catch bei async Operationen
+- Fehler per sonner toast.error() anzeigen
+- Erfolg per sonner toast.success() anzeigen
+- Supabase Errors immer prüfen: if (error) throw error;
+
+## Drei-Rollen-System
+- super_admin = Inhaber (voller Zugriff, Upload, Layout, Versionen, User+Admin anlegen)
+- admin = Abteilungsleiter (PLU-Liste + User anlegen + PW zurücksetzen)
+- user = Personal (PLU-Liste ansehen, eigene Produkte, ausblenden, PDF)
+- is_admin() in DB = true für super_admin UND admin
+- is_super_admin() in DB = true NUR für super_admin
+
+## Dokumentation aktuell halten!
+- Bei JEDER Änderung an Features, Rollen, DB-Schema oder Architektur:
+  → docs/ Dateien aktualisieren (ARCHITECTURE.md, ROLES_AND_PERMISSIONS.md, DATABASE.md, FEATURES.md)
+- Bei Änderungen an Coding-Standards → .cursor/rules/*.mdc aktualisieren
+- README.md aktuell halten bei neuen Features oder Setup-Änderungen

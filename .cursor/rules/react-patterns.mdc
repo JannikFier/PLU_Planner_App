@@ -1,0 +1,47 @@
+---
+description: React-Komponentenstandards
+globs: "**/*.tsx"
+alwaysApply: false
+---
+
+# React Patterns
+
+## Komponenten
+- Immer funktionale Komponenten mit TypeScript Props-Interface
+- shadcn/ui Komponenten bevorzugen (Button, Dialog, Input, Select, Table, Card, Badge etc.)
+- Tailwind CSS für Styling – KEIN CSS-Modules, KEIN styled-components
+- cn() Helper aus @/lib/utils für bedingte Klassen
+
+## Daten laden – IMMER TanStack Query
+
+```tsx
+// FALSCH – niemals useEffect für Daten
+useEffect(() => { fetchData() }, []);
+
+// RICHTIG – TanStack Query
+const { data, isLoading, error } = useQuery({
+  queryKey: ['plu-items', versionId],
+  queryFn: () => fetchPluItems(versionId),
+  enabled: !!versionId
+});
+```
+
+## Mutationen
+
+```tsx
+const mutation = useMutation({
+  mutationFn: async (data) => {
+    const { error } = await supabase.from('table').insert(data);
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['key'] });
+    toast.success('Gespeichert');
+  },
+  onError: (error) => toast.error(error.message)
+});
+```
+
+## Loading & Error States
+- Immer isLoading behandeln (Skeleton oder Spinner)
+- Immer Fehler per toast.error() anzeigen
