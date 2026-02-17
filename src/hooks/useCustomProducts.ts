@@ -167,21 +167,16 @@ export function useDeleteCustomProduct() {
   })
 }
 
-/** Master-Produkt umbenennen (nur Super-Admin) – setzt is_manually_renamed = true */
+/** Master-Produkt umbenennen (Admin + Super-Admin) – per RPC, setzt is_manually_renamed = true */
 export function useRenameMasterProduct() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async ({ id, displayName }: { id: string; displayName: string }) => {
-      const { error } = await supabase
-        .from('master_plu_items')
-        .update(
-        ({
-          display_name: displayName,
-          is_manually_renamed: true,
-        } as Database['public']['Tables']['master_plu_items']['Update']) as never
-      )
-        .eq('id', id)
+      const { error } = await supabase.rpc('rename_master_plu_item', {
+        item_id: id,
+        new_display_name: displayName,
+      } as never)
 
       if (error) throw error
     },
@@ -195,21 +190,16 @@ export function useRenameMasterProduct() {
   })
 }
 
-/** Master-Produkt-Name zurücksetzen (nur Super-Admin) */
+/** Master-Produkt-Name zurücksetzen (Admin + Super-Admin) – per RPC */
 export function useResetProductName() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async ({ id, systemName }: { id: string; systemName: string }) => {
-      const { error } = await supabase
-        .from('master_plu_items')
-        .update(
-        ({
-          display_name: systemName,
-          is_manually_renamed: false,
-        } as Database['public']['Tables']['master_plu_items']['Update']) as never
-      )
-        .eq('id', id)
+      const { error } = await supabase.rpc('reset_master_plu_item_display_name', {
+        item_id: id,
+        system_name: systemName,
+      } as never)
 
       if (error) throw error
     },

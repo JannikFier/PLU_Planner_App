@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -15,6 +17,7 @@ import {
   Plus,
   EyeOff,
   FileDown,
+  Pencil,
 } from 'lucide-react'
 
 // PLU-Komponenten
@@ -40,6 +43,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { buildDisplayList } from '@/lib/layout-engine'
 import type { PLUStats } from '@/lib/plu-helpers'
 import { getCurrentKW } from '@/lib/date-kw-utils'
+import { ensureActiveVersion } from '@/lib/ensure-active-version'
 
 interface MasterListProps {
   mode: 'user' | 'admin'
@@ -57,6 +61,7 @@ interface MasterListProps {
  */
 export function MasterList({ mode }: MasterListProps) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { profile } = useAuth()
   const rolePrefix = profile?.role === 'super_admin' ? '/super-admin' : profile?.role === 'admin' ? '/admin' : '/user'
 
@@ -200,6 +205,21 @@ export function MasterList({ mode }: MasterListProps) {
   // Keine Version? Kurz-Hinweis statt endlos warten
   const hasNoVersion = !versionLoading && !versionsLoading && !activeVersion && versions.length === 0
 
+  // Wenn Versionen existieren, aber keine aktive: neueste automatisch auf active setzen
+  useEffect(() => {
+    if (versionLoading || versionsLoading || versions.length === 0) return
+    const hasActive = versions.some((v) => v.status === 'active')
+    if (hasActive) return
+    ensureActiveVersion(versions)
+      .then((updated) => {
+        if (updated) {
+          void queryClient.invalidateQueries({ queryKey: ['versions'] })
+          void queryClient.invalidateQueries({ queryKey: ['version', 'active'] })
+        }
+      })
+      .catch((err) => toast.error(err instanceof Error ? err.message : 'Aktive Version setzen fehlgeschlagen'))
+  }, [versionLoading, versionsLoading, versions, queryClient])
+
   // Tab wurde sichtbar: Browser throttelt Hintergrund-Tabs – Re-Render erzwingen,
   // damit bereits geladene Daten sofort angezeigt werden (sonst erst nach Klick).
   const [, setVisibilityTick] = useState(0)
@@ -293,6 +313,16 @@ export function MasterList({ mode }: MasterListProps) {
               <EyeOff className="h-4 w-4 mr-1" />
               Ausgeblendete
             </Button>
+            {mode === 'admin' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`${rolePrefix}/renamed-products`)}
+              >
+                <Pencil className="h-4 w-4 mr-1" />
+                Umbenennen
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"

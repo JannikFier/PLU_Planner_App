@@ -30,8 +30,9 @@ import { ArrowLeft, Eye, Trash2, Loader2 } from 'lucide-react'
 
 import { useVersions } from '@/hooks/useVersions'
 import { supabase } from '@/lib/supabase'
+import type { Database } from '@/types/database'
 
-/** Hook: Version löschen (nur draft/frozen) */
+/** Hook: Version löschen (inkl. aktive – dann wird die nächste zur aktiven) */
 function useDeleteVersion() {
   const queryClient = useQueryClient()
 
@@ -86,6 +87,22 @@ export function VersionsPage() {
   const handleDeleteConfirm = async () => {
     if (!versionToDelete) return
     try {
+      const isActive = versions.some((v) => v.id === versionToDelete.id && v.status === 'active')
+      if (isActive) {
+        const rest = versions.filter((v) => v.id !== versionToDelete.id)
+        if (rest.length > 0) {
+          const nextVersion = rest[0]
+          const updatePayload: Database['public']['Tables']['versions']['Update'] = {
+            status: 'active',
+            published_at: new Date().toISOString(),
+          }
+          const { error: updateError } = await supabase
+            .from('versions')
+            .update(updatePayload as never)
+            .eq('id', nextVersion.id)
+          if (updateError) throw updateError
+        }
+      }
       await deleteMutation.mutateAsync(versionToDelete.id)
       setVersionToDelete(null)
       toast.success(`Version ${versionToDelete.kwLabel} gelöscht`)
@@ -166,18 +183,16 @@ export function VersionsPage() {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {version.status !== 'active' && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Löschen"
-                              aria-label="Löschen"
-                              disabled={deleteMutation.isPending}
-                              onClick={() => handleDeleteClick(version.id, version.kw_label)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Löschen"
+                            aria-label="Löschen"
+                            disabled={deleteMutation.isPending}
+                            onClick={() => handleDeleteClick(version.id, version.kw_label)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>

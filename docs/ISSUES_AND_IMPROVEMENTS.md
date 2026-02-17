@@ -38,3 +38,8 @@ Diese Datei listet bekannte Issues und Verbesserungsideen für spätere Sprints.
 - AuthPrefetch beim App-Start
 - Visibility-API für Tab-Focus
 - Super-Admin Standard-Ansicht: Dashboard (Pfeil zurück führt zum Dashboard; Masterliste über Karte)
+- **Upload: Duplicate-Key behoben** – Beim erneuten Einspielen derselben KW wird die bestehende Version ersetzt („Überschreiben“-Bestätigung wird beim Veröffentlichen berücksichtigt).
+- **Parser-Transparenz** – Auf der PLU-Upload-Seite werden pro Datei übersprungene Zeilen angezeigt (skippedRows) plus Hinweistext zu möglichen Gründen.
+- **Rollback bei Publish-Fehler** – Schlägt das Einfügen der Items oder die Aktivierung fehl, wird die neu angelegte Version wieder gelöscht; keine „halben“ Versionen mehr.
+
+**Ausblick:** Atomares Veröffentlichen per RPC/Transaktion (eine DB-Transaktion für Version + Items + Aktivieren) wäre eine spätere Verbesserung für maximale Konsistenz.

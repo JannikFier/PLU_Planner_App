@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AuthPrefetch } from '@/components/AuthPrefetch'
 import { HomeRedirect } from '@/components/HomeRedirect'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 
 // Layout (nicht lazy – wird überall gebraucht)
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
@@ -22,6 +23,7 @@ const MasterList = lazy(() => import('@/pages/MasterList').then((m) => ({ defaul
 const HiddenItems = lazy(() => import('@/pages/HiddenItems').then((m) => ({ default: m.HiddenItems })))
 const CustomProductsPage = lazy(() => import('@/pages/CustomProductsPage').then((m) => ({ default: m.CustomProductsPage })))
 const HiddenProductsPage = lazy(() => import('@/pages/HiddenProductsPage').then((m) => ({ default: m.HiddenProductsPage })))
+const RenamedProductsPage = lazy(() => import('@/pages/RenamedProductsPage').then((m) => ({ default: m.RenamedProductsPage })))
 const UserManagement = lazy(() => import('@/pages/UserManagement').then((m) => ({ default: m.UserManagement })))
 const NotFound = lazy(() => import('@/pages/NotFound').then((m) => ({ default: m.NotFound })))
 const LayoutSettingsPage = lazy(() => import('@/pages/LayoutSettingsPage').then((m) => ({ default: m.LayoutSettingsPage })))
@@ -181,6 +183,14 @@ function App() {
               }
             />
             <Route
+              path="/admin/renamed-products"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <RenamedProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/users"
               element={
                 <ProtectedRoute requireAdmin>
@@ -227,6 +237,14 @@ function App() {
               element={
                 <ProtectedRoute requireSuperAdmin>
                   <HiddenProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/renamed-products"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <RenamedProductsPage />
                 </ProtectedRoute>
               }
             />
@@ -289,6 +307,7 @@ function App() {
 
         {/* Toast Notifications (global) */}
         <Toaster position="top-right" richColors closeButton />
+        <SpeedInsights />
       </TooltipProvider>
     </QueryClientProvider>
   )

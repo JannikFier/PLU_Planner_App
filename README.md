@@ -81,6 +81,15 @@ npm run dev
 | `npm run test` | Startet Tests im Watch-Modus |
 | `npm run test:run` | Führt Tests einmal aus (z.B. vor Push) – Details: [docs/TESTING.md](docs/TESTING.md) |
 
+### Konsolenmeldungen in Cursor (Entwicklung)
+
+Beim Entwickeln in Cursors eingebettetem Browser können in der Konsole **403** und **400** von Supabase erscheinen („Failed to load resource“). Das ist erwartbar und unkritisch:
+
+- **403** – Tritt oft beim **Logout** auf (z.B. abgelaufener Token oder anderer Browser-Kontext). Der Supabase-Client behandelt das bereits und meldet dich trotzdem lokal ab.
+- **400** – Kann beim automatischen **Token-Refresh** auftreten, wenn in Cursors Umgebung der Refresh-Token fehlt oder anders gespeichert wird.
+
+Auf **Vercel** (normale Domain, normaler Browser) treten diese Meldungen in der Regel nicht auf. Die App funktioniert in beiden Fällen korrekt.
+
 ## Projektstruktur
 
 ```

@@ -35,7 +35,7 @@ Der PLU Planner verwaltet wöchentliche Preis-Look-Up (PLU) Listen für Obst- un
 2. **Ein Upload-Feld** für eine oder mehrere Excel-Dateien (max. 2 für den Vergleich); im Datei-Dialog können mehrere Dateien auf einmal ausgewählt werden.
 3. **Auto-Erkennung:** Listentyp (Stück/Gewicht) wird aus dem **Excel-Inhalt** (erste Zeile/Header, z. B. „Gewicht“, „Stück“, „Stück ÜO“) und bei Bedarf aus dem Dateinamen erkannt. KW wird aus dem Dateinamen übernommen.
 4. **Ziel-KW und Jahr** sind Dropdowns: KW nur **aktuelle ± 3** (z. B. bei KW 10: 7–13), Jahr nur **aktuelles Jahr ± 1**. Automatische Vorauswahl: nächste freie KW (bzw. aktuelle), aktuelles Jahr als Standard. Bei zwei Dateien: automatische Zuordnung (eine als Stück-, eine als Gewichtsliste); **manuelle Korrektur** pro Datei per Dropdown (Stück/Gewicht) möglich.
-5. **Überschreibungs-Warnung:** Ist die gewählte Ziel-KW für das gewählte Jahr bereits in `versions` vorhanden, erscheint vor dem Vergleich ein Dialog mit der Wahl „Ziel-KW ändern“ oder „Überschreiben“.
+5. **Überschreibungs-Warnung:** Ist die gewählte Ziel-KW für das gewählte Jahr bereits in `versions` vorhanden, erscheint vor dem Vergleich ein Dialog mit der Wahl „Ziel-KW ändern“ oder „Überschreiben“. Bei „Überschreiben“ wird beim Einspielen die **bestehende Version für diese KW ersetzt** (kein zweiter Eintrag, keine Duplicate-Key-Fehler).
 6. **Schritt 2 (Vorschau):** Einzeilige Statistik (Gesamt · Unverändert · Neu · PLU geändert · Entfernt · ggf. Konflikte). **„Neu“ und „Entfernt“ sind klickbar** und zeigen in einem Popover die Liste der betroffenen Produkte (PLU + Name). Darunter die **vollständige PLU-Liste** wie nach dem Einspielen (Layout-Engine + PLUTable, mit aktuellen Layout-Einstellungen), scrollbar. Falls Konflikte: Konflikt-Bereich im selben Schritt; Button „Konflikte speichern & einspielen“ bzw. „Ins System einspielen“.
 7. Excel wird client-seitig geparst (xlsx Library)
 8. Vergleich mit aktueller Version:
@@ -55,6 +55,7 @@ Von der **Masterliste** aus führt der Button „Neuer Upload“ zur PLU-Upload-
 - **Duplikate in Excel**: Erste Occurrence gewinnt
 - **User-eigene Produkte**: Werden beim Vergleich EXKLUDIERT
 - PLU-Format: Genau 5 Ziffern (Regex: `/^\d{5}$/`)
+- **Übersprungene Zeilen:** Pro Datei werden „X Zeilen · Y beim Einlesen übersprungen“ angezeigt; bei Y > 0 erscheint ein Hinweis (ungültige PLU, leerer Name, doppelte PLU). So ist transparent, ob Excel-Zeilen nicht übernommen wurden.
 
 ## Feature: Globale PLU-Liste (Runde 2)
 
@@ -82,11 +83,15 @@ Alle Rollen arbeiten an EINER gemeinsamen Liste. Änderungen gelten für alle.
 - Verwaltung über die Seite **Eigene & Ausgeblendete** (`*/hidden-items`): zwei Sektionen – oben „Eigene Produkte“ (Liste + hinzufügen), darunter „Ausgeblendete Produkte“ (Einblenden, Per Excel ausblenden)
 
 ### Umbenennungen
-- **Custom Products:** Ersteller oder Super-Admin kann umbenennen
-- **Master Products:** Nur Super-Admin kann umbenennen
-  - Setzt `is_manually_renamed = true`
-  - Layout-Engine überspringt dann Bezeichnungsregeln für dieses Item
-  - Kann zurückgesetzt werden (display_name = system_name, Flag = false)
+- **Custom Products:** Ersteller oder Super-Admin kann umbenennen (z. B. auf der Seite Eigene Produkte).
+- **Master Products:** Admin und Super-Admin können umbenennen.
+  - **In der Masterliste** gibt es keinen Stift mehr an der Tabelle; stattdessen Toolbar-Button **„Umbenennen“** (zwischen „Ausgeblendete“ und „PDF“). Klick führt zur Seite **Umbenannte Produkte** (`/admin/renamed-products` bzw. `/super-admin/renamed-products`).
+  - **Seite Umbenannte Produkte:** Liste aller umbenannten Master-Items (PLU, Original, Aktuell, Aktion „Zurücksetzen“). Oben rechts Button **„Produkte umbenennen“** öffnet einen Dialog mit der vollen PLU-Liste.
+  - **Dialog „Produkte umbenennen“:** Einfache Suchleiste (PLU/Name) wie beim Dialog „Produkte ausblenden“ – filtert die Liste, Treffer werden hervorgehoben, optional Scroll zum ersten Treffer. Kein „X von Y“, keine Pfeil-Buttons. Pro Zeile ein Stift; Klick öffnet den Dialog „Produkt umbenennen“ (Neuer Name, optional Zurücksetzen). Nach Speichern bleibt der Dialog offen, die Listen werden aktualisiert.
+  - Setzt `is_manually_renamed = true`; nur `display_name` wird geändert, `system_name` bleibt für Excel-Abgleich unverändert.
+  - Layout-Engine überspringt dann Bezeichnungsregeln für dieses Item.
+  - **Zurücksetzen:** Auf der Seite Umbenannte Produkte pro Zeile „Zurücksetzen“ (mit Bestätigung) → `display_name = system_name`, `is_manually_renamed = false`.
+- **Suche in der Masterliste:** Die Find-in-Page-Suchleiste in der Masterliste ist aktuell **deaktiviert**. Zum Suchen in der PLU-Tabelle kann die Browser-Suche (z. B. Strg+F / Cmd+F) genutzt werden. Im Dialog „Produkte umbenennen“ gibt es weiterhin die Filter-Suche (PLU/Name) wie bei „Produkte ausblenden“, ohne Pfeile.
 
 ## Feature: Warengruppen (Blöcke)
 

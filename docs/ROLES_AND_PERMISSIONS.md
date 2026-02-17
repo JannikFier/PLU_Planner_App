@@ -15,7 +15,7 @@ Der PLU Planner unterscheidet drei Rollen mit klar abgegrenzten Rechten.
 | PDF exportieren | ✅ | ✅ | ✅ |
 | Benachrichtigungen verwalten | ✅ | ✅ | ✅ |
 | **Custom Product umbenennen** | ✅ (alle) | Nur eigene | Nur eigene |
-| **Master Product umbenennen** | ✅ | ❌ | ❌ |
+| **Master Product umbenennen** | ✅ | ✅ | ❌ |
 | **User (Personal) anlegen** | ✅ | ✅ | ❌ |
 | **User-Passwörter zurücksetzen** | ✅ | ✅ | ❌ |
 | **Admin anlegen** | ✅ | ❌ | ❌ |
@@ -133,4 +133,6 @@ Die Datenbank-Sicherheit wird durch PostgreSQL RLS Policies gewährleistet:
 - `custom_products` → alle lesen/einfügen; Ersteller oder Super-Admin updaten/löschen
 - `hidden_items` → alle lesen/einfügen/löschen (jeder kann ein-/ausblenden)
 - `version_notifications` → eigene lesen/updaten; Super-Admin einfügen
-- `master_plu_items.is_manually_renamed` → nur Super-Admin setzt dieses Flag
+- `master_plu_items` (Umbenennen): Admin und Super-Admin über RPC-Funktionen `rename_master_plu_item` / `reset_master_plu_item_display_name` (nur display_name, is_manually_renamed)
+
+Die **Seite Umbenannte Produkte** und der Dialog **„Produkte umbenennen“** sind nur für Admin und Super-Admin erreichbar (Routen `/admin/renamed-products`, `/super-admin/renamed-products`). Die **Vergleichslogik** beim Excel-Upload verwendet weiterhin den ursprünglichen Namen (`system_name`), nicht den Anzeigenamen (`display_name`).

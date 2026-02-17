@@ -14,6 +14,8 @@ interface PublishInput {
   items: MasterPLUItem[]
   /** ID des Super-Admins der die Version erstellt */
   createdBy: string
+  /** Bei true: bestehende Version für (kwNummer, jahr) zuerst löschen (Überschreiben) */
+  replaceExistingVersion?: boolean
 }
 
 interface PublishResult {
@@ -31,7 +33,31 @@ interface PublishResult {
  * 5. Benachrichtigungen für neue Produkte erstellen
  */
 export async function publishVersion(input: PublishInput): Promise<PublishResult> {
-  const { kwNummer, jahr, items, createdBy } = input
+  const { kwNummer, jahr, items, createdBy, replaceExistingVersion } = input
+
+  // 0. Optional: Bestehende Version für (kwNummer, jahr) löschen (Überschreiben)
+  if (replaceExistingVersion) {
+    const { data: existingVersion, error: findError } = await supabase
+      .from('versions')
+      .select('id')
+      .eq('kw_nummer', kwNummer)
+      .eq('jahr', jahr)
+      .maybeSingle()
+
+    if (findError) {
+      throw new Error(`Bestehende Version suchen fehlgeschlagen: ${findError.message}`)
+    }
+    if (existingVersion) {
+      const { error: deleteError } = await supabase
+        .from('versions')
+        .delete()
+        .eq('id', (existingVersion as { id: string }).id)
+
+      if (deleteError) {
+        throw new Error(`Bestehende Version löschen fehlgeschlagen: ${deleteError.message}`)
+      }
+    }
+  }
 
   // 1. Alte aktive Version(en) einfrieren
   const { error: freezeError } = await supabase
@@ -91,6 +117,7 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
       .insert((batch as Database['public']['Tables']['master_plu_items']['Insert'][]) as never)
 
     if (insertError) {
+      await supabase.from('versions').delete().eq('id', versionId)
       throw new Error(`Items einfügen fehlgeschlagen (Batch ${Math.floor(i / BATCH_SIZE) + 1}): ${insertError.message}`)
     }
   }
@@ -107,6 +134,7 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
     .eq('id', versionId)
 
   if (activateError) {
+    await supabase.from('versions').delete().eq('id', versionId)
     throw new Error(`Version aktivieren fehlgeschlagen: ${activateError.message}`)
   }
 
@@ -147,6 +175,21 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
   } catch (err) {
     console.warn('Benachrichtigungen konnten nicht erstellt werden:', err)
     throw err
+  }
+
+  // 6. Nur aktuelle KW + 2 zurück behalten (max. 3 Versionen), Rest löschen
+  const { data: allVersions, error: listError } = await supabase
+    .from('versions')
+    .select('id')
+    .order('jahr', { ascending: false })
+    .order('kw_nummer', { ascending: false })
+
+  if (!listError && allVersions && allVersions.length > 3) {
+    const toDelete = (allVersions as { id: string }[]).slice(3)
+    for (const v of toDelete) {
+      const { error: delError } = await supabase.from('versions').delete().eq('id', v.id)
+      if (delError) console.warn('Alte Version löschen fehlgeschlagen:', v.id, delError)
+    }
   }
 
   return {

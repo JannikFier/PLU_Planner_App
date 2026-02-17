@@ -42,19 +42,27 @@ export function parseBlockNameToItemType(s: string | null): 'PIECE' | 'WEIGHT' |
   return null
 }
 
-/** Filtert Items nach Suchtext (PLU oder Anzeigename/Systemname, case-insensitive). */
+/** Prüft, ob ein Item den Suchtext in PLU oder Name enthält (case-insensitive). Für Find-in-Page und Filter. */
+export function itemMatchesSearch(
+  item: { plu: string; display_name?: string | null; system_name?: string | null },
+  searchText: string,
+): boolean {
+  const q = searchText.trim().toLowerCase()
+  if (!q) return false
+  const pluMatch = item.plu.toLowerCase().includes(q)
+  const name = (item.display_name ?? item.system_name ?? '').toLowerCase()
+  const sys = (item.system_name ?? '').toLowerCase()
+  return pluMatch || name.includes(q) || sys.includes(q)
+}
+
+/** Filtert Items nach Suchtext (PLU oder Anzeigename/Systemname, case-insensitive). Leere Suche = alle Items. */
 export function filterItemsBySearch<T extends { plu: string; display_name: string; system_name?: string | null }>(
   items: T[],
   searchText: string,
 ): T[] {
   const q = searchText.trim().toLowerCase()
-  if (!q) return []
-  return items.filter((item) => {
-    const pluMatch = item.plu.toLowerCase().includes(q)
-    const name = (item.display_name ?? item.system_name ?? '').toLowerCase()
-    const sys = (item.system_name ?? '').toLowerCase()
-    return pluMatch || name.includes(q) || sys.includes(q)
-  })
+  if (!q) return items
+  return items.filter((item) => itemMatchesSearch(item, searchText))
 }
 
 // ============================================================

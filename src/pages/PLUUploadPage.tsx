@@ -193,6 +193,9 @@ export function PLUUploadPage() {
                       <Badge variant="secondary" className="shrink-0">
                         <FileSpreadsheet className="h-3 w-3 mr-1" />
                         {entry.result.totalRows} Zeilen
+                        {entry.result.skippedRows > 0 && (
+                          <> · {entry.result.skippedRows} beim Einlesen übersprungen</>
+                        )}
                       </Badge>
                       <span className="text-sm text-muted-foreground">
                         Erkannt: {entry.result.itemType === 'WEIGHT' ? 'Gewicht' : 'Stück'}
@@ -221,6 +224,11 @@ export function PLUUploadPage() {
                       </Button>
                     </div>
                   ))}
+                  {fileResults.some((e) => e.result.skippedRows > 0) && (
+                    <p className="text-sm text-muted-foreground">
+                      Übersprungene Zeilen haben z. B. ungültige PLU (genau 5 Ziffern), leeren Namen oder doppelte PLU.
+                    </p>
+                  )}
                 </div>
               )}
               <Separator />

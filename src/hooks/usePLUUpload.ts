@@ -39,6 +39,7 @@ export function usePLUUpload() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [publishResult, setPublishResult] = useState<{ itemCount: number; notificationCount: number } | null>(null)
   const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false)
+  const [replaceExistingVersion, setReplaceExistingVersion] = useState(false)
 
   // Abgeleitet: die Datei mit Zuordnung „Stück“ bzw. „Gewicht“ (für Vergleich)
   const pieceResult = fileResults.find((f) => f.assignment === 'piece')?.result ?? null
@@ -58,6 +59,7 @@ export function usePLUUpload() {
   const reset = useCallback(() => {
     hasSetInitialKwRef.current = false
     setOverwriteConfirmOpen(false)
+    setReplaceExistingVersion(false)
     setStep(1)
     setFileResults([])
     setTargetKW('')
@@ -122,6 +124,7 @@ export function usePLUUpload() {
       return
     }
     setOverwriteConfirmOpen(false)
+    if (forceOverwrite) setReplaceExistingVersion(true)
     setIsProcessing(true)
     try {
       const newVersionId = generateUUID()
@@ -215,11 +218,13 @@ export function usePLUUpload() {
         jahr,
         items: allItems,
         createdBy: user.id,
+        replaceExistingVersion,
       })
       setPublishResult({
         itemCount: result.itemCount,
         notificationCount: result.notificationCount,
       })
+      setReplaceExistingVersion(false)
       await queryClient.invalidateQueries({ queryKey: ['versions'] })
       await queryClient.invalidateQueries({ queryKey: ['version', 'active'] })
       await queryClient.invalidateQueries({ queryKey: ['plu-items'] })
@@ -230,7 +235,7 @@ export function usePLUUpload() {
     } finally {
       setIsProcessing(false)
     }
-  }, [user, targetKW, targetJahr, pieceComparison, weightComparison, conflicts, queryClient])
+  }, [user, targetKW, targetJahr, pieceComparison, weightComparison, conflicts, replaceExistingVersion, queryClient])
 
   const setConflictResolution = useCallback((index: number, resolution: ConflictItem['resolution']) => {
     setConflicts((prev) => {

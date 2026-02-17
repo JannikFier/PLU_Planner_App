@@ -1,14 +1,19 @@
 // PLUTable: Zwei-Spalten-Tabelle mit Buchstaben-/Block-Headern, Flussrichtung und Trennlinien
-// Unterstützt Auswahl-Modus (Checkboxen) und Custom-Product-Indikator
+// Unterstützt Auswahl-Modus (Checkboxen), optional Find-in-Page (Suche mit Pfeilen + Markierung)
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   groupItemsByLetter,
   groupItemsByBlock,
   splitLetterGroupsIntoColumns,
   getDisplayNameForItem,
+  itemMatchesSearch,
 } from '@/lib/plu-helpers'
 import { cn } from '@/lib/utils'
+import { useFindInPage } from '@/hooks/useFindInPage'
+import { Search } from 'lucide-react'
+import { FindInPageBar } from '@/components/plu/FindInPageBar'
+import { Button } from '@/components/ui/button'
 import { PreisBadge } from './PreisBadge'
 import { StatusBadge } from './StatusBadge'
 import type { Block } from '@/types/database'
@@ -31,11 +36,11 @@ interface PLUTableProps {
   flowDirection?: 'ROW_BY_ROW' | 'COLUMN_FIRST'
   blocks?: Block[]
   fontSizes?: FontSizes
-  // NEU: Auswahl-Modus für Ausblenden
   selectionMode?: boolean
   selectedPLUs?: Set<string>
   onToggleSelect?: (plu: string) => void
-  onRename?: (item: DisplayItem) => void
+  /** Suchleiste mit Find-in-Page (Pfeile, Markierung, Springen) oberhalb der Tabelle */
+  showFindInPage?: boolean
 }
 
 /** Einzelne Zeile in der flachen Liste (Item oder Header) */
@@ -103,12 +108,16 @@ function PLUColumn({
   selectionMode,
   selectedPLUs,
   onToggleSelect,
+  findInPageRowOffset,
+  findInPageHighlightRowIndex,
 }: {
   rows: FlatRow[]
   fonts: FontSizes
   selectionMode?: boolean
   selectedPLUs?: Set<string>
   onToggleSelect?: (plu: string) => void
+  findInPageRowOffset?: number
+  findInPageHighlightRowIndex?: number | null
 }) {
   const hasAnyPrice = useMemo(
     () => rows.some((r) => r.type === 'item' && r.item?.preis != null),
@@ -152,8 +161,13 @@ function PLUColumn({
         <tbody>
           {rows.map((row, i) => {
             if (row.type === 'header') {
+              const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
               return (
-                <tr key={`header-${i}-${row.label}`} className="border-b border-border">
+                <tr
+                  key={`header-${i}-${row.label}`}
+                  className="border-b border-border"
+                  {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}
+                >
                   <td
                     colSpan={2 + (selectionMode ? 1 : 0) + (hasAnyPrice ? 1 : 0)}
                     className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50"
@@ -167,11 +181,19 @@ function PLUColumn({
 
             const item = row.item!
             const isSelected = selectedPLUs?.has(item.plu) ?? false
+            const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
+            const isHighlight = findInPageHighlightRowIndex !== undefined && rowIndex === findInPageHighlightRowIndex
 
             return (
               <tr
                 key={item.id}
-                className={cn('border-b border-border last:border-b-0', selectionMode && 'cursor-pointer hover:bg-muted/30', isSelected && 'bg-primary/5')}
+                {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}
+                className={cn(
+                  'border-b border-border last:border-b-0',
+                  selectionMode && 'cursor-pointer hover:bg-muted/30',
+                  isSelected && 'bg-primary/5',
+                  isHighlight && 'bg-primary/10',
+                )}
                 onClick={selectionMode ? () => onToggleSelect?.(item.plu) : undefined}
               >
                 {selectionMode && (
@@ -223,12 +245,16 @@ function RowByRowTable({
   selectionMode,
   selectedPLUs,
   onToggleSelect,
+  findInPageRowOffset,
+  findInPageHighlightRowIndex,
 }: {
   tableRows: TableRow[]
   fonts: FontSizes
   selectionMode?: boolean
   selectedPLUs?: Set<string>
   onToggleSelect?: (plu: string) => void
+  findInPageRowOffset?: number
+  findInPageHighlightRowIndex?: number | null
 }) {
   const hasAnyPrice = useMemo(
     () =>
@@ -300,8 +326,13 @@ function RowByRowTable({
       <tbody>
         {tableRows.map((row, i) => {
           if (row.type === 'fullHeader') {
+            const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
             return (
-              <tr key={`header-${i}-${row.label}`} className="border-b border-border">
+              <tr
+                key={`header-${i}-${row.label}`}
+                className="border-b border-border"
+                {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}
+              >
                 <td
                   colSpan={totalCols}
                   className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50"
@@ -315,9 +346,15 @@ function RowByRowTable({
 
           const leftSelected = row.left ? (selectedPLUs?.has(row.left.plu) ?? false) : false
           const rightSelected = row.right ? (selectedPLUs?.has(row.right.plu) ?? false) : false
+          const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
+          const isHighlight = findInPageHighlightRowIndex !== undefined && rowIndex === findInPageHighlightRowIndex
 
           return (
-            <tr key={`pair-${i}`} className="border-b border-border last:border-b-0">
+            <tr
+              key={`pair-${i}`}
+              className={cn('border-b border-border last:border-b-0', isHighlight && 'bg-primary/10')}
+              {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}
+            >
               {/* Linke Seite */}
               {row.left ? (
                 <>
@@ -396,6 +433,22 @@ function RowByRowTable({
   )
 }
 
+/** Suchbare Zeilen für Find-in-Page (Reihenfolge wie im DOM). */
+type SearchableRow = TableRow | FlatRow
+
+function isRowMatch(row: SearchableRow, searchText: string): boolean {
+  const q = searchText.trim().toLowerCase()
+  if (!q) return false
+  if (row.type === 'fullHeader' || row.type === 'header') return false
+  if (row.type === 'itemPair')
+    return (
+      (row.left != null && itemMatchesSearch(row.left, searchText)) ||
+      (row.right != null && itemMatchesSearch(row.right, searchText))
+    )
+  if (row.type === 'item') return row.item != null && itemMatchesSearch(row.item, searchText)
+  return false
+}
+
 /**
  * PLU-Tabelle im Zwei-Spalten-Layout.
  */
@@ -409,8 +462,64 @@ export function PLUTable({
   selectionMode = false,
   selectedPLUs,
   onToggleSelect,
+  showFindInPage = false,
 }: PLUTableProps) {
   const fonts = fontSizes ?? DEFAULT_FONT_SIZES
+
+  const { searchableRows, sectionOffsets } = useMemo((): {
+    searchableRows: SearchableRow[]
+    sectionOffsets: number[]
+  } => {
+    if (!showFindInPage || items.length === 0) return { searchableRows: [], sectionOffsets: [0] }
+    const buildForItems = (its: DisplayItem[]): SearchableRow[] => {
+      const grp =
+        sortMode === 'BY_BLOCK'
+          ? groupItemsByBlock(its, blocks)
+          : groupItemsByLetter(its)
+      if (flowDirection === 'ROW_BY_ROW')
+        return buildRowByRowTable(grp as (LetterGroup<DisplayItem> | BlockGroup<DisplayItem>)[])
+      if (sortMode === 'ALPHABETICAL') {
+        const [leftGroups, rightGroups] = splitLetterGroupsIntoColumns(grp as LetterGroup<DisplayItem>[])
+        return [
+          ...buildFlatRowsFromLetterGroups(leftGroups),
+          ...buildFlatRowsFromLetterGroups(rightGroups),
+        ]
+      }
+      const allRows = buildFlatRowsFromBlockGroups(grp as BlockGroup<DisplayItem>[])
+      const mid = Math.ceil(allRows.length / 2)
+      return [...allRows.slice(0, mid), ...allRows.slice(mid)]
+    }
+    if (displayMode === 'SEPARATED') {
+      const pieceItems = items.filter((i) => i.item_type === 'PIECE')
+      const weightItems = items.filter((i) => i.item_type === 'WEIGHT')
+      const pieceRows = buildForItems(pieceItems)
+      const weightRows = buildForItems(weightItems)
+      return {
+        searchableRows: [...pieceRows, ...weightRows],
+        sectionOffsets: [0, pieceRows.length],
+      }
+    }
+    const rows = buildForItems(items)
+    return { searchableRows: rows, sectionOffsets: [0] }
+  }, [showFindInPage, items, displayMode, sortMode, flowDirection, blocks])
+
+  const [searchText, setSearchText] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const showSearchBar = Boolean(showFindInPage && (searchOpen || searchText.trim().length > 0))
+  const { matchIndices, currentIndex, goNext, goPrev, totalMatches } = useFindInPage(
+    searchableRows,
+    searchText,
+    (row) => isRowMatch(row, searchText),
+  )
+  const findInPageHighlightRowIndex = totalMatches > 0 ? matchIndices[currentIndex] ?? null : null
+
+  useEffect(() => {
+    if (!showFindInPage || totalMatches === 0) return
+    const idx = matchIndices[currentIndex]
+    if (idx == null) return
+    const el = document.querySelector(`[data-row-index="${idx}"]`)
+    if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [showFindInPage, currentIndex, totalMatches, matchIndices])
 
   if (items.length === 0) {
     return (
@@ -427,6 +536,38 @@ export function PLUTable({
 
     return (
       <div className="space-y-8">
+        {showFindInPage && !showSearchBar && (
+          <div className="rounded-t-lg border border-border bg-muted/30 px-4 py-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground hover:text-foreground"
+              onClick={() => setSearchOpen(true)}
+              aria-label="In Liste suchen"
+            >
+              <Search className="h-4 w-4" />
+              In Liste suchen
+            </Button>
+          </div>
+        )}
+        {showSearchBar && (
+          <div className="sticky top-0 z-10 rounded-t-lg border border-border border-b bg-background px-4 py-2">
+            <FindInPageBar
+              searchText={searchText}
+              onSearchTextChange={setSearchText}
+              currentIndex={currentIndex}
+              totalMatches={totalMatches}
+              onPrev={goPrev}
+              onNext={goNext}
+              placeholder="PLU oder Name suchen…"
+              onClose={() => {
+                setSearchOpen(false)
+                setSearchText('')
+              }}
+            />
+          </div>
+        )}
         {pieceItems.length > 0 && (
           <div>
             <div
@@ -444,6 +585,8 @@ export function PLUTable({
               selectionMode={selectionMode}
               selectedPLUs={selectedPLUs}
               onToggleSelect={onToggleSelect}
+              findInPageHighlightRowIndex={showFindInPage ? findInPageHighlightRowIndex : undefined}
+              findInPageRowOffset={showFindInPage ? sectionOffsets[0] : undefined}
             />
           </div>
         )}
@@ -464,6 +607,8 @@ export function PLUTable({
               selectionMode={selectionMode}
               selectedPLUs={selectedPLUs}
               onToggleSelect={onToggleSelect}
+              findInPageHighlightRowIndex={showFindInPage ? findInPageHighlightRowIndex : undefined}
+              findInPageRowOffset={showFindInPage ? sectionOffsets[1] : undefined}
             />
           </div>
         )}
@@ -480,6 +625,38 @@ export function PLUTable({
       >
         PLU-Liste
       </div>
+      {showFindInPage && !showSearchBar && (
+        <div className="border-x border-t border-border bg-muted/30 px-4 py-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-muted-foreground hover:text-foreground"
+            onClick={() => setSearchOpen(true)}
+            aria-label="In Liste suchen"
+          >
+            <Search className="h-4 w-4" />
+            In Liste suchen
+          </Button>
+        </div>
+      )}
+      {showSearchBar && (
+        <div className="sticky top-0 z-10 border-x border-t border-b border-border bg-background px-4 py-2">
+          <FindInPageBar
+            searchText={searchText}
+            onSearchTextChange={setSearchText}
+            currentIndex={currentIndex}
+            totalMatches={totalMatches}
+            onPrev={goPrev}
+            onNext={goNext}
+            placeholder="PLU oder Name suchen…"
+            onClose={() => {
+              setSearchOpen(false)
+              setSearchText('')
+            }}
+          />
+        </div>
+      )}
       <TwoColumnLayout
         items={items}
         sortMode={sortMode}
@@ -489,6 +666,8 @@ export function PLUTable({
         selectionMode={selectionMode}
         selectedPLUs={selectedPLUs}
         onToggleSelect={onToggleSelect}
+        findInPageHighlightRowIndex={showFindInPage ? findInPageHighlightRowIndex : undefined}
+        findInPageRowOffset={showFindInPage ? sectionOffsets[0] : undefined}
       />
     </div>
   )
@@ -504,6 +683,8 @@ function TwoColumnLayout({
   selectionMode,
   selectedPLUs,
   onToggleSelect,
+  findInPageHighlightRowIndex,
+  findInPageRowOffset,
 }: {
   items: DisplayItem[]
   sortMode: 'ALPHABETICAL' | 'BY_BLOCK'
@@ -513,6 +694,8 @@ function TwoColumnLayout({
   selectionMode?: boolean
   selectedPLUs?: Set<string>
   onToggleSelect?: (plu: string) => void
+  findInPageHighlightRowIndex?: number | null
+  findInPageRowOffset?: number
 }) {
   const groups = useMemo(() => {
     if (sortMode === 'BY_BLOCK') return groupItemsByBlock(items, blocks)
@@ -554,6 +737,8 @@ function TwoColumnLayout({
             selectionMode={selectionMode}
             selectedPLUs={selectedPLUs}
             onToggleSelect={onToggleSelect}
+            findInPageRowOffset={findInPageRowOffset}
+            findInPageHighlightRowIndex={findInPageHighlightRowIndex}
           />
         </div>
         <div className="md:hidden">
@@ -563,20 +748,47 @@ function TwoColumnLayout({
             selectionMode={selectionMode}
             selectedPLUs={selectedPLUs}
             onToggleSelect={onToggleSelect}
+            findInPageRowOffset={findInPageRowOffset}
+            findInPageHighlightRowIndex={findInPageHighlightRowIndex}
           />
         </div>
       </div>
     )
   }
 
+  const leftRowCount = leftRows.length
   return (
     <div className="rounded-b-lg border border-t-0 border-border overflow-hidden">
       <div className="hidden md:flex divide-x divide-border">
-        <PLUColumn rows={leftRows} fonts={fonts} selectionMode={selectionMode} selectedPLUs={selectedPLUs} onToggleSelect={onToggleSelect} />
-        <PLUColumn rows={rightRows} fonts={fonts} selectionMode={selectionMode} selectedPLUs={selectedPLUs} onToggleSelect={onToggleSelect} />
+        <PLUColumn
+          rows={leftRows}
+          fonts={fonts}
+          selectionMode={selectionMode}
+          selectedPLUs={selectedPLUs}
+          onToggleSelect={onToggleSelect}
+          findInPageRowOffset={findInPageRowOffset}
+          findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+        />
+        <PLUColumn
+          rows={rightRows}
+          fonts={fonts}
+          selectionMode={selectionMode}
+          selectedPLUs={selectedPLUs}
+          onToggleSelect={onToggleSelect}
+          findInPageRowOffset={findInPageRowOffset !== undefined ? findInPageRowOffset + leftRowCount : undefined}
+          findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+        />
       </div>
       <div className="md:hidden">
-        <PLUColumn rows={allFlatRows} fonts={fonts} selectionMode={selectionMode} selectedPLUs={selectedPLUs} onToggleSelect={onToggleSelect} />
+        <PLUColumn
+          rows={allFlatRows}
+          fonts={fonts}
+          selectionMode={selectionMode}
+          selectedPLUs={selectedPLUs}
+          onToggleSelect={onToggleSelect}
+          findInPageRowOffset={findInPageRowOffset}
+          findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+        />
       </div>
     </div>
   )
