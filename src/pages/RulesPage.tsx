@@ -26,7 +26,7 @@ export function RulesPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/super-admin')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/super-admin/masterlist')} aria-label="Zurück">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>

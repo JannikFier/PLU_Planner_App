@@ -201,6 +201,7 @@ function SortableBlockItem({
           className="h-7 w-7"
           disabled={isFirst}
           onClick={onMoveUp}
+          aria-label="Nach oben"
         >
           <ChevronUp className="h-4 w-4" />
         </Button>
@@ -210,6 +211,7 @@ function SortableBlockItem({
           className="h-7 w-7"
           disabled={isLast}
           onClick={onMoveDown}
+          aria-label="Nach unten"
         >
           <ChevronDown className="h-4 w-4" />
         </Button>

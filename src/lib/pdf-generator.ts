@@ -275,12 +275,19 @@ function renderSection(
     doc.setFontSize(fonts.product)
     doc.text(getDisplayPlu(item.plu), x + 1, y + PAGE.rowHeight / 2 + 1)
 
-    // Artikelname (ohne Stern)
+    // Artikelname (ohne Stern) – Kürzung per getTextWidth bis in Spaltenbreite passt
     doc.setTextColor(0, 0, 0)
     const displayName = getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)
-    const maxChars = Math.floor(nameColWidth / 1.8)
-    const truncatedName = displayName.length > maxChars ? displayName.slice(0, maxChars - 1) + '…' : displayName
-    doc.text(truncatedName, x + pluColWidth + 1, y + PAGE.rowHeight / 2 + 1)
+    const maxNameWidth = nameColWidth - 2
+    let nameToDraw = displayName
+    const ellipsis = '…'
+    if (doc.getTextWidth(displayName) > maxNameWidth) {
+      while (nameToDraw.length > 0 && doc.getTextWidth(nameToDraw + ellipsis) > maxNameWidth) {
+        nameToDraw = nameToDraw.slice(0, -1)
+      }
+      nameToDraw = nameToDraw + ellipsis
+    }
+    doc.text(nameToDraw, x + pluColWidth + 1, y + PAGE.rowHeight / 2 + 1)
 
     // Preis-Spalte (Kasten wie PLU, gelbe Markierung bei neuem Produkt)
     const preisX = x + pluColWidth + nameColWidth

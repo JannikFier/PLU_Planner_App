@@ -6,6 +6,7 @@
 // CustomProduct Typ wird via LayoutEngineInput referenziert
 import type { DisplayItem, LayoutEngineInput, LayoutEngineOutput, PLUStatus } from '@/types/plu'
 import { nameContainsKeyword, normalizeKeywordInName } from '@/lib/keyword-rules'
+import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
 
 /**
  * Baut die finale Anzeigeliste für alle Rollen.
@@ -28,24 +29,41 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
     blocks,
     sortMode,
     markYellowKwCount,
+    versionKwNummer,
+    versionJahr,
+    currentKwNummer,
+    currentJahr,
   } = input
 
-  // SCHRITT 1: Master-Items als Basis
-  let items: DisplayItem[] = masterItems.map((item) => ({
-    id: item.id,
-    plu: item.plu,
-    system_name: item.system_name,
-    display_name: item.display_name ?? item.system_name,
-    item_type: item.item_type,
-    status: item.status as PLUStatus,
-    old_plu: item.old_plu,
-    warengruppe: item.warengruppe,
-    block_id: item.block_id,
-    block_name: null, // Wird in Schritt 5 gesetzt
-    preis: item.preis,
-    is_custom: false,
-    is_manually_renamed: item.is_manually_renamed ?? false,
-  }))
+  // Wochen-Differenz: wie viele KW seit der Version vergangen sind (für „neu“-Dauer)
+  const weeksSinceVersion =
+    (currentJahr - versionJahr) * 52 + (currentKwNummer - versionKwNummer)
+
+  // SCHRITT 1: Master-Items als Basis („Neu“ nur markYellowKwCount KW anzeigen)
+  let items: DisplayItem[] = masterItems.map((item) => {
+    let status = item.status as PLUStatus
+    if (
+      status === 'NEW_PRODUCT_YELLOW' &&
+      weeksSinceVersion >= markYellowKwCount
+    ) {
+      status = 'UNCHANGED'
+    }
+    return {
+      id: item.id,
+      plu: item.plu,
+      system_name: item.system_name,
+      display_name: item.display_name ?? item.system_name,
+      item_type: item.item_type,
+      status,
+      old_plu: item.old_plu,
+      warengruppe: item.warengruppe,
+      block_id: item.block_id,
+      block_name: null, // Wird in Schritt 5 gesetzt
+      preis: item.preis,
+      is_custom: false,
+      is_manually_renamed: item.is_manually_renamed ?? false,
+    }
+  })
 
   // SCHRITT 2: Custom Products hinzufügen
   // NUR wenn PLU NICHT in Master existiert (Master hat Vorrang = implizite Pause)
@@ -53,13 +71,13 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
 
   for (const cp of customProducts) {
     if (!masterPLUs.has(cp.plu)) {
-      // Status zeitlich berechnen: created_at + mark_yellow_kw_count Wochen > now → gelb
+      // Status kalenderwochenbasiert (wie Master): Hinzugefüge-KW aus created_at, dann wie viele KW vergangen
       const createdDate = new Date(cp.created_at)
-      const weeksOld = Math.floor(
-        (Date.now() - createdDate.getTime()) / (7 * 24 * 60 * 60 * 1000),
-      )
+      const { kw: addedKw, year: addedYear } = getKWAndYearFromDate(createdDate)
+      const weeksSinceAdded =
+        (currentJahr - addedYear) * 52 + (currentKwNummer - addedKw)
       const status: PLUStatus =
-        weeksOld < markYellowKwCount ? 'NEW_PRODUCT_YELLOW' : 'UNCHANGED'
+        weeksSinceAdded < markYellowKwCount ? 'NEW_PRODUCT_YELLOW' : 'UNCHANGED'
 
       items.push({
         id: cp.id,

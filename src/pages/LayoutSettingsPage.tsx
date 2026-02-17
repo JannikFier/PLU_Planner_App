@@ -17,51 +17,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ArrowLeft, Check, Loader2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { RadioCard } from '@/components/ui/radio-card'
 
 import { useLayoutSettings, useUpdateLayoutSettings } from '@/hooks/useLayoutSettings'
 import { LayoutPreview } from '@/components/plu/LayoutPreview'
 import { Skeleton } from '@/components/ui/skeleton'
-
-// ============================================================
-// Radio-Card Komponente (wiederverwendbar)
-// ============================================================
-
-interface RadioCardProps {
-  selected: boolean
-  onClick: () => void
-  title: string
-  description: string
-}
-
-function RadioCard({ selected, onClick, title, description }: RadioCardProps) {
-  return (
-    <div
-      onClick={onClick}
-      className={cn(
-        'cursor-pointer rounded-lg border-2 p-3 transition-all',
-        selected
-          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-          : 'border-border hover:border-muted-foreground/30',
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <div
-          className={cn(
-            'mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 flex items-center justify-center',
-            selected ? 'border-primary' : 'border-muted-foreground/40',
-          )}
-        >
-          {selected && <div className="h-2 w-2 rounded-full bg-primary" />}
-        </div>
-        <div>
-          <div className="text-sm font-medium">{title}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">{description}</div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ============================================================
 // LayoutSettingsPage
@@ -115,7 +75,10 @@ export function LayoutSettingsPage() {
         features_keyword_rules: settings.features_keyword_rules,
       })
       // Kleine Verzögerung damit der initiale setForm nicht gleich Auto-Save auslöst
-      setTimeout(() => { isInitialized.current = true }, 100)
+      const timeoutId = setTimeout(() => {
+        isInitialized.current = true
+      }, 100)
+      return () => clearTimeout(timeoutId)
     }
   }, [settings])
 
@@ -177,6 +140,16 @@ export function LayoutSettingsPage() {
     [autoSave],
   )
 
+  // Tab wurde sichtbar: Browser throttelt Hintergrund-Tabs – Re-Render erzwingen
+  const [, setVisibilityTick] = useState(0)
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') setVisibilityTick((t) => t + 1)
+    }
+    document.addEventListener('visibilitychange', handler)
+    return () => document.removeEventListener('visibilitychange', handler)
+  }, [])
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -193,7 +166,7 @@ export function LayoutSettingsPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/super-admin')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/super-admin/masterlist')} aria-label="Zurück">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>

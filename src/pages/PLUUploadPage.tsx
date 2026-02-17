@@ -39,15 +39,16 @@ import {
   Loader2,
   X,
 } from 'lucide-react'
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState, useCallback } from 'react'
 import { usePLUUpload } from '@/hooks/usePLUUpload'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
 import { useBlocks } from '@/hooks/useBlocks'
 import { useBezeichnungsregeln } from '@/hooks/useBezeichnungsregeln'
 import { PLUTable } from '@/components/plu/PLUTable'
+import { generateUUID } from '@/lib/utils'
 import { resolveConflicts } from '@/lib/comparison-logic'
 import { buildDisplayList } from '@/lib/layout-engine'
-import { getKWOptionsForUpload, getUploadYearOptions } from '@/lib/date-kw-utils'
+import { getKWOptionsForUpload, getUploadYearOptions, getCurrentKW } from '@/lib/date-kw-utils'
 import type { ConflictItem } from '@/types/plu'
 import type { MasterPLUItem } from '@/types/database'
 
@@ -101,7 +102,7 @@ export function PLUUploadPage() {
     if (weightComparison) all.push(...weightComparison.allItems)
     const resolved = conflicts.filter((c) => c.resolution)
     if (resolved.length > 0) {
-      const versionId = all[0]?.version_id ?? crypto.randomUUID()
+      const versionId = all[0]?.version_id ?? generateUUID()
       all.push(...resolveConflicts(resolved, versionId))
     }
     return all
@@ -116,6 +117,8 @@ export function PLUUploadPage() {
         position: r.position,
         case_sensitive: r.case_sensitive,
       }))
+    const versionKw = parseInt(targetKW, 10) || 0
+    const versionJahr = parseInt(String(targetJahr), 10) || new Date().getFullYear()
     const result = buildDisplayList({
       masterItems: previewItems,
       customProducts: [],
@@ -126,12 +129,20 @@ export function PLUUploadPage() {
       displayMode,
       markRedKwCount: layoutSettings?.mark_red_kw_count ?? 0,
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
-      currentKwNummer: parseInt(targetKW, 10) || 0,
+      versionKwNummer: versionKw,
+      versionJahr,
+      currentKwNummer: getCurrentKW(),
+      currentJahr: new Date().getFullYear(),
     })
     return result.items
-  }, [step, previewItems, regeln, blocks, layoutSettings, sortMode, displayMode, targetKW])
+  }, [step, previewItems, regeln, blocks, layoutSettings, sortMode, displayMode, targetKW, targetJahr])
 
   const step2ContainerRef = useRef<HTMLDivElement>(null)
+  const [step2Boundary, setStep2Boundary] = useState<HTMLDivElement | null>(null)
+  const setStep2ContainerRef = useCallback((el: HTMLDivElement | null) => {
+    (step2ContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el
+    setStep2Boundary(el)
+  }, [])
 
   const handleFinish = () => {
     reset()
@@ -288,7 +299,7 @@ export function PLUUploadPage() {
 
         {/* Schritt 2: Vorschau inkl. Vergleich, ggf. Konflikte, Einspielen */}
         {step === 2 && (
-          <div ref={step2ContainerRef} className="flex flex-col flex-1 min-h-0">
+          <div ref={setStep2ContainerRef} className="flex flex-col flex-1 min-h-0">
           <Card className="flex flex-col flex-1 min-h-0">
             <CardHeader className="shrink-0">
               <CardTitle>Vergleichsergebnis</CardTitle>
@@ -308,7 +319,7 @@ export function PLUUploadPage() {
                       <PopoverContent
                         className="w-[min(28rem,95vw)] max-h-[min(70vh,480px)] overflow-auto p-4"
                         align="start"
-                        collisionBoundary={step2ContainerRef.current ?? undefined}
+                        collisionBoundary={step2Boundary ?? undefined}
                         collisionPadding={12}
                       >
                         <p className="font-semibold mb-3 text-base">Neue Produkte</p>
@@ -336,7 +347,7 @@ export function PLUUploadPage() {
                       <PopoverContent
                         className="w-[min(28rem,95vw)] max-h-[min(70vh,480px)] overflow-auto p-4"
                         align="start"
-                        collisionBoundary={step2ContainerRef.current ?? undefined}
+                        collisionBoundary={step2Boundary ?? undefined}
                         collisionPadding={12}
                       >
                         <p className="font-semibold mb-3 text-base">Entfernte Produkte</p>

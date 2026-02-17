@@ -1,6 +1,6 @@
 // EditCustomProductDialog: Eigenes Produkt bearbeiten (Name, Typ, Preis, Warengruppe)
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -42,15 +42,6 @@ export function EditCustomProductDialog({
   const [itemType, setItemType] = useState<'PIECE' | 'WEIGHT'>(product.item_type)
   const [preis, setPreis] = useState(product.preis != null ? String(product.preis).replace('.', ',') : '')
   const [blockId, setBlockId] = useState(product.block_id ?? '')
-
-  useEffect(() => {
-    if (open && product) {
-      setName(product.name)
-      setItemType(product.item_type)
-      setPreis(product.preis != null ? String(product.preis).replace('.', ',') : '')
-      setBlockId(product.block_id ?? '')
-    }
-  }, [open, product])
 
   const preisNum = preis.trim() ? parseFloat(preis.replace(',', '.')) : null
   const isValidPreis = preisNum === null || (!isNaN(preisNum) && preisNum >= 0)

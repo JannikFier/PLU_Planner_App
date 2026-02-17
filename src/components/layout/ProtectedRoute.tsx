@@ -23,7 +23,7 @@ export function ProtectedRoute({
   requireSuperAdmin = false,
 }: ProtectedRouteProps) {
   const location = useLocation()
-  const { user, profile, isAdmin, isSuperAdmin, mustChangePassword, isLoading } = useAuth()
+  const { user, isAdmin, isSuperAdmin, mustChangePassword, isLoading } = useAuth()
   const isChangePasswordPage = location.pathname === '/change-password'
 
   // Laden: Spinner anzeigen
@@ -56,12 +56,6 @@ export function ProtectedRoute({
   // Admin-Route, aber kein Admin/Super-Admin
   if (requireAdmin && !isAdmin) {
     return <Navigate to="/user" replace />
-  }
-
-  // Wenn User auf eine Route kommt die nicht seiner Rolle entspricht
-  // (z.B. User versucht /admin zu öffnen)
-  if (!requireAdmin && !requireSuperAdmin && profile?.role === 'super_admin') {
-    // Super-Admin darf alles – kein Redirect nötig
   }
 
   return <>{children}</>

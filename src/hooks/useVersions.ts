@@ -1,6 +1,7 @@
 // Hook: Alle Versionen laden (für KW-Selector)
 
 import { useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
 import type { Version } from '@/types/database'
@@ -12,6 +13,7 @@ import type { Version } from '@/types/database'
 export function useVersions() {
   return useQuery<Version[]>({
     queryKey: ['versions'],
+    staleTime: 2 * 60_000,
     queryFn: () =>
       withRetryOnAbort(async () => {
         const { data, error } = await supabase
@@ -21,7 +23,7 @@ export function useVersions() {
           .order('kw_nummer', { ascending: false })
 
         if (error) {
-          console.error('Versionen laden fehlgeschlagen:', error)
+          toast.error('Versionen laden fehlgeschlagen: ' + (error?.message ?? 'Unbekannter Fehler'))
           throw error
         }
         return (data ?? []) as Version[]

@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Search, EyeOff } from 'lucide-react'
 import { useHideProductsBatch } from '@/hooks/useHiddenItems'
 import { filterItemsBySearch, getDisplayPlu } from '@/lib/plu-helpers'
+import { cn } from '@/lib/utils'
 
 /** Ä→A, Ö→O, Ü→U für Gruppierung */
 function normalizeLetterForGrouping(char: string): string {
@@ -160,10 +161,12 @@ export function HideProductsDialog({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              type="search"
               placeholder="PLU oder Name eingeben..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               className="pl-9"
+              aria-label="Suche"
             />
           </div>
 
@@ -241,13 +244,13 @@ export function HideProductsDialog({
                             ) : null}
                           </td>
                           <td
-                            className={`px-2 py-1 text-sm font-mono ${row.left ? 'cursor-pointer hover:bg-muted/30' : ''} ${leftH ? 'bg-primary/10' : ''}`}
+                            className={cn('px-2 py-1 text-sm font-mono', row.left && 'cursor-pointer hover:bg-muted/30', leftH && 'bg-primary/10')}
                             onClick={row.left ? () => toggleSelect(row.left!.plu) : undefined}
                           >
                             {row.left ? getDisplayPlu(row.left.plu) : ''}
                           </td>
                           <td
-                            className={`px-2 py-1 text-sm truncate border-l border-border ${row.left ? 'cursor-pointer hover:bg-muted/30' : ''} ${leftH ? 'bg-primary/10' : ''}`}
+                            className={cn('px-2 py-1 text-sm break-words min-w-0 border-l border-border', row.left && 'cursor-pointer hover:bg-muted/30', leftH && 'bg-primary/10')}
                             title={row.left?.display_name}
                             onClick={row.left ? () => toggleSelect(row.left!.plu) : undefined}
                           >
@@ -264,13 +267,13 @@ export function HideProductsDialog({
                             ) : null}
                           </td>
                           <td
-                            className={`px-2 py-1 text-sm font-mono ${row.right ? 'cursor-pointer hover:bg-muted/30' : ''} ${rightH ? 'bg-primary/10' : ''}`}
+                            className={cn('px-2 py-1 text-sm font-mono', row.right && 'cursor-pointer hover:bg-muted/30', rightH && 'bg-primary/10')}
                             onClick={row.right ? () => toggleSelect(row.right!.plu) : undefined}
                           >
                             {row.right ? getDisplayPlu(row.right.plu) : ''}
                           </td>
                           <td
-                            className={`px-2 py-1 text-sm truncate border-l border-border ${row.right ? 'cursor-pointer hover:bg-muted/30' : ''} ${rightH ? 'bg-primary/10' : ''}`}
+                            className={cn('px-2 py-1 text-sm break-words min-w-0 border-l border-border', row.right && 'cursor-pointer hover:bg-muted/30', rightH && 'bg-primary/10')}
                             title={row.right?.display_name}
                             onClick={row.right ? () => toggleSelect(row.right!.plu) : undefined}
                           >

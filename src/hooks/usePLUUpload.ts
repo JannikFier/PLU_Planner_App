@@ -1,12 +1,13 @@
 // usePLUUpload: Gemeinsame Logik für Excel-Upload und KW-Vergleich (3 Schritte)
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { parseExcelFile } from '@/lib/excel-parser'
 import { clampKWToUploadRange, getCurrentKW, getNextFreeKW, versionExistsForKW } from '@/lib/date-kw-utils'
 import { compareWithCurrentVersion, resolveConflicts } from '@/lib/comparison-logic'
 import { publishVersion } from '@/lib/publish-version'
+import { generateUUID } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useVersions } from '@/hooks/useVersions'
@@ -25,7 +26,7 @@ export function usePLUUpload() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const { data: versionsData } = useVersions()
-  const versions = versionsData ?? []
+  const versions = useMemo(() => versionsData ?? [], [versionsData])
   const hasSetInitialKwRef = useRef(false)
 
   const [step, setStep] = useState<UploadStep>(1)
@@ -123,7 +124,7 @@ export function usePLUUpload() {
     setOverwriteConfirmOpen(false)
     setIsProcessing(true)
     try {
-      const newVersionId = crypto.randomUUID()
+      const newVersionId = generateUUID()
       const { data: activeVersionData } = await supabase
         .from('versions')
         .select('*')
@@ -205,7 +206,7 @@ export function usePLUUpload() {
       if (weightComparison) allItems.push(...weightComparison.allItems)
       const resolvedConflicts = conflicts.filter((c) => c.resolution)
       if (resolvedConflicts.length > 0) {
-        const newVersionId = allItems[0]?.version_id ?? crypto.randomUUID()
+        const newVersionId = allItems[0]?.version_id ?? generateUUID()
         const resolvedItems = resolveConflicts(resolvedConflicts, newVersionId)
         allItems.push(...resolvedItems)
       }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
@@ -34,18 +34,18 @@ export function LoginPage() {
   const [localError, setLocalError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Automatische Erkennung: Email (enthält @) oder Personalnummer (Hooks vor allen Returns)
+  const isEmail = useMemo(() => identifier.includes('@'), [identifier])
+
   // Wenn eingeloggt: weiterleiten
   if (user && !isLoading) {
     if (mustChangePassword) {
       return <Navigate to="/change-password" replace />
     }
-    if (isSuperAdmin) return <Navigate to="/super-admin" replace />
+    if (isSuperAdmin) return <Navigate to="/super-admin/masterlist" replace />
     if (isAdmin) return <Navigate to="/admin" replace />
     return <Navigate to="/user" replace />
   }
-
-  // Automatische Erkennung: Email (enthält @) oder Personalnummer
-  const isEmail = identifier.includes('@')
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

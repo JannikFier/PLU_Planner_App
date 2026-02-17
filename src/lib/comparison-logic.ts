@@ -1,5 +1,6 @@
 // Vergleichs-Logik: Vergleicht neue Excel-Daten mit bestehender KW-Version
 
+import { generateUUID } from '@/lib/utils'
 import type { MasterPLUItem } from '@/types/database'
 import type {
   ParsedPLURow,
@@ -88,7 +89,7 @@ export function compareWithCurrentVersion(input: CompareInput): ComparisonResult
 
     // Basis-Item erstellen
     const baseItem: MasterPLUItem = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       version_id: newVersionId,
       plu: row.plu,
       system_name: row.systemName,
@@ -203,7 +204,7 @@ export function resolveConflicts(
     if (!conflict.resolution || conflict.resolution === 'ignore') {
       // Ignorieren: Bestehenden Namen behalten
       resolved.push({
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         version_id: newVersionId,
         plu: conflict.plu,
         system_name: conflict.existingName,
@@ -221,7 +222,7 @@ export function resolveConflicts(
     } else if (conflict.resolution === 'replace') {
       // Ersetzen: Neuen Namen übernehmen
       resolved.push({
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         version_id: newVersionId,
         plu: conflict.plu,
         system_name: conflict.incomingName,

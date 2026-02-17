@@ -48,7 +48,7 @@ export function ChangePasswordPage() {
 
       // Weiterleitung je nach Rolle
       if (isSuperAdmin) {
-        navigate('/super-admin', { replace: true })
+        navigate('/super-admin/masterlist', { replace: true })
       } else if (isAdmin) {
         navigate('/admin', { replace: true })
       } else {
@@ -104,7 +104,6 @@ export function ChangePasswordPage() {
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     onClick={() => setShowNewPassword(!showNewPassword)}
-                    tabIndex={-1}
                     aria-label={showNewPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
                   >
                     {showNewPassword ? (
@@ -132,7 +131,6 @@ export function ChangePasswordPage() {
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    tabIndex={-1}
                     aria-label={showConfirmPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
                   >
                     {showConfirmPassword ? (

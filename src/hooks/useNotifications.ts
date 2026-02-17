@@ -2,9 +2,31 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { withRetryOnAbort } from '@/lib/supabase-retry'
 import { useAuth } from '@/hooks/useAuth'
+import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { toast } from 'sonner'
-import type { VersionNotification, MasterPLUItem } from '@/types/database'
+import type { Database, VersionNotification, MasterPLUItem } from '@/types/database'
+
+/** Anzahl neuer + geänderter Produkte in der aktiven Version (für Badge) */
+export function useActiveVersionChangeCount() {
+  const { data: activeVersion } = useActiveVersion()
+
+  return useQuery({
+    queryKey: ['active-version-change-count', activeVersion?.id],
+    queryFn: async () => {
+      if (!activeVersion?.id) return 0
+      const { count, error } = await supabase
+        .from('master_plu_items')
+        .select('*', { count: 'exact', head: true })
+        .eq('version_id', activeVersion.id)
+        .in('status', ['NEW_PRODUCT_YELLOW', 'PLU_CHANGED_RED'])
+      if (error) throw error
+      return count ?? 0
+    },
+    enabled: !!activeVersion?.id,
+  })
+}
 
 /** Notification für aktuellen User + Version laden */
 export function useVersionNotification(versionId: string | undefined) {
@@ -35,18 +57,17 @@ export function useUnreadNotificationCount() {
 
   return useQuery({
     queryKey: ['notification-count'],
-    queryFn: async () => {
-      if (!user) return 0
-
-      const { count, error } = await supabase
-        .from('version_notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false)
-
-      if (error) throw error
-      return count ?? 0
-    },
+    queryFn: () =>
+      withRetryOnAbort(async () => {
+        if (!user) return 0
+        const { count, error } = await supabase
+          .from('version_notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('is_read', false)
+        if (error) throw error
+        return count ?? 0
+      }),
     enabled: !!user,
     // Alle 30 Sekunden automatisch prüfen
     refetchInterval: 30000,
@@ -64,10 +85,12 @@ export function useMarkNotificationRead() {
 
       const { error } = await supabase
         .from('version_notifications')
-        .update({
+        .update(
+        ({
           is_read: true,
           read_at: new Date().toISOString(),
-        } as never)
+        } as Database['public']['Tables']['version_notifications']['Update']) as never
+      )
         .eq('user_id', user.id)
         .eq('version_id', versionId)
 
@@ -89,28 +112,27 @@ export function useUnreadNotifications() {
 
   return useQuery({
     queryKey: ['unread-notifications'],
-    queryFn: async () => {
-      if (!user) return []
-
-      const { data, error } = await supabase
-        .from('version_notifications')
-        .select(`
-          *,
-          versions:version_id (
-            id,
-            kw_nummer,
-            jahr,
-            kw_label,
-            status
-          )
-        `)
-        .eq('user_id', user.id)
-        .eq('is_read', false)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      return data ?? []
-    },
+    queryFn: () =>
+      withRetryOnAbort(async () => {
+        if (!user) return []
+        const { data, error } = await supabase
+          .from('version_notifications')
+          .select(`
+            *,
+            versions:version_id (
+              id,
+              kw_nummer,
+              jahr,
+              kw_label,
+              status
+            )
+          `)
+          .eq('user_id', user.id)
+          .eq('is_read', false)
+          .order('created_at', { ascending: false })
+        if (error) throw error
+        return data ?? []
+      }),
     enabled: !!user,
   })
 }
@@ -127,6 +149,27 @@ export function useNewProducts(versionId: string | undefined) {
         .select('*')
         .eq('version_id', versionId)
         .eq('status', 'NEW_PRODUCT_YELLOW')
+        .order('system_name')
+
+      if (error) throw error
+      return (data ?? []) as MasterPLUItem[]
+    },
+    enabled: !!versionId,
+  })
+}
+
+/** Geänderte PLUs einer Version laden (status = PLU_CHANGED_RED) */
+export function useChangedProducts(versionId: string | undefined) {
+  return useQuery({
+    queryKey: ['changed-products', versionId],
+    queryFn: async () => {
+      if (!versionId) return []
+
+      const { data, error } = await supabase
+        .from('master_plu_items')
+        .select('*')
+        .eq('version_id', versionId)
+        .eq('status', 'PLU_CHANGED_RED')
         .order('system_name')
 
       if (error) throw error

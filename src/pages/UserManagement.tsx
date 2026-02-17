@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { UserPlus, KeyRound, Loader2, Copy, Check, Users, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Profile } from '@/types/database'
@@ -65,33 +66,21 @@ function generateOneTimePassword(): string {
  * - Admin: Kann nur User anlegen
  * Beide können Passwörter zurücksetzen (Einmalpasswort).
  */
-// #region agent log
-const DEBUG_INGEST = 'http://127.0.0.1:7244/ingest/d1646c8f-788c-4220-8020-ca825d2ef16e'
-function _log(loc: string, msg: string, data: Record<string, unknown>) {
-  fetch(DEBUG_INGEST, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: loc, message: msg, data, timestamp: Date.now(), hypothesisId: 'UM1' }) }).catch(() => {})
-}
-// #endregion
-
 export function UserManagement() {
-  _log('UserManagement.tsx:render', 'UserManagement mounted/rendered', {})
-  const { isSuperAdmin } = useAuth()
+  const { isSuperAdmin, user: currentUser } = useAuth()
+  const currentUserId = currentUser?.id ?? null
   const queryClient = useQueryClient()
 
   // User-Liste laden
   const { data: users, isLoading } = useQuery({
     queryKey: ['all-profiles'],
     queryFn: async () => {
-      _log('UserManagement.tsx:queryFn', 'all-profiles query start', {})
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (error) {
-        _log('UserManagement.tsx:queryFn', 'all-profiles query error', { err: error.message })
-        throw error
-      }
-      _log('UserManagement.tsx:queryFn', 'all-profiles query success', { count: data?.length ?? 0 })
+      if (error) throw error
       return data as Profile[]
     },
   })
@@ -231,11 +220,27 @@ export function UserManagement() {
     },
   })
 
-  // Passwort in Zwischenablage kopieren
+  // Passwort in Zwischenablage kopieren (mit Fallback für ältere Browser/HTTP)
   const copyPassword = async () => {
-    await navigator.clipboard.writeText(generatedPassword)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(generatedPassword)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = generatedPassword
+        ta.setAttribute('readonly', '')
+        ta.style.position = 'absolute'
+        ta.style.left = '-9999px'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error('Kopieren fehlgeschlagen. Bitte Passwort manuell kopieren.')
+    }
   }
 
   // Rollen-Badge Farbe
@@ -388,7 +393,7 @@ export function UserManagement() {
               <code className="flex-1 text-center text-2xl font-mono font-bold tracking-wider">
                 {generatedPassword}
               </code>
-              <Button variant="outline" size="icon" onClick={copyPassword}>
+              <Button variant="outline" size="icon" onClick={copyPassword} aria-label="Passwort kopieren">
                 {copied ? (
                   <Check className="h-4 w-4 text-emerald-600" />
                 ) : (
@@ -531,19 +536,28 @@ export function UserManagement() {
                               <KeyRound className="h-3 w-3" />
                               Passwort
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1 text-destructive hover:text-destructive"
-                              disabled={deleteUserMutation.isPending}
-                              onClick={() => {
-                                setUserToDelete(user)
-                                setShowDeleteConfirmDialog(true)
-                              }}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                              Löschen
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-block">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-1 text-destructive hover:text-destructive"
+                                    disabled={deleteUserMutation.isPending || user.id === currentUserId}
+                                    onClick={() => {
+                                      setUserToDelete(user)
+                                      setShowDeleteConfirmDialog(true)
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                    Löschen
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {user.id === currentUserId ? 'Sie können sich nicht selbst löschen' : 'Benutzer löschen'}
+                              </TooltipContent>
+                            </Tooltip>
                           </div>
                         )}
                       </TableCell>

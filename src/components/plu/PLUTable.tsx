@@ -8,6 +8,7 @@ import {
   splitLetterGroupsIntoColumns,
   getDisplayNameForItem,
 } from '@/lib/plu-helpers'
+import { cn } from '@/lib/utils'
 import { PreisBadge } from './PreisBadge'
 import { StatusBadge } from './StatusBadge'
 import type { Block } from '@/types/database'
@@ -109,7 +110,10 @@ function PLUColumn({
   selectedPLUs?: Set<string>
   onToggleSelect?: (plu: string) => void
 }) {
-  const hasAnyPrice = rows.some((r) => r.type === 'item' && r.item?.preis != null)
+  const hasAnyPrice = useMemo(
+    () => rows.some((r) => r.type === 'item' && r.item?.preis != null),
+    [rows],
+  )
 
   return (
     <div className="flex-1 min-w-0">
@@ -167,7 +171,7 @@ function PLUColumn({
             return (
               <tr
                 key={item.id}
-                className={`border-b border-border last:border-b-0 ${selectionMode ? 'cursor-pointer hover:bg-muted/30' : ''} ${isSelected ? 'bg-primary/5' : ''}`}
+                className={cn('border-b border-border last:border-b-0', selectionMode && 'cursor-pointer hover:bg-muted/30', isSelected && 'bg-primary/5')}
                 onClick={selectionMode ? () => onToggleSelect?.(item.plu) : undefined}
               >
                 {selectionMode && (
@@ -190,7 +194,7 @@ function PLUColumn({
                   />
                 </td>
                 <td
-                  className="px-2 py-1 truncate border-l border-border"
+                  className="px-2 py-1 break-words min-w-0 border-l border-border"
                   style={{ fontSize: fonts.product + 'px' }}
                   title={getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
                 >
@@ -226,8 +230,12 @@ function RowByRowTable({
   selectedPLUs?: Set<string>
   onToggleSelect?: (plu: string) => void
 }) {
-  const hasAnyPrice = tableRows.some(
-    (r) => r.type === 'itemPair' && (r.left?.preis != null || r.right?.preis != null),
+  const hasAnyPrice = useMemo(
+    () =>
+      tableRows.some(
+        (r) => r.type === 'itemPair' && (r.left?.preis != null || r.right?.preis != null),
+      ),
+    [tableRows],
   )
   const totalCols = (selectionMode ? 2 : 0) + 4 + (hasAnyPrice ? 2 : 0)
 
@@ -268,7 +276,7 @@ function RowByRowTable({
           )}
           {selectionMode && <th className="px-1 py-1.5 border-l-2 border-border" />}
           <th
-            className={`px-2 py-1.5 text-left font-semibold text-muted-foreground uppercase tracking-wider ${selectionMode || hasAnyPrice ? '' : 'border-l-2 border-border'}`}
+            className={cn('px-2 py-1.5 text-left font-semibold text-muted-foreground uppercase tracking-wider', !(selectionMode || hasAnyPrice) && 'border-l-2 border-border')}
             style={{ fontSize: fonts.column + 'px' }}
           >
             PLU
@@ -326,7 +334,7 @@ function RowByRowTable({
                   <td className="px-2 py-1" style={{ fontSize: fonts.product + 'px' }}>
                     <StatusBadge plu={row.left.plu} status={row.left.status} oldPlu={row.left.old_plu} style={{ fontSize: fonts.product + 'px' }} />
                   </td>
-                  <td className="px-2 py-1 truncate border-l border-border" style={{ fontSize: fonts.product + 'px' }} title={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}>
+                  <td className="px-2 py-1 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px' }} title={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}>
                     {getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}
                   </td>
                   {hasAnyPrice && (
@@ -358,10 +366,10 @@ function RowByRowTable({
                       />
                     </td>
                   )}
-                  <td className={`px-2 py-1 ${selectionMode ? '' : 'border-l-2 border-border'}`} style={{ fontSize: fonts.product + 'px' }}>
+                  <td className={cn('px-2 py-1', !selectionMode && 'border-l-2 border-border')} style={{ fontSize: fonts.product + 'px' }}>
                     <StatusBadge plu={row.right.plu} status={row.right.status} oldPlu={row.right.old_plu} style={{ fontSize: fonts.product + 'px' }} />
                   </td>
-                  <td className="px-2 py-1 truncate border-l border-border" style={{ fontSize: fonts.product + 'px' }} title={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}>
+                  <td className="px-2 py-1 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px' }} title={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}>
                     {getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}
                   </td>
                   {hasAnyPrice && (
@@ -375,7 +383,7 @@ function RowByRowTable({
               ) : (
                 <>
                   {selectionMode && <td className="px-1 py-1 border-l-2 border-border" />}
-                  <td className={`px-2 py-1 ${selectionMode ? '' : 'border-l-2 border-border'}`} />
+                  <td className={cn('px-2 py-1', !selectionMode && 'border-l-2 border-border')} />
                   <td className="px-2 py-1 border-l border-border" />
                   {hasAnyPrice && <td className="px-2 py-1 border-l border-border" />}
                 </>

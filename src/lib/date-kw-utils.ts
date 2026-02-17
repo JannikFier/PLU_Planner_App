@@ -1,6 +1,6 @@
 // Kalenderwochen- und Jahr-Helfer für Upload und Versionen
 
-import { getWeek } from 'date-fns'
+import { getWeek, getISOWeekYear } from 'date-fns'
 
 /** Anzahl KWs vor/nach aktueller KW in der Upload-Auswahl */
 const KW_RANGE = 3
@@ -41,7 +41,20 @@ export function getCurrentKW(): number {
   return getWeek(new Date(), { firstWeekContainsDate: 4 })
 }
 
-/** Nächste freie KW ab currentKW für das gegebene Jahr (Version existiert noch nicht). */
+/** ISO-Kalenderwoche und -Jahr zu einem Datum (gleiche Logik wie getCurrentKW für Konsistenz). */
+export function getKWAndYearFromDate(date: Date): { kw: number; year: number } {
+  return {
+    kw: getWeek(date, { firstWeekContainsDate: 4 }),
+    year: getISOWeekYear(date),
+  }
+}
+
+/**
+ * Nächste freie KW ab currentKW für das gegebene Jahr (Version existiert noch nicht).
+ * Wenn keine freie KW im Bereich currentKW..53 gefunden wird, wird currentKW zurückgegeben.
+ * In diesem Fall kann currentKW bereits in versions existieren – Aufrufer sollten
+ * versionExistsForKW(currentKW, jahr, versions) prüfen und ggf. warnen.
+ */
 export function getNextFreeKW(
   currentKW: number,
   jahr: number,
@@ -53,6 +66,9 @@ export function getNextFreeKW(
   )
   for (let kw = currentKW; kw <= 53; kw++) {
     if (!existing.has(kw)) return kw
+  }
+  if (existing.has(currentKW) && import.meta.env.DEV) {
+    console.warn(`getNextFreeKW: Keine freie KW in ${jahr} ab KW ${currentKW}; currentKW existiert bereits.`)
   }
   return currentKW
 }

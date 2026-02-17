@@ -1,6 +1,6 @@
 // MasterList – Haupt-PLU-Tabelle mit Layout-Engine, Toolbar und globaler Liste
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
@@ -21,7 +21,10 @@ import {
 import { KWSelector } from '@/components/plu/KWSelector'
 import { PLUTable } from '@/components/plu/PLUTable'
 import { PLUFooter } from '@/components/plu/PLUFooter'
-import { ExportPDFDialog } from '@/components/plu/ExportPDFDialog'
+
+const ExportPDFDialog = lazy(() =>
+  import('@/components/plu/ExportPDFDialog').then((m) => ({ default: m.ExportPDFDialog })),
+)
 
 // Hooks
 import { useActiveVersion } from '@/hooks/useActiveVersion'
@@ -36,6 +39,7 @@ import { useAuth } from '@/hooks/useAuth'
 // Layout-Engine + Helpers
 import { buildDisplayList } from '@/lib/layout-engine'
 import type { PLUStats } from '@/lib/plu-helpers'
+import { getCurrentKW } from '@/lib/date-kw-utils'
 
 interface MasterListProps {
   mode: 'user' | 'admin'
@@ -110,6 +114,10 @@ export function MasterList({ mode }: MasterListProps) {
         case_sensitive: r.case_sensitive,
       }))
 
+    const version = selectedVersionId
+      ? versions.find((v) => v.id === selectedVersionId) ?? activeVersion
+      : activeVersion
+    const now = new Date()
     const result = buildDisplayList({
       masterItems: rawItems,
       customProducts,
@@ -120,7 +128,10 @@ export function MasterList({ mode }: MasterListProps) {
       displayMode,
       markRedKwCount: layoutSettings?.mark_red_kw_count ?? 0,
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
-      currentKwNummer: activeVersion?.kw_nummer ?? 0,
+      versionKwNummer: version?.kw_nummer ?? 0,
+      versionJahr: version?.jahr ?? now.getFullYear(),
+      currentKwNummer: getCurrentKW(),
+      currentJahr: now.getFullYear(),
     })
 
     // Layout-Engine stats → PLUStats konvertieren
@@ -134,13 +145,19 @@ export function MasterList({ mode }: MasterListProps) {
     }
 
     return { displayItems: result.items, stats: pluStats }
-  }, [rawItems, customProducts, hiddenItems, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion])
+  }, [rawItems, customProducts, hiddenItems, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion, selectedVersionId, versions])
 
   // Aktuelle Version finden (für Anzeige im Header)
-  const currentVersion = versions.find((v) => v.id === effectiveVersionId) ?? activeVersion
+  const currentVersion = useMemo(
+    () => versions.find((v) => v.id === effectiveVersionId) ?? activeVersion,
+    [versions, effectiveVersionId, activeVersion],
+  )
 
   // PDF-Export: Display-Items für gewählte KW (aktuelle KW vorausgewählt)
-  const pdfVersion = versions.find((v) => v.id === effectivePdfVersionId) ?? activeVersion
+  const pdfVersion = useMemo(
+    () => versions.find((v) => v.id === effectivePdfVersionId) ?? activeVersion,
+    [versions, effectivePdfVersionId, activeVersion],
+  )
   const { displayItems: pdfDisplayItems, stats: pdfStats } = useMemo(() => {
     if (!pdfRawItems.length && !customProducts.length) {
       return { displayItems: [] as ReturnType<typeof buildDisplayList>['items'], stats: { total: 0, unchanged: 0, newCount: 0, changedCount: 0, hidden: 0, customCount: 0 } as PLUStats }
@@ -148,6 +165,7 @@ export function MasterList({ mode }: MasterListProps) {
     const activeRegeln = regeln
       .filter((r) => r.is_active)
       .map((r) => ({ keyword: r.keyword, position: r.position, case_sensitive: r.case_sensitive }))
+    const now = new Date()
     const result = buildDisplayList({
       masterItems: pdfRawItems,
       customProducts,
@@ -158,7 +176,10 @@ export function MasterList({ mode }: MasterListProps) {
       displayMode,
       markRedKwCount: layoutSettings?.mark_red_kw_count ?? 0,
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
-      currentKwNummer: pdfVersion?.kw_nummer ?? activeVersion?.kw_nummer ?? 0,
+      versionKwNummer: pdfVersion?.kw_nummer ?? activeVersion?.kw_nummer ?? 0,
+      versionJahr: pdfVersion?.jahr ?? activeVersion?.jahr ?? now.getFullYear(),
+      currentKwNummer: getCurrentKW(),
+      currentJahr: now.getFullYear(),
     })
     return {
       displayItems: result.items,
@@ -178,6 +199,17 @@ export function MasterList({ mode }: MasterListProps) {
 
   // Keine Version? Kurz-Hinweis statt endlos warten
   const hasNoVersion = !versionLoading && !versionsLoading && !activeVersion && versions.length === 0
+
+  // Tab wurde sichtbar: Browser throttelt Hintergrund-Tabs – Re-Render erzwingen,
+  // damit bereits geladene Daten sofort angezeigt werden (sonst erst nach Klick).
+  const [, setVisibilityTick] = useState(0)
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') setVisibilityTick((t) => t + 1)
+    }
+    document.addEventListener('visibilitychange', handler)
+    return () => document.removeEventListener('visibilitychange', handler)
+  }, [])
 
   return (
     <DashboardLayout>
@@ -364,22 +396,26 @@ export function MasterList({ mode }: MasterListProps) {
         )}
       </div>
 
-      {/* === Dialoge === */}
-      <ExportPDFDialog
-        open={showPDFDialog}
-        onOpenChange={setShowPDFDialog}
-        items={pdfDisplayItems}
-        stats={pdfStats}
-        kwLabel={pdfVersion?.kw_label ?? ''}
-        displayMode={displayMode}
-        sortMode={sortMode}
-        flowDirection={flowDirection}
-        blocks={blocks}
-        versions={versions}
-        selectedVersionId={effectivePdfVersionId}
-        onVersionChange={setPdfExportVersionId}
-        fontSizes={fontSizes}
-      />
+      {/* === Dialoge – PDF-Export lazy, damit jspdf/html2canvas erst bei Öffnen geladen werden === */}
+      {showPDFDialog && (
+        <Suspense fallback={null}>
+          <ExportPDFDialog
+            open={showPDFDialog}
+            onOpenChange={setShowPDFDialog}
+            items={pdfDisplayItems}
+            stats={pdfStats}
+            kwLabel={pdfVersion?.kw_label ?? ''}
+            displayMode={displayMode}
+            sortMode={sortMode}
+            flowDirection={flowDirection}
+            blocks={blocks}
+            versions={versions}
+            selectedVersionId={effectivePdfVersionId}
+            onVersionChange={setPdfExportVersionId}
+            fontSizes={fontSizes}
+          />
+        </Suspense>
+      )}
     </DashboardLayout>
   )
 }

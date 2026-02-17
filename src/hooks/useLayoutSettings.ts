@@ -35,6 +35,7 @@ const DEFAULT_LAYOUT: LayoutSettings = {
 export function useLayoutSettings() {
   return useQuery<LayoutSettings>({
     queryKey: ['layout-settings'],
+    staleTime: 5 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('layout_settings')
@@ -42,10 +43,8 @@ export function useLayoutSettings() {
         .limit(1)
         .maybeSingle()
 
-      if (error || !data) {
-        return DEFAULT_LAYOUT
-      }
-
+      if (error) throw error
+      if (!data) return DEFAULT_LAYOUT
       return data as LayoutSettings
     },
   })
@@ -71,7 +70,7 @@ export function useUpdateLayoutSettings() {
       const UPDATE_TIMEOUT_MS = 12_000
       const updatePromise = supabase
         .from('layout_settings')
-        .update(updates as never)
+        .update((updates as LayoutSettingsUpdate) as never)
         .eq('id', settingsId)
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Speichern hat zu lange gedauert. Bitte Seite neu laden und erneut versuchen.')), UPDATE_TIMEOUT_MS)

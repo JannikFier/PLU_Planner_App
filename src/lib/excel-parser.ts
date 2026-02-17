@@ -317,7 +317,7 @@ export function parseHiddenItemsExcel(file: File): Promise<{ plus: string[]; fil
         for (const rawRow of rawRows) {
           if (!rawRow || rawRow.length === 0) continue
           const cell = rawRow[0]
-          const val = (cell != null ? String(cell).trim() : '').trim()
+          const val = cell != null ? String(cell).trim() : ''
           if (val) plus.push(val)
         }
 

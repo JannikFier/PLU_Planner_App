@@ -29,8 +29,9 @@ export function ComingSoon({ title, description, phase }: ComingSoonProps) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate(-1)}
+            onClick={() => (window.history.length <= 1 ? navigate('/') : navigate(-1))}
             className="shrink-0"
+            aria-label="Zurück"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>

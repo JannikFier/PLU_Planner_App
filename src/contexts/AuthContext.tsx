@@ -1,7 +1,10 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { isAbortError } from '@/lib/error-utils'
+import { withRetryOnAbort } from '@/lib/supabase-retry'
 import type { User, Session } from '@supabase/supabase-js'
-import type { Profile } from '@/types/database'
+import type { Database, Profile } from '@/types/database'
 
 /** Auth-State – eine einzige Quelle für die gesamte App */
 export interface AuthState {
@@ -28,9 +31,6 @@ interface AuthContextValue extends AuthState {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
-
-const isAbortError = (err: unknown) =>
-  err instanceof Error && (err.name === 'AbortError' || (err as { code?: string }).code === 'ABORT_ERR')
 
 /** Auth-Logik zentral im Provider – State bleibt bei Navigation erhalten */
 function authReducer(
@@ -61,9 +61,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   })
 
   const PROFILE_CACHE_KEY = 'plu_planner_profile'
+  const SESSION_CACHE_KEY = 'plu_planner_session'
+  const FETCH_PROFILE_TIMEOUT = 8000
 
-  const fetchProfile = useCallback(async (userId: string, retried = false): Promise<Profile | null> => {
-    try {
+  const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
+    const fetchOnce = async (): Promise<Profile | null> => {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -73,14 +75,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         const err = error as { message?: string; cause?: unknown }
         const isAbort = isAbortError(err) || isAbortError(err.cause) || (err.message?.includes?.('AbortError') ?? false)
-        if (isAbort && !retried) {
-          await new Promise((r) => setTimeout(r, 120))
-          return fetchProfile(userId, true)
-        }
         if (!isAbort) {
-          console.error('Profil laden fehlgeschlagen:', error)
+          toast.error('Profil laden fehlgeschlagen: ' + (error?.message ?? 'Unbekannter Fehler'))
         }
-        return null
+        throw error
       }
       const profile = data as Profile
       try {
@@ -89,12 +87,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // sessionStorage voll oder nicht verfügbar – ignorieren
       }
       return profile
+    }
+
+    try {
+      const result = await Promise.race([
+        withRetryOnAbort(fetchOnce),
+        new Promise<null>((r) => setTimeout(() => r(null), FETCH_PROFILE_TIMEOUT)),
+      ])
+      return result
     } catch (e) {
-      if (isAbortError(e) && !retried) {
-        await new Promise((r) => setTimeout(r, 120))
-        return fetchProfile(userId, true)
-      }
-      console.error('Profil laden fehlgeschlagen:', e)
+      toast.error('Profil laden fehlgeschlagen: ' + (e instanceof Error ? e.message : 'Unbekannter Fehler'))
       return null
     }
   }, [])
@@ -104,11 +106,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initAuth = async () => {
       try {
+        // Sofort mit Cache anzeigen (Reload = Seite sofort da), getSession im Hintergrund
+        let cachedProfile: { userId: string; profile: Profile } | null = null
+        let cachedSession: { userId: string; email: string } | null = null
+        try {
+          const profileRaw = sessionStorage.getItem(PROFILE_CACHE_KEY)
+          const sessionRaw = sessionStorage.getItem(SESSION_CACHE_KEY)
+          if (profileRaw) {
+            const parsed = JSON.parse(profileRaw) as { userId: string; profile: Profile }
+            if (parsed.userId && parsed.profile) cachedProfile = parsed
+          }
+          if (sessionRaw) {
+            const parsed = JSON.parse(sessionRaw) as { userId: string; email: string }
+            if (parsed.userId) cachedSession = parsed
+          }
+        } catch {
+          // Cache ungültig – ignorieren
+        }
+
+        if (cachedProfile && cachedSession && cachedProfile.userId === cachedSession.userId && mounted) {
+          const minimalUser = { id: cachedProfile.userId, email: cachedSession.email ?? '' } as User
+          setState((prev) => ({
+            ...prev,
+            ...authReducer(minimalUser, null, cachedProfile.profile),
+            isLoading: false,
+            error: null,
+          }))
+        }
+
         const { data: { session } } = await supabase.auth.getSession()
 
         if (session?.user && mounted) {
           const userId = session.user.id
-          // Sofort mit gecachtem Profil anzeigen (Reload = sofort drin), dann im Hintergrund aktualisieren
+          try {
+            sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify({ userId, email: session.user.email ?? '' }))
+          } catch {
+            // ignorieren
+          }
           let cached: { userId: string; profile: Profile } | null = null
           try {
             const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
@@ -129,7 +163,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }))
           }
 
-          // Immer frisches Profil nachladen (im Hintergrund, wenn Cache genutzt wurde)
           const profile = await fetchProfile(userId)
           if (!mounted) return
           setState((prev) => ({
@@ -139,6 +172,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             error: null,
           }))
         } else if (mounted) {
+          try {
+            sessionStorage.removeItem(SESSION_CACHE_KEY)
+          } catch {
+            // ignorieren
+          }
           setState((prev) => ({ ...prev, isLoading: false }))
         }
       } catch (e) {
@@ -162,8 +200,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!mounted) return
         try {
           if (event === 'SIGNED_IN' && session?.user) {
-            const profile = await fetchProfile(session.user.id)
+            const userId = session.user.id
+            let profile = await fetchProfile(userId)
             if (!mounted) return
+            if (!profile) {
+              try {
+                const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
+                if (raw) {
+                  const parsed = JSON.parse(raw) as { userId: string; profile: Profile }
+                  if (parsed.userId === userId && parsed.profile) profile = parsed.profile
+                }
+              } catch {
+                /* Cache ungültig */
+              }
+            }
             setState((prev) => ({
               ...prev,
               ...authReducer(session.user, session, profile),
@@ -173,6 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else if (event === 'SIGNED_OUT') {
           try {
             sessionStorage.removeItem(PROFILE_CACHE_KEY)
+            sessionStorage.removeItem(SESSION_CACHE_KEY)
           } catch {
             // ignorieren
           }
@@ -204,23 +255,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithEmail = useCallback(async (email: string, password: string) => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
 
-    // #region agent log – Login-Flow
-    const DEBUG_INGEST = 'http://127.0.0.1:7244/ingest/d1646c8f-788c-4220-8020-ca825d2ef16e'
-    const log = (msg: string, d?: Record<string, unknown>) => {
-      fetch(DEBUG_INGEST, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'AuthContext:loginWithEmail', message: msg, data: d ?? {}, timestamp: Date.now(), hypothesisId: 'L1' }) }).catch(() => {})
+    const LOGIN_TIMEOUT = 15000
+    const loginTask = async () => {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (error) throw { type: 'auth' as const, error }
+      if (!data?.session?.user) throw { type: 'no_session' as const }
+      let profile = await fetchProfile(data.session.user.id)
+      if (!profile) {
+        try {
+          const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
+          if (raw) {
+            const parsed = JSON.parse(raw) as { userId: string; profile: Profile }
+            if (parsed.userId === data.session.user.id && parsed.profile) profile = parsed.profile
+          }
+        } catch {
+          /* Cache ungültig */
+        }
+      }
+      return { session: data.session, user: data.session.user, profile }
     }
-    log('signInWithPassword start')
-    // #endregion
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    log('signInWithPassword done', { hasError: !!error, hasData: !!data, hasSession: !!data?.session, hasUser: !!data?.session?.user })
-
-    if (error) {
-      const userMessage = 'Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.'
+    try {
+      const result = await Promise.race([
+        loginTask(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('TIMEOUT')), LOGIN_TIMEOUT)
+        ),
+      ])
+      setState((prev) => ({
+        ...prev,
+        ...authReducer(result.user, result.session, result.profile),
+        isLoading: false,
+        error: null,
+      }))
+      return
+    } catch (e: unknown) {
+      if (e instanceof Error && e.message === 'TIMEOUT') {
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: 'Verbindung dauert zu lange. Bitte prüfe deine Internetverbindung.',
+        }))
+        return
+      }
+      const err = e as { type?: string }
+      const userMessage =
+        err?.type === 'auth' || err?.type === 'no_session'
+          ? 'Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.'
+          : 'Ein Fehler ist aufgetreten. Bitte versuche es erneut.'
       setState((prev) => ({
         ...prev,
         isLoading: false,
@@ -228,28 +313,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }))
       throw new Error(userMessage)
     }
-
-    // Sofort State setzen mit Session aus Response – nicht auf onAuthStateChange warten (sonst hängt die UI)
-    if (data?.session?.user) {
-      log('fetchProfile start', { userId: data.session.user.id })
-      const profile = await fetchProfile(data.session.user.id)
-      log('fetchProfile done', { hasProfile: !!profile })
-      setState((prev) => ({
-        ...prev,
-        ...authReducer(data.session!.user, data.session!, profile),
-        isLoading: false,
-        error: null,
-      }))
-    } else {
-      setState((prev) => ({ ...prev, isLoading: false }))
-    }
   }, [fetchProfile])
 
   const loginWithPersonalnummer = useCallback(async (personalnummer: string, password: string) => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
 
+    // RPC: Args-Typ aus Database['public']['Functions']['lookup_email_by_personalnummer']['Args']
     const { data: email, error: lookupError } = await supabase.rpc(
-      'lookup_email_by_personalnummer' as never,
+      'lookup_email_by_personalnummer',
       { p_nummer: personalnummer } as never
     ) as { data: string | null; error: { message: string } | null }
 
@@ -277,7 +348,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (uid) {
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ must_change_password: false } as never)
+        .update(
+          ({ must_change_password: false } as Database['public']['Tables']['profiles']['Update']) as never
+        )
         .eq('id', uid)
 
       if (profileError) throw profileError

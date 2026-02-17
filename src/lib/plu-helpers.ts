@@ -1,5 +1,6 @@
 // PLU-spezifische Helper-Funktionen (wiederverwendbar)
 
+import { generateUUID } from '@/lib/utils'
 import type { Block } from '@/types/database'
 import type { PLUStatus } from '@/types/plu'
 
@@ -30,6 +31,15 @@ export function formatKWLabel(kw: number, jahr: number): string {
 /** Preis in Euro formatieren (deutsche Darstellung), z.B. 1.5 → "1,50 €" */
 export function formatPreisEur(preis: number): string {
   return preis.toFixed(2).replace('.', ',') + ' €'
+}
+
+/** Leitet aus Blockname/Text Stück vs. Gewicht ab (z.B. "Gewicht" → WEIGHT, "Stück" → PIECE). */
+export function parseBlockNameToItemType(s: string | null): 'PIECE' | 'WEIGHT' | null {
+  if (!s || !s.trim()) return null
+  const t = s.trim().toLowerCase()
+  if (t.includes('gewicht')) return 'WEIGHT'
+  if (t.includes('stück') || t.includes('stueck')) return 'PIECE'
+  return null
 }
 
 /** Filtert Items nach Suchtext (PLU oder Anzeigename/Systemname, case-insensitive). */
@@ -73,7 +83,7 @@ export function getDisplayNameForItem(name: string | null, fallback: string, isC
 
 /** Eindeutigen Platzhalter für custom_products.plu erzeugen (Preis-only-Produkte). */
 export function generatePriceOnlyPlu(): string {
-  return PRICE_ONLY_PLU_PREFIX + crypto.randomUUID()
+  return PRICE_ONLY_PLU_PREFIX + generateUUID()
 }
 
 // ============================================================

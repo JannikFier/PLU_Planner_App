@@ -1,6 +1,8 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { DashboardCard } from '@/components/layout/DashboardCard'
+import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
 import { ClipboardList, Users } from 'lucide-react'
 
 /**
@@ -10,8 +12,9 @@ import { ClipboardList, Users } from 'lucide-react'
  */
 export function AdminDashboard() {
   const navigate = useNavigate()
+  usePrefetchForNavigation()
 
-  const cards = [
+  const cards = useMemo(() => [
     {
       title: 'PLU-Liste',
       description: 'Aktuelle PLU-Liste anzeigen und exportieren',
@@ -28,7 +31,7 @@ export function AdminDashboard() {
       color: 'text-sky-600',
       bg: 'bg-sky-50',
     },
-  ]
+  ], [navigate])
 
   return (
     <DashboardLayout>
@@ -42,22 +45,15 @@ export function AdminDashboard() {
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map((card) => (
-            <Card
+            <DashboardCard
               key={card.title}
-              className="cursor-pointer transition-all hover:shadow-md hover:border-primary/20"
+              title={card.title}
+              description={card.description}
+              icon={card.icon}
               onClick={card.onClick}
-            >
-              <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                <div className={`rounded-lg p-3 ${card.bg}`}>
-                  <card.icon className={`h-6 w-6 ${card.color}`} />
-                </div>
-                <div>
-                  <CardTitle className="text-lg">{card.title}</CardTitle>
-                  <CardDescription>{card.description}</CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent />
-            </Card>
+              color={card.color}
+              bg={card.bg}
+            />
           ))}
         </div>
       </div>

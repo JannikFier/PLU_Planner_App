@@ -76,13 +76,13 @@ export function ExportPDFDialog({
         fontSizes,
       })
 
-      const fileName = `PLU-Liste_${kwLabel.replace('/', '_')}.pdf`
+      const safeLabel = kwLabel.replace(/[^a-zA-Z0-9_-]/g, '_')
+      const fileName = `PLU-Liste_${safeLabel}.pdf`
       doc.save(fileName)
       toast.success('PDF heruntergeladen')
       onOpenChange(false)
-    } catch (error) {
+    } catch {
       toast.error('Fehler beim Erstellen des PDFs')
-      console.error('PDF-Generierung fehlgeschlagen:', error)
     } finally {
       setIsGenerating(false)
     }
@@ -123,17 +123,18 @@ export function ExportPDFDialog({
           toast.success('Druckdialog geöffnet')
         } catch {
           toast.info('PDF heruntergeladen – öffne es und drucke mit Strg+P')
-          doc.save(`PLU-Liste_${kwLabel.replace('/', '_')}.pdf`)
+          doc.save(`PLU-Liste_${kwLabel.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`)
         }
         setTimeout(() => {
-          document.body.removeChild(iframe)
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe)
+          }
           URL.revokeObjectURL(url)
         }, 1000)
       }
       onOpenChange(false)
-    } catch (error) {
+    } catch {
       toast.error('Fehler beim Erstellen des PDFs')
-      console.error('PDF-Generierung fehlgeschlagen:', error)
     } finally {
       setIsGenerating(false)
     }

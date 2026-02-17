@@ -78,6 +78,8 @@ npm run dev
 | `npm run build` | Erstellt den Production Build in `dist/` |
 | `npm run preview` | Zeigt den Production Build lokal an |
 | `npm run lint` | Prüft den Code mit ESLint |
+| `npm run test` | Startet Tests im Watch-Modus |
+| `npm run test:run` | Führt Tests einmal aus (z.B. vor Push) – Details: [docs/TESTING.md](docs/TESTING.md) |
 
 ## Projektstruktur
 
@@ -129,6 +131,7 @@ Ausführliche Dokumentation findest du im `docs/` Ordner:
 - **[ROLES_AND_PERMISSIONS.md](docs/ROLES_AND_PERMISSIONS.md)** – Drei-Rollen-System, Login-Flows, Passwort-Management
 - **[DATABASE.md](docs/DATABASE.md)** – Alle Tabellen, ER-Diagramm, RLS-Regeln
 - **[FEATURES.md](docs/FEATURES.md)** – Alle Features, Business-Regeln, Farbcodes
+- **[TESTING.md](docs/TESTING.md)** – Unit-Tests (Vitest), Konvention, Erweiterung
 
 ## Lizenz
 

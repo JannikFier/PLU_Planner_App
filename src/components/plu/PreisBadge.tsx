@@ -1,5 +1,6 @@
 // PreisBadge: Preis-Kasten für eigene Produkte – gleiches Styling wie PLU-Zelle (StatusBadge)
 
+import React from 'react'
 import { formatPreisEur } from '@/lib/plu-helpers'
 import { cn } from '@/lib/utils'
 
@@ -10,7 +11,7 @@ interface PreisBadgeProps {
 }
 
 /** Zeigt Preis als Kasten wie PLU – gleiche Schrift, gleicher Kasten, nur hinten. */
-export function PreisBadge({ value, className, style }: PreisBadgeProps) {
+export const PreisBadge = React.memo(function PreisBadge({ value, className, style }: PreisBadgeProps) {
   return (
     <span
       className={cn(
@@ -22,4 +23,4 @@ export function PreisBadge({ value, className, style }: PreisBadgeProps) {
       {formatPreisEur(value)}
     </span>
   )
-}
+})

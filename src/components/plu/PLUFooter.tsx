@@ -1,5 +1,6 @@
 // PLUFooter: Statistik-Zeile unter der PLU-Tabelle
 
+import React from 'react'
 import { Badge } from '@/components/ui/badge'
 import type { PLUStats } from '@/lib/plu-helpers'
 
@@ -12,7 +13,7 @@ interface PLUFooterProps {
  * Zeigt Zusammenfassung unter der Tabelle:
  * Gesamt | Neu (gelb) | Geändert (rot) | Eigene | Ausgeblendet
  */
-export function PLUFooter({ stats }: PLUFooterProps) {
+export const PLUFooter = React.memo(function PLUFooter({ stats }: PLUFooterProps) {
   return (
     <div className="flex flex-wrap items-center gap-3 px-1 py-2 text-sm text-muted-foreground">
       <span>
@@ -68,4 +69,4 @@ export function PLUFooter({ stats }: PLUFooterProps) {
       )}
     </div>
   )
-}
+})

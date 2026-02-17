@@ -25,7 +25,7 @@ Der PLU Planner verwaltet wöchentliche Preis-Look-Up (PLU) Listen für Obst- un
 | Rot | `#EF4444` | PLU geändert (gleicher Name, neue PLU) | PLU-Feld in Tabelle + PDF |
 | Keine | – | Unverändert | Standard |
 
-**Wichtig:** Markierungen sind **zeitlich begrenzt** (konfigurierbar: 1-4 KWs). Danach werden sie automatisch zu "unverändert".
+**Wichtig:** Markierungen sind **zeitlich begrenzt** (Layout: „Wie lange als neu anzeigen“, Standard 4 KW). **Master-Items** (aus Excel): „Neu“ nur für X KW ab der **Version-KW** (der KW, in der die Produkte hinzugefügt wurden). **Eigene Produkte:** „Neu“ für X KW ab `created_at`. Danach automatisch „unverändert“.
 
 ## Feature: Excel Upload & KW-Vergleich
 
@@ -163,8 +163,8 @@ Der Super-Admin kann einstellen. Die Layout-Seite zeigt eine **Live-Vorschau** m
 
 Nach einem KW-Upload erhalten alle User (außer dem Uploader) eine Benachrichtigung:
 - Ein Eintrag pro User pro Version in `version_notifications` (gelesen/ungelesen)
-- NotificationBell im AppHeader zeigt Badge mit Anzahl ungelesener Notifications
-- NotificationDialog zeigt neue Produkte der Version mit "Ausblenden"-Option
+- **NotificationBell** im AppHeader zeigt Badge mit Anzahl ungelesener Notifications (nur Admin/User; Super-Admin sieht die Glocke nicht, da er als Uploader keine Notifications erhält – nutzt stattdessen die Karte „Benachrichtigungen“ auf dem Dashboard)
+- NotificationDialog zeigt neue und geänderte PLUs der Version (diese Woche hinzugefügt bzw. PLU geändert) mit "Ausblenden"-Option
 - "Gelesen" markiert die Notification als gelesen
 - Ausblenden-Aktion im Dialog schreibt in `hidden_items` (global)
 

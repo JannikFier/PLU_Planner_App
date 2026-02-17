@@ -4,12 +4,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
-import type { CustomProduct } from '@/types/database'
+import type { CustomProduct, Database } from '@/types/database'
 
 /** Alle globalen Custom Products laden */
 export function useCustomProducts() {
   return useQuery({
     queryKey: ['custom-products'],
+    staleTime: 2 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('custom_products')
@@ -39,14 +40,16 @@ export function useAddCustomProduct() {
 
       const { data, error } = await supabase
         .from('custom_products')
-        .insert({
+        .insert(
+        ({
           plu: product.plu,
           name: product.name,
           item_type: product.item_type,
           preis: product.preis ?? null,
           block_id: product.block_id ?? null,
           created_by: user.id,
-        } as never)
+        } as Database['public']['Tables']['custom_products']['Insert']) as never
+      )
         .select()
         .single()
 
@@ -57,7 +60,7 @@ export function useAddCustomProduct() {
       queryClient.invalidateQueries({ queryKey: ['custom-products'] })
       toast.success('Eigenes Produkt hinzugefügt')
     },
-    onError: (_error) => {
+    onError: () => {
       // Fehler wird von CustomProductDialog als Popup angezeigt
     },
   })
@@ -92,7 +95,7 @@ export function useAddCustomProductsBatch() {
 
       const { data, error } = await supabase
         .from('custom_products')
-        .insert(rows as never)
+        .insert((rows as Database['public']['Tables']['custom_products']['Insert'][]) as never)
         .select()
 
       if (error) throw error
@@ -126,7 +129,7 @@ export function useUpdateCustomProduct() {
     }) => {
       const { error } = await supabase
         .from('custom_products')
-        .update(updates as never)
+        .update((updates as Database['public']['Tables']['custom_products']['Update']) as never)
         .eq('id', id)
 
       if (error) throw error
@@ -172,10 +175,12 @@ export function useRenameMasterProduct() {
     mutationFn: async ({ id, displayName }: { id: string; displayName: string }) => {
       const { error } = await supabase
         .from('master_plu_items')
-        .update({
+        .update(
+        ({
           display_name: displayName,
           is_manually_renamed: true,
-        } as never)
+        } as Database['public']['Tables']['master_plu_items']['Update']) as never
+      )
         .eq('id', id)
 
       if (error) throw error
@@ -198,10 +203,12 @@ export function useResetProductName() {
     mutationFn: async ({ id, systemName }: { id: string; systemName: string }) => {
       const { error } = await supabase
         .from('master_plu_items')
-        .update({
+        .update(
+        ({
           display_name: systemName,
           is_manually_renamed: false,
-        } as never)
+        } as Database['public']['Tables']['master_plu_items']['Update']) as never
+      )
         .eq('id', id)
 
       if (error) throw error

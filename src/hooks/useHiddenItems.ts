@@ -4,12 +4,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
-import type { HiddenItem } from '@/types/database'
+import type { Database, HiddenItem } from '@/types/database'
 
 /** Alle ausgeblendeten PLUs laden */
 export function useHiddenItems() {
   return useQuery({
     queryKey: ['hidden-items'],
+    staleTime: 2 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('hidden_items')
@@ -33,7 +34,9 @@ export function useHideProduct() {
 
       const { error } = await supabase
         .from('hidden_items')
-        .insert({ plu, hidden_by: user.id } as never)
+        .insert(
+        ({ plu, hidden_by: user.id } as Database['public']['Tables']['hidden_items']['Insert']) as never
+      )
 
       if (error) throw error
     },
@@ -70,7 +73,9 @@ export function useHideProductsBatch() {
       for (const plu of plus) {
         const { error } = await supabase
           .from('hidden_items')
-          .insert({ plu, hidden_by: user.id } as never)
+          .insert(
+            ({ plu, hidden_by: user.id } as Database['public']['Tables']['hidden_items']['Insert']) as never
+          )
         if (error) {
           if ((error as { code?: string }).code === '23505') skipped++
           else throw error

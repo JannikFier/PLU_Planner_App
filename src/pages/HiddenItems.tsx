@@ -8,6 +8,16 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -30,14 +40,15 @@ import { useCustomProducts, useAddCustomProductsBatch, useDeleteCustomProduct } 
 import { useBlocks } from '@/hooks/useBlocks'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
 import { useAuth } from '@/hooks/useAuth'
-import { formatPreisEur, generatePriceOnlyPlu, getDisplayPlu } from '@/lib/plu-helpers'
+import { formatPreisEur, generatePriceOnlyPlu, getDisplayPlu, parseBlockNameToItemType } from '@/lib/plu-helpers'
 import { parseCustomProductsExcel, parseHiddenItemsExcel } from '@/lib/excel-parser'
 import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { CustomProductDialog } from '@/components/plu/CustomProductDialog'
+import { ExcelPreviewBox } from '@/components/plu/ExcelPreviewBox'
 import { HideProductsDialog } from '@/components/plu/HideProductsDialog'
-import type { Profile } from '@/types/database'
+import type { Profile, CustomProduct } from '@/types/database'
 import type { CustomProductParseResult, ParsedCustomProductRow } from '@/types/plu'
 
 /** Zusammengeführte Info für ein ausgeblendetes Produkt */
@@ -55,21 +66,13 @@ interface HiddenProductInfo {
  * HiddenItems-Seite: Eigene & Ausgeblendete – zwei Sektionen:
  * (1) Eigene Produkte (Liste + hinzufügen), (2) Ausgeblendete Produkte (Einblenden).
  */
-/** Spalte 3 zu ItemType: Stück/Gewicht erkennen */
-function parseBlockNameToItemType(s: string | null): 'PIECE' | 'WEIGHT' | null {
-  if (!s || !s.trim()) return null
-  const t = s.trim().toLowerCase()
-  if (t.includes('gewicht')) return 'WEIGHT'
-  if (t.includes('stück') || t.includes('stueck')) return 'PIECE'
-  return null
-}
-
 export function HiddenItems() {
   const navigate = useNavigate()
   const { profile, user } = useAuth()
   const currentUserId = user?.id ?? null
   const [showCustomProductDialog, setShowCustomProductDialog] = useState(false)
   const [showHideProductsDialog, setShowHideProductsDialog] = useState(false)
+  const [productToDelete, setProductToDelete] = useState<CustomProduct | null>(null)
   const [excelParseResult, setExcelParseResult] = useState<CustomProductParseResult | null>(null)
   const [excelOverrides, setExcelOverrides] = useState<Record<number, { block_id?: string | null; item_type?: 'PIECE' | 'WEIGHT' }>>({})
   const [hiddenExcelResult, setHiddenExcelResult] = useState<{ plus: string[]; fileName: string } | null>(null)
@@ -365,6 +368,7 @@ export function HiddenItems() {
               variant="ghost"
               size="icon"
               onClick={() => navigate(`${rolePrefix}/masterlist`)}
+              aria-label="Zurück"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -507,7 +511,7 @@ export function HiddenItems() {
                             variant="ghost"
                             size="sm"
                             className="text-destructive hover:text-destructive"
-                            onClick={() => deleteProduct.mutate(cp.id)}
+                            onClick={() => setProductToDelete(cp)}
                             disabled={deleteProduct.isPending}
                           >
                             <Trash2 className="h-3 w-3 mr-1" />
@@ -669,6 +673,31 @@ export function HiddenItems() {
           searchableItems={searchableItems}
         />
 
+        <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Produkt löschen?</AlertDialogTitle>
+              <AlertDialogDescription>
+                &quot;{productToDelete?.name}&quot; unwiderruflich löschen? Dies kann nicht rückgängig gemacht werden.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  if (productToDelete) {
+                    deleteProduct.mutate(productToDelete.id)
+                    setProductToDelete(null)
+                  }
+                }}
+              >
+                Löschen
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <Dialog
           open={excelParseResult !== null}
           onOpenChange={(open) => {
@@ -690,14 +719,14 @@ export function HiddenItems() {
                   {sortMode === 'BY_BLOCK' ? ' Spalte 3 = Warengruppe.' : ' Spalte 3 = Stück/Gewicht.'}
                 </p>
                 {excelAddPreview && excelAddPreview.willSkip > 0 && (
-                  <div className={`rounded-lg border px-4 py-3 text-sm ${excelAddPreview.willAdd === 0 ? 'border-destructive/30 bg-destructive/5 text-destructive' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                  <ExcelPreviewBox variant={excelAddPreview.willAdd === 0 ? 'error' : 'warning'}>
                     <strong>Hinweis:</strong> {excelAddPreview.willSkip} Zeile(n) haben eine PLU, die bereits existiert.
                     {excelAddPreview.willAdd > 0 ? (
                       <> Diese werden übersprungen. Es werden {excelAddPreview.willAdd} Produkte importiert.</>
                     ) : (
                       <> Alle PLUs sind bereits vergeben. Es können keine Produkte hinzugefügt werden.</>
                     )}
-                  </div>
+                  </ExcelPreviewBox>
                 )}
                 <div className="overflow-auto flex-1 min-h-0 border rounded-md">
                   <table className="w-full text-sm">
@@ -819,14 +848,14 @@ export function HiddenItems() {
                   {hiddenExcelResult.fileName}: {hiddenExcelResult.plus.length} PLU(s) ausgelesen.
                 </p>
                 {hiddenExcelPreview.unrecognized.length > 0 && (
-                  <div className={`rounded-lg border px-4 py-3 text-sm ${hiddenExcelPreview.recognized.length === 0 ? 'border-destructive/30 bg-destructive/5 text-destructive' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                  <ExcelPreviewBox variant={hiddenExcelPreview.recognized.length === 0 ? 'error' : 'warning'}>
                     <strong>Hinweis:</strong> {hiddenExcelPreview.unrecognized.length} PLU(s) wurden nicht gefunden.
                     {hiddenExcelPreview.recognized.length > 0 ? (
                       <> Diese Zeilen können entfernt werden. {hiddenExcelPreview.recognized.length} Produkte werden ausgeblendet.</>
                     ) : (
                       <> Keine gültigen Produkte zum Ausblenden. Prüfe die PLU-Nummern in der Excel oder entferne die Zeilen.</>
                     )}
-                  </div>
+                  </ExcelPreviewBox>
                 )}
                 <ul className="max-h-[280px] overflow-auto border rounded-md py-1 space-y-0.5">
                   {hiddenExcelResult.plus.map((plu) => {

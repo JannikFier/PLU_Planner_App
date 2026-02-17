@@ -1,8 +1,13 @@
 // Hook: Warengruppen (Blöcke) + Block-Regeln – Lesen und CRUD
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
-import type { Block, BlockRule } from '@/types/database'
+import type { Block, BlockRule, Database } from '@/types/database'
+
+const onMutationError = (error: unknown) => {
+  toast.error('Fehler: ' + (error instanceof Error ? error.message : String(error)))
+}
 
 /**
  * Lädt alle Blöcke (Warengruppen), sortiert nach order_index.
@@ -10,6 +15,7 @@ import type { Block, BlockRule } from '@/types/database'
 export function useBlocks() {
   return useQuery<Block[]>({
     queryKey: ['blocks'],
+    staleTime: 5 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('blocks')
@@ -46,7 +52,9 @@ export function useCreateBlock() {
     mutationFn: async ({ name, order_index }: { name: string; order_index?: number }) => {
       const { data, error } = await supabase
         .from('blocks')
-        .insert({ name, order_index: order_index ?? 0 } as never)
+        .insert(
+        ({ name, order_index: order_index ?? 0 } as Database['public']['Tables']['blocks']['Insert']) as never
+      )
         .select()
         .single()
 
@@ -56,6 +64,7 @@ export function useCreateBlock() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blocks'] })
     },
+    onError: onMutationError,
   })
 }
 
@@ -67,7 +76,7 @@ export function useUpdateBlock() {
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
       const { error } = await supabase
         .from('blocks')
-        .update({ name } as never)
+        .update(({ name } as Database['public']['Tables']['blocks']['Update']) as never)
         .eq('id', id)
 
       if (error) throw error
@@ -75,6 +84,7 @@ export function useUpdateBlock() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blocks'] })
     },
+    onError: onMutationError,
   })
 }
 
@@ -92,6 +102,7 @@ export function useDeleteBlock() {
       queryClient.invalidateQueries({ queryKey: ['block-rules'] })
       queryClient.invalidateQueries({ queryKey: ['plu-items'] })
     },
+    onError: onMutationError,
   })
 }
 
@@ -105,7 +116,9 @@ export function useReorderBlocks() {
       for (const block of blocks) {
         const { error } = await supabase
           .from('blocks')
-          .update({ order_index: block.order_index } as never)
+          .update(
+          ({ order_index: block.order_index } as Database['public']['Tables']['blocks']['Update']) as never
+        )
           .eq('id', block.id)
 
         if (error) throw error
@@ -114,6 +127,7 @@ export function useReorderBlocks() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blocks'], refetchType: 'all' })
     },
+    onError: onMutationError,
   })
 }
 
@@ -125,7 +139,9 @@ export function useAssignProducts() {
     mutationFn: async ({ itemIds, blockId }: { itemIds: string[]; blockId: string | null }) => {
       const { error } = await supabase
         .from('master_plu_items')
-        .update({ block_id: blockId } as never)
+        .update(
+        ({ block_id: blockId } as Database['public']['Tables']['master_plu_items']['Update']) as never
+      )
         .in('id', itemIds)
 
       if (error) throw error
@@ -135,6 +151,7 @@ export function useAssignProducts() {
       queryClient.invalidateQueries({ queryKey: ['plu-items'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['blocks'], refetchType: 'all' })
     },
+    onError: onMutationError,
   })
 }
 
@@ -151,13 +168,14 @@ export function useCreateBlockRule() {
     }) => {
       const { error } = await supabase
         .from('block_rules')
-        .insert(rule as never)
+        .insert((rule as Database['public']['Tables']['block_rules']['Insert']) as never)
 
       if (error) throw error
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['block-rules'] })
     },
+    onError: onMutationError,
   })
 }
 
@@ -173,5 +191,6 @@ export function useDeleteBlockRule() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['block-rules'] })
     },
+    onError: onMutationError,
   })
 }

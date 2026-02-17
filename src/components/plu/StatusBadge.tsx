@@ -1,5 +1,6 @@
 // StatusBadge: Farbige PLU-Zelle je nach Status
 
+import React from 'react'
 import { cn } from '@/lib/utils'
 import { getDisplayPlu, getStatusColorClass } from '@/lib/plu-helpers'
 import type { PLUStatus } from '@/types/plu'
@@ -23,7 +24,7 @@ interface StatusBadgeProps {
  * - Rot: PLU geändert (zeigt alte PLU als Tooltip)
  * - Kein Hintergrund: Unverändert
  */
-export function StatusBadge({ plu, status, oldPlu, className, style }: StatusBadgeProps) {
+export const StatusBadge = React.memo(function StatusBadge({ plu, status, oldPlu, className, style }: StatusBadgeProps) {
   const colorClass = getStatusColorClass(status)
   const hasOldPlu = status === 'PLU_CHANGED_RED' && oldPlu
 
@@ -40,4 +41,4 @@ export function StatusBadge({ plu, status, oldPlu, className, style }: StatusBad
       {getDisplayPlu(plu)}
     </span>
   )
-}
+})

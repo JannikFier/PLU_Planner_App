@@ -104,7 +104,12 @@ export interface LayoutEngineInput {
   displayMode: 'MIXED' | 'SEPARATED'
   markRedKwCount: number
   markYellowKwCount: number
+  /** KW der angezeigten Version (wann die Master-Items „dazukamen“) */
+  versionKwNummer: number
+  versionJahr: number
+  /** Aktuelle Kalenderwoche/Jahr (heute) – für „wie lange als neu anzeigen“ */
   currentKwNummer: number
+  currentJahr: number
 }
 
 /** Output der Layout-Engine */

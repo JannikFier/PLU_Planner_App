@@ -1,5 +1,6 @@
 // VersionsPage: KW-Versionen verwalten
 
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -7,6 +8,16 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   Table,
   TableBody,
@@ -66,12 +77,18 @@ export function VersionsPage() {
   const navigate = useNavigate()
   const { data: versions = [], isLoading } = useVersions()
   const deleteMutation = useDeleteVersion()
+  const [versionToDelete, setVersionToDelete] = useState<{ id: string; kwLabel: string } | null>(null)
 
-  const handleDelete = async (id: string, kwLabel: string) => {
-    if (!confirm(`Version ${kwLabel} wirklich löschen? Alle zugehörigen PLU-Daten werden entfernt.`)) return
+  const handleDeleteClick = (id: string, kwLabel: string) => {
+    setVersionToDelete({ id, kwLabel })
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!versionToDelete) return
     try {
-      await deleteMutation.mutateAsync(id)
-      toast.success(`Version ${kwLabel} gelöscht`)
+      await deleteMutation.mutateAsync(versionToDelete.id)
+      setVersionToDelete(null)
+      toast.success(`Version ${versionToDelete.kwLabel} gelöscht`)
     } catch (err) {
       toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
     }
@@ -82,7 +99,7 @@ export function VersionsPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/super-admin')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/super-admin/masterlist')} aria-label="Zurück">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -144,6 +161,7 @@ export function VersionsPage() {
                             variant="ghost"
                             size="icon"
                             title="Ansehen"
+                            aria-label="Ansehen"
                             onClick={() => navigate('/super-admin/masterlist')}
                           >
                             <Eye className="h-4 w-4" />
@@ -153,8 +171,9 @@ export function VersionsPage() {
                               variant="ghost"
                               size="icon"
                               title="Löschen"
+                              aria-label="Löschen"
                               disabled={deleteMutation.isPending}
-                              onClick={() => handleDelete(version.id, version.kw_label)}
+                              onClick={() => handleDeleteClick(version.id, version.kw_label)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
@@ -168,6 +187,26 @@ export function VersionsPage() {
             )}
           </CardContent>
         </Card>
+
+        <AlertDialog open={!!versionToDelete} onOpenChange={(open) => !open && setVersionToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Version löschen?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Version {versionToDelete?.kwLabel} wirklich löschen? Alle zugehörigen PLU-Daten werden entfernt.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Löschen
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   )

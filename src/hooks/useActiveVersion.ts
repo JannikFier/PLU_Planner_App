@@ -1,6 +1,7 @@
 // Hook: Aktive Version laden (status = 'active')
 
 import { useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
 import type { Version } from '@/types/database'
@@ -12,6 +13,7 @@ import type { Version } from '@/types/database'
 export function useActiveVersion() {
   return useQuery<Version | null>({
     queryKey: ['version', 'active'],
+    staleTime: 60_000,
     queryFn: () =>
       withRetryOnAbort(async () => {
         const { data: active, error: activeError } = await supabase
@@ -33,7 +35,7 @@ export function useActiveVersion() {
 
         if (latestError) {
           if ((latestError as { message?: string }).message?.includes?.('AbortError')) throw latestError
-          console.error('Keine Version gefunden:', latestError)
+          toast.error('Keine Version gefunden: ' + (latestError?.message ?? 'Unbekannter Fehler'))
           return null
         }
         return (latest ?? null) as Version | null

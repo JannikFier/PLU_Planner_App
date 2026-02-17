@@ -383,7 +383,7 @@ function InteractiveProductRow({ item }: { item: MasterPLUItem }) {
       <td className="px-2 py-1">
         <StatusBadge plu={item.plu} status={item.status} oldPlu={item.old_plu} />
       </td>
-      <td className="px-2 py-1 text-sm truncate border-l border-border" title={getDisplayNameForItem(item.display_name, item.system_name, (item as unknown as DisplayItem).is_custom)}>
+      <td className="px-2 py-1 text-sm break-words min-w-0 border-l border-border" title={getDisplayNameForItem(item.display_name, item.system_name, (item as unknown as DisplayItem).is_custom)}>
         {getDisplayNameForItem(item.display_name, item.system_name, (item as unknown as DisplayItem).is_custom)}
       </td>
       <td className="px-2 py-1 border-l border-border">

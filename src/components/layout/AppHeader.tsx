@@ -11,6 +11,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { LogOut, Settings, User, Shield, Crown, ChevronLeft } from 'lucide-react'
 import { NotificationBell } from '@/components/plu/NotificationBell'
+import { cn } from '@/lib/utils'
 
 /**
  * App Header – wird auf allen geschützten Seiten angezeigt.
@@ -22,7 +23,7 @@ export function AppHeader() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Home-Pfad je nach Rolle
+  // Home-Pfad = Dashboard je nach Rolle (einheitlich: Pfeil führt zurück zum Dashboard)
   const homePath = isSuperAdmin ? '/super-admin' : isAdmin ? '/admin' : '/user'
 
   // Zurück-Button zeigen, wenn nicht auf dem eigenen Dashboard
@@ -53,6 +54,7 @@ export function AppHeader() {
               size="icon"
               onClick={() => navigate(homePath)}
               className="mr-1"
+              aria-label="Zurück"
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
@@ -80,30 +82,26 @@ export function AppHeader() {
         <div className="flex items-center gap-3">
           {/* Rollen-Badge */}
           {roleLabel && (
-            <div className={`hidden sm:flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
-              isSuperAdmin
-                ? 'bg-amber-100 text-amber-800'
-                : 'bg-primary/10 text-primary'
-            }`}>
+            <div className={cn(
+              'hidden sm:flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium',
+              isSuperAdmin ? 'bg-amber-100 text-amber-800' : 'bg-primary/10 text-primary'
+            )}>
               <RoleIcon className="h-3 w-3" />
               {roleLabel}
             </div>
           )}
 
-          {/* Benachrichtigungs-Glocke für alle Rollen */}
-          <NotificationBell />
+          {/* Benachrichtigungs-Glocke nur für Admin/User (Super-Admin nutzt Karte „Benachrichtigungen“ auf dem Dashboard) */}
+          {!isSuperAdmin && <NotificationBell />}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                 <Avatar className="h-9 w-9">
-                  <AvatarFallback className={`text-sm font-medium ${
-                    isSuperAdmin
-                      ? 'bg-amber-100 text-amber-800'
-                      : isAdmin
-                        ? 'bg-primary/10 text-primary'
-                        : 'bg-muted text-muted-foreground'
-                  }`}>
+                  <AvatarFallback className={cn(
+                    'text-sm font-medium',
+                    isSuperAdmin ? 'bg-amber-100 text-amber-800' : isAdmin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                  )}>
                     {initials}
                   </AvatarFallback>
                 </Avatar>
@@ -122,18 +120,12 @@ export function AppHeader() {
               </div>
               <DropdownMenuSeparator />
 
-              {/* Super-Admin: Links zu Super-Admin und User-Ansicht */}
+              {/* Super-Admin: nur User-Ansicht (Dashboard/Masterliste über Logo und Pfeil) */}
               {isSuperAdmin && (
-                <>
-                  <DropdownMenuItem onClick={() => navigate('/super-admin')}>
-                    <Crown className="mr-2 h-4 w-4" />
-                    Super-Admin
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/user')}>
-                    <User className="mr-2 h-4 w-4" />
-                    User-Ansicht (wie Mitarbeiter)
-                  </DropdownMenuItem>
-                </>
+                <DropdownMenuItem onClick={() => navigate('/user')}>
+                  <User className="mr-2 h-4 w-4" />
+                  User-Ansicht (wie Mitarbeiter)
+                </DropdownMenuItem>
               )}
 
               {/* Admin (nicht Super-Admin): nur Admin-Bereich */}

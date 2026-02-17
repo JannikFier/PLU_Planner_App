@@ -1,7 +1,7 @@
 // Publish-Logik: Version veröffentlichen, Items schreiben, Benachrichtigungen erstellen
 
 import { supabase } from '@/lib/supabase'
-import type { MasterPLUItem } from '@/types/database'
+import type { Database, MasterPLUItem } from '@/types/database'
 
 const BATCH_SIZE = 500
 
@@ -36,26 +36,30 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
   // 1. Alte aktive Version(en) einfrieren
   const { error: freezeError } = await supabase
     .from('versions')
-    .update({
+    .update(
+    ({
       status: 'frozen',
       frozen_at: new Date().toISOString(),
       delete_after: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    } as never)
+    } as Database['public']['Tables']['versions']['Update']) as never
+  )
     .eq('status', 'active')
 
   if (freezeError) {
-    console.warn('Keine aktive Version zum Einfrieren gefunden (oder Fehler):', freezeError)
+    throw new Error(`Aktive Version einfrieren fehlgeschlagen: ${freezeError.message}`)
   }
 
   // 2. Neue Version als draft anlegen
   const { data: newVersion, error: versionError } = await supabase
     .from('versions')
-    .insert({
+    .insert(
+    ({
       kw_nummer: kwNummer,
       jahr,
       status: 'draft',
       created_by: createdBy,
-    } as never)
+    } as Database['public']['Tables']['versions']['Insert']) as never
+  )
     .select()
     .single()
 
@@ -84,7 +88,7 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
     const batch = itemsToInsert.slice(i, i + BATCH_SIZE)
     const { error: insertError } = await supabase
       .from('master_plu_items')
-      .insert(batch as never)
+      .insert((batch as Database['public']['Tables']['master_plu_items']['Insert'][]) as never)
 
     if (insertError) {
       throw new Error(`Items einfügen fehlgeschlagen (Batch ${Math.floor(i / BATCH_SIZE) + 1}): ${insertError.message}`)
@@ -94,10 +98,12 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
   // 4. Version aktivieren
   const { error: activateError } = await supabase
     .from('versions')
-    .update({
+    .update(
+    ({
       status: 'active',
       published_at: new Date().toISOString(),
-    } as never)
+    } as Database['public']['Tables']['versions']['Update']) as never
+  )
     .eq('id', versionId)
 
   if (activateError) {
@@ -114,7 +120,10 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
       .select('id')
       .neq('id', createdBy)
 
-    if (!usersError && allUsers && allUsers.length > 0) {
+    if (usersError) {
+      throw new Error(`Benutzer für Benachrichtigungen laden fehlgeschlagen: ${usersError.message}`)
+    }
+    if (allUsers && allUsers.length > 0) {
       const notifications = (allUsers as { id: string }[]).map((user) => ({
         user_id: user.id,
         version_id: versionId,
@@ -126,7 +135,7 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
         const batch = notifications.slice(i, i + BATCH_SIZE)
         const { error: notifError } = await supabase
           .from('version_notifications')
-          .insert(batch as never)
+          .insert((batch as Database['public']['Tables']['version_notifications']['Insert'][]) as never)
 
         if (notifError) {
           console.warn('Version-Notifications einfügen fehlgeschlagen:', notifError)
@@ -137,6 +146,7 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
     }
   } catch (err) {
     console.warn('Benachrichtigungen konnten nicht erstellt werden:', err)
+    throw err
   }
 
   return {

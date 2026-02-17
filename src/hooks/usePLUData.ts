@@ -1,6 +1,7 @@
 // Hook: PLU-Items für eine bestimmte Version laden
 
 import { useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { MasterPLUItem } from '@/types/database'
 
@@ -21,6 +22,7 @@ export function usePLUData(
   return useQuery<MasterPLUItem[]>({
     queryKey: ['plu-items', versionId],
     enabled: !!versionId && enabled,
+    staleTime: 2 * 60_000,
     queryFn: async () => {
       if (!versionId) return []
 
@@ -31,7 +33,7 @@ export function usePLUData(
         .order('system_name', { ascending: true })
 
       if (error) {
-        console.error('PLU-Items laden fehlgeschlagen:', error)
+        toast.error('PLU-Items laden fehlgeschlagen: ' + (error?.message ?? 'Unbekannter Fehler'))
         throw error
       }
 

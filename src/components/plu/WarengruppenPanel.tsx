@@ -21,6 +21,16 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -57,6 +67,7 @@ export function WarengruppenPanel() {
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
   const [showAddBlock, setShowAddBlock] = useState(false)
   const [showRenameBlock, setShowRenameBlock] = useState(false)
+  const [showDeleteBlockConfirm, setShowDeleteBlockConfirm] = useState(false)
   const [blockName, setBlockName] = useState('')
 
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId)
@@ -153,14 +164,18 @@ export function WarengruppenPanel() {
     }
   }
 
-  // Block löschen
-  const handleDeleteBlock = async () => {
+  // Block löschen – Bestätigungsdialog öffnen
+  const handleDeleteBlockClick = () => {
+    if (selectedBlockId) setShowDeleteBlockConfirm(true)
+  }
+
+  const handleDeleteBlockConfirm = async () => {
     if (!selectedBlockId) return
-    if (!confirm(`"${selectedBlock?.name}" wirklich löschen? Produkte verlieren nur die Zuordnung.`)) return
     try {
       await deleteBlock.mutateAsync(selectedBlockId)
       setSelectedBlockId(null)
       setCheckedIds(new Set())
+      setShowDeleteBlockConfirm(false)
       toast.success('Warengruppe gelöscht')
     } catch {
       toast.error('Fehler beim Löschen')
@@ -246,7 +261,7 @@ export function WarengruppenPanel() {
               >
                 <Pencil className="h-3 w-3 mr-1" /> Umbenennen
               </Button>
-              <Button size="sm" variant="outline" onClick={handleDeleteBlock}>
+              <Button size="sm" variant="outline" onClick={handleDeleteBlockClick}>
                 <Trash2 className="h-3 w-3 mr-1 text-destructive" /> Löschen
               </Button>
             </div>
@@ -261,10 +276,12 @@ export function WarengruppenPanel() {
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
+              type="search"
               placeholder="Nach Name oder PLU suchen..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8"
+              aria-label="Suche"
             />
           </div>
         </CardHeader>
@@ -321,7 +338,7 @@ export function WarengruppenPanel() {
           <div className="flex items-center gap-2 px-2 py-1 rounded text-sm bg-background border border-border shadow-lg">
             <GripVertical className="h-3 w-3 text-muted-foreground" />
             <span className="font-mono text-xs text-muted-foreground">{draggingItem.plu}</span>
-            <span className="truncate">{draggingItem.display_name ?? draggingItem.system_name}</span>
+            <span className="break-words min-w-0 max-w-[200px]">{draggingItem.display_name ?? draggingItem.system_name}</span>
           </div>
         )}
       </DragOverlay>
@@ -372,6 +389,26 @@ export function WarengruppenPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showDeleteBlockConfirm} onOpenChange={setShowDeleteBlockConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Warengruppe löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &quot;{selectedBlock?.name}&quot; wirklich löschen? Produkte verlieren nur die Zuordnung zur Gruppe.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteBlockConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
@@ -462,7 +499,7 @@ function DraggableProduct({
       <span className="font-mono text-xs text-muted-foreground w-[50px] shrink-0">
         {getDisplayPlu(item.plu)}
       </span>
-      <span className="flex-1 truncate">
+      <span className="flex-1 break-words min-w-0">
         {item.display_name ?? item.system_name}
       </span>
       {assignedBlockName && (

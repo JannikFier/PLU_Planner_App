@@ -129,6 +129,7 @@ Die Datenbank-Sicherheit wird durch PostgreSQL RLS Policies gewährleistet:
 - `is_super_admin()` → gibt `true` nur für `super_admin`
 - Upload/Layout/Versionen/Blöcke/Regeln → nur `is_super_admin()`
 - User-Verwaltung (Profile lesen) → `is_admin()`
+- **profiles UPDATE:** User können nur das eigene Profil ändern; die Spalte `role` darf dabei nicht geändert werden (Migration 008 – verhindert Rollen-Eskalation).
 - `custom_products` → alle lesen/einfügen; Ersteller oder Super-Admin updaten/löschen
 - `hidden_items` → alle lesen/einfügen/löschen (jeder kann ein-/ausblenden)
 - `version_notifications` → eigene lesen/updaten; Super-Admin einfügen
