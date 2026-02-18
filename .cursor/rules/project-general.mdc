@@ -48,11 +48,12 @@ alwaysApply: true
 - Erfolg per sonner toast.success() anzeigen
 - Supabase Errors immer prüfen: if (error) throw error;
 
-## Drei-Rollen-System
-- super_admin = Inhaber (voller Zugriff, Upload, Layout, Versionen, User+Admin anlegen)
-- admin = Abteilungsleiter (PLU-Liste + User anlegen + PW zurücksetzen)
-- user = Personal (PLU-Liste ansehen, eigene Produkte, ausblenden, PDF)
-- is_admin() in DB = true für super_admin UND admin
+## Vier-Rollen-System
+- super_admin = Inhaber (voller Zugriff, Upload, Layout, Versionen, Rollen tauschen; User/Admin/Viewer anlegen)
+- admin = Abteilungsleiter (PLU-Liste + Umbenennen; Benutzerverwaltung: alle außer Super-Admin sehen, Passwort zurücksetzen + Löschen; nur User anlegen; keine Rollenänderung)
+- user = Personal (PLU-Liste, eigene Produkte, ausblenden, umbenennen, PDF; keine Benutzerverwaltung)
+- viewer = Nur PLU-Liste ansehen + PDF (keine weiteren Aktionen)
+- is_admin() in DB = true für super_admin UND admin (nicht viewer)
 - is_super_admin() in DB = true NUR für super_admin
 
 ## Dokumentation aktuell halten!

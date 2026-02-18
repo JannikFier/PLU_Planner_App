@@ -68,7 +68,7 @@ interface HiddenProductInfo {
  */
 export function HiddenItems() {
   const navigate = useNavigate()
-  const { profile, user } = useAuth()
+  const { profile, user, isSuperAdmin } = useAuth()
   const currentUserId = user?.id ?? null
   const [showCustomProductDialog, setShowCustomProductDialog] = useState(false)
   const [showHideProductsDialog, setShowHideProductsDialog] = useState(false)
@@ -402,21 +402,25 @@ export function HiddenItems() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <h3 className="text-lg font-semibold">Eigene Produkte</h3>
               <div className="flex flex-wrap gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  onChange={handleExcelFileSelect}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  Per Excel hochladen
-                </Button>
+                {isSuperAdmin && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={handleExcelFileSelect}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Per Excel hochladen
+                    </Button>
+                  </>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -540,21 +544,25 @@ export function HiddenItems() {
                 <EyeOff className="h-4 w-4 mr-2" />
                 Produkte ausblenden
               </Button>
-              <input
-                ref={hiddenExcelFileInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={handleHiddenExcelFileSelect}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => hiddenExcelFileInputRef.current?.click()}
-              >
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Per Excel ausblenden
-              </Button>
+              {isSuperAdmin && (
+                <>
+                  <input
+                    ref={hiddenExcelFileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={handleHiddenExcelFileSelect}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => hiddenExcelFileInputRef.current?.click()}
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Per Excel ausblenden
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>

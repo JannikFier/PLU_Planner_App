@@ -1,12 +1,14 @@
 /**
- * Prefetch von Daten für MasterList und LayoutSettingsPage.
+ * Prefetch von Daten für MasterList, LayoutSettingsPage und Benutzerverwaltung.
  * Wird beim App-Start (AuthPrefetch) und auf den Dashboards aufgerufen,
- * damit beim Klick auf "Masterliste" oder "Layout" die Daten bereits im Cache sind.
+ * damit beim Klick auf "Masterliste", "Layout" oder "Benutzer" die Daten bereits im Cache sind.
  */
 
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
+import type { Profile } from '@/types/database'
 
 /** Liest aktive Version-ID aus Cache (version/active oder aus versions-Liste). */
 function getActiveVersionIdFromCache(queryClient: QueryClient): string | null {
@@ -36,6 +38,21 @@ export function runMasterListPrefetch(queryClient: QueryClient): void {
         void queryClient.prefetchQuery({ queryKey: ['plu-items', versionId] })
       }
     })
+}
+
+/** Prefetch für Benutzerverwaltung (Admin/Super-Admin). Damit der "Alle Benutzer"-Kasten nach Reload schnell gefüllt ist. */
+export function runAdminPrefetch(queryClient: QueryClient): void {
+  void queryClient.prefetchQuery({
+    queryKey: ['all-profiles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as Profile[]
+    },
+  })
 }
 
 export function usePrefetchForNavigation() {

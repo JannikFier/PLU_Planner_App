@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Loader2 } from 'lucide-react'
 
 export function HomeRedirect() {
-  const { user, isLoading, isSuperAdmin, isAdmin } = useAuth()
+  const { user, isLoading, isSuperAdmin, isAdmin, isViewer } = useAuth()
 
   if (isLoading) {
     return (
@@ -24,5 +24,6 @@ export function HomeRedirect() {
 
   if (isSuperAdmin) return <Navigate to="/super-admin" replace />
   if (isAdmin) return <Navigate to="/admin" replace />
+  if (isViewer) return <Navigate to="/viewer" replace />
   return <Navigate to="/user" replace />
 }

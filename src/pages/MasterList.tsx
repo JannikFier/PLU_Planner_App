@@ -46,7 +46,7 @@ import { getCurrentKW } from '@/lib/date-kw-utils'
 import { ensureActiveVersion } from '@/lib/ensure-active-version'
 
 interface MasterListProps {
-  mode: 'user' | 'admin'
+  mode: 'user' | 'admin' | 'viewer'
 }
 
 /**
@@ -62,8 +62,8 @@ interface MasterListProps {
 export function MasterList({ mode }: MasterListProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { profile } = useAuth()
-  const rolePrefix = profile?.role === 'super_admin' ? '/super-admin' : profile?.role === 'admin' ? '/admin' : '/user'
+  const { profile, isAdmin } = useAuth()
+  const rolePrefix = profile?.role === 'super_admin' ? '/super-admin' : profile?.role === 'admin' ? '/admin' : profile?.role === 'viewer' ? '/viewer' : '/user'
 
   // Daten laden
   const { data: activeVersion, isLoading: versionLoading } = useActiveVersion()
@@ -252,7 +252,7 @@ export function MasterList({ mode }: MasterListProps) {
             </p>
           </div>
 
-          {/* KW-Auswahl + Neuer Upload (nur Admin) */}
+          {/* KW-Auswahl + Neuer Upload (nur Super-Admin / mode admin) */}
           <div className="flex items-center gap-2">
             {mode === 'admin' && (
               <Button onClick={() => navigate('/super-admin/plu-upload')} size="sm">
@@ -296,24 +296,28 @@ export function MasterList({ mode }: MasterListProps) {
 
             <div className="flex-1" />
 
-            {/* Aktionen: rechts */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`${rolePrefix}/custom-products`)}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Eigene Produkte
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`${rolePrefix}/hidden-products`)}
-            >
-              <EyeOff className="h-4 w-4 mr-1" />
-              Ausgeblendete
-            </Button>
-            {mode === 'admin' && (
+            {/* Aktionen: rechts (Viewer nur PDF) */}
+            {mode !== 'viewer' && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`${rolePrefix}/custom-products`)}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Eigene Produkte
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`${rolePrefix}/hidden-products`)}
+                >
+                  <EyeOff className="h-4 w-4 mr-1" />
+                  Ausgeblendete
+                </Button>
+              </>
+            )}
+            {(mode === 'admin' || (mode === 'user' && isAdmin)) && (
               <Button
                 variant="outline"
                 size="sm"

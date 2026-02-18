@@ -1,6 +1,8 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Loader2 } from 'lucide-react'
@@ -31,6 +33,7 @@ const RulesPage = lazy(() => import('@/pages/RulesPage').then((m) => ({ default:
 const BlockSortPage = lazy(() => import('@/pages/BlockSortPage').then((m) => ({ default: m.BlockSortPage })))
 const VersionsPage = lazy(() => import('@/pages/VersionsPage').then((m) => ({ default: m.VersionsPage })))
 const PLUUploadPage = lazy(() => import('@/pages/PLUUploadPage').then((m) => ({ default: m.PLUUploadPage })))
+const ViewerDashboard = lazy(() => import('@/pages/ViewerDashboard').then((m) => ({ default: m.ViewerDashboard })))
 
 /** Ladeanzeige beim Wechsel zu lazy-geladenen Seiten – mit Layout-Struktur, damit der Übergang nicht abrupt wirkt */
 function PageLoadingFallback() {
@@ -55,10 +58,13 @@ function PageLoadingFallback() {
 }
 
 // TanStack Query Client – zentrale Konfiguration
+// gcTime mindestens so hoch wie maxAge der Persistenz, damit gecachte Daten nach Reload nicht sofort verworfen werden
+const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 // 24 Stunden
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
+      gcTime: CACHE_MAX_AGE_MS,
       retry: (failureCount, error) => {
         if (isAbortError(error)) return failureCount < 2
         return failureCount < 1
@@ -67,6 +73,13 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
     },
   },
+})
+
+// Persister: Cache in sessionStorage speichern → nach Reload sofort letzte Daten anzeigen, dann im Hintergrund aktualisieren
+const persister = createSyncStoragePersister({
+  storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
+  key: 'PLU_PLANNER_QUERY_CACHE',
+  throttleTime: 1000,
 })
 
 /**
@@ -79,7 +92,14 @@ const queryClient = new QueryClient({
  */
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister,
+        maxAge: CACHE_MAX_AGE_MS,
+        buster: 'plu-planner-v1',
+      }}
+    >
       <AuthPrefetch />
       <TooltipProvider>
         <BrowserRouter>
@@ -137,6 +157,24 @@ function App() {
               element={
                 <ProtectedRoute>
                   <HiddenProductsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* === Viewer-Bereich (nur viewer) === */}
+            <Route
+              path="/viewer"
+              element={
+                <ProtectedRoute>
+                  <ViewerDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/viewer/masterlist"
+              element={
+                <ProtectedRoute>
+                  <MasterList mode="viewer" />
                 </ProtectedRoute>
               }
             />
@@ -309,7 +347,7 @@ function App() {
         <Toaster position="top-right" richColors closeButton />
         <SpeedInsights />
       </TooltipProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   )
 }
 

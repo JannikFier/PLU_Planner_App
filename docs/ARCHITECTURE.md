@@ -100,7 +100,7 @@ MasterList-Seite
 ```
 Server State (Supabase DB)
     ↓  useQuery()
-TanStack Query Cache
+TanStack Query Cache (persistiert in sessionStorage beim Reload → sofortige Anzeige letzter Daten)
     ↓
 React Components (UI)
     ↓  useMutation()

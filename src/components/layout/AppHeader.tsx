@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { LogOut, Settings, User, Shield, Crown, ChevronLeft } from 'lucide-react'
+import { LogOut, Settings, User, Shield, Crown, ChevronLeft, Eye } from 'lucide-react'
 import { NotificationBell } from '@/components/plu/NotificationBell'
 import { cn } from '@/lib/utils'
 
@@ -19,12 +19,12 @@ import { cn } from '@/lib/utils'
  * Passt sich an die drei Rollen an: Super-Admin, Admin, User.
  */
 export function AppHeader() {
-  const { profile, isAdmin, isSuperAdmin, logout } = useAuth()
+  const { profile, isAdmin, isSuperAdmin, isViewer, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
   // Home-Pfad = Dashboard je nach Rolle (einheitlich: Pfeil führt zurück zum Dashboard)
-  const homePath = isSuperAdmin ? '/super-admin' : isAdmin ? '/admin' : '/user'
+  const homePath = isSuperAdmin ? '/super-admin' : isAdmin ? '/admin' : isViewer ? '/viewer' : '/user'
 
   // Zurück-Button zeigen, wenn nicht auf dem eigenen Dashboard
   const showBack = location.pathname !== homePath
@@ -35,8 +35,8 @@ export function AppHeader() {
     : profile?.email?.slice(0, 2).toUpperCase() ?? '??'
 
   // Rollen-Anzeige
-  const roleLabel = isSuperAdmin ? 'Super-Admin' : isAdmin ? 'Admin' : null
-  const RoleIcon = isSuperAdmin ? Crown : Shield
+  const roleLabel = isSuperAdmin ? 'Super-Admin' : isAdmin ? 'Admin' : isViewer ? 'Viewer' : null
+  const RoleIcon = isSuperAdmin ? Crown : isAdmin ? Shield : Eye
 
   const handleLogout = async () => {
     await logout()
@@ -74,6 +74,9 @@ export function AppHeader() {
               {isAdmin && !isSuperAdmin && (
                 <span className="text-xs text-muted-foreground">Administration</span>
               )}
+              {isViewer && (
+                <span className="text-xs text-muted-foreground">Nur Ansicht</span>
+              )}
             </div>
           </div>
         </div>
@@ -84,15 +87,15 @@ export function AppHeader() {
           {roleLabel && (
             <div className={cn(
               'hidden sm:flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium',
-              isSuperAdmin ? 'bg-amber-100 text-amber-800' : 'bg-primary/10 text-primary'
+              isSuperAdmin ? 'bg-amber-100 text-amber-800' : isAdmin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
             )}>
               <RoleIcon className="h-3 w-3" />
               {roleLabel}
             </div>
           )}
 
-          {/* Benachrichtigungs-Glocke nur für Admin/User (Super-Admin nutzt Karte „Benachrichtigungen“ auf dem Dashboard) */}
-          {!isSuperAdmin && <NotificationBell />}
+          {/* Benachrichtigungs-Glocke nur für Admin/User (nicht Super-Admin, nicht Viewer) */}
+          {!isSuperAdmin && !isViewer && <NotificationBell />}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -100,7 +103,7 @@ export function AppHeader() {
                 <Avatar className="h-9 w-9">
                   <AvatarFallback className={cn(
                     'text-sm font-medium',
-                    isSuperAdmin ? 'bg-amber-100 text-amber-800' : isAdmin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                    isSuperAdmin ? 'bg-amber-100 text-amber-800' : isAdmin ? 'bg-primary/10 text-primary' : isViewer ? 'bg-muted text-muted-foreground' : 'bg-muted text-muted-foreground'
                   )}>
                     {initials}
                   </AvatarFallback>

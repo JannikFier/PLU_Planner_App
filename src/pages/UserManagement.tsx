@@ -85,10 +85,10 @@ export function UserManagement() {
     },
   })
 
-  // Gefilterte User: Admin sieht nur User, Super-Admin sieht alle
+  // Gefilterte User: Super-Admin sieht alle, Admin sieht alle außer Super-Admin
   const filteredUsers = users?.filter(u => {
     if (isSuperAdmin) return true
-    return u.role === 'user' // Admin sieht nur User
+    return u.role !== 'super_admin'
   })
 
   // Dialog States
@@ -105,7 +105,7 @@ export function UserManagement() {
   const [newDisplayName, setNewDisplayName] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [newPersonalnummer, setNewPersonalnummer] = useState('')
-  const [newRole, setNewRole] = useState<'user' | 'admin'>('user')
+  const [newRole, setNewRole] = useState<'user' | 'admin' | 'viewer'>('user')
 
   // User erstellen
   const createUserMutation = useMutation({
@@ -119,13 +119,15 @@ export function UserManagement() {
       const oneTimePassword = generateOneTimePassword()
 
       // Edge Function aufrufen (erstellt User über Admin API)
+      // Admin darf nur User anlegen (Rolle immer 'user'); Super-Admin wählt Rolle
+      const roleToCreate = isSuperAdmin ? newRole : 'user'
       const { data, error } = await supabase.functions.invoke('create-user', {
         body: {
           email: newEmail.trim() || undefined,
           password: oneTimePassword,
           personalnummer: newPersonalnummer.trim() || undefined,
           displayName: newDisplayName,
-          role: newRole,
+          role: roleToCreate,
         },
         headers: {
           Authorization: `Bearer ${currentSession.access_token}`,
@@ -243,11 +245,12 @@ export function UserManagement() {
     }
   }
 
-  // Rollen-Badge Farbe
+  // Rollen-Badge Farbe und Label
   const roleBadgeVariant = (role: string) => {
     switch (role) {
       case 'super_admin': return 'default' as const
       case 'admin': return 'secondary' as const
+      case 'viewer': return 'outline' as const
       default: return 'outline' as const
     }
   }
@@ -256,9 +259,31 @@ export function UserManagement() {
     switch (role) {
       case 'super_admin': return 'Super-Admin'
       case 'admin': return 'Admin'
+      case 'viewer': return 'Viewer'
       default: return 'User'
     }
   }
+
+  // Rolle ändern (nur Super-Admin)
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ userId, newRole }: { userId: string; newRole: 'user' | 'admin' | 'viewer' }) => {
+      const { data: { session } } = await supabase.auth.refreshSession()
+      if (!session?.access_token) throw new Error('Nicht angemeldet.')
+      const { data, error } = await supabase.functions.invoke('update-user-role', {
+        body: { userId, newRole },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
+      toast.success('Rolle wurde geändert.')
+    },
+    onError: (e: Error) => {
+      toast.error(e.message)
+    },
+  })
 
   return (
     <DashboardLayout>
@@ -331,7 +356,7 @@ export function UserManagement() {
                     <Label>Rolle</Label>
                     <Select
                       value={newRole}
-                      onValueChange={(v) => setNewRole(v as 'user' | 'admin')}
+                      onValueChange={(v) => setNewRole(v as 'user' | 'admin' | 'viewer')}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -339,6 +364,7 @@ export function UserManagement() {
                       <SelectContent>
                         <SelectItem value="user">User (Personal)</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="viewer">Viewer (nur Liste + PDF)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -515,9 +541,26 @@ export function UserManagement() {
                         {formatProfileDisplayEmail(user.email)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={roleBadgeVariant(user.role)}>
-                          {roleBadgeLabel(user.role)}
-                        </Badge>
+                        {isSuperAdmin && user.role !== 'super_admin' ? (
+                          <Select
+                            value={user.role}
+                            onValueChange={(v) => updateRoleMutation.mutate({ userId: user.id, newRole: v as 'user' | 'admin' | 'viewer' })}
+                            disabled={updateRoleMutation.isPending}
+                          >
+                            <SelectTrigger className="w-[140px] h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="user">User</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="viewer">Viewer</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge variant={roleBadgeVariant(user.role)}>
+                            {roleBadgeLabel(user.role)}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         {/* Super-Admin kann nicht bearbeitet werden */}

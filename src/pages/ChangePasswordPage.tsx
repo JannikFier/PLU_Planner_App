@@ -16,7 +16,7 @@ import { toast } from 'sonner'
  */
 export function ChangePasswordPage() {
   const navigate = useNavigate()
-  const { changePassword, profile, isSuperAdmin, isAdmin } = useAuth()
+  const { changePassword, profile, isSuperAdmin, isAdmin, isViewer } = useAuth()
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -51,6 +51,8 @@ export function ChangePasswordPage() {
         navigate('/super-admin/masterlist', { replace: true })
       } else if (isAdmin) {
         navigate('/admin', { replace: true })
+      } else if (isViewer) {
+        navigate('/viewer', { replace: true })
       } else {
         navigate('/user', { replace: true })
       }

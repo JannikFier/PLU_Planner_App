@@ -65,10 +65,10 @@ serve(async (req) => {
       )
     }
 
-    // Admin darf nur User erstellen, Super-Admin auch Admins
-    if (role === 'admin' && callerProfile.role !== 'super_admin') {
+    // Nur Super-Admin darf Admin oder Viewer erstellen; Admin darf nur User erstellen
+    if ((role === 'admin' || role === 'viewer') && callerProfile.role !== 'super_admin') {
       return new Response(
-        JSON.stringify({ error: 'Nur Super-Admins können Admins erstellen.' }),
+        JSON.stringify({ error: 'Nur Super-Admins können Admins oder Viewer erstellen.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -80,6 +80,10 @@ serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    // Erlaubte Rollen: user, admin, viewer (super_admin bereits oben abgefangen)
+    const allowedRoles = ['user', 'admin', 'viewer'] as const
+    const roleToSet = allowedRoles.includes(role) ? role : 'user'
 
     // Auth-E-Mail: E-Mail wenn angegeben, sonst Personalnummer@plu-planner.local
     const authEmail = emailTrimmed
@@ -99,7 +103,7 @@ serve(async (req) => {
       user_metadata: {
         personalnummer: metadataPersonalnummer,
         display_name: displayName || '',
-        role: role || 'user',
+        role: roleToSet,
         must_change_password: true,
       },
     })

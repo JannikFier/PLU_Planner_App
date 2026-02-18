@@ -10,7 +10,7 @@ export interface Database {
           email: string
           personalnummer: string
           display_name: string | null
-          role: 'super_admin' | 'admin' | 'user'
+          role: 'super_admin' | 'admin' | 'user' | 'viewer'
           must_change_password: boolean
           created_by: string | null
           created_at: string
@@ -21,7 +21,7 @@ export interface Database {
           email: string
           personalnummer: string
           display_name?: string | null
-          role?: 'super_admin' | 'admin' | 'user'
+          role?: 'super_admin' | 'admin' | 'user' | 'viewer'
           must_change_password?: boolean
           created_by?: string | null
           created_at?: string
@@ -32,7 +32,7 @@ export interface Database {
           email?: string
           personalnummer?: string
           display_name?: string | null
-          role?: 'super_admin' | 'admin' | 'user'
+          role?: 'super_admin' | 'admin' | 'user' | 'viewer'
           must_change_password?: boolean
           last_login?: string | null
         }

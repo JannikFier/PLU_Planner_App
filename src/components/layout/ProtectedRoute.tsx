@@ -23,8 +23,13 @@ export function ProtectedRoute({
   requireSuperAdmin = false,
 }: ProtectedRouteProps) {
   const location = useLocation()
-  const { user, isAdmin, isSuperAdmin, mustChangePassword, isLoading } = useAuth()
+  const { user, profile, isAdmin, isSuperAdmin, mustChangePassword, isLoading } = useAuth()
   const isChangePasswordPage = location.pathname === '/change-password'
+
+  // Viewer darf keine Admin/Super-Admin-Routen betreten
+  if ((requireAdmin || requireSuperAdmin) && profile?.role === 'viewer') {
+    return <Navigate to="/viewer" replace />
+  }
 
   // Laden: Spinner anzeigen
   if (isLoading) {

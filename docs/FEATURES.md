@@ -15,7 +15,7 @@
 
 ## Kern-Konzept
 
-Der PLU Planner verwaltet wöchentliche Preis-Look-Up (PLU) Listen für Obst- und Gemüseabteilungen. Jede Kalenderwoche liefert die Zentrale neue Excel-Dateien, die hochgeladen und mit der Vorwoche verglichen werden.
+Der PLU Planner verwaltet wöchentliche Preis-Look-Up (PLU) Listen für Obst- und Gemüseabteilungen. Jede Kalenderwoche liefert die Zentrale neue Excel-Dateien, die hochgeladen und mit der Vorwoche verglichen werden. Es gibt **vier Rollen**: Super-Admin (Inhaber, alles inkl. Rollen tauschen), Admin (Benutzerverwaltung ohne Rollenänderung, PLU inkl. Umbenennen), User (volle PLU-Funktionen, keine Benutzerverwaltung), Viewer (nur PLU-Liste ansehen + PDF). Details in [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md).
 
 ## Farbcodes
 
@@ -65,7 +65,7 @@ Alle Rollen arbeiten an EINER gemeinsamen Liste. Änderungen gelten für alle.
 - Alle Rollen können eigene Produkte hinzufügen. **Entweder PLU oder Preis:** PLU = 4 oder 5 Ziffern (ohne Dezimaltrenner), ODER Preis = Dezimalzahl (z.B. 1,50). Genau eines davon ist Pflicht. Name + Typ (+ optional Block/Warengruppe je nach Layout) wie bisher.
 - Produkte ohne PLU (nur Preis): In der DB wird in `custom_products.plu` ein interner Platzhalter `price-{uuid}` gespeichert (NOT NULL UNIQUE); in der Anzeige erscheint in der PLU-Spalte „–“.
 - **Preisanzeige in der Tabelle:** Bei eigenen Produkten mit Preis erscheint in der PLU-Tabelle (und Layout-Vorschau) in der Artikel-Spalte ein kompakter €-Preiskasten (z.B. „1,50 €“). Ohne Preis wird kein Preiskasten angezeigt.
-- **Excel-Upload:** Auf „Eigene & Ausgeblendete“ kann per Button „Per Excel hochladen“ eine Excel-Datei mit 3 Spalten (PLU oder Preis | Name | Warengruppe oder Stück/Gewicht je nach Layout) importiert werden. Bei fehlenden Angaben in Spalte 3 erscheint eine Vorschau mit Nachfrage (Dropdown pro Zeile); danach werden alle Produkte batchweise hinzugefügt.
+- **Excel-Upload:** Nur **Super-Admin** sieht die Buttons „Per Excel hochladen“ (Eigene Produkte) und „Per Excel ausblenden“. Auf „Eigene & Ausgeblendete“ kann der Super-Admin eine Excel-Datei mit 3 Spalten (PLU oder Preis | Name | Warengruppe oder Stück/Gewicht je nach Layout) importieren. Bei fehlenden Angaben in Spalte 3 erscheint eine Vorschau mit Nachfrage (Dropdown pro Zeile); danach werden alle Produkte batchweise hinzugefügt.
 - **„Von mir erstellt“:** In der Tabelle Eigene Produkte wird bei Einträgen, die der aktuelle User erstellt hat (`created_by`), ein Badge „Von mir erstellt“ angezeigt.
 - Werden global gespeichert (nicht pro User)
 - **Master hat Vorrang:** Wenn eine PLU sowohl in master_plu_items als auch in custom_products existiert, wird nur das Master-Item angezeigt. Das Custom Product wird "implizit pausiert".
@@ -78,7 +78,7 @@ Alle Rollen arbeiten an EINER gemeinsamen Liste. Änderungen gelten für alle.
 - KW-unabhängig (bleiben über KW-Wechsel bestehen)
 - Jeder kann Produkte auch wieder einblenden
 - **Suchfunktion zum Ausblenden:** Auf der Masterliste gibt es ein Suchfeld; Treffer (PLU/Name) werden in einem Popover angezeigt, pro Treffer kann „Ausblenden“ geklickt werden.
-- **Excel-Upload zum Ausblenden:** Auf „Eigene & Ausgeblendete“ in der Sektion Ausgeblendete Produkte: Button „Per Excel ausblenden“. Excel mit einer Spalte PLU-Nummern (eine pro Zeile); Vorschau „Diese Produkte werden ausgeblendet“, Bestätigung, dann batchweise in `hidden_items`.
+- **Excel-Upload zum Ausblenden:** Nur Super-Admin sieht den Button. Auf „Eigene & Ausgeblendete“ in der Sektion Ausgeblendete Produkte: Button „Per Excel ausblenden“. Excel mit einer Spalte PLU-Nummern (eine pro Zeile); Vorschau „Diese Produkte werden ausgeblendet“, Bestätigung, dann batchweise in `hidden_items`.
 - **„Von mir ausgeblendet“:** In der Tabelle Ausgeblendete Produkte wird bei Einträgen, die der aktuelle User ausgeblendet hat (`hidden_by`), zusätzlich „Von mir“ angezeigt.
 - Verwaltung über die Seite **Eigene & Ausgeblendete** (`*/hidden-items`): zwei Sektionen – oben „Eigene Produkte“ (Liste + hinzufügen), darunter „Ausgeblendete Produkte“ (Einblenden, Per Excel ausblenden)
 

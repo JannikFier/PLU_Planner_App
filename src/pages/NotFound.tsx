@@ -12,7 +12,7 @@ export function NotFound() {
   const { profile } = useAuth()
 
   const dashboardPath =
-    profile?.role === 'super_admin' ? '/super-admin/masterlist' : profile?.role === 'admin' ? '/admin' : '/user'
+    profile?.role === 'super_admin' ? '/super-admin/masterlist' : profile?.role === 'admin' ? '/admin' : profile?.role === 'viewer' ? '/viewer' : '/user'
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">

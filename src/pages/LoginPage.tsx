@@ -19,6 +19,7 @@ export function LoginPage() {
     isLoading,
     isSuperAdmin,
     isAdmin,
+    isViewer,
     mustChangePassword,
     error,
     loginWithEmail,
@@ -44,6 +45,7 @@ export function LoginPage() {
     }
     if (isSuperAdmin) return <Navigate to="/super-admin/masterlist" replace />
     if (isAdmin) return <Navigate to="/admin" replace />
+    if (isViewer) return <Navigate to="/viewer" replace />
     return <Navigate to="/user" replace />
   }
 

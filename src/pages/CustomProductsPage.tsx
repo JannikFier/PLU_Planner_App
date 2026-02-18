@@ -54,7 +54,7 @@ import { parseBlockNameToItemType } from '@/lib/plu-helpers'
 
 export function CustomProductsPage() {
   const navigate = useNavigate()
-  const { profile, user } = useAuth()
+  const { profile, user, isSuperAdmin } = useAuth()
   const currentUserId = user?.id ?? null
 
   const [showAddDialog, setShowAddDialog] = useState(false)
@@ -204,17 +204,21 @@ export function CustomProductsPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={handleExcelFileSelect}
-            />
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Per Excel hochladen
-            </Button>
+            {isSuperAdmin && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={handleExcelFileSelect}
+                />
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Per Excel hochladen
+                </Button>
+              </>
+            )}
             <Button variant="outline" size="sm" onClick={() => setShowAddDialog(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Eigenes Produkt hinzufügen

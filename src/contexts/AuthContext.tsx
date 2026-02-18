@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { isAbortError } from '@/lib/error-utils'
@@ -15,6 +15,8 @@ export interface AuthState {
   isAdmin: boolean
   /** true NUR für super_admin (Inhaber) */
   isSuperAdmin: boolean
+  /** true NUR für viewer (nur Liste + PDF) */
+  isViewer: boolean
   /** true wenn User beim Login sein Passwort ändern muss */
   mustChangePassword: boolean
   isLoading: boolean
@@ -44,6 +46,7 @@ function authReducer(
     profile,
     isAdmin: profile?.role === 'super_admin' || profile?.role === 'admin',
     isSuperAdmin: profile?.role === 'super_admin',
+    isViewer: profile?.role === 'viewer',
     mustChangePassword: profile?.must_change_password ?? false,
   }
 }
@@ -55,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profile: null,
     isAdmin: false,
     isSuperAdmin: false,
+    isViewer: false,
     mustChangePassword: false,
     isLoading: true,
     error: null,
@@ -63,6 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const PROFILE_CACHE_KEY = 'plu_planner_profile'
   const SESSION_CACHE_KEY = 'plu_planner_session'
   const FETCH_PROFILE_TIMEOUT = 8000
+  /** true wenn wir in diesem Init bereits aus Cache angezeigt haben – dann getSession-Update minimal halten */
+  const displayedFromCacheRef = useRef(false)
 
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     const fetchOnce = async (): Promise<Profile | null> => {
@@ -103,37 +109,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true
+    displayedFromCacheRef.current = false
 
-    const initAuth = async () => {
+    const runGetSessionAndContinue = async () => {
       try {
-        // Sofort mit Cache anzeigen (Reload = Seite sofort da), getSession im Hintergrund
-        let cachedProfile: { userId: string; profile: Profile } | null = null
-        let cachedSession: { userId: string; email: string } | null = null
-        try {
-          const profileRaw = sessionStorage.getItem(PROFILE_CACHE_KEY)
-          const sessionRaw = sessionStorage.getItem(SESSION_CACHE_KEY)
-          if (profileRaw) {
-            const parsed = JSON.parse(profileRaw) as { userId: string; profile: Profile }
-            if (parsed.userId && parsed.profile) cachedProfile = parsed
-          }
-          if (sessionRaw) {
-            const parsed = JSON.parse(sessionRaw) as { userId: string; email: string }
-            if (parsed.userId) cachedSession = parsed
-          }
-        } catch {
-          // Cache ungültig – ignorieren
-        }
-
-        if (cachedProfile && cachedSession && cachedProfile.userId === cachedSession.userId && mounted) {
-          const minimalUser = { id: cachedProfile.userId, email: cachedSession.email ?? '' } as User
-          setState((prev) => ({
-            ...prev,
-            ...authReducer(minimalUser, null, cachedProfile.profile),
-            isLoading: false,
-            error: null,
-          }))
-        }
-
         const { data: { session } } = await supabase.auth.getSession()
 
         if (session?.user && mounted) {
@@ -154,6 +133,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Cache ungültig – ignorieren
           }
 
+          if (cached && mounted && displayedFromCacheRef.current) {
+            // Bereits aus Cache angezeigt – nur Session nachziehen, kein voller Re-Render mit gleichen Profildaten
+            setState((prev) => ({ ...prev, session }))
+            return
+          }
+
           if (cached && mounted) {
             setState((prev) => ({
               ...prev,
@@ -163,14 +148,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }))
           }
 
-          const profile = await fetchProfile(userId)
-          if (!mounted) return
-          setState((prev) => ({
-            ...prev,
-            ...authReducer(session.user, session, profile),
-            isLoading: false,
-            error: null,
-          }))
+          if (!displayedFromCacheRef.current) {
+            const profile = await fetchProfile(userId)
+            if (!mounted) return
+            setState((prev) => ({
+              ...prev,
+              ...authReducer(session.user, session, profile),
+              isLoading: false,
+              error: null,
+            }))
+          }
         } else if (mounted) {
           try {
             sessionStorage.removeItem(SESSION_CACHE_KEY)
@@ -179,6 +166,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           setState((prev) => ({ ...prev, isLoading: false }))
         }
+      } catch (e) {
+        if (!mounted) return
+        if (isAbortError(e)) {
+          setState((prev) => ({ ...prev, isLoading: false }))
+          return
+        }
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: 'Auth-Initialisierung fehlgeschlagen',
+        }))
+      }
+    }
+
+    const initAuth = () => {
+      try {
+        let cachedProfile: { userId: string; profile: Profile } | null = null
+        let cachedSession: { userId: string; email: string } | null = null
+        try {
+          const profileRaw = sessionStorage.getItem(PROFILE_CACHE_KEY)
+          const sessionRaw = sessionStorage.getItem(SESSION_CACHE_KEY)
+          if (profileRaw) {
+            const parsed = JSON.parse(profileRaw) as { userId: string; profile: Profile }
+            if (parsed.userId && parsed.profile) cachedProfile = parsed
+          }
+          if (sessionRaw) {
+            const parsed = JSON.parse(sessionRaw) as { userId: string; email: string }
+            if (parsed.userId) cachedSession = parsed
+          }
+        } catch {
+          // Cache ungültig – ignorieren
+        }
+
+        if (cachedProfile && cachedSession && cachedProfile.userId === cachedSession.userId && mounted) {
+          displayedFromCacheRef.current = true
+          const minimalUser = { id: cachedProfile.userId, email: cachedSession.email ?? '' } as User
+          setState((prev) => ({
+            ...prev,
+            ...authReducer(minimalUser, null, cachedProfile.profile),
+            isLoading: false,
+            error: null,
+          }))
+          // getSession erst im Idle ausführen, damit Lazy-Chunks und First Paint Priorität haben
+          let scheduled = false
+          const runOnce = () => {
+            if (scheduled) return
+            scheduled = true
+            clearTimeout(timeoutId)
+            if (typeof cancelIdleCallback !== 'undefined' && idleId !== undefined) cancelIdleCallback(idleId)
+            void runGetSessionAndContinue()
+          }
+          const timeoutId = setTimeout(runOnce, 120)
+          const idleId =
+            typeof requestIdleCallback !== 'undefined'
+              ? requestIdleCallback(runOnce, { timeout: 2000 })
+              : undefined
+          return
+        }
+
+        void runGetSessionAndContinue()
       } catch (e) {
         if (!mounted) return
         if (isAbortError(e)) {
@@ -233,6 +280,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             profile: null,
             isAdmin: false,
             isSuperAdmin: false,
+            isViewer: false,
             mustChangePassword: false,
             isLoading: false,
             error: null,

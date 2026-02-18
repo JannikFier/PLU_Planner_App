@@ -1,0 +1,4 @@
+# PLU Planner – Supabase Projekt-Konfiguration
+# update-user-role: JWT-Check am Gateway deaktivieren, Auth erfolgt in der Function (getUser + super_admin-Check)
+[functions.update-user-role]
+verify_jwt = false
