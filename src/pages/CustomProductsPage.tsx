@@ -2,13 +2,12 @@
 // Liste, hinzufügen, bearbeiten, ausblenden, löschen, Excel-Import
 
 import { useMemo, useState, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ArrowLeft, Plus, Eye, EyeOff, Layers, FileSpreadsheet, Trash2, Pencil } from 'lucide-react'
+import { Plus, Eye, EyeOff, Layers, FileSpreadsheet, Trash2, Pencil } from 'lucide-react'
 import { useCustomProducts, useAddCustomProductsBatch, useDeleteCustomProduct } from '@/hooks/useCustomProducts'
 import { useHiddenItems, useHideProduct, useUnhideProduct } from '@/hooks/useHiddenItems'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
@@ -53,8 +52,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { parseBlockNameToItemType } from '@/lib/plu-helpers'
 
 export function CustomProductsPage() {
-  const navigate = useNavigate()
-  const { profile, user, isSuperAdmin } = useAuth()
+  const { user, isSuperAdmin } = useAuth()
   const currentUserId = user?.id ?? null
 
   const [showAddDialog, setShowAddDialog] = useState(false)
@@ -82,8 +80,6 @@ export function CustomProductsPage() {
     () => new Set([...masterItems.map((m) => m.plu), ...customProducts.map((c) => c.plu)]),
     [masterItems, customProducts],
   )
-
-  const rolePrefix = profile?.role === 'super_admin' ? '/super-admin' : profile?.role === 'admin' ? '/admin' : '/user'
 
   const handleExcelFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -189,9 +185,6 @@ export function CustomProductsPage() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(`${rolePrefix}/masterlist`)}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
             <div className="rounded-lg p-2 bg-muted">
               <Layers className="h-5 w-5 text-muted-foreground" />
             </div>

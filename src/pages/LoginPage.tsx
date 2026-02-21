@@ -43,7 +43,7 @@ export function LoginPage() {
     if (mustChangePassword) {
       return <Navigate to="/change-password" replace />
     }
-    if (isSuperAdmin) return <Navigate to="/super-admin/masterlist" replace />
+    if (isSuperAdmin) return <Navigate to="/super-admin" replace />
     if (isAdmin) return <Navigate to="/admin" replace />
     if (isViewer) return <Navigate to="/viewer" replace />
     return <Navigate to="/user" replace />

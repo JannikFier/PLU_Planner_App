@@ -23,6 +23,13 @@ bezeichnungsregeln (Keyword-Regeln)
 blocks (Warengruppen/Blöcke)
     │
     └──→ block_rules (1:n) – Zuweisungsregeln pro Block
+
+Backshop-PLU-Liste (getrennt von Obst/Gemüse, gleiche profiles):
+backshop_versions → backshop_master_plu_items (inkl. image_url)
+                  → backshop_version_notifications
+backshop_blocks → backshop_block_rules
+backshop_custom_products, backshop_hidden_items (Bild Pflicht bei custom)
+backshop_layout_settings (Singleton), backshop_bezeichnungsregeln
 ```
 
 ## Tabellen im Detail
@@ -37,7 +44,7 @@ Erweitert Supabase Auth um App-spezifische Daten.
 | `email` | TEXT | E-Mail-Adresse |
 | `personalnummer` | TEXT (UNIQUE) | 7-stellige Personalnummer |
 | `display_name` | TEXT | Anzeigename |
-| `role` | TEXT | `super_admin`, `admin` oder `user` |
+| `role` | TEXT | `super_admin`, `admin`, `user` oder `viewer` |
 | `must_change_password` | BOOLEAN | Einmalpasswort-Flag |
 | `created_by` | UUID | Wer hat diesen User angelegt |
 | `created_at` | TIMESTAMPTZ | Erstellt am |
@@ -200,6 +207,35 @@ Pro User pro Version eine Benachrichtigung (gelesen/ungelesen).
 | `product_name` | TEXT | Produktname |
 | `user_decision` | TEXT | `pending`, `uebernommen`, `ausgeblendet` |
 
+## Backshop-Tabellen (Migration 011)
+
+Getrennte Tabellen für die zweite PLU-Liste „Backshop“. Keine Änderung an den Obst/Gemüse-Tabellen.
+
+| Tabelle | Beschreibung |
+|---------|--------------|
+| `backshop_versions` | KW-Versionen für Backshop (wie versions) |
+| `backshop_blocks` | Warengruppen nur für Backshop |
+| `backshop_block_rules` | Zuweisungsregeln für backshop_blocks |
+| `backshop_master_plu_items` | PLU-Einträge pro Backshop-Version; **kein** item_type, dafür **image_url** (TEXT, Referenz auf Supabase Storage) |
+| `backshop_custom_products` | Eigene Produkte Backshop; **image_url NOT NULL** (Bild Pflicht) |
+| `backshop_hidden_items` | Ausgeblendete PLUs Backshop |
+| `backshop_version_notifications` | Benachrichtigungen pro Backshop-Version |
+| `backshop_layout_settings` | Singleton Layout für Backshop (sort_mode, Schriftgrößen, Markierungs-Dauer) |
+| `backshop_bezeichnungsregeln` | Bezeichnungsregeln nur für Backshop |
+
+**Funktion:** `get_active_backshop_version()` – gibt die aktive Backshop-Version zurück (analog `get_active_version()`).
+
+**RLS:** Lesen für alle authentifizierten User; Schreiben für versions/items/blocks/regeln/layout/bezeichnungsregeln nur Super-Admin; custom_products/hidden_items wie bei Obst/Gemüse.
+
+## Supabase Storage (Backshop-Bilder)
+
+- **Bucket:** `backshop-images` (im Supabase Dashboard anlegen, **nicht** per SQL – Supabase empfiehlt Dashboard oder API).
+- **Zweck:** Bilder für Backshop-Produkte (aus Excel-Upload oder manuell im Umbenennen-Bereich / bei eigenen Produkten).
+- **Policies:** Authentifizierte User dürfen lesen; authentifizierte User dürfen hochladen, aktualisieren und löschen.
+- In der App werden die URLs in `backshop_master_plu_items.image_url` bzw. `backshop_custom_products.image_url` gespeichert.
+
+**Schritt-für-Schritt-Anleitung:** [docs/BACKSHOP_STORAGE_SETUP.md](BACKSHOP_STORAGE_SETUP.md)
+
 ## Wichtige SQL-Funktionen
 
 | Funktion | Zweck |
@@ -208,7 +244,8 @@ Pro User pro Version eine Benachrichtigung (gelesen/ungelesen).
 | `is_super_admin()` | Gibt true nur für super_admin |
 | `lookup_email_by_personalnummer(p_nummer)` | Findet Email zu einer Personalnummer (für Login) |
 | `get_current_kw()` | Gibt aktuelle Kalenderwoche + Jahr zurück |
-| `get_active_version()` | Gibt die aktive KW-Version zurück |
+| `get_active_version()` | Gibt die aktive KW-Version (Obst/Gemüse) zurück |
+| `get_active_backshop_version()` | Gibt die aktive Backshop-Version zurück |
 | `handle_new_user()` | Trigger: erstellt automatisch Profil bei neuem Auth-User |
 
 ## SQL-Migrations
@@ -222,3 +259,8 @@ Die Datenbank wird über nummerierte SQL-Scripts aufgebaut:
 5. **005_add_display_name.sql** – display_name Feld für master_plu_items
 6. **006_global_lists.sql** – custom_products, hidden_items, version_notifications + is_manually_renamed
 7. **007_cron_jobs.sql** – pg_cron Jobs (KW-Switch, Auto-Delete, Notification Cleanup)
+8. **008_profiles_prevent_role_escalation.sql** – Rollen-Eskalation verhindern
+9. **009_rename_master_plu_item.sql** – Umbenennen (display_name, is_manually_renamed)
+10. **010_four_roles_viewer.sql** – Rolle viewer
+11. **011_backshop_schema.sql** – Backshop-Tabellen (Versionen, Items mit image_url, Custom, Hidden, Notifications, Layout, Regeln, Blöcke) + RLS + get_active_backshop_version()
+12. **013_backshop_cron.sql** – Backshop-Cron-Jobs (backshop-kw-switch, backshop-auto-delete-old-versions, backshop-notification-cleanup)

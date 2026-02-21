@@ -2,13 +2,12 @@
 // Liste, Einblenden, Bearbeiten (bei eigenen), "Produkte ausblenden" oben rechts
 
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ArrowLeft, EyeOff, Undo2, Pencil } from 'lucide-react'
+import { EyeOff, Undo2, Pencil } from 'lucide-react'
 import { useHiddenItems, useUnhideProduct } from '@/hooks/useHiddenItems'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
@@ -35,8 +34,7 @@ interface HiddenProductInfo {
 }
 
 export function HiddenProductsPage() {
-  const navigate = useNavigate()
-  const { profile, user } = useAuth()
+  const { user } = useAuth()
   const currentUserId = user?.id ?? null
 
   const [showHideDialog, setShowHideDialog] = useState(false)
@@ -137,16 +135,11 @@ export function HiddenProductsPage() {
     })
   }, [hiddenItems, masterItems, customProducts, profileMap])
 
-  const rolePrefix = profile?.role === 'super_admin' ? '/super-admin' : profile?.role === 'admin' ? '/admin' : '/user'
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(`${rolePrefix}/masterlist`)} aria-label="Zurück">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
             <div className="rounded-lg p-2 bg-muted">
               <EyeOff className="h-5 w-5 text-muted-foreground" />
             </div>

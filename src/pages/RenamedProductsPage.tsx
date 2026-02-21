@@ -2,7 +2,6 @@
 // Liste der umbenannten Master-Items, „Produkte umbenennen“-Dialog, Zurücksetzen mit Bestätigung
 
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Pencil, Undo2 } from 'lucide-react'
+import { Pencil, Undo2 } from 'lucide-react'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
 import { useResetProductName } from '@/hooks/useCustomProducts'
@@ -27,8 +26,7 @@ import { RenameProductsDialog } from '@/components/plu/RenameProductsDialog'
 import type { MasterPLUItem } from '@/types/database'
 
 export function RenamedProductsPage() {
-  const navigate = useNavigate()
-  const { profile } = useAuth()
+  useAuth()
   const [showRenameDialog, setShowRenameDialog] = useState(false)
   const [resetConfirmItem, setResetConfirmItem] = useState<MasterPLUItem | null>(null)
 
@@ -40,9 +38,6 @@ export function RenamedProductsPage() {
     () => masterItems.filter((m) => m.is_manually_renamed === true),
     [masterItems],
   )
-
-  const rolePrefix =
-    profile?.role === 'super_admin' ? '/super-admin' : profile?.role === 'admin' ? '/admin' : '/user'
 
   const handleResetConfirm = async () => {
     if (!resetConfirmItem) return
@@ -59,14 +54,6 @@ export function RenamedProductsPage() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(`${rolePrefix}/masterlist`)}
-              aria-label="Zurück"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
             <div className="rounded-lg p-2 bg-muted">
               <Pencil className="h-5 w-5 text-muted-foreground" />
             </div>

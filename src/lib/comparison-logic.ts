@@ -8,6 +8,9 @@ import type {
   ComparisonResult,
   ComparisonSummary,
   ConflictItem,
+  ParsedBackshopRow,
+  BackshopCompareItem,
+  BackshopComparisonResult,
 } from '@/types/plu'
 
 /** Key für Name-Lookup: lowercase name + item_type */
@@ -242,4 +245,166 @@ export function resolveConflicts(
   }
 
   return resolved
+}
+
+// ============================================================
+// Backshop-Vergleich (ohne item_type, mit Bild-Erhalt)
+// ============================================================
+
+interface CompareBackshopInput {
+  incomingRows: ParsedBackshopRow[]
+  currentItems: BackshopCompareItem[]
+  previousItems: BackshopCompareItem[]
+  newVersionId: string
+  isFirstUpload: boolean
+}
+
+/** Sucht ein bestehendes Bild für PLU oder Name (zuerst current, dann previous). */
+function findExistingImageUrl(
+  plu: string,
+  systemName: string,
+  currentByPLU: Map<string, BackshopCompareItem>,
+  currentByName: Map<string, BackshopCompareItem>,
+  previousByName: Map<string, BackshopCompareItem>,
+  incomingImageUrl: string | null
+): string | null {
+  if (incomingImageUrl) return incomingImageUrl
+  const byPlu = currentByPLU.get(plu)
+  if (byPlu?.image_url) return byPlu.image_url
+  const nameKey = systemName.toLowerCase()
+  const byName = currentByName.get(nameKey)
+  if (byName?.image_url) return byName.image_url
+  const prev = previousByName.get(nameKey)
+  if (prev?.image_url) return prev.image_url
+  return null
+}
+
+/**
+ * Vergleicht neue Backshop-Excel-Daten mit der bestehenden Version.
+ * Gleiche Logik wie Obst/Gemüse, aber ohne item_type.
+ * Bild-Erhalt: Wenn die neue Zeile kein Bild hat, wird das Bild aus current/previous übernommen (Match über PLU oder Name).
+ */
+export function compareBackshopWithCurrentVersion(input: CompareBackshopInput): BackshopComparisonResult {
+  const { incomingRows, currentItems, previousItems, isFirstUpload } = input
+
+  const currentByPLU = new Map<string, BackshopCompareItem>()
+  const currentByName = new Map<string, BackshopCompareItem>()
+  for (const item of currentItems) {
+    currentByPLU.set(item.plu, item)
+    currentByName.set(item.system_name.toLowerCase(), item)
+  }
+
+  const previousByName = new Map<string, BackshopCompareItem>()
+  for (const item of previousItems) {
+    const key = item.system_name.toLowerCase()
+    if (!currentByName.has(key)) previousByName.set(key, item)
+  }
+
+  const unchanged: BackshopCompareItem[] = []
+  const pluChanged: BackshopCompareItem[] = []
+  const newProducts: BackshopCompareItem[] = []
+  const conflicts: { plu: string; incomingName: string; existingName: string }[] = []
+  const allItems: BackshopCompareItem[] = []
+  const processedPLUs = new Set<string>()
+  let duplicatesSkipped = 0
+
+  for (const row of incomingRows) {
+    if (processedPLUs.has(row.plu)) {
+      duplicatesSkipped++
+      continue
+    }
+    processedPLUs.add(row.plu)
+
+    const imageUrl = findExistingImageUrl(
+      row.plu,
+      row.systemName,
+      currentByPLU,
+      currentByName,
+      previousByName,
+      row.imageUrl
+    )
+
+    const baseItem: BackshopCompareItem = {
+      id: generateUUID(),
+      plu: row.plu,
+      system_name: row.systemName,
+      display_name: null,
+      status: 'UNCHANGED',
+      old_plu: null,
+      image_url: imageUrl,
+    }
+
+    if (isFirstUpload) {
+      baseItem.status = 'UNCHANGED'
+      unchanged.push(baseItem)
+      allItems.push(baseItem)
+      continue
+    }
+
+    const existingByPLU = currentByPLU.get(row.plu)
+    if (existingByPLU) {
+      if (existingByPLU.system_name.toLowerCase() === row.systemName.toLowerCase()) {
+        baseItem.status = 'UNCHANGED'
+        baseItem.image_url = imageUrl
+        unchanged.push(baseItem)
+      } else {
+        conflicts.push({
+          plu: row.plu,
+          incomingName: row.systemName,
+          existingName: existingByPLU.system_name,
+        })
+        continue
+      }
+      allItems.push(baseItem)
+      continue
+    }
+
+    const nKey = row.systemName.toLowerCase()
+    const existingByName = currentByName.get(nKey)
+    if (existingByName) {
+      baseItem.status = 'PLU_CHANGED_RED'
+      baseItem.old_plu = existingByName.plu
+      baseItem.image_url = imageUrl
+      pluChanged.push(baseItem)
+      allItems.push(baseItem)
+      continue
+    }
+
+    const previousItem = previousByName.get(nKey)
+    if (previousItem) {
+      baseItem.status = 'PLU_CHANGED_RED'
+      baseItem.old_plu = previousItem.plu
+      baseItem.image_url = imageUrl
+      pluChanged.push(baseItem)
+      allItems.push(baseItem)
+      continue
+    }
+
+    baseItem.status = 'NEW_PRODUCT_YELLOW'
+    baseItem.image_url = imageUrl
+    newProducts.push(baseItem)
+    allItems.push(baseItem)
+  }
+
+  const removed = currentItems.filter((item) => !processedPLUs.has(item.plu))
+
+  const summary: ComparisonSummary = {
+    total: allItems.length,
+    unchanged: unchanged.length,
+    pluChanged: pluChanged.length,
+    newProducts: newProducts.length,
+    removed: removed.length,
+    conflicts: conflicts.length,
+    duplicatesSkipped,
+  }
+
+  return {
+    unchanged,
+    pluChanged,
+    newProducts,
+    removed,
+    conflicts,
+    allItems,
+    summary,
+  }
 }

@@ -200,6 +200,10 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | `src/lib/` | Business-Logik, Helper-Funktionen, Konstanten |
 | `src/types/` | TypeScript Type-Definitionen |
 
+## Reload und Ladeverhalten
+
+Damit Reloads (Command-R) schnell und flüssig wirken, gibt es einen eigenen Plan für Auth-Cache, Query-Persistenz, Prefetch und App-Shell: [RELOAD_UND_LAADEVERHALTEN.md](RELOAD_UND_LAADEVERHALTEN.md).
+
 ## Deployment
 
 Das Projekt wird auf **Vercel** gehostet:

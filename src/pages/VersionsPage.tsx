@@ -26,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ArrowLeft, Eye, Trash2, Loader2 } from 'lucide-react'
+import { Eye, Trash2, Loader2 } from 'lucide-react'
 
 import { useVersions } from '@/hooks/useVersions'
 import { supabase } from '@/lib/supabase'
@@ -115,16 +115,11 @@ export function VersionsPage() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/super-admin/masterlist')} aria-label="Zurück">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
+        <div>
             <h2 className="text-2xl font-bold tracking-tight">Versionen</h2>
             <p className="text-sm text-muted-foreground">
               KW-Versionen verwalten und ansehen.
             </p>
-          </div>
         </div>
 
         <Card>

@@ -1,5 +1,5 @@
-// Supabase Edge Function: Rolle eines Benutzers ändern (nur Super-Admin)
-// Wird von der App aufgerufen wenn Super-Admin einen User hoch-/runterstuft.
+// Supabase Edge Function: Rolle eines Benutzers ändern (Super-Admin oder Admin)
+// Wird von der App aufgerufen wenn Super-Admin oder Admin einen User hoch-/runterstuft.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -46,9 +46,9 @@ serve(async (req) => {
       .eq('id', caller.id)
       .single()
 
-    if (!callerProfile || callerProfile.role !== 'super_admin') {
+    if (!callerProfile || (callerProfile.role !== 'super_admin' && callerProfile.role !== 'admin')) {
       return new Response(
-        JSON.stringify({ error: 'Nur Super-Admins dürfen Rollen ändern.' }),
+        JSON.stringify({ error: 'Nur Super-Admins und Admins dürfen Rollen ändern.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

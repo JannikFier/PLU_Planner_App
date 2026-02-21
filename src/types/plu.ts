@@ -24,6 +24,8 @@ export interface DisplayItem {
   is_custom: boolean
   is_manually_renamed: boolean
   created_by?: string
+  /** Optional: Bild-URL (Backshop-Liste); bei Obst/Gemüse immer undefined */
+  image_url?: string | null
 }
 
 /** Geparste Zeile aus einer Excel-Datei */
@@ -60,6 +62,101 @@ export interface CustomProductParseResult {
   fileName: string
   totalRows: number
   skippedRows: number
+}
+
+/** Geparste Zeile aus Backshop-Excel (PLU, Name, optional Bild-Referenz) */
+export interface ParsedBackshopRow {
+  plu: string
+  systemName: string
+  /** Spaltenindex der Abbildung (für spätere Bild-Extraktion); -1 wenn nicht erkannt */
+  imageColumnIndex: number
+  /** Rohdaten für Bild: z. B. Bild-URL aus Zelle oder Platzhalter; erst nach Upload in Storage gesetzt */
+  imageUrl: string | null
+  /** 0-basierte Zeile der Bildzelle (für Zuordnung bei Excel-Bild-Extraktion) */
+  imageSheetRow0?: number
+  /** 0-basierte Spalte der Bildzelle (für Zuordnung bei Excel-Bild-Extraktion) */
+  imageSheetCol0?: number
+  /** 1-basierte Zeile der PLU-Zelle (für Duplikat-/Übersichts-Anzeige) */
+  pluSheetRow?: number
+  /** 1-basierte Spalte der PLU-Zelle (für Duplikat-/Übersichts-Anzeige) */
+  pluSheetCol?: number
+}
+
+/** Position in der Excel (1-basiert, wie in Excel angezeigt). */
+export interface BackshopSkippedPosition {
+  row: number
+  col: number
+}
+
+/** Doppelte PLU: Position des Duplikats + PLU + Position der ersten Vorkommens (zum klaren Nachschlagen). */
+export interface BackshopDuplicateDetail {
+  row: number
+  col: number
+  plu: string
+  firstRow: number
+  firstCol: number
+}
+
+/** Aufschlüsselung: warum Zeilen übersprungen wurden (pro Datei). */
+export interface BackshopSkippedReasons {
+  invalidPlu: number
+  emptyName: number
+  duplicatePlu: number
+}
+
+/** Pro Grund die Liste der Positionen (Zeile/Spalte 1-basiert) zum Nachschlagen in der Excel. */
+export interface BackshopSkippedDetails {
+  invalidPlu: BackshopSkippedPosition[]
+  emptyName: BackshopSkippedPosition[]
+  duplicatePlu: BackshopDuplicateDetail[]
+}
+
+/** Gleiche Bezeichnung (Name), aber verschiedene PLU – für Übersicht „Wo ist das Problem?“ */
+export interface SameNameDifferentPluEntry {
+  name: string
+  occurrences: { plu: string; row: number; col: number }[]
+}
+
+/** Ergebnis des Backshop-Excel-Parsers */
+export interface BackshopParseResult {
+  rows: ParsedBackshopRow[]
+  fileName: string
+  totalRows: number
+  skippedRows: number
+  /** Aufschlüsselung der übersprungenen Zeilen (nur gesetzt wenn skippedRows > 0). */
+  skippedReasons?: BackshopSkippedReasons
+  /** Zeile/Spalte pro übersprungener Position (1-basiert, zum Nachschlagen in der Excel). */
+  skippedDetails?: BackshopSkippedDetails
+  /** Gleiche Bezeichnung, verschiedene PLU (nur Namen mit mind. 2 verschiedenen PLUs). */
+  sameNameDifferentPlu?: SameNameDifferentPluEntry[]
+  /** Welche Spalte als PLU erkannt wurde (0-basiert) */
+  pluColumnIndex: number
+  /** Welche Spalte als Name/Warentext erkannt wurde */
+  nameColumnIndex: number
+  /** Ob Abbildungs-Spalte gefunden wurde */
+  hasImageColumn: boolean
+}
+
+/** Ein Backshop-Master-Item für Vergleich (mit optionalem image_url) */
+export interface BackshopCompareItem {
+  id: string
+  plu: string
+  system_name: string
+  display_name: string | null
+  status: string
+  old_plu: string | null
+  image_url: string | null
+}
+
+/** Ergebnis des Backshop-Vergleichs (Items inkl. image_url, Bild-Erhalt aus Vorversion) */
+export interface BackshopComparisonResult {
+  unchanged: BackshopCompareItem[]
+  pluChanged: BackshopCompareItem[]
+  newProducts: BackshopCompareItem[]
+  removed: BackshopCompareItem[]
+  conflicts: { plu: string; incomingName: string; existingName: string }[]
+  allItems: BackshopCompareItem[]
+  summary: ComparisonSummary
 }
 
 /** Ergebnis des KW-Vergleichs */

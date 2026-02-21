@@ -14,6 +14,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react'
 // Layout (nicht lazy – wird überall gebraucht)
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
 import { isAbortError } from '@/lib/error-utils'
+import { shouldPersistQuery } from '@/lib/query-persist-allowlist'
 
 // Seiten – lazy geladen
 const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })))
@@ -21,6 +22,8 @@ const ChangePasswordPage = lazy(() => import('@/pages/ChangePasswordPage').then(
 const UserDashboard = lazy(() => import('@/pages/UserDashboard').then((m) => ({ default: m.UserDashboard })))
 const AdminDashboard = lazy(() => import('@/pages/AdminDashboard').then((m) => ({ default: m.AdminDashboard })))
 const SuperAdminDashboard = lazy(() => import('@/pages/SuperAdminDashboard').then((m) => ({ default: m.SuperAdminDashboard })))
+const SuperAdminObstBereichPage = lazy(() => import('@/pages/SuperAdminObstBereichPage').then((m) => ({ default: m.SuperAdminObstBereichPage })))
+const SuperAdminBackshopBereichPage = lazy(() => import('@/pages/SuperAdminBackshopBereichPage').then((m) => ({ default: m.SuperAdminBackshopBereichPage })))
 const MasterList = lazy(() => import('@/pages/MasterList').then((m) => ({ default: m.MasterList })))
 const HiddenItems = lazy(() => import('@/pages/HiddenItems').then((m) => ({ default: m.HiddenItems })))
 const CustomProductsPage = lazy(() => import('@/pages/CustomProductsPage').then((m) => ({ default: m.CustomProductsPage })))
@@ -34,6 +37,15 @@ const BlockSortPage = lazy(() => import('@/pages/BlockSortPage').then((m) => ({ 
 const VersionsPage = lazy(() => import('@/pages/VersionsPage').then((m) => ({ default: m.VersionsPage })))
 const PLUUploadPage = lazy(() => import('@/pages/PLUUploadPage').then((m) => ({ default: m.PLUUploadPage })))
 const ViewerDashboard = lazy(() => import('@/pages/ViewerDashboard').then((m) => ({ default: m.ViewerDashboard })))
+const BackshopMasterList = lazy(() => import('@/pages/BackshopMasterList').then((m) => ({ default: m.BackshopMasterList })))
+const BackshopUploadPage = lazy(() => import('@/pages/BackshopUploadPage').then((m) => ({ default: m.BackshopUploadPage })))
+const BackshopCustomProductsPage = lazy(() => import('@/pages/BackshopCustomProductsPage').then((m) => ({ default: m.BackshopCustomProductsPage })))
+const BackshopHiddenProductsPage = lazy(() => import('@/pages/BackshopHiddenProductsPage').then((m) => ({ default: m.BackshopHiddenProductsPage })))
+const BackshopRenamedProductsPage = lazy(() => import('@/pages/BackshopRenamedProductsPage').then((m) => ({ default: m.BackshopRenamedProductsPage })))
+const BackshopVersionsPage = lazy(() => import('@/pages/BackshopVersionsPage').then((m) => ({ default: m.BackshopVersionsPage })))
+const BackshopLayoutSettingsPage = lazy(() => import('@/pages/BackshopLayoutSettingsPage').then((m) => ({ default: m.BackshopLayoutSettingsPage })))
+const BackshopRulesPage = lazy(() => import('@/pages/BackshopRulesPage').then((m) => ({ default: m.BackshopRulesPage })))
+const BackshopBlockSortPage = lazy(() => import('@/pages/BackshopBlockSortPage').then((m) => ({ default: m.BackshopBlockSortPage })))
 
 /** Ladeanzeige beim Wechsel zu lazy-geladenen Seiten – mit Layout-Struktur, damit der Übergang nicht abrupt wirkt */
 function PageLoadingFallback() {
@@ -98,6 +110,7 @@ function App() {
         persister,
         maxAge: CACHE_MAX_AGE_MS,
         buster: 'plu-planner-v1',
+        dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
       }}
     >
       <AuthPrefetch />
@@ -160,6 +173,38 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/user/backshop-list"
+              element={
+                <ProtectedRoute>
+                  <BackshopMasterList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/backshop-custom-products"
+              element={
+                <ProtectedRoute>
+                  <BackshopCustomProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/backshop-hidden-products"
+              element={
+                <ProtectedRoute>
+                  <BackshopHiddenProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/backshop-renamed-products"
+              element={
+                <ProtectedRoute>
+                  <BackshopRenamedProductsPage />
+                </ProtectedRoute>
+              }
+            />
 
             {/* === Viewer-Bereich (nur viewer) === */}
             <Route
@@ -175,6 +220,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <MasterList mode="viewer" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/viewer/backshop-list"
+              element={
+                <ProtectedRoute>
+                  <BackshopMasterList />
                 </ProtectedRoute>
               }
             />
@@ -229,6 +282,38 @@ function App() {
               }
             />
             <Route
+              path="/admin/backshop-list"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <BackshopMasterList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/backshop-custom-products"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <BackshopCustomProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/backshop-hidden-products"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <BackshopHiddenProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/backshop-renamed-products"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <BackshopRenamedProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/users"
               element={
                 <ProtectedRoute requireAdmin>
@@ -243,6 +328,22 @@ function App() {
               element={
                 <ProtectedRoute requireSuperAdmin>
                   <SuperAdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/obst"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <SuperAdminObstBereichPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/backshop"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <SuperAdminBackshopBereichPage />
                 </ProtectedRoute>
               }
             />
@@ -295,6 +396,46 @@ function App() {
               }
             />
             <Route
+              path="/super-admin/backshop-list"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <BackshopMasterList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/backshop-custom-products"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <BackshopCustomProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/backshop-hidden-products"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <BackshopHiddenProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/backshop-renamed-products"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <BackshopRenamedProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/backshop-upload"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <BackshopUploadPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/super-admin/layout"
               element={
                 <ProtectedRoute requireSuperAdmin>
@@ -319,10 +460,42 @@ function App() {
               }
             />
             <Route
+              path="/super-admin/backshop-layout"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <BackshopLayoutSettingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/backshop-rules"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <BackshopRulesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/backshop-block-sort"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <BackshopBlockSortPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/super-admin/versions"
               element={
                 <ProtectedRoute requireSuperAdmin>
                   <VersionsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/backshop-versions"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <BackshopVersionsPage />
                 </ProtectedRoute>
               }
             />

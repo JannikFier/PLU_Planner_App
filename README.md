@@ -78,8 +78,12 @@ npm run dev
 | `npm run build` | Erstellt den Production Build in `dist/` |
 | `npm run preview` | Zeigt den Production Build lokal an |
 | `npm run lint` | Prüft den Code mit ESLint |
-| `npm run test` | Startet Tests im Watch-Modus |
-| `npm run test:run` | Führt Tests einmal aus (z.B. vor Push) – Details: [docs/TESTING.md](docs/TESTING.md) |
+| `npm run test` | Startet Unit-Tests im Watch-Modus |
+| `npm run test:run` | Führt Unit-Tests einmal aus (z.B. vor Push) |
+| `npm run test:e2e` | E2E-Tests (Playwright); Dev-Server wird bei Bedarf gestartet |
+| `npm run test:e2e:ui` | E2E-Tests mit Playwright-UI |
+
+Details: [docs/TESTING.md](docs/TESTING.md). Vor Release: [docs/TEST_UND_RELEASE.md](docs/TEST_UND_RELEASE.md) (Checkliste + Routen-Matrix).
 
 ### Konsolenmeldungen in Cursor (Entwicklung)
 
@@ -140,7 +144,8 @@ Ausführliche Dokumentation findest du im `docs/` Ordner:
 - **[ROLES_AND_PERMISSIONS.md](docs/ROLES_AND_PERMISSIONS.md)** – Drei-Rollen-System, Login-Flows, Passwort-Management
 - **[DATABASE.md](docs/DATABASE.md)** – Alle Tabellen, ER-Diagramm, RLS-Regeln
 - **[FEATURES.md](docs/FEATURES.md)** – Alle Features, Business-Regeln, Farbcodes
-- **[TESTING.md](docs/TESTING.md)** – Unit-Tests (Vitest), Konvention, Erweiterung
+- **[TESTING.md](docs/TESTING.md)** – Unit-Tests (Vitest), E2E (Playwright), Konvention
+- **[TEST_UND_RELEASE.md](docs/TEST_UND_RELEASE.md)** – Routen-Matrix, manuelle Test-Checkliste, Vor-Release-Check
 
 ## Lizenz
 

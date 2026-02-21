@@ -48,7 +48,7 @@ export function ChangePasswordPage() {
 
       // Weiterleitung je nach Rolle
       if (isSuperAdmin) {
-        navigate('/super-admin/masterlist', { replace: true })
+        navigate('/super-admin', { replace: true })
       } else if (isAdmin) {
         navigate('/admin', { replace: true })
       } else if (isViewer) {

@@ -303,8 +303,8 @@ export function CustomProductDialog({
             </div>
           </div>
 
-          {/* Warengruppe: bei BY_BLOCK Pflicht, bei ALPHABETICAL optional (nur wenn Blöcke existieren) */}
-          {sortMode === 'BY_BLOCK' ? (
+          {/* Warengruppe: nur bei BY_BLOCK – dann Pflicht inkl. „Neue Warengruppe anlegen“. Bei ALPHABETICAL keine Warengruppe. */}
+          {sortMode === 'BY_BLOCK' && (
             <div className="space-y-2">
               <Label>Warengruppe</Label>
               {!showNewBlockInput ? (
@@ -371,28 +371,6 @@ export function CustomProductDialog({
                   </Button>
                 </div>
               )}
-            </div>
-          ) : blocks.length > 0 && (
-            <div className="space-y-2">
-              <Label>Warengruppe (optional)</Label>
-              <Select
-                value={blockId || '__none__'}
-                onValueChange={(v) => setBlockId(v === '__none__' ? '' : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Keine Zuordnung" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Keine Zuordnung</SelectItem>
-                  {blocks
-                    .sort((a, b) => a.order_index - b.order_index)
-                    .map((block) => (
-                      <SelectItem key={block.id} value={block.id}>
-                        {block.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
             </div>
           )}
         </div>

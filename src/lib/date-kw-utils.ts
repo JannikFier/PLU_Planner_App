@@ -73,6 +73,23 @@ export function getNextFreeKW(
   return currentKW
 }
 
+/**
+ * Liest ein Datum im Format DD.MM.YYYY aus einem Dateinamen und gibt KW und Jahr zurück.
+ * Nützlich für Backshop-Dateinamen wie "Kassenblatt ZWS-PLU 20.01.2026.xlsx".
+ */
+export function parseKWAndYearFromFilename(filename: string): { kw: number; year: number } | null {
+  const match = filename.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b/)
+  if (!match) return null
+  const [, dayStr, monthStr, yearStr] = match
+  const day = parseInt(dayStr!, 10)
+  const month = parseInt(monthStr!, 10)
+  const year = parseInt(yearStr!, 10)
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 2000 || year > 2100) return null
+  const date = new Date(year, month - 1, day)
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null
+  return getKWAndYearFromDate(date)
+}
+
 /** Prüft, ob für (kw, jahr) bereits eine Version existiert */
 export function versionExistsForKW(
   kw: number,

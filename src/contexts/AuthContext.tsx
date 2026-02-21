@@ -70,6 +70,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /** true wenn wir in diesem Init bereits aus Cache angezeigt haben – dann getSession-Update minimal halten */
   const displayedFromCacheRef = useRef(false)
 
+  /** State „nicht eingeloggt“ + Cache leeren. Wird genutzt wenn Auth-Check fehlschlägt oder abgebrochen wird (z. B. anderer Tab) – dann immer zum Login. */
+  const setLoggedOutAndClearCache = useCallback(() => {
+    try {
+      sessionStorage.removeItem(PROFILE_CACHE_KEY)
+      sessionStorage.removeItem(SESSION_CACHE_KEY)
+    } catch {
+      // ignorieren
+    }
+    setState({
+      user: null,
+      session: null,
+      profile: null,
+      isAdmin: false,
+      isSuperAdmin: false,
+      isViewer: false,
+      mustChangePassword: false,
+      isLoading: false,
+      error: null,
+    })
+  }, [])
+
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     const fetchOnce = async (): Promise<Profile | null> => {
       const { data, error } = await supabase
@@ -136,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (cached && mounted && displayedFromCacheRef.current) {
             // Bereits aus Cache angezeigt – nur Session nachziehen, kein voller Re-Render mit gleichen Profildaten
             setState((prev) => ({ ...prev, session }))
+            void fetchProfile(userId) // Hintergrund: Profil-Cache für nächsten Reload aktualisieren
             return
           }
 
@@ -159,24 +181,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }))
           }
         } else if (mounted) {
-          try {
-            sessionStorage.removeItem(SESSION_CACHE_KEY)
-          } catch {
-            // ignorieren
-          }
-          setState((prev) => ({ ...prev, isLoading: false }))
+          // getSession() erfolgreich, aber keine Session (z. B. in anderem Tab ausgeloggt) → Cache leeren, ausloggen
+          setLoggedOutAndClearCache()
         }
-      } catch (e) {
+      } catch {
         if (!mounted) return
-        if (isAbortError(e)) {
-          setState((prev) => ({ ...prev, isLoading: false }))
-          return
-        }
-        setState((prev) => ({
-          ...prev,
-          isLoading: false,
-          error: 'Auth-Initialisierung fehlgeschlagen',
-        }))
+        // Netzwerkfehler/Timeout: nicht ausloggen, nur Loading beenden – User bleibt mit Cache eingeloggt
+        setState((prev) => ({ ...prev, isLoading: false }))
       }
     }
 
@@ -228,15 +239,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         void runGetSessionAndContinue()
       } catch (e) {
         if (!mounted) return
-        if (isAbortError(e)) {
-          setState((prev) => ({ ...prev, isLoading: false }))
-          return
-        }
-        setState((prev) => ({
-          ...prev,
-          isLoading: false,
-          error: 'Auth-Initialisierung fehlgeschlagen',
-        }))
+        // Auth-Check fehlgeschlagen oder abgebrochen → ausloggen, Redirect zum Login
+        setLoggedOutAndClearCache()
       }
     }
 
@@ -287,8 +291,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           })
         }
         } catch (e) {
-          if (mounted && !isAbortError(e)) {
-            setState((prev) => ({ ...prev, isLoading: false, error: 'Auth-Initialisierung fehlgeschlagen' }))
+          if (mounted) {
+            // Auth-Update fehlgeschlagen oder abgebrochen → ausloggen, Redirect zum Login
+            setLoggedOutAndClearCache()
           }
         }
       }
@@ -298,7 +303,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [fetchProfile])
+  }, [fetchProfile, setLoggedOutAndClearCache])
 
   const loginWithEmail = useCallback(async (email: string, password: string) => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }))

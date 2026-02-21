@@ -22,5 +22,15 @@ export function AuthPrefetch() {
     }
   }, [authLoading, user, mustChangePassword, queryClient, profile?.role])
 
+  // Dashboard-Chunk der Rolle vorladen, damit Redirect/Navigation sofort den Chunk nutzen kann
+  useEffect(() => {
+    if (authLoading || !user || mustChangePassword || !profile?.role) return
+    const role = profile.role
+    if (role === 'super_admin') void import('@/pages/SuperAdminDashboard')
+    else if (role === 'admin') void import('@/pages/AdminDashboard')
+    else if (role === 'viewer') void import('@/pages/ViewerDashboard')
+    else void import('@/pages/UserDashboard')
+  }, [authLoading, user, mustChangePassword, profile?.role])
+
   return null
 }

@@ -46,6 +46,7 @@ import { useBlocks } from '@/hooks/useBlocks'
 import { useBezeichnungsregeln } from '@/hooks/useBezeichnungsregeln'
 import { PLUTable } from '@/components/plu/PLUTable'
 import { generateUUID } from '@/lib/utils'
+import { formatKWLabel, formatKWShort } from '@/lib/plu-helpers'
 import { resolveConflicts } from '@/lib/comparison-logic'
 import { buildDisplayList } from '@/lib/layout-engine'
 import { getKWOptionsForUpload, getUploadYearOptions, getCurrentKW } from '@/lib/date-kw-utils'
@@ -245,7 +246,7 @@ export function PLUUploadPage() {
                     <SelectContent>
                       {getKWOptionsForUpload().map((kw) => (
                         <SelectItem key={kw} value={String(kw)}>
-                          KW {String(kw).padStart(2, '0')}
+                          {formatKWShort(kw)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -287,7 +288,7 @@ export function PLUUploadPage() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>KW bereits vorhanden</AlertDialogTitle>
                     <AlertDialogDescription>
-                      KW {targetKW.padStart(2, '0')} ist für {targetJahr} bereits vorhanden.
+                      {formatKWLabel(Number(targetKW), Number(targetJahr))} ist für {targetJahr} bereits vorhanden.
                       Möchtest du die bestehende Version überschreiben oder eine andere Ziel-KW wählen?
                     </AlertDialogDescription>
                   </AlertDialogHeader>
@@ -466,7 +467,7 @@ export function PLUUploadPage() {
               <div>
                 <h3 className="text-lg font-semibold">Erfolgreich veröffentlicht!</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  KW{targetKW.padStart(2, '0')}/{targetJahr}
+                  {formatKWLabel(Number(targetKW), Number(targetJahr))}
                 </p>
               </div>
               <div className="flex justify-center gap-6 text-sm">

@@ -102,7 +102,7 @@ export function ExportPDFDialog({
         fontSizes,
       })
 
-      doc.autoPrint()
+      // Kein doc.autoPrint() – würde auf Mac einen zweiten Druckdialog auslösen
       const blob = doc.output('blob')
       const url = URL.createObjectURL(blob)
 
@@ -125,12 +125,13 @@ export function ExportPDFDialog({
           toast.info('PDF heruntergeladen – öffne es und drucke mit Strg+P')
           doc.save(`PLU-Liste_${kwLabel.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`)
         }
+        // Iframe/URL erst nach 30 s aufräumen, damit der Druckdialog unter Windows (Chrome/Edge) nicht sofort schließt
         setTimeout(() => {
           if (document.body.contains(iframe)) {
             document.body.removeChild(iframe)
           }
           URL.revokeObjectURL(url)
-        }, 1000)
+        }, 30_000)
       }
       onOpenChange(false)
     } catch {

@@ -364,6 +364,276 @@ export interface Database {
           read_at?: string | null
         }
       }
+      // Backshop (getrennte Liste)
+      backshop_versions: {
+        Row: {
+          id: string
+          kw_nummer: number
+          jahr: number
+          kw_label: string
+          status: 'draft' | 'active' | 'frozen'
+          created_at: string
+          published_at: string | null
+          frozen_at: string | null
+          delete_after: string | null
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          kw_nummer: number
+          jahr: number
+          status?: 'draft' | 'active' | 'frozen'
+          created_at?: string
+          published_at?: string | null
+          frozen_at?: string | null
+          delete_after?: string | null
+          created_by?: string | null
+        }
+        Update: {
+          kw_nummer?: number
+          jahr?: number
+          status?: 'draft' | 'active' | 'frozen'
+          published_at?: string | null
+          frozen_at?: string | null
+          delete_after?: string | null
+        }
+      }
+      backshop_master_plu_items: {
+        Row: {
+          id: string
+          version_id: string
+          plu: string
+          system_name: string
+          display_name: string | null
+          status: 'UNCHANGED' | 'NEW_PRODUCT_YELLOW' | 'PLU_CHANGED_RED'
+          old_plu: string | null
+          warengruppe: string | null
+          block_id: string | null
+          is_manually_renamed: boolean
+          image_url: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          version_id: string
+          plu: string
+          system_name: string
+          display_name?: string | null
+          status?: 'UNCHANGED' | 'NEW_PRODUCT_YELLOW' | 'PLU_CHANGED_RED'
+          old_plu?: string | null
+          warengruppe?: string | null
+          block_id?: string | null
+          is_manually_renamed?: boolean
+          image_url?: string | null
+          created_at?: string
+        }
+        Update: {
+          plu?: string
+          system_name?: string
+          display_name?: string | null
+          status?: 'UNCHANGED' | 'NEW_PRODUCT_YELLOW' | 'PLU_CHANGED_RED'
+          old_plu?: string | null
+          warengruppe?: string | null
+          block_id?: string | null
+          is_manually_renamed?: boolean
+          image_url?: string | null
+        }
+      }
+      backshop_blocks: {
+        Row: {
+          id: string
+          name: string
+          order_index: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          order_index?: number
+          created_at?: string
+        }
+        Update: {
+          name?: string
+          order_index?: number
+        }
+      }
+      backshop_block_rules: {
+        Row: {
+          id: string
+          block_id: string
+          rule_type: 'NAME_CONTAINS' | 'NAME_REGEX' | 'PLU_RANGE'
+          value: string
+          case_sensitive: boolean
+          modify_name_action: 'PREFIX' | 'SUFFIX' | 'NONE' | null
+          modify_name_keyword: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          block_id: string
+          rule_type: 'NAME_CONTAINS' | 'NAME_REGEX' | 'PLU_RANGE'
+          value: string
+          case_sensitive?: boolean
+          modify_name_action?: 'PREFIX' | 'SUFFIX' | 'NONE' | null
+          modify_name_keyword?: string | null
+          created_at?: string
+        }
+        Update: {
+          rule_type?: 'NAME_CONTAINS' | 'NAME_REGEX' | 'PLU_RANGE'
+          value?: string
+          case_sensitive?: boolean
+          modify_name_action?: 'PREFIX' | 'SUFFIX' | 'NONE' | null
+          modify_name_keyword?: string | null
+        }
+      }
+      backshop_custom_products: {
+        Row: {
+          id: string
+          plu: string
+          name: string
+          image_url: string
+          block_id: string | null
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          plu: string
+          name: string
+          image_url: string
+          block_id?: string | null
+          created_by: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          plu?: string
+          name?: string
+          image_url?: string
+          block_id?: string | null
+          updated_at?: string
+        }
+      }
+      backshop_hidden_items: {
+        Row: {
+          id: string
+          plu: string
+          hidden_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          plu: string
+          hidden_by: string
+          created_at?: string
+        }
+        Update: Record<string, never>
+      }
+      backshop_version_notifications: {
+        Row: {
+          id: string
+          user_id: string
+          version_id: string
+          is_read: boolean
+          read_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          version_id: string
+          is_read?: boolean
+          read_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          is_read?: boolean
+          read_at?: string | null
+        }
+      }
+      backshop_layout_settings: {
+        Row: {
+          id: string
+          sort_mode: 'ALPHABETICAL' | 'BY_BLOCK'
+          display_mode: 'MIXED' | 'SEPARATED'
+          flow_direction: 'ROW_BY_ROW' | 'COLUMN_FIRST'
+          font_header_px: number
+          font_column_px: number
+          font_product_px: number
+          mark_red_kw_count: number
+          mark_yellow_kw_count: number
+          features_custom_products: boolean
+          features_hidden_items: boolean
+          features_blocks: boolean
+          features_keyword_rules: boolean
+          allow_mixed_mode: boolean
+          allow_separated_mode: boolean
+          page_break_per_block: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          sort_mode?: 'ALPHABETICAL' | 'BY_BLOCK'
+          display_mode?: 'MIXED' | 'SEPARATED'
+          flow_direction?: 'ROW_BY_ROW' | 'COLUMN_FIRST'
+          font_header_px?: number
+          font_column_px?: number
+          font_product_px?: number
+          mark_red_kw_count?: number
+          mark_yellow_kw_count?: number
+          features_custom_products?: boolean
+          features_hidden_items?: boolean
+          features_blocks?: boolean
+          features_keyword_rules?: boolean
+          allow_mixed_mode?: boolean
+          allow_separated_mode?: boolean
+          page_break_per_block?: boolean
+        }
+        Update: {
+          sort_mode?: 'ALPHABETICAL' | 'BY_BLOCK'
+          display_mode?: 'MIXED' | 'SEPARATED'
+          flow_direction?: 'ROW_BY_ROW' | 'COLUMN_FIRST'
+          font_header_px?: number
+          font_column_px?: number
+          font_product_px?: number
+          mark_red_kw_count?: number
+          mark_yellow_kw_count?: number
+          features_custom_products?: boolean
+          features_hidden_items?: boolean
+          features_blocks?: boolean
+          features_keyword_rules?: boolean
+          allow_mixed_mode?: boolean
+          allow_separated_mode?: boolean
+          page_break_per_block?: boolean
+        }
+      }
+      backshop_bezeichnungsregeln: {
+        Row: {
+          id: string
+          keyword: string
+          position: 'PREFIX' | 'SUFFIX'
+          case_sensitive: boolean
+          is_active: boolean
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          keyword: string
+          position: 'PREFIX' | 'SUFFIX'
+          case_sensitive?: boolean
+          is_active?: boolean
+          created_by?: string | null
+        }
+        Update: {
+          keyword?: string
+          position?: 'PREFIX' | 'SUFFIX'
+          case_sensitive?: boolean
+          is_active?: boolean
+        }
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -382,6 +652,14 @@ export interface Database {
       lookup_email_by_personalnummer: {
         Args: { p_nummer: string }
         Returns: string | null
+      }
+      rename_backshop_master_plu_item: {
+        Args: { item_id: string; new_display_name: string; new_image_url?: string | null }
+        Returns: undefined
+      }
+      reset_backshop_master_plu_item_display_name: {
+        Args: { item_id: string; system_name: string }
+        Returns: undefined
       }
     }
     Enums: Record<string, never>
@@ -402,3 +680,14 @@ export type Notification = Database['public']['Tables']['notifications_queue']['
 export type CustomProduct = Database['public']['Tables']['custom_products']['Row']
 export type HiddenItem = Database['public']['Tables']['hidden_items']['Row']
 export type VersionNotification = Database['public']['Tables']['version_notifications']['Row']
+
+// Backshop
+export type BackshopVersion = Database['public']['Tables']['backshop_versions']['Row']
+export type BackshopMasterPLUItem = Database['public']['Tables']['backshop_master_plu_items']['Row']
+export type BackshopBlock = Database['public']['Tables']['backshop_blocks']['Row']
+export type BackshopCustomProduct = Database['public']['Tables']['backshop_custom_products']['Row']
+export type BackshopHiddenItem = Database['public']['Tables']['backshop_hidden_items']['Row']
+export type BackshopVersionNotification = Database['public']['Tables']['backshop_version_notifications']['Row']
+export type BackshopLayoutSettings = Database['public']['Tables']['backshop_layout_settings']['Row']
+export type BackshopBlockRule = Database['public']['Tables']['backshop_block_rules']['Row']
+export type BackshopBezeichnungsregel = Database['public']['Tables']['backshop_bezeichnungsregeln']['Row']

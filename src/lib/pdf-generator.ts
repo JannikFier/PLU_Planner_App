@@ -37,7 +37,7 @@ const PAGE = {
   headerHeight: 14,    // KW-Banner Höhe
   columnHeaderH: 8,    // Spaltenköpfe Höhe
   rowHeight: 5.5,      // Zeile Höhe
-  groupHeaderH: 6,     // Gruppen-Header Höhe
+  groupHeaderH: 12,     // Gruppen-Header Höhe (z. B. Brot – 24pt mit Abstand oben/unten)
   footerHeight: 8,     // Footer Höhe
   columnGap: 0,        // Keine weißen Kästen, keine Mittellinie (Benutzerwunsch)
 }
@@ -467,4 +467,396 @@ function buildColumnRows(allRows: PDFRow[], startItem: number, endItem: number):
   }
 
   return result
+}
+
+// ========== Backshop-PDF (Bild → PLU → Name, Kopf „PLU-Liste Backshop“, gleicher Footer) ==========
+
+const BACKSHOP_ROW_HEIGHT = 22
+/** Bild-Spalte: etwas breiter für größere Produktbilder. */
+const BACKSHOP_IMAGE_SIZE = 22
+/** PLU-Spalte: reicht für 5-stellige Nummer. */
+const BACKSHOP_PLU_WIDTH = 14
+/** Innenabstand in der PLU-Zelle (links und rechts), damit Abstand zum Strich gleich ist. */
+const BACKSHOP_PLU_PADDING = 1.5
+/** Mindesthöhe der Spaltenzeile „Bild PLU Name“ (Schrift kommt aus fonts.column) */
+const BACKSHOP_COLUMN_HEADER_H = 6
+
+export interface GenerateBackshopPDFInput {
+  items: DisplayItem[]
+  kwLabel: string
+  sortMode: 'ALPHABETICAL' | 'BY_BLOCK'
+  flowDirection: 'ROW_BY_ROW' | 'COLUMN_FIRST'
+  blocks: Block[]
+  fontSizes?: { header: number; column: number; product: number }
+  /** Bei Nach Warengruppen: jede Warengruppe auf neuer PDF-Seite beginnen */
+  pageBreakPerBlock?: boolean
+}
+
+/** Lädt ein Bild von URL und gibt Data-URL plus Pixelmaße zurück; bei Fehler null. */
+async function loadImageWithDimensions(url: string): Promise<{ dataUrl: string; width: number; height: number } | null> {
+  try {
+    const res = await fetch(url, { mode: 'cors', credentials: 'omit' })
+    if (!res.ok) return null
+    const blob = await res.blob()
+    const dataUrl = await new Promise<string | null>((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string | null)
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+    if (!dataUrl) return null
+    const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
+      img.onerror = () => reject(new Error('Image load failed'))
+      img.src = dataUrl
+    })
+    return { dataUrl, width, height }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Erzeugt ein PDF für die Backshop-Liste: Reihenfolge Bild → PLU → Name,
+ * Kopf „PLU-Liste Backshop“, Footer wie Obst/Gemüse.
+ */
+export async function generateBackshopPDF(input: GenerateBackshopPDFInput): Promise<jsPDF> {
+  const { items, kwLabel, sortMode, flowDirection, blocks, fontSizes: inputFonts, pageBreakPerBlock = false } = input
+  // Titel 32pt, Warengruppen (z. B. Brot) 24pt, Spalten/Produkte 18pt
+  const fonts: PDFFontSizes & { group: number } = inputFonts
+    ? {
+        header: Math.max(12, Math.min(36, pxToPt(inputFonts.header))),
+        column: Math.max(8, Math.min(20, pxToPt(inputFonts.column))),
+        product: Math.max(7, Math.min(20, pxToPt(inputFonts.product))),
+        group: 24, // Warengruppen-Header (z. B. Brot, Brötchen) fest 24pt
+      }
+    : { ...DEFAULT_PDF_FONTS, group: 24 } as PDFFontSizes & { group: number }
+
+  const imageDataUrls = new Map<string, { dataUrl: string; width: number; height: number }>()
+  const urlsToLoad = items.filter((i) => i.image_url).map((i) => ({ id: i.id, url: i.image_url! }))
+  await Promise.all(
+    urlsToLoad.map(async ({ id, url }) => {
+      const loaded = await loadImageWithDimensions(url)
+      if (loaded) imageDataUrls.set(id, loaded)
+    }),
+  )
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const dateStr = new Date().toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+
+  const pdfRows = buildPDFRows(items, sortMode, blocks)
+  renderBackshopSection(doc, pdfRows, dateStr, kwLabel, flowDirection, fonts, imageDataUrls, pageBreakPerBlock)
+  return doc
+}
+
+/** Rendert Backshop-Sektion: Header „PLU-Liste Backshop“, Zeilen Bild | PLU | Name, Footer. */
+function renderBackshopSection(
+  doc: jsPDF,
+  pdfRows: PDFRow[],
+  dateStr: string,
+  kwLabel: string,
+  flowDirection: 'ROW_BY_ROW' | 'COLUMN_FIRST',
+  fonts: PDFFontSizes & { group: number },
+  imageDataUrls: Map<string, { dataUrl: string; width: number; height: number }>,
+  pageBreakPerBlock: boolean,
+): void {
+  const usableWidth = PAGE.width - PAGE.marginLeft - PAGE.marginRight
+  const colWidth = (usableWidth - PAGE.columnGap) / 2
+  const imageSize = Math.min(BACKSHOP_IMAGE_SIZE, BACKSHOP_ROW_HEIGHT - 1)
+  const pluWidth = BACKSHOP_PLU_WIDTH
+  const nameWidth = colWidth - imageSize - pluWidth - 2
+
+  const rightColStart = PAGE.marginLeft + colWidth + PAGE.columnGap
+  const centerDividerX = PAGE.marginLeft + colWidth
+  let currentPage = 1
+  let yPos = PAGE.marginTop
+  let tableStartY = PAGE.marginTop
+  /** Nur COLUMN_FIRST: erste Produktzeile pro Seite ohne oberen Rahmen (vermeidet Doppellinie). */
+  let firstProductRowDone = false
+  /** ROW_BY_ROW: nächste Produktzeile ist erste nach Spaltenköpfen (inkl. nach Seitenumbruch) → kein oberer Rahmen. */
+  let skipTopBorderForNextProductRow = true
+
+  function drawHeader() {
+    doc.setFillColor(...COLORS.headerBg)
+    doc.rect(PAGE.marginLeft, yPos, usableWidth, PAGE.headerHeight, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(fonts.header)
+    doc.setTextColor(...COLORS.headerText)
+    doc.text('PLU-Liste Backshop', PAGE.width / 2, yPos + PAGE.headerHeight / 2 + 1, { align: 'center' })
+    yPos += PAGE.headerHeight + 2
+  }
+
+  function drawColumnHeaders() {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(fonts.column)
+    doc.setTextColor(0, 0, 0)
+    const leftX = PAGE.marginLeft
+    const rightX = rightColStart
+    const headerH = BACKSHOP_COLUMN_HEADER_H
+    doc.text('Bild', leftX + 1, yPos + headerH / 2 + 0.5)
+    doc.text('PLU', leftX + imageSize + 1 + BACKSHOP_PLU_PADDING, yPos + headerH / 2 + 0.5)
+    doc.text('Name', leftX + imageSize + 1 + pluWidth + 0.5, yPos + headerH / 2 + 0.5)
+    doc.text('Bild', rightX + 1, yPos + headerH / 2 + 0.5)
+    doc.text('PLU', rightX + imageSize + 1 + BACKSHOP_PLU_PADDING, yPos + headerH / 2 + 0.5)
+    doc.text('Name', rightX + imageSize + 1 + pluWidth + 0.5, yPos + headerH / 2 + 0.5)
+    doc.setTextColor(0, 0, 0)
+    doc.setDrawColor(...COLORS.border)
+    doc.setLineWidth(0.3)
+    doc.line(PAGE.marginLeft, yPos + headerH, PAGE.marginLeft + usableWidth, yPos + headerH)
+    yPos += headerH + 1
+  }
+
+  function drawFooter(pageNum: number) {
+    const footerY = PAGE.height - PAGE.marginBottom + 3
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    doc.setTextColor(0, 0, 0)
+    doc.text(kwLabel, PAGE.marginLeft, footerY)
+    doc.text(dateStr, PAGE.width / 2, footerY, { align: 'center' })
+    doc.text(`Seite ${pageNum}`, PAGE.width - PAGE.marginRight, footerY, { align: 'right' })
+  }
+
+  /**
+   * Neue Seite. Wenn groupLabel gesetzt ist (Umbruch mitten in einer Kategorie),
+   * Kategorie und Spaltenköpfe auf der neuen Seite wiederholen.
+   */
+  function startNewPage(groupLabel?: string | null) {
+    drawCenterDivider(tableStartY, yPos)
+    drawInnerVerticalLines(tableStartY, yPos)
+    drawOuterVerticalLines(tableStartY, yPos)
+    drawFooter(currentPage)
+    doc.addPage()
+    currentPage++
+    yPos = PAGE.marginTop
+    if (flowDirection === 'COLUMN_FIRST') firstProductRowDone = false
+    if (groupLabel != null && groupLabel !== '') {
+      drawGroupHeader(groupLabel, yPos)
+      drawRowLine(yPos + PAGE.groupHeaderH)
+      tableStartY = yPos + PAGE.groupHeaderH
+      yPos += PAGE.groupHeaderH
+      yPos += 1.5
+      drawColumnHeaders()
+      if (flowDirection === 'ROW_BY_ROW') skipTopBorderForNextProductRow = true
+    }
+  }
+
+  function drawRowLine(y: number) {
+    doc.setDrawColor(...COLORS.border)
+    doc.setLineWidth(0.4)
+    doc.line(PAGE.marginLeft, y, PAGE.marginLeft + usableWidth, y)
+  }
+
+  function drawCenterDivider(yStart: number, yEnd: number) {
+    doc.setDrawColor(...COLORS.border)
+    doc.setLineWidth(0.4)
+    doc.line(centerDividerX, yStart, centerDividerX, yEnd)
+  }
+
+  /** Vertikale Linien links und rechts der Tabelle (klare Tabellenstruktur). */
+  function drawOuterVerticalLines(yStart: number, yEnd: number) {
+    doc.setDrawColor(...COLORS.border)
+    doc.setLineWidth(0.4)
+    doc.line(PAGE.marginLeft, yStart, PAGE.marginLeft, yEnd)
+    doc.line(PAGE.marginLeft + usableWidth, yStart, PAGE.marginLeft + usableWidth, yEnd)
+  }
+
+  /** Vertikale Trennlinien zwischen Bild | PLU | Name (ein Tabellenblock). */
+  function drawInnerVerticalLines(yStart: number, yEnd: number) {
+    doc.setDrawColor(...COLORS.border)
+    doc.setLineWidth(0.25)
+    const leftX = PAGE.marginLeft
+    const rightX = rightColStart
+    doc.line(leftX + imageSize + 1, yStart, leftX + imageSize + 1, yEnd)
+    doc.line(leftX + imageSize + 1 + pluWidth, yStart, leftX + imageSize + 1 + pluWidth, yEnd)
+    doc.line(rightX + imageSize + 1, yStart, rightX + imageSize + 1, yEnd)
+    doc.line(rightX + imageSize + 1 + pluWidth, yStart, rightX + imageSize + 1 + pluWidth, yEnd)
+  }
+
+  /** skipTopBorder: true bei erster Produktzeile, damit keine doppelte Linie über den Bildern (Trennlinie unter „Bild, PLU, Name“ reicht). */
+  function drawBackshopItem(item: DisplayItem, x: number, y: number, skipTopBorder = false) {
+    const imageInfo = item.id ? imageDataUrls.get(item.id) : null
+    doc.setDrawColor(...COLORS.border)
+    doc.setLineWidth(0.3)
+    const w = imageSize + 1
+    const h = BACKSHOP_ROW_HEIGHT
+    if (skipTopBorder) {
+      doc.line(x, y + h, x, y)
+      doc.line(x, y + h, x + w, y + h)
+      doc.line(x + w, y + h, x + w, y)
+    } else {
+      doc.rect(x, y, w, h, 'S')
+    }
+    if (imageInfo) {
+      try {
+        const format = imageInfo.dataUrl.startsWith('data:image/jpeg') || imageInfo.dataUrl.startsWith('data:image/jpg') ? 'JPEG' : 'PNG'
+        const iw = imageInfo.width
+        const ih = imageInfo.height
+        let drawW: number
+        let drawH: number
+        if (iw <= 0 || ih <= 0) {
+          drawW = imageSize
+          drawH = imageSize
+        } else {
+          const ratio = iw / ih
+          if (ratio >= 1) {
+            drawW = imageSize
+            drawH = imageSize / ratio
+          } else {
+            drawH = imageSize
+            drawW = imageSize * ratio
+          }
+        }
+        const xOff = (imageSize - drawW) / 2
+        const yOff = (imageSize - drawH) / 2
+        doc.addImage(imageInfo.dataUrl, format, x + 0.5 + xOff, y + 0.5 + yOff, drawW, drawH)
+      } catch {
+        doc.setFontSize(6)
+        doc.text('Bild', x + (imageSize + 1) / 2, y + BACKSHOP_ROW_HEIGHT / 2 + 1, { align: 'center' })
+      }
+    } else {
+      doc.setFontSize(6)
+      doc.setTextColor(128, 128, 128)
+      doc.text('–', x + (imageSize + 1) / 2, y + BACKSHOP_ROW_HEIGHT / 2 + 1, { align: 'center' })
+      doc.setTextColor(0, 0, 0)
+    }
+
+    const pluX = x + imageSize + 1
+    if (item.status === 'NEW_PRODUCT_YELLOW') {
+      doc.setFillColor(...COLORS.newBg)
+      doc.rect(pluX, y, pluWidth, BACKSHOP_ROW_HEIGHT, 'F')
+      doc.setTextColor(...COLORS.newText)
+    } else if (item.status === 'PLU_CHANGED_RED') {
+      doc.setFillColor(...COLORS.changedBg)
+      doc.rect(pluX, y, pluWidth, BACKSHOP_ROW_HEIGHT, 'F')
+      doc.setTextColor(...COLORS.changedText)
+    } else {
+      doc.setTextColor(0, 0, 0)
+    }
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(fonts.product)
+    doc.text(getDisplayPlu(item.plu), pluX + BACKSHOP_PLU_PADDING, y + BACKSHOP_ROW_HEIGHT / 2 + 1)
+    doc.setTextColor(0, 0, 0)
+
+    const nameX = pluX + pluWidth
+    const displayName = getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)
+    const maxNameWidth = nameWidth - 1 // Nutze Spaltenbreite voll aus
+    let nameToDraw = displayName
+    const ellipsis = '…'
+    if (doc.getTextWidth(displayName) > maxNameWidth) {
+      while (nameToDraw.length > 0 && doc.getTextWidth(nameToDraw + ellipsis) > maxNameWidth) {
+        nameToDraw = nameToDraw.slice(0, -1)
+      }
+      nameToDraw = nameToDraw + ellipsis
+    }
+    doc.text(nameToDraw, nameX + 0.5, y + BACKSHOP_ROW_HEIGHT / 2 + 1)
+  }
+
+  function drawGroupHeader(label: string, y: number) {
+    doc.setFillColor(...COLORS.groupBg)
+    doc.rect(PAGE.marginLeft, y, usableWidth, PAGE.groupHeaderH, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(fonts.group)
+    doc.setTextColor(...COLORS.groupText)
+    // Baseline tiefer, damit 24pt-Text optisch in der Mitte des Kastens steht (nicht oben rausragt)
+    doc.text(label, PAGE.marginLeft + usableWidth / 2, y + PAGE.groupHeaderH / 2 + 3, { align: 'center' })
+  }
+
+  drawHeader()
+
+  const maxY = PAGE.height - PAGE.marginBottom - PAGE.footerHeight
+  let groupIndex = 0
+  let currentGroupLabel: string | null = null
+
+  if (flowDirection === 'ROW_BY_ROW') {
+    let rowIndex = 0
+    let i = 0
+    while (i < pdfRows.length) {
+      const row = pdfRows[i]
+      if (row.type === 'group') {
+        const needNewPage = pageBreakPerBlock && groupIndex > 0
+          || (yPos + PAGE.groupHeaderH + 1.5 + BACKSHOP_COLUMN_HEADER_H + 1 + BACKSHOP_ROW_HEIGHT > maxY)
+        if (needNewPage) startNewPage()
+        groupIndex++
+        currentGroupLabel = row.label ?? null
+        // Linie über grauem Kasten, Warengruppe (Brot), Linie darunter; Vertikale schließen an Unterkante Brot an
+        drawRowLine(yPos)
+        drawGroupHeader(row.label!, yPos)
+        drawRowLine(yPos + PAGE.groupHeaderH)
+        tableStartY = yPos + PAGE.groupHeaderH
+        yPos += PAGE.groupHeaderH
+        yPos += 1.5
+        drawColumnHeaders()
+        skipTopBorderForNextProductRow = true
+        rowIndex = 0
+        i++
+        continue
+      }
+      if (yPos + BACKSHOP_ROW_HEIGHT > maxY) startNewPage(currentGroupLabel)
+      const leftItem = row.item!
+      const skipTop = skipTopBorderForNextProductRow
+      skipTopBorderForNextProductRow = false
+      drawBackshopItem(leftItem, PAGE.marginLeft, yPos, skipTop)
+      if (i + 1 < pdfRows.length && pdfRows[i + 1].type === 'item') {
+        drawBackshopItem(pdfRows[i + 1].item!, rightColStart, yPos, skipTop)
+        drawCenterDivider(yPos, yPos + BACKSHOP_ROW_HEIGHT)
+        i += 2
+      } else {
+        drawCenterDivider(yPos, yPos + BACKSHOP_ROW_HEIGHT)
+        i++
+      }
+      drawRowLine(yPos + BACKSHOP_ROW_HEIGHT)
+      yPos += BACKSHOP_ROW_HEIGHT
+      rowIndex++
+    }
+  } else {
+    const itemCount = pdfRows.filter((r) => r.type === 'item').length
+    const midPoint = Math.ceil(itemCount / 2)
+    const leftRows = buildColumnRows(pdfRows, 0, midPoint)
+    const rightRows = buildColumnRows(pdfRows, midPoint, itemCount)
+    const maxRows = Math.max(leftRows.length, rightRows.length)
+    for (let j = 0; j < maxRows; j++) {
+      const leftRow = leftRows[j]
+      const rightRow = rightRows[j]
+      const isLeftGroup = leftRow?.type === 'group'
+      const isRightGroup = rightRow?.type === 'group'
+      const rowH = (isLeftGroup || isRightGroup) ? PAGE.groupHeaderH : BACKSHOP_ROW_HEIGHT
+      if (isLeftGroup || isRightGroup) {
+        if (pageBreakPerBlock && groupIndex > 0) startNewPage()
+        else if (yPos + rowH > maxY) startNewPage()
+        groupIndex++
+        if (groupIndex === 1) drawRowLine(yPos)
+      } else if (yPos + rowH > maxY) {
+        startNewPage()
+      }
+      if (isLeftGroup || isRightGroup) {
+        doc.setFillColor(...COLORS.groupBg)
+        doc.rect(PAGE.marginLeft, yPos, usableWidth, rowH, 'F')
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(fonts.group)
+        doc.setTextColor(...COLORS.groupText)
+        if (leftRow?.type === 'group') doc.text(leftRow.label!, PAGE.marginLeft + colWidth / 2, yPos + rowH / 2 + 1, { align: 'center' })
+        if (rightRow?.type === 'group') doc.text(rightRow.label!, rightColStart + colWidth / 2, yPos + rowH / 2 + 1, { align: 'center' })
+        firstProductRowDone = false
+      } else {
+        const skipTop = !firstProductRowDone
+        if (leftRow?.item) drawBackshopItem(leftRow.item, PAGE.marginLeft, yPos, skipTop)
+        if (rightRow?.item) drawBackshopItem(rightRow.item, rightColStart, yPos, skipTop)
+        firstProductRowDone = true
+        drawCenterDivider(yPos, yPos + rowH)
+      }
+      drawRowLine(yPos + rowH)
+      yPos += rowH
+      if (groupIndex === 1 && (isLeftGroup || isRightGroup)) tableStartY = yPos
+    }
+  }
+
+  drawCenterDivider(tableStartY, yPos)
+  drawInnerVerticalLines(tableStartY, yPos)
+  drawOuterVerticalLines(tableStartY, yPos)
+  drawFooter(currentPage)
 }

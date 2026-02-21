@@ -2,6 +2,7 @@
 
 import {
   formatKWLabel,
+  formatKWShort,
   formatPreisEur,
   parseBlockNameToItemType,
   PRICE_ONLY_PLU_PREFIX,
@@ -35,6 +36,16 @@ describe('plu-helpers', () => {
     })
     it('formatiert zweistellige KW', () => {
       expect(formatKWLabel(53, 2024)).toBe('KW53/2024')
+    })
+  })
+
+  describe('formatKWShort', () => {
+    it('formatiert KW ohne Jahr mit führender Null', () => {
+      expect(formatKWShort(7)).toBe('KW07')
+      expect(formatKWShort(1)).toBe('KW01')
+    })
+    it('formatiert zweistellige KW', () => {
+      expect(formatKWShort(53)).toBe('KW53')
     })
   })
 
@@ -99,9 +110,9 @@ describe('plu-helpers', () => {
     it('filtert nach system_name', () => {
       expect(filterItemsBySearch(items, 'Apfel')).toHaveLength(1)
     })
-    it('gibt leeres Array bei leerem Suchtext', () => {
-      expect(filterItemsBySearch(items, '')).toEqual([])
-      expect(filterItemsBySearch(items, '   ')).toEqual([])
+    it('gibt alle Items bei leerem Suchtext (kein Filter)', () => {
+      expect(filterItemsBySearch(items, '')).toEqual(items)
+      expect(filterItemsBySearch(items, '   ')).toEqual(items)
     })
     it('Teilstring-Treffer', () => {
       expect(filterItemsBySearch(items, 'apf')).toHaveLength(1)

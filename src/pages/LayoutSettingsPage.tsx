@@ -1,11 +1,9 @@
 // LayoutSettingsPage: Layout-Konfiguration für Super-Admin (mit Live-Vorschau)
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -16,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Check, Loader2 } from 'lucide-react'
+import { Check, Loader2 } from 'lucide-react'
 import { RadioCard } from '@/components/ui/radio-card'
 
 import { useLayoutSettings, useUpdateLayoutSettings } from '@/hooks/useLayoutSettings'
@@ -28,7 +26,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 // ============================================================
 
 export function LayoutSettingsPage() {
-  const navigate = useNavigate()
   const { data: settings, isLoading } = useLayoutSettings()
   const updateMutation = useUpdateLayoutSettings()
 
@@ -165,16 +162,11 @@ export function LayoutSettingsPage() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/super-admin/masterlist')} aria-label="Zurück">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
+        <div>
             <h2 className="text-2xl font-bold tracking-tight">Layout-Konfiguration</h2>
             <p className="text-sm text-muted-foreground">
               Wie soll die PLU-Liste aufgebaut sein?
             </p>
-          </div>
         </div>
 
         {/* Zwei-Spalten-Layout: Einstellungen + Vorschau */}

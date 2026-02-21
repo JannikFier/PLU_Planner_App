@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { DashboardCard } from '@/components/layout/DashboardCard'
 import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
-import { ClipboardList, Users } from 'lucide-react'
+import { ClipboardList, Users, Layers, EyeOff, Pencil } from 'lucide-react'
 
 /**
  * Admin Dashboard – Startseite für Admins (z.B. Abteilungsleiter).
@@ -16,12 +16,44 @@ export function AdminDashboard() {
 
   const cards = useMemo(() => [
     {
-      title: 'PLU-Liste',
+      title: 'PLU-Liste Obst/Gemüse',
       description: 'Aktuelle PLU-Liste anzeigen und exportieren',
       icon: ClipboardList,
       onClick: () => navigate('/admin/masterlist'),
       color: 'text-primary',
       bg: 'bg-primary/10',
+    },
+    {
+      title: 'PLU-Liste Backshop',
+      description: 'Backshop-Liste mit Bild, PLU und Name',
+      icon: ClipboardList,
+      onClick: () => navigate('/admin/backshop-list'),
+      color: 'text-slate-600',
+      bg: 'bg-slate-100',
+    },
+    {
+      title: 'Eigene Produkte (Backshop)',
+      description: 'Eigene Backshop-Produkte mit Bild anlegen und verwalten',
+      icon: Layers,
+      onClick: () => navigate('/admin/backshop-custom-products'),
+      color: 'text-slate-600',
+      bg: 'bg-slate-100',
+    },
+    {
+      title: 'Ausgeblendete Produkte (Backshop)',
+      description: 'Ausgeblendete Backshop-Produkte einblenden',
+      icon: EyeOff,
+      onClick: () => navigate('/admin/backshop-hidden-products'),
+      color: 'text-slate-600',
+      bg: 'bg-slate-100',
+    },
+    {
+      title: 'Umbenannte Produkte (Backshop)',
+      description: 'Anzeigenamen und Bilder in der Backshop-Liste anpassen',
+      icon: Pencil,
+      onClick: () => navigate('/admin/backshop-renamed-products'),
+      color: 'text-slate-600',
+      bg: 'bg-slate-100',
     },
     {
       title: 'Benutzerverwaltung',
@@ -43,7 +75,7 @@ export function AdminDashboard() {
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {cards.map((card) => (
             <DashboardCard
               key={card.title}

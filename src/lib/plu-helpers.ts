@@ -28,6 +28,11 @@ export function formatKWLabel(kw: number, jahr: number): string {
   return `KW${String(kw).padStart(2, '0')}/${jahr}`
 }
 
+/** KW kurz formatieren (ohne Jahr), z.B. formatKWShort(7) → "KW07" – für Dropdown-Optionen. */
+export function formatKWShort(kw: number): string {
+  return `KW${String(kw).padStart(2, '0')}`
+}
+
 /** Preis in Euro formatieren (deutsche Darstellung), z.B. 1.5 → "1,50 €" */
 export function formatPreisEur(preis: number): string {
   return preis.toFixed(2).replace('.', ',') + ' €'
@@ -82,11 +87,12 @@ export function getDisplayPlu(plu: string): string {
   return isPriceOnlyPlu(plu) ? '–' : plu
 }
 
-/** Entfernt Anzeige-Stern (★) aus Custom-Produkt-Namen – nur für die Darstellung. */
+/** Für Anzeige: Mehrfach-Leerzeichen auf eines reduzieren, trimmen; bei Custom zusätzlich ★ entfernen. */
 export function getDisplayNameForItem(name: string | null, fallback: string, isCustom?: boolean): string {
-  const raw = name ?? fallback
-  if (!isCustom) return raw
-  return raw.replace(/\s*★\s*/g, ' ').replace(/\s+/g, ' ').trim() || fallback
+  const raw = (name ?? fallback) ?? ''
+  const normalized = raw.replace(/\s+/g, ' ').trim()
+  if (!isCustom) return normalized || (fallback ?? '')
+  return normalized.replace(/\s*★\s*/g, ' ').replace(/\s+/g, ' ').trim() || fallback
 }
 
 /** Eindeutigen Platzhalter für custom_products.plu erzeugen (Preis-only-Produkte). */

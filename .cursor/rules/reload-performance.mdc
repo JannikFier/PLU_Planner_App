@@ -1,0 +1,16 @@
+---
+description: Reload- und Ladeperformance – Regeln damit die App nach Reload und bei neuen Features schnell bleibt
+alwaysApply: true
+---
+
+# Reload-Performance
+
+## Grundregeln (bei neuen Features und Refactorings beachten)
+
+1. **Auth-Cache:** Profil/Session nach Login und nach jedem `fetchProfile` in sessionStorage schreiben. Cache nur bei Logout oder ungültiger Session leeren, nicht bei Netzwerkfehlern.
+2. **Neue Daten/Listen:** Prefetch in `src/hooks/usePrefetchForNavigation.ts` (oder Backshop-Pendant) aufnehmen und in `AuthPrefetch` oder auf dem zugehörigen Dashboard auslösen.
+3. **Neue Routen (häufig nach Login):** Chunk vorladen wie die Dashboards in `src/components/AuthPrefetch.tsx` (dynamischer `import()` nach Rolle).
+4. **Kein globales Blockieren:** Kein `useIsRestoring()` als Gate für die ganze UI; Shell/Header sofort, Inhalte mit Skeleton bis Daten da sind.
+5. **Persist-Allowlist:** Neue Queries, die nach Reload sofort verfügbar sein sollen, in [src/lib/query-persist-allowlist.ts](src/lib/query-persist-allowlist.ts) in `PERSIST_QUERY_KEY_PREFIXES` eintragen. Bei neuen Features oder neuen TanStack-Query-Keys prüfen, ob Persistenz nötig ist.
+
+Ausführlich: [docs/RELOAD_UND_LAADEVERHALTEN.md](../docs/RELOAD_UND_LAADEVERHALTEN.md).

@@ -67,7 +67,7 @@ function generateOneTimePassword(): string {
  * Beide können Passwörter zurücksetzen (Einmalpasswort).
  */
 export function UserManagement() {
-  const { isSuperAdmin, user: currentUser } = useAuth()
+  const { isSuperAdmin, isAdmin, user: currentUser } = useAuth()
   const currentUserId = currentUser?.id ?? null
   const queryClient = useQueryClient()
 
@@ -541,7 +541,7 @@ export function UserManagement() {
                         {formatProfileDisplayEmail(user.email)}
                       </TableCell>
                       <TableCell>
-                        {isSuperAdmin && user.role !== 'super_admin' ? (
+                        {(isSuperAdmin || isAdmin) && user.role !== 'super_admin' ? (
                           <Select
                             value={user.role}
                             onValueChange={(v) => updateRoleMutation.mutate({ userId: user.id, newRole: v as 'user' | 'admin' | 'viewer' })}

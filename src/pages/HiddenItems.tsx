@@ -1,7 +1,6 @@
 // HiddenItems – Eigene & Ausgeblendete Produkte (alle Rollen)
 
 import { useMemo, useState, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -32,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Undo2, EyeOff, Layers, Plus, FileSpreadsheet, Trash2 } from 'lucide-react'
+import { Undo2, EyeOff, Layers, Plus, FileSpreadsheet, Trash2 } from 'lucide-react'
 import { useHiddenItems, useUnhideProduct, useUnhideAll, useHideProductsBatch, useHideProduct } from '@/hooks/useHiddenItems'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
@@ -67,8 +66,7 @@ interface HiddenProductInfo {
  * (1) Eigene Produkte (Liste + hinzufügen), (2) Ausgeblendete Produkte (Einblenden).
  */
 export function HiddenItems() {
-  const navigate = useNavigate()
-  const { profile, user, isSuperAdmin } = useAuth()
+  const { user, isSuperAdmin } = useAuth()
   const currentUserId = user?.id ?? null
   const [showCustomProductDialog, setShowCustomProductDialog] = useState(false)
   const [showHideProductsDialog, setShowHideProductsDialog] = useState(false)
@@ -355,23 +353,12 @@ export function HiddenItems() {
     return { willAdd, willSkip, skipIndices }
   }, [excelParseResult, existingPLUs])
 
-  // Routen-Prefix für Zurück-Navigation
-  const rolePrefix = profile?.role === 'super_admin' ? '/super-admin' : profile?.role === 'admin' ? '/admin' : '/user'
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(`${rolePrefix}/masterlist`)}
-              aria-label="Zurück"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
             <div className="rounded-lg p-2 bg-muted">
               <Layers className="h-5 w-5 text-muted-foreground" />
             </div>

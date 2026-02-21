@@ -11,6 +11,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { LogOut, Settings, User, Shield, Crown, ChevronLeft, Eye } from 'lucide-react'
 import { NotificationBell } from '@/components/plu/NotificationBell'
+import { BackshopNotificationBell } from '@/components/plu/BackshopNotificationBell'
 import { cn } from '@/lib/utils'
 
 /**
@@ -23,11 +24,66 @@ export function AppHeader() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Home-Pfad = Dashboard je nach Rolle (einheitlich: Pfeil führt zurück zum Dashboard)
+  // Home-Pfad = Dashboard je nach Rolle
   const homePath = isSuperAdmin ? '/super-admin' : isAdmin ? '/admin' : isViewer ? '/viewer' : '/user'
 
-  // Zurück-Button zeigen, wenn nicht auf dem eigenen Dashboard
-  const showBack = location.pathname !== homePath
+  // Super-Admin in User-/Viewer-Ansicht: gleicher Zurück-Flow wie echter User, Wechsel nur über Avatar-Menü
+  const viewingAsUser = isSuperAdmin && (location.pathname.startsWith('/user') || location.pathname.startsWith('/viewer'))
+  // Logo-Klick: in User-Ansicht zum User-/Viewer-Dashboard, sonst normales homePath
+  const effectiveHomePath = viewingAsUser
+    ? (location.pathname.startsWith('/user') ? '/user' : '/viewer')
+    : homePath
+
+  // Backshop-Unter-Seiten (eigene Produkte, ausgeblendet, umbenannt) → Zurück zur Backshop-Liste
+  const USER_BACKSHOP_SUB = ['/user/backshop-custom-products', '/user/backshop-hidden-products', '/user/backshop-renamed-products']
+  const ADMIN_BACKSHOP_SUB = ['/admin/backshop-custom-products', '/admin/backshop-hidden-products', '/admin/backshop-renamed-products']
+
+  /** Zurück-Ziel für User-Bereich (/user) – inkl. zweite Stufe Backshop (Unter-Seite → Liste → Dashboard) */
+  function getUserAreaBackTarget(path: string): string | null {
+    if (path === '/user') return null
+    if (USER_BACKSHOP_SUB.includes(path)) return '/user/backshop-list'
+    if (path === '/user/backshop-list') return '/user'
+    return '/user'
+  }
+
+  /** Zurück-Ziel für Viewer-Bereich (/viewer) */
+  function getViewerAreaBackTarget(path: string): string | null {
+    if (path === '/viewer') return null
+    return '/viewer'
+  }
+
+  /** Zurück-Ziel für Admin-Bereich (/admin) – inkl. zweite Stufe Backshop */
+  function getAdminAreaBackTarget(path: string): string | null {
+    if (path === '/admin') return null
+    if (ADMIN_BACKSHOP_SUB.includes(path)) return '/admin/backshop-list'
+    if (path === '/admin/backshop-list') return '/admin'
+    return '/admin'
+  }
+
+  const backTarget = (() => {
+    const path = location.pathname
+    if (isSuperAdmin) {
+      if (viewingAsUser) {
+        if (path.startsWith('/user')) return getUserAreaBackTarget(path)
+        return getViewerAreaBackTarget(path)
+      }
+      if (path === '/super-admin') return null
+      if (path.startsWith('/super-admin/backshop-')) return '/super-admin/backshop'
+      if (path === '/super-admin/backshop') return '/super-admin'
+      const obstSubPaths = ['/super-admin/layout', '/super-admin/rules', '/super-admin/block-sort', '/super-admin/versions', '/super-admin/masterlist', '/super-admin/custom-products', '/super-admin/hidden-products', '/super-admin/renamed-products', '/super-admin/plu-upload', '/super-admin/hidden-items']
+      if (obstSubPaths.some((p) => path === p)) return '/super-admin/obst'
+      if (path === '/super-admin/obst') return '/super-admin'
+      if (path === '/super-admin/users') return '/super-admin'
+      return homePath
+    }
+    if (path.startsWith('/user')) return getUserAreaBackTarget(path)
+    if (path.startsWith('/viewer')) return getViewerAreaBackTarget(path)
+    if (path.startsWith('/admin')) return getAdminAreaBackTarget(path)
+    if (path === homePath) return null
+    return homePath
+  })()
+
+  const showBack = backTarget != null
 
   // Initialen für Avatar berechnen
   const initials = profile?.display_name
@@ -48,11 +104,11 @@ export function AppHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         {/* Links: Zurück-Button + Logo */}
         <div className="flex items-center gap-3">
-          {showBack && (
+          {showBack && backTarget && (
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate(homePath)}
+              onClick={() => navigate(backTarget)}
               className="mr-1"
               aria-label="Zurück"
             >
@@ -61,7 +117,7 @@ export function AppHeader() {
           )}
           <div
             className="flex cursor-pointer items-center gap-2"
-            onClick={() => navigate(homePath)}
+            onClick={() => navigate(effectiveHomePath)}
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
               PLU
@@ -96,6 +152,8 @@ export function AppHeader() {
 
           {/* Benachrichtigungs-Glocke nur für Admin/User (nicht Super-Admin, nicht Viewer) */}
           {!isSuperAdmin && !isViewer && <NotificationBell />}
+          {/* Backshop-Glocke nur auf Backshop-Seiten, nie für Super-Admin */}
+          {!isSuperAdmin && !isViewer && location.pathname.includes('backshop') && <BackshopNotificationBell />}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -123,8 +181,14 @@ export function AppHeader() {
               </div>
               <DropdownMenuSeparator />
 
-              {/* Super-Admin: nur User-Ansicht (Dashboard/Masterliste über Logo und Pfeil) */}
-              {isSuperAdmin && (
+              {/* Super-Admin: Wechsel User-Ansicht ↔ Super-Admin-Ansicht nur über dieses Menü */}
+              {isSuperAdmin && viewingAsUser && (
+                <DropdownMenuItem onClick={() => navigate('/super-admin')}>
+                  <Crown className="mr-2 h-4 w-4" />
+                  Zur Super-Admin-Ansicht
+                </DropdownMenuItem>
+              )}
+              {isSuperAdmin && !viewingAsUser && (
                 <DropdownMenuItem onClick={() => navigate('/user')}>
                   <User className="mr-2 h-4 w-4" />
                   User-Ansicht (wie Mitarbeiter)

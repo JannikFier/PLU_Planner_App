@@ -15,12 +15,20 @@ export function ViewerDashboard() {
 
   const cards = useMemo(() => [
     {
-      title: 'PLU-Liste',
+      title: 'PLU-Liste Obst/Gemüse',
       description: 'PLU-Liste ansehen und als PDF herunterladen oder drucken',
       icon: ClipboardList,
       onClick: () => navigate('/viewer/masterlist'),
       color: 'text-primary',
       bg: 'bg-primary/10',
+    },
+    {
+      title: 'PLU-Liste Backshop',
+      description: 'Backshop-Liste mit Bild, PLU und Name ansehen',
+      icon: ClipboardList,
+      onClick: () => navigate('/viewer/backshop-list'),
+      color: 'text-slate-600',
+      bg: 'bg-slate-100',
     },
   ], [navigate])
 

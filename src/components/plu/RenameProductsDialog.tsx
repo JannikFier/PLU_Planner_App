@@ -15,7 +15,7 @@ import { Pencil, Search } from 'lucide-react'
 import { filterItemsBySearch, getDisplayPlu, itemMatchesSearch } from '@/lib/plu-helpers'
 import { RenameDialog } from '@/components/plu/RenameDialog'
 import { cn } from '@/lib/utils'
-import type { MasterPLUItem } from '@/types/database'
+import type { MasterPLUItem, BackshopMasterPLUItem } from '@/types/database'
 import type { DisplayItem } from '@/types/plu'
 
 /** Ä→A, Ö→O, Ü→U für Gruppierung */
@@ -81,17 +81,40 @@ function masterItemToDisplayItem(m: MasterPLUItem): DisplayItem {
   }
 }
 
+/** Backshop-Master-Item zu DisplayItem (mit image_url). */
+function backshopMasterItemToDisplayItem(m: BackshopMasterPLUItem): DisplayItem {
+  return {
+    id: m.id,
+    plu: m.plu,
+    system_name: m.system_name,
+    display_name: m.display_name ?? m.system_name,
+    item_type: 'PIECE',
+    status: m.status as DisplayItem['status'],
+    old_plu: m.old_plu,
+    warengruppe: m.warengruppe,
+    block_id: m.block_id,
+    block_name: null,
+    preis: null,
+    is_custom: false,
+    is_manually_renamed: m.is_manually_renamed ?? false,
+    image_url: m.image_url ?? undefined,
+  }
+}
+
 export interface RenameProductsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** Alle Master-Items der aktiven Version (id, plu, display_name, system_name). */
-  searchableItems: MasterPLUItem[]
+  /** Obst/Gemüse: MasterPLUItem[]; Backshop: BackshopMasterPLUItem[] */
+  searchableItems: MasterPLUItem[] | BackshopMasterPLUItem[]
+  /** Bei 'backshop': Backshop-RPCs, RenameDialog mit Bild. */
+  listType?: 'default' | 'backshop'
 }
 
 export function RenameProductsDialog({
   open,
   onOpenChange,
   searchableItems,
+  listType = 'default',
 }: RenameProductsDialogProps) {
   const [searchText, setSearchText] = useState('')
   const [renameItem, setRenameItem] = useState<DisplayItem | null>(null)
@@ -103,8 +126,8 @@ export function RenameProductsDialog({
       searchableItems.map((m) => ({
         id: m.id,
         plu: m.plu,
-        display_name: m.display_name ?? m.system_name,
-        system_name: m.system_name,
+        display_name: (m as MasterPLUItem & BackshopMasterPLUItem).display_name ?? (m as MasterPLUItem & BackshopMasterPLUItem).system_name,
+        system_name: (m as MasterPLUItem & BackshopMasterPLUItem).system_name,
       })),
     [searchableItems],
   )
@@ -132,15 +155,23 @@ export function RenameProductsDialog({
         return
       }
       setRenameItem(null)
-      queryClient.invalidateQueries({ queryKey: ['plu-items'] })
+      if (listType === 'backshop') {
+        queryClient.invalidateQueries({ queryKey: ['backshop-plu-items'] })
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['plu-items'] })
+      }
     },
-    [queryClient],
+    [queryClient, listType],
   )
 
   const handleOpenRename = (item: SearchableItem) => {
     const master = searchableItems.find((m) => m.id === item.id)
     if (!master) return
-    setRenameItem(masterItemToDisplayItem(master))
+    if (listType === 'backshop') {
+      setRenameItem(backshopMasterItemToDisplayItem(master as BackshopMasterPLUItem))
+    } else {
+      setRenameItem(masterItemToDisplayItem(master as MasterPLUItem))
+    }
   }
 
   const handleClose = (nextOpen: boolean) => {
@@ -298,6 +329,7 @@ export function RenameProductsDialog({
         open={!!renameItem}
         onOpenChange={handleRenameDialogClose}
         item={renameItem}
+        listType={listType}
       />
     </>
   )

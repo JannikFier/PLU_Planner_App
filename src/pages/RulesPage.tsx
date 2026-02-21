@@ -6,7 +6,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Plus, ArrowRight, Info, Settings, ExternalLink } from 'lucide-react'
+import { Plus, ArrowRight, ExternalLink, Info, Settings } from 'lucide-react'
 
 import { useBezeichnungsregeln } from '@/hooks/useBezeichnungsregeln'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
@@ -25,16 +25,11 @@ export function RulesPage() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/super-admin/masterlist')} aria-label="Zurück">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
+        <div>
             <h2 className="text-2xl font-bold tracking-tight">Inhalt & Regeln</h2>
             <p className="text-sm text-muted-foreground">
               Bezeichnungsregeln und Warengruppen verwalten.
             </p>
-          </div>
         </div>
 
         {/* === BEZEICHNUNGSREGELN === */}
