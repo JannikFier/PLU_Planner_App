@@ -174,6 +174,7 @@ function renderSection(
 
   const rightColStart = PAGE.marginLeft + colWidth + PAGE.columnGap
   const centerDividerX = PAGE.marginLeft + colWidth  // Strich zwischen linker und rechter Spalte
+  const hasAnyOffer = pdfRows.some((r) => r.type === 'item' && r.item?.is_offer)
 
   let currentPage = 1
   let yPos = PAGE.marginTop
@@ -208,8 +209,16 @@ function renderSection(
     doc.setDrawColor(...COLORS.border)
     doc.setLineWidth(0.6)
     doc.line(PAGE.marginLeft, yPos + PAGE.columnHeaderH, PAGE.marginLeft + usableWidth, yPos + PAGE.columnHeaderH)
-
     yPos += PAGE.columnHeaderH + 1
+
+    if (hasAnyOffer) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(6)
+      doc.setTextColor(120, 120, 120)
+      doc.text('Angebot = rot umkreist', PAGE.marginLeft, yPos + 2)
+      doc.setTextColor(0, 0, 0)
+      yPos += 4
+    }
   }
 
   // === Footer ===
@@ -247,6 +256,14 @@ function renderSection(
     doc.line(centerDividerX, yStart, centerDividerX, yEnd)
   }
 
+  // Angebot-Label: Text „Angebot“ (optional mit Symbol) – Breite für Kürzung reservieren
+  const OFFER_LABEL = ' Angebot'
+  const offerLabelWidth = (() => {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(fonts.product)
+    return doc.getTextWidth(OFFER_LABEL) + 4 // +4 für kleinen roten Kreis
+  })()
+
   // === Einzelnes Item zeichnen ===
   function drawItem(item: DisplayItem, x: number, y: number) {
     // Strich zwischen PLU und Artikel (immer); Strich vor Preis NUR wenn Produkt einen Preis hat
@@ -275,10 +292,10 @@ function renderSection(
     doc.setFontSize(fonts.product)
     doc.text(getDisplayPlu(item.plu), x + 1, y + PAGE.rowHeight / 2 + 1)
 
-    // Artikelname (ohne Stern) – Kürzung per getTextWidth bis in Spaltenbreite passt
+    // Artikelname – bei is_offer Platz für „Angebot“ (rot umkreist) lassen
     doc.setTextColor(0, 0, 0)
     const displayName = getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)
-    const maxNameWidth = nameColWidth - 2
+    const maxNameWidth = item.is_offer ? nameColWidth - 2 - offerLabelWidth : nameColWidth - 2
     let nameToDraw = displayName
     const ellipsis = '…'
     if (doc.getTextWidth(displayName) > maxNameWidth) {
@@ -288,6 +305,24 @@ function renderSection(
       nameToDraw = nameToDraw + ellipsis
     }
     doc.text(nameToDraw, x + pluColWidth + 1, y + PAGE.rowHeight / 2 + 1)
+
+    // Angebot: kleines Symbol + „Angebot“ rot umkreist (rechts im Namenbereich)
+    if (item.is_offer) {
+      const nameColRight = x + pluColWidth + nameColWidth
+      const offerX = nameColRight - 1
+      const cy = y + PAGE.rowHeight / 2 + 1
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(fonts.product)
+      doc.setTextColor(200, 0, 0)
+      doc.text(OFFER_LABEL.trim(), offerX, cy, { align: 'right' })
+      const tw = doc.getTextWidth(OFFER_LABEL.trim())
+      const cx = offerX - tw / 2
+      const r = Math.max(tw / 2 + 1, PAGE.rowHeight / 2 - 0.5)
+      doc.setDrawColor(200, 0, 0)
+      doc.setLineWidth(0.25)
+      doc.circle(cx, cy - 0.5, r)
+      doc.setTextColor(0, 0, 0)
+    }
 
     // Preis-Spalte (Kasten wie PLU, gelbe Markierung bei neuem Produkt)
     const preisX = x + pluColWidth + nameColWidth
@@ -573,6 +608,7 @@ function renderBackshopSection(
 
   const rightColStart = PAGE.marginLeft + colWidth + PAGE.columnGap
   const centerDividerX = PAGE.marginLeft + colWidth
+  const hasAnyOffer = pdfRows.some((r) => r.type === 'item' && r.item?.is_offer)
   let currentPage = 1
   let yPos = PAGE.marginTop
   let tableStartY = PAGE.marginTop
@@ -609,6 +645,14 @@ function renderBackshopSection(
     doc.setLineWidth(0.3)
     doc.line(PAGE.marginLeft, yPos + headerH, PAGE.marginLeft + usableWidth, yPos + headerH)
     yPos += headerH + 1
+    if (hasAnyOffer) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(6)
+      doc.setTextColor(120, 120, 120)
+      doc.text('Angebot = rot umkreist', PAGE.marginLeft, yPos + 2)
+      doc.setTextColor(0, 0, 0)
+      yPos += 4
+    }
   }
 
   function drawFooter(pageNum: number) {
@@ -744,7 +788,9 @@ function renderBackshopSection(
 
     const nameX = pluX + pluWidth
     const displayName = getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)
-    const maxNameWidth = nameWidth - 1 // Nutze Spaltenbreite voll aus
+    const backshopOfferLabel = ' Angebot'
+    const backshopOfferLabelWidth = doc.getTextWidth(backshopOfferLabel.trim()) + 4
+    const maxNameWidth = item.is_offer ? nameWidth - 1 - backshopOfferLabelWidth : nameWidth - 1
     let nameToDraw = displayName
     const ellipsis = '…'
     if (doc.getTextWidth(displayName) > maxNameWidth) {
@@ -754,6 +800,22 @@ function renderBackshopSection(
       nameToDraw = nameToDraw + ellipsis
     }
     doc.text(nameToDraw, nameX + 0.5, y + BACKSHOP_ROW_HEIGHT / 2 + 1)
+
+    if (item.is_offer) {
+      const nameColRight = nameX + nameWidth
+      const cy = y + BACKSHOP_ROW_HEIGHT / 2 + 1
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(fonts.product)
+      doc.setTextColor(200, 0, 0)
+      doc.text(backshopOfferLabel.trim(), nameColRight - 0.5, cy, { align: 'right' })
+      const tw = doc.getTextWidth(backshopOfferLabel.trim())
+      const cx = nameColRight - 0.5 - tw / 2
+      const r = Math.max(tw / 2 + 1, BACKSHOP_ROW_HEIGHT / 2 - 0.5)
+      doc.setDrawColor(200, 0, 0)
+      doc.setLineWidth(0.25)
+      doc.circle(cx, cy - 0.5, r)
+      doc.setTextColor(0, 0, 0)
+    }
   }
 
   function drawGroupHeader(label: string, y: number) {

@@ -7,6 +7,8 @@ import type {
   ItemType,
   ParsedCustomProductRow,
   CustomProductParseResult,
+  ParsedOfferItemRow,
+  OfferItemsParseResult,
 } from '@/types/plu'
 
 /** Regex für gültige PLU: genau 5 Ziffern */
@@ -322,6 +324,72 @@ export function parseHiddenItemsExcel(file: File): Promise<{ plus: string[]; fil
         }
 
         resolve({ plus, fileName: file.name })
+      } catch (err) {
+        reject(new Error(`Excel-Parsing fehlgeschlagen: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`))
+      }
+    }
+
+    reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'))
+    reader.readAsArrayBuffer(file)
+  })
+}
+
+/**
+ * Parst eine Excel-Datei für Werbung/Angebot.
+ * Format: Spalte 1 = PLU, Spalte 2 = Name (optional), Spalte 3 = Anzahl Wochen (1–4).
+ */
+export function parseOfferItemsExcel(file: File): Promise<OfferItemsParseResult> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer)
+        const workbook = XLSX.read(data, { type: 'array' })
+
+        const sheetName = workbook.SheetNames[0]
+        if (!sheetName) {
+          reject(new Error('Excel-Datei enthält keine Sheets'))
+          return
+        }
+
+        const sheet = workbook.Sheets[sheetName]
+        const rawRows: unknown[][] = XLSX.utils.sheet_to_json(sheet, {
+          header: 1,
+          defval: '',
+        })
+
+        const rows: ParsedOfferItemRow[] = []
+        let skippedRows = 0
+        for (const rawRow of rawRows) {
+          if (!rawRow || rawRow.length === 0) continue
+          const pluCell = rawRow[0]
+          const plu = pluCell != null ? String(pluCell).trim() : ''
+          if (!plu) {
+            skippedRows++
+            continue
+          }
+          const nameCell = rawRow[1]
+          const name = nameCell != null ? String(nameCell).trim() : undefined
+          const weeksCell = rawRow[2]
+          let weeks = 1
+          if (weeksCell != null && weeksCell !== '') {
+            const n = typeof weeksCell === 'number' ? weeksCell : parseInt(String(weeksCell).trim(), 10)
+            if (Number.isNaN(n) || n < 1 || n > 4) {
+              skippedRows++
+              continue
+            }
+            weeks = n
+          }
+          rows.push({ plu, name, weeks })
+        }
+
+        resolve({
+          rows,
+          fileName: file.name,
+          totalRows: rawRows.length,
+          skippedRows,
+        })
       } catch (err) {
         reject(new Error(`Excel-Parsing fehlgeschlagen: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`))
       }

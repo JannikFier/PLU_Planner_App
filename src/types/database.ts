@@ -343,6 +343,31 @@ export interface Database {
           plu?: string
         }
       }
+      plu_offer_items: {
+        Row: {
+          id: string
+          plu: string
+          start_kw: number
+          start_jahr: number
+          duration_weeks: number
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          plu: string
+          start_kw: number
+          start_jahr: number
+          duration_weeks: number
+          created_by: string
+        }
+        Update: {
+          plu?: string
+          start_kw?: number
+          start_jahr?: number
+          duration_weeks?: number
+        }
+      }
       version_notifications: {
         Row: {
           id: string
@@ -530,6 +555,31 @@ export interface Database {
         }
         Update: Record<string, never>
       }
+      backshop_offer_items: {
+        Row: {
+          id: string
+          plu: string
+          start_kw: number
+          start_jahr: number
+          duration_weeks: number
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          plu: string
+          start_kw: number
+          start_jahr: number
+          duration_weeks: number
+          created_by: string
+        }
+        Update: {
+          plu?: string
+          start_kw?: number
+          start_jahr?: number
+          duration_weeks?: number
+        }
+      }
       backshop_version_notifications: {
         Row: {
           id: string
@@ -679,6 +729,7 @@ export type Bezeichnungsregel = Database['public']['Tables']['bezeichnungsregeln
 export type Notification = Database['public']['Tables']['notifications_queue']['Row']
 export type CustomProduct = Database['public']['Tables']['custom_products']['Row']
 export type HiddenItem = Database['public']['Tables']['hidden_items']['Row']
+export type OfferItem = Database['public']['Tables']['plu_offer_items']['Row']
 export type VersionNotification = Database['public']['Tables']['version_notifications']['Row']
 
 // Backshop
@@ -687,6 +738,7 @@ export type BackshopMasterPLUItem = Database['public']['Tables']['backshop_maste
 export type BackshopBlock = Database['public']['Tables']['backshop_blocks']['Row']
 export type BackshopCustomProduct = Database['public']['Tables']['backshop_custom_products']['Row']
 export type BackshopHiddenItem = Database['public']['Tables']['backshop_hidden_items']['Row']
+export type BackshopOfferItem = Database['public']['Tables']['backshop_offer_items']['Row']
 export type BackshopVersionNotification = Database['public']['Tables']['backshop_version_notifications']['Row']
 export type BackshopLayoutSettings = Database['public']['Tables']['backshop_layout_settings']['Row']
 export type BackshopBlockRule = Database['public']['Tables']['backshop_block_rules']['Row']

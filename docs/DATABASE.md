@@ -7,6 +7,7 @@ profiles (Supabase Auth + App-Daten)
     │
     ├──→ custom_products (1:n) – Globale eigene Produkte (created_by)
     ├──→ hidden_items (1:n) – Global ausgeblendete PLUs (hidden_by)
+    ├──→ plu_offer_items (1:n) – Werbung/Angebot (Obst/Gemüse), Laufzeit in Wochen
     ├──→ version_notifications (1:n) – Gelesen/Ungelesen pro Version
     │
     ├──→ user_overrides (1:n) – LEGACY, nicht mehr aktiv genutzt
@@ -28,7 +29,7 @@ Backshop-PLU-Liste (getrennt von Obst/Gemüse, gleiche profiles):
 backshop_versions → backshop_master_plu_items (inkl. image_url)
                   → backshop_version_notifications
 backshop_blocks → backshop_block_rules
-backshop_custom_products, backshop_hidden_items (Bild Pflicht bei custom)
+backshop_custom_products, backshop_hidden_items, backshop_offer_items (Bild Pflicht bei custom)
 backshop_layout_settings (Singleton), backshop_bezeichnungsregeln
 ```
 
@@ -181,6 +182,22 @@ Global ausgeblendete PLUs. KW-unabhängig.
 | `plu` | TEXT (UNIQUE) | Ausgeblendete PLU |
 | `hidden_by` | UUID (FK → profiles) | Wer hat ausgeblendet |
 | `created_at` | TIMESTAMPTZ | Ausgeblendet am |
+
+### plu_offer_items (Werbung/Angebot – Obst/Gemüse)
+
+Produkte, die als „Angebot“ in der Werbung geführt werden. Laufzeit in Wochen (1–4), Start = aktuelle KW beim Anlegen.
+
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `id` | UUID (PK) | Eintrag-ID |
+| `plu` | TEXT (UNIQUE) | PLU des Angebots |
+| `start_kw` | INT | Start-Kalenderwoche |
+| `start_jahr` | INT | Start-Jahr |
+| `duration_weeks` | INT (1–4) | Laufzeit in Wochen |
+| `created_by` | UUID (FK → profiles) | Wer hat hinzugefügt |
+| `created_at` | TIMESTAMPTZ | Angelegt am |
+
+**RLS:** Lesen für alle Auth-User; Einfügen/Löschen/Update nur für User, Admin, Super-Admin (nicht Viewer).
 
 ### version_notifications (NEU – Runde 2)
 

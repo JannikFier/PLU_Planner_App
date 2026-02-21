@@ -90,6 +90,15 @@ Alle Rollen arbeiten an EINER gemeinsamen Liste. Änderungen gelten für alle.
 - **„Von mir ausgeblendet“:** In der Tabelle Ausgeblendete Produkte wird bei Einträgen, die der aktuelle User ausgeblendet hat (`hidden_by`), zusätzlich „Von mir“ angezeigt.
 - Verwaltung über die Seite **Eigene & Ausgeblendete** (`*/hidden-items`): zwei Sektionen – oben „Eigene Produkte“ (Liste + hinzufügen), darunter „Ausgeblendete Produkte“ (Einblenden, Per Excel ausblenden)
 
+### Werbung/Angebot (plu_offer_items / backshop_offer_items)
+- **User, Admin und Super-Admin** können Produkte als „Angebot“ markieren (Viewer nur Lesen).
+- **Laufzeit:** Beim Hinzufügen wird eine Laufzeit von 1–4 Wochen gewählt (Start = aktuelle KW). Nach Ablauf gilt das Produkt nicht mehr als Angebot.
+- **Toolbar:** In der Masterliste (Obst/Gemüse und Backshop) zwischen „Ausgeblendete“ und „Umbenennen“: Button **„Werbung“** → Seite **Produkte in der Werbung** (`*/offer-products` bzw. `*/backshop-offer-products`).
+- **Seite Werbung:** Liste aller Einträge (PLU, Artikel, Laufzeit, Status Aktiv/Abgelaufen), **„Aus Werbung entfernen“** pro Zeile, Button **„Produkte zur Werbung hinzufügen“** (Dialog mit Suche wie bei Ausblenden, Klick = hinzufügen mit gewählter Laufzeit 1–4 Wochen).
+- **Excel-Import:** Super-Admin kann **„Per Excel hinzufügen“**: Spalte 1 = PLU, 2 = Name (optional), 3 = Wochen (1–4). Start = aktuelle KW.
+- **Anzeige:** In der PLU-Tabelle erscheint bei Angebots-Produkten ein Badge **„Angebot“** (dezent). Im PDF: Text „Angebot“ rot umkreist am Ende der Zeile; Kopfzeile „Angebot = rot umkreist“ wenn mindestens ein Angebot vorkommt.
+- **Obst/Gemüse und Backshop** getrennt (eigene Tabellen und Seiten).
+
 ### Umbenennungen
 - **Custom Products:** Ersteller oder Super-Admin kann umbenennen (z. B. auf der Seite Eigene Produkte).
 - **Master Products:** Admin und Super-Admin können umbenennen.

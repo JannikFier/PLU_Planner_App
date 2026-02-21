@@ -28,6 +28,7 @@ const MasterList = lazy(() => import('@/pages/MasterList').then((m) => ({ defaul
 const HiddenItems = lazy(() => import('@/pages/HiddenItems').then((m) => ({ default: m.HiddenItems })))
 const CustomProductsPage = lazy(() => import('@/pages/CustomProductsPage').then((m) => ({ default: m.CustomProductsPage })))
 const HiddenProductsPage = lazy(() => import('@/pages/HiddenProductsPage').then((m) => ({ default: m.HiddenProductsPage })))
+const OfferProductsPage = lazy(() => import('@/pages/OfferProductsPage').then((m) => ({ default: m.OfferProductsPage })))
 const RenamedProductsPage = lazy(() => import('@/pages/RenamedProductsPage').then((m) => ({ default: m.RenamedProductsPage })))
 const UserManagement = lazy(() => import('@/pages/UserManagement').then((m) => ({ default: m.UserManagement })))
 const NotFound = lazy(() => import('@/pages/NotFound').then((m) => ({ default: m.NotFound })))
@@ -41,6 +42,7 @@ const BackshopMasterList = lazy(() => import('@/pages/BackshopMasterList').then(
 const BackshopUploadPage = lazy(() => import('@/pages/BackshopUploadPage').then((m) => ({ default: m.BackshopUploadPage })))
 const BackshopCustomProductsPage = lazy(() => import('@/pages/BackshopCustomProductsPage').then((m) => ({ default: m.BackshopCustomProductsPage })))
 const BackshopHiddenProductsPage = lazy(() => import('@/pages/BackshopHiddenProductsPage').then((m) => ({ default: m.BackshopHiddenProductsPage })))
+const BackshopOfferProductsPage = lazy(() => import('@/pages/BackshopOfferProductsPage').then((m) => ({ default: m.BackshopOfferProductsPage })))
 const BackshopRenamedProductsPage = lazy(() => import('@/pages/BackshopRenamedProductsPage').then((m) => ({ default: m.BackshopRenamedProductsPage })))
 const BackshopVersionsPage = lazy(() => import('@/pages/BackshopVersionsPage').then((m) => ({ default: m.BackshopVersionsPage })))
 const BackshopLayoutSettingsPage = lazy(() => import('@/pages/BackshopLayoutSettingsPage').then((m) => ({ default: m.BackshopLayoutSettingsPage })))
@@ -174,6 +176,22 @@ function App() {
               }
             />
             <Route
+              path="/user/offer-products"
+              element={
+                <ProtectedRoute>
+                  <OfferProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/renamed-products"
+              element={
+                <ProtectedRoute>
+                  <RenamedProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/user/backshop-list"
               element={
                 <ProtectedRoute>
@@ -194,6 +212,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <BackshopHiddenProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/backshop-offer-products"
+              element={
+                <ProtectedRoute>
+                  <BackshopOfferProductsPage />
                 </ProtectedRoute>
               }
             />
@@ -274,6 +300,14 @@ function App() {
               }
             />
             <Route
+              path="/admin/offer-products"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <OfferProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/renamed-products"
               element={
                 <ProtectedRoute requireAdmin>
@@ -302,6 +336,14 @@ function App() {
               element={
                 <ProtectedRoute requireAdmin>
                   <BackshopHiddenProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/backshop-offer-products"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <BackshopOfferProductsPage />
                 </ProtectedRoute>
               }
             />
@@ -380,6 +422,14 @@ function App() {
               }
             />
             <Route
+              path="/super-admin/offer-products"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <OfferProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/super-admin/renamed-products"
               element={
                 <ProtectedRoute requireSuperAdmin>
@@ -416,6 +466,14 @@ function App() {
               element={
                 <ProtectedRoute requireSuperAdmin>
                   <BackshopHiddenProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/backshop-offer-products"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <BackshopOfferProductsPage />
                 </ProtectedRoute>
               }
             />

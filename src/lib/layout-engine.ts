@@ -27,6 +27,7 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
     masterItems,
     customProducts,
     hiddenPLUs,
+    offerPLUs,
     bezeichnungsregeln,
     blocks,
     sortMode,
@@ -108,6 +109,12 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
 
   // SCHRITT 3: Ausgeblendete Items herausfiltern (NICHT löschen, nur nicht anzeigen)
   items = items.filter((item) => !hiddenPLUs.has(item.plu))
+
+  // Angebot/Werbung: is_offer setzen
+  items = items.map((item) => ({
+    ...item,
+    is_offer: offerPLUs?.has(item.plu) ?? false,
+  }))
 
   // SCHRITT 4: Bezeichnungsregeln anwenden
   // WICHTIG: Prüfung NUR über das Flag is_manually_renamed!
@@ -195,6 +202,8 @@ export type BackshopBezeichnungsregelInput = {
 export interface BackshopDisplayListInput {
   masterItems: BackshopMasterPLUItem[]
   hiddenPLUs?: Set<string>
+  /** PLUs die aktuell als Angebot/Werbung gelten (für is_offer auf DisplayItem) */
+  offerPLUs?: Set<string>
   sortMode: 'ALPHABETICAL' | 'BY_BLOCK'
   blocks?: Block[]
   /** Eigene Backshop-Produkte; werden nur hinzugefügt, wenn PLU nicht in Master vorkommt */
@@ -212,6 +221,7 @@ export function buildBackshopDisplayList(input: BackshopDisplayListInput): Layou
   const {
     masterItems,
     hiddenPLUs = new Set(),
+    offerPLUs,
     sortMode,
     blocks = [],
     customProducts = [],
@@ -236,6 +246,7 @@ export function buildBackshopDisplayList(input: BackshopDisplayListInput): Layou
     is_custom: false,
     is_manually_renamed: item.is_manually_renamed ?? false,
     image_url: item.image_url ?? undefined,
+    is_offer: offerPLUs?.has(item.plu) ?? false,
   }))
 
   for (const cp of customProducts) {
@@ -255,6 +266,7 @@ export function buildBackshopDisplayList(input: BackshopDisplayListInput): Layou
         is_custom: true,
         is_manually_renamed: false,
         image_url: cp.image_url,
+        is_offer: offerPLUs?.has(cp.plu) ?? false,
       })
     }
   }

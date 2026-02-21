@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Undo2, EyeOff, Layers, Plus, FileSpreadsheet, Trash2 } from 'lucide-react'
+import { Undo2, EyeOff, Layers, Plus, FileSpreadsheet, Trash2, Megaphone } from 'lucide-react'
 import { useHiddenItems, useUnhideProduct, useUnhideAll, useHideProductsBatch, useHideProduct } from '@/hooks/useHiddenItems'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
@@ -39,6 +39,7 @@ import { useCustomProducts, useAddCustomProductsBatch, useDeleteCustomProduct } 
 import { useBlocks } from '@/hooks/useBlocks'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
 import { useAuth } from '@/hooks/useAuth'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { formatPreisEur, generatePriceOnlyPlu, getDisplayPlu, parseBlockNameToItemType } from '@/lib/plu-helpers'
 import { parseCustomProductsExcel, parseHiddenItemsExcel } from '@/lib/excel-parser'
 import { supabase } from '@/lib/supabase'
@@ -67,6 +68,14 @@ interface HiddenProductInfo {
  */
 export function HiddenItems() {
   const { user, isSuperAdmin } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  // Prefix aus aktueller URL, damit Super-Admin in User-Ansicht dort bleibt
+  const pathPrefix =
+    location.pathname.startsWith('/super-admin') ? '/super-admin'
+    : location.pathname.startsWith('/admin') ? '/admin'
+    : location.pathname.startsWith('/viewer') ? '/viewer'
+    : '/user'
   const currentUserId = user?.id ?? null
   const [showCustomProductDialog, setShowCustomProductDialog] = useState(false)
   const [showHideProductsDialog, setShowHideProductsDialog] = useState(false)
@@ -654,6 +663,26 @@ export function HiddenItems() {
             </CardContent>
           </Card>
         )}
+
+        {/* === Sektion 3: Werbung === */}
+        <Card className="mt-8">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <h3 className="text-lg font-semibold">Werbung</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`${pathPrefix}/offer-products`)}
+              >
+                <Megaphone className="h-4 w-4 mr-2" />
+                Zur Werbung
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              Produkte in der Werbung verwalten: hinzufügen, Laufzeit anzeigen und ändern, aus Werbung entfernen.
+            </p>
+          </CardContent>
+        </Card>
 
         <CustomProductDialog
           open={showCustomProductDialog}

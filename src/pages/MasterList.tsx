@@ -1,7 +1,7 @@
 // MasterList – Haupt-PLU-Tabelle mit Layout-Engine, Toolbar und globaler Liste
 
 import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
@@ -18,6 +18,7 @@ import {
   EyeOff,
   FileDown,
   Pencil,
+  Megaphone,
 } from 'lucide-react'
 
 // PLU-Komponenten
@@ -37,12 +38,14 @@ import { useLayoutSettings } from '@/hooks/useLayoutSettings'
 import { useBlocks } from '@/hooks/useBlocks'
 import { useCustomProducts } from '@/hooks/useCustomProducts'
 import { useHiddenItems } from '@/hooks/useHiddenItems'
+import { useOfferItems } from '@/hooks/useOfferItems'
 import { useBezeichnungsregeln } from '@/hooks/useBezeichnungsregeln'
 import { useAuth } from '@/hooks/useAuth'
 // Layout-Engine + Helpers
 import { buildDisplayList } from '@/lib/layout-engine'
 import type { PLUStats } from '@/lib/plu-helpers'
-import { getCurrentKW } from '@/lib/date-kw-utils'
+import { getCurrentKW, getKWAndYearFromDate } from '@/lib/date-kw-utils'
+import { getActiveOfferPLUs } from '@/lib/offer-utils'
 import { ensureActiveVersion } from '@/lib/ensure-active-version'
 
 interface MasterListProps {
@@ -61,9 +64,15 @@ interface MasterListProps {
  */
 export function MasterList({ mode }: MasterListProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
-  const { profile, isAdmin } = useAuth()
-  const rolePrefix = profile?.role === 'super_admin' ? '/super-admin' : profile?.role === 'admin' ? '/admin' : profile?.role === 'viewer' ? '/viewer' : '/user'
+  const { isAdmin } = useAuth()
+  // Prefix aus aktueller URL (nicht aus Rolle), damit Super-Admin in User-Ansicht dort bleibt
+  const rolePrefix =
+    location.pathname.startsWith('/super-admin') ? '/super-admin'
+    : location.pathname.startsWith('/admin') ? '/admin'
+    : location.pathname.startsWith('/viewer') ? '/viewer'
+    : '/user'
 
   // Daten laden
   const { data: activeVersion, isLoading: versionLoading } = useActiveVersion()
@@ -72,7 +81,14 @@ export function MasterList({ mode }: MasterListProps) {
   const { data: blocks = [] } = useBlocks()
   const { data: customProducts = [] } = useCustomProducts()
   const { data: hiddenItems = [] } = useHiddenItems()
+  const { data: offerItems = [] } = useOfferItems()
   const { data: regeln = [] } = useBezeichnungsregeln()
+
+  const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
+  const offerPLUs = useMemo(
+    () => getActiveOfferPLUs(offerItems, currentKw, currentJahr),
+    [offerItems, currentKw, currentJahr],
+  )
 
   // Gewählte Version (standardmäßig die aktive)
   const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>(undefined)
@@ -127,6 +143,7 @@ export function MasterList({ mode }: MasterListProps) {
       masterItems: rawItems,
       customProducts,
       hiddenPLUs: new Set(hiddenItems.map((h) => h.plu)),
+      offerPLUs,
       bezeichnungsregeln: activeRegeln,
       blocks,
       sortMode,
@@ -150,7 +167,7 @@ export function MasterList({ mode }: MasterListProps) {
     }
 
     return { displayItems: result.items, stats: pluStats }
-  }, [rawItems, customProducts, hiddenItems, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion, selectedVersionId, versions])
+  }, [rawItems, customProducts, hiddenItems, offerPLUs, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion, selectedVersionId, versions])
 
   // Aktuelle Version finden (für Anzeige im Header)
   const currentVersion = useMemo(
@@ -175,6 +192,7 @@ export function MasterList({ mode }: MasterListProps) {
       masterItems: pdfRawItems,
       customProducts,
       hiddenPLUs: new Set(hiddenItems.map((h) => h.plu)),
+      offerPLUs,
       bezeichnungsregeln: activeRegeln,
       blocks,
       sortMode,
@@ -197,7 +215,7 @@ export function MasterList({ mode }: MasterListProps) {
         customCount: result.stats.customCount,
       } as PLUStats,
     }
-  }, [pdfRawItems, customProducts, hiddenItems, regeln, blocks, layoutSettings, sortMode, displayMode, pdfVersion, activeVersion])
+  }, [pdfRawItems, customProducts, hiddenItems, offerPLUs, regeln, blocks, layoutSettings, sortMode, displayMode, pdfVersion, activeVersion])
 
   // Loading-State
   const isLoading = versionLoading || versionsLoading || itemsLoading
@@ -314,6 +332,14 @@ export function MasterList({ mode }: MasterListProps) {
                 >
                   <EyeOff className="h-4 w-4 mr-1" />
                   Ausgeblendete
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`${rolePrefix}/offer-products`)}
+                >
+                  <Megaphone className="h-4 w-4 mr-1" />
+                  Werbung
                 </Button>
               </>
             )}

@@ -21,6 +21,7 @@ export const PERSIST_QUERY_KEY_PREFIXES: readonly string[] = [
   'plu-items',
   'custom-products',
   'hidden-items',
+  'offer-items',
   'bezeichnungsregeln',
   'all-profiles',
   // Backshop
@@ -31,6 +32,7 @@ export const PERSIST_QUERY_KEY_PREFIXES: readonly string[] = [
   'backshop-plu-items',
   'backshop-custom-products',
   'backshop-hidden-items',
+  'backshop-offer-items',
   'backshop-bezeichnungsregeln',
 ] as const
 

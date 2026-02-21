@@ -5,13 +5,14 @@ import { DashboardCard, DashboardGroupCard } from '@/components/layout/Dashboard
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
 import { BackshopNotificationDialog } from '@/components/plu/BackshopNotificationDialog'
-import { Upload, Palette, FileText, Package, ClipboardList, Plus, EyeOff, Bell, Pencil } from 'lucide-react'
+import { Upload, Palette, FileText, Package, ClipboardList, Plus, EyeOff, Bell, Pencil, Megaphone } from 'lucide-react'
 import { toast } from 'sonner'
 
 const BACKSHOP_ITEMS = [
   { title: 'Backshop-Liste', description: 'Backshop-Liste mit Bild, PLU und Name', icon: ClipboardList, to: '/super-admin/backshop-list', color: 'text-slate-600', bg: 'bg-slate-100' },
   { title: 'Eigene Produkte (Backshop)', description: 'Eigene Backshop-Produkte mit Bild anlegen', icon: Plus, to: '/super-admin/backshop-custom-products', color: 'text-slate-600', bg: 'bg-slate-100' },
   { title: 'Ausgeblendete (Backshop)', description: 'Ausgeblendete Backshop-Produkte einblenden', icon: EyeOff, to: '/super-admin/backshop-hidden-products', color: 'text-slate-600', bg: 'bg-slate-100' },
+  { title: 'Werbung (Backshop)', description: 'Angebote verwalten (Backshop)', icon: Megaphone, to: '/super-admin/backshop-offer-products', color: 'text-slate-600', bg: 'bg-slate-100' },
   { title: 'Umbenannte (Backshop)', description: 'Anzeigenamen und Bilder anpassen', icon: Pencil, to: '/super-admin/backshop-renamed-products', color: 'text-slate-600', bg: 'bg-slate-100' },
 ]
 const BACKSHOP_CONFIG_ITEMS = [

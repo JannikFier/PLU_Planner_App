@@ -34,13 +34,18 @@ export function AppHeader() {
     ? (location.pathname.startsWith('/user') ? '/user' : '/viewer')
     : homePath
 
-  // Backshop-Unter-Seiten (eigene Produkte, ausgeblendet, umbenannt) → Zurück zur Backshop-Liste
-  const USER_BACKSHOP_SUB = ['/user/backshop-custom-products', '/user/backshop-hidden-products', '/user/backshop-renamed-products']
-  const ADMIN_BACKSHOP_SUB = ['/admin/backshop-custom-products', '/admin/backshop-hidden-products', '/admin/backshop-renamed-products']
+  // Obst/Gemüse-Unter-Seiten (eigene Produkte, ausgeblendet, Werbung, umbenannt) → Zurück zur Masterliste
+  const USER_OBST_SUB = ['/user/custom-products', '/user/hidden-products', '/user/offer-products', '/user/renamed-products', '/user/hidden-items']
+  const ADMIN_OBST_SUB = ['/admin/custom-products', '/admin/hidden-products', '/admin/offer-products', '/admin/renamed-products', '/admin/hidden-items']
+  // Backshop-Unter-Seiten → Zurück zur Backshop-Liste
+  const USER_BACKSHOP_SUB = ['/user/backshop-custom-products', '/user/backshop-hidden-products', '/user/backshop-offer-products', '/user/backshop-renamed-products']
+  const ADMIN_BACKSHOP_SUB = ['/admin/backshop-custom-products', '/admin/backshop-hidden-products', '/admin/backshop-offer-products', '/admin/backshop-renamed-products']
 
-  /** Zurück-Ziel für User-Bereich (/user) – inkl. zweite Stufe Backshop (Unter-Seite → Liste → Dashboard) */
+  /** Zurück-Ziel für User-Bereich (/user) – Obst-Unter-Seiten → Masterliste, Backshop-Unter-Seiten → Backshop-Liste, Masterliste/Liste → Dashboard */
   function getUserAreaBackTarget(path: string): string | null {
     if (path === '/user') return null
+    if (USER_OBST_SUB.includes(path)) return '/user/masterlist'
+    if (path === '/user/masterlist') return '/user'
     if (USER_BACKSHOP_SUB.includes(path)) return '/user/backshop-list'
     if (path === '/user/backshop-list') return '/user'
     return '/user'
@@ -52,9 +57,11 @@ export function AppHeader() {
     return '/viewer'
   }
 
-  /** Zurück-Ziel für Admin-Bereich (/admin) – inkl. zweite Stufe Backshop */
+  /** Zurück-Ziel für Admin-Bereich (/admin) – Obst-Unter-Seiten → Masterliste, Backshop-Unter-Seiten → Backshop-Liste */
   function getAdminAreaBackTarget(path: string): string | null {
     if (path === '/admin') return null
+    if (ADMIN_OBST_SUB.includes(path)) return '/admin/masterlist'
+    if (path === '/admin/masterlist') return '/admin'
     if (ADMIN_BACKSHOP_SUB.includes(path)) return '/admin/backshop-list'
     if (path === '/admin/backshop-list') return '/admin'
     return '/admin'
@@ -70,7 +77,7 @@ export function AppHeader() {
       if (path === '/super-admin') return null
       if (path.startsWith('/super-admin/backshop-')) return '/super-admin/backshop'
       if (path === '/super-admin/backshop') return '/super-admin'
-      const obstSubPaths = ['/super-admin/layout', '/super-admin/rules', '/super-admin/block-sort', '/super-admin/versions', '/super-admin/masterlist', '/super-admin/custom-products', '/super-admin/hidden-products', '/super-admin/renamed-products', '/super-admin/plu-upload', '/super-admin/hidden-items']
+      const obstSubPaths = ['/super-admin/layout', '/super-admin/rules', '/super-admin/block-sort', '/super-admin/versions', '/super-admin/masterlist', '/super-admin/custom-products', '/super-admin/hidden-products', '/super-admin/offer-products', '/super-admin/renamed-products', '/super-admin/plu-upload', '/super-admin/hidden-items']
       if (obstSubPaths.some((p) => path === p)) return '/super-admin/obst'
       if (path === '/super-admin/obst') return '/super-admin'
       if (path === '/super-admin/users') return '/super-admin'

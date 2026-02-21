@@ -26,6 +26,8 @@ export interface DisplayItem {
   created_by?: string
   /** Optional: Bild-URL (Backshop-Liste); bei Obst/Gemüse immer undefined */
   image_url?: string | null
+  /** In der Werbung/Angebot (aktuell aktiv) */
+  is_offer?: boolean
 }
 
 /** Geparste Zeile aus einer Excel-Datei */
@@ -59,6 +61,21 @@ export interface ParsedCustomProductRow {
 /** Ergebnis des Excel-Parsers für eigene Produkte */
 export interface CustomProductParseResult {
   rows: ParsedCustomProductRow[]
+  fileName: string
+  totalRows: number
+  skippedRows: number
+}
+
+/** Geparste Zeile aus Excel für Werbung/Angebot (Spalte 1: PLU, 2: Name optional, 3: Wochen 1–4) */
+export interface ParsedOfferItemRow {
+  plu: string
+  name?: string
+  weeks: number
+}
+
+/** Ergebnis des Excel-Parsers für Werbung/Angebot */
+export interface OfferItemsParseResult {
+  rows: ParsedOfferItemRow[]
   fileName: string
   totalRows: number
   skippedRows: number
@@ -195,6 +212,8 @@ export interface LayoutEngineInput {
   masterItems: MasterPLUItem[]
   customProducts: CustomProduct[]
   hiddenPLUs: Set<string>
+  /** PLUs die aktuell als Angebot/Werbung gelten (für is_offer auf DisplayItem) */
+  offerPLUs?: Set<string>
   bezeichnungsregeln: { keyword: string; position: 'PREFIX' | 'SUFFIX'; case_sensitive: boolean }[]
   blocks: Block[]
   sortMode: 'ALPHABETICAL' | 'BY_BLOCK'

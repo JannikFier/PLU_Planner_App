@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ListFilter, RefreshCw, AlertCircle, FileDown, Plus, EyeOff, Pencil } from 'lucide-react'
+import { ListFilter, RefreshCw, AlertCircle, FileDown, Plus, EyeOff, Pencil, Megaphone } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { KWSelector } from '@/components/plu/KWSelector'
 import { PLUTable } from '@/components/plu/PLUTable'
@@ -19,10 +19,13 @@ import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
 import { useBackshopLayoutSettings } from '@/hooks/useBackshopLayoutSettings'
 import { useBackshopCustomProducts } from '@/hooks/useBackshopCustomProducts'
 import { useBackshopHiddenItems } from '@/hooks/useBackshopHiddenItems'
+import { useBackshopOfferItems } from '@/hooks/useBackshopOfferItems'
 import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
 import { useBackshopBezeichnungsregeln } from '@/hooks/useBackshopBezeichnungsregeln'
 import { buildBackshopDisplayList } from '@/lib/layout-engine'
 import type { PLUStats } from '@/lib/plu-helpers'
+import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
+import { getActiveOfferPLUs } from '@/lib/offer-utils'
 
 /**
  * Backshop-Masterliste: Tabelle mit Bild, PLU, Name.
@@ -64,12 +67,18 @@ export function BackshopMasterList() {
 
   const { data: customProducts = [] } = useBackshopCustomProducts()
   const { data: hiddenItems = [] } = useBackshopHiddenItems()
+  const { data: offerItems = [] } = useBackshopOfferItems()
   const { data: blocks = [] } = useBackshopBlocks()
   const { data: bezeichnungsregeln = [] } = useBackshopBezeichnungsregeln()
 
   const hiddenPLUs = useMemo(
     () => new Set(hiddenItems.map((h) => h.plu)),
     [hiddenItems],
+  )
+  const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
+  const offerPLUs = useMemo(
+    () => getActiveOfferPLUs(offerItems, currentKw, currentJahr),
+    [offerItems, currentKw, currentJahr],
   )
 
   const sortMode = layoutSettings?.sort_mode ?? 'ALPHABETICAL'
@@ -84,6 +93,7 @@ export function BackshopMasterList() {
     const result = buildBackshopDisplayList({
       masterItems: rawItems,
       hiddenPLUs,
+      offerPLUs,
       sortMode,
       blocks,
       customProducts,
@@ -98,7 +108,7 @@ export function BackshopMasterList() {
       customCount: result.stats.customCount,
     }
     return { displayItems: result.items, stats: pluStats }
-  }, [rawItems, hiddenPLUs, sortMode, blocks, customProducts, bezeichnungsregeln])
+  }, [rawItems, hiddenPLUs, offerPLUs, sortMode, blocks, customProducts, bezeichnungsregeln])
 
   const currentVersion = useMemo(
     () => versions.find((v) => v.id === effectiveVersionId) ?? activeVersion,
@@ -198,6 +208,14 @@ export function BackshopMasterList() {
                 >
                   <EyeOff className="h-4 w-4 mr-1" />
                   Ausgeblendete
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`${rolePrefix}/backshop-offer-products`)}
+                >
+                  <Megaphone className="h-4 w-4 mr-1" />
+                  Werbung
                 </Button>
               </>
             )}

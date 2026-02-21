@@ -28,6 +28,7 @@ export function runMasterListPrefetch(queryClient: QueryClient): void {
   void queryClient.prefetchQuery({ queryKey: ['blocks'] })
   void queryClient.prefetchQuery({ queryKey: ['custom-products'] })
   void queryClient.prefetchQuery({ queryKey: ['hidden-items'] })
+  void queryClient.prefetchQuery({ queryKey: ['offer-items'] })
   void queryClient.prefetchQuery({ queryKey: ['bezeichnungsregeln'] })
 
   // Sobald eine der beiden Queries fertig ist: Version-ID aus Cache holen und plu-items prefetchen (kein Waterfall).

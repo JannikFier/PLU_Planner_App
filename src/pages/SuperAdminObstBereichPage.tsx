@@ -5,13 +5,14 @@ import { DashboardCard, DashboardGroupCard } from '@/components/layout/Dashboard
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
 import { NotificationDialog } from '@/components/plu/NotificationDialog'
-import { Upload, Palette, FileText, Package, ClipboardList, Plus, EyeOff, Bell, Pencil } from 'lucide-react'
+import { Upload, Palette, FileText, Package, ClipboardList, Plus, EyeOff, Bell, Pencil, Megaphone } from 'lucide-react'
 import { toast } from 'sonner'
 
 const OBST_ITEMS = [
   { title: 'Masterliste Obst/Gemüse', description: 'PLU-Liste anzeigen und bearbeiten', icon: ClipboardList, to: '/super-admin/masterlist', color: 'text-emerald-600', bg: 'bg-emerald-50' },
   { title: 'Eigene Produkte', description: 'Hinzufügen, bearbeiten, ausblenden (Obst/Gemüse)', icon: Plus, to: '/super-admin/custom-products', color: 'text-emerald-600', bg: 'bg-emerald-50' },
   { title: 'Ausgeblendete', description: 'Einsehen und wieder einblenden (Obst/Gemüse)', icon: EyeOff, to: '/super-admin/hidden-products', color: 'text-gray-600', bg: 'bg-gray-100' },
+  { title: 'Werbung', description: 'Angebote verwalten (Obst/Gemüse)', icon: Megaphone, to: '/super-admin/offer-products', color: 'text-emerald-600', bg: 'bg-emerald-50' },
   { title: 'Umbenannte', description: 'Anzeigenamen anpassen (Obst/Gemüse)', icon: Pencil, to: '/super-admin/renamed-products', color: 'text-emerald-600', bg: 'bg-emerald-50' },
 ]
 const OBST_CONFIG_ITEMS = [

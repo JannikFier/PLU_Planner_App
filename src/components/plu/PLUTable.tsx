@@ -14,6 +14,7 @@ import { useFindInPage } from '@/hooks/useFindInPage'
 import { Search } from 'lucide-react'
 import { FindInPageBar } from '@/components/plu/FindInPageBar'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { PreisBadge } from './PreisBadge'
 import { StatusBadge } from './StatusBadge'
 import type { Block } from '@/types/database'
@@ -261,7 +262,14 @@ function PLUColumn({
                   style={{ fontSize: fonts.product + 'px' }}
                   title={getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
                 >
-                  {getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
+                  <span className="inline-flex items-center gap-1.5 flex-wrap">
+                    {getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
+                    {item.is_offer && (
+                      <Badge variant="secondary" className="text-xs font-normal bg-red-100 text-red-800 border-0 shrink-0">
+                        Angebot
+                      </Badge>
+                    )}
+                  </span>
                 </td>
                 {hasAnyPrice && (
                   <td className="w-[90px] min-w-[90px] px-2 py-1 border-l border-border" style={{ fontSize: fonts.product + 'px' }}>
@@ -367,7 +375,14 @@ function RowByRowTable({
                   {selectionMode && <td className="px-1 py-1 text-center"><input type="checkbox" checked={leftSelected} onChange={() => onToggleSelect?.(row.left!.plu)} className="h-4 w-4 rounded border-border" /></td>}
                   {showImageColumn && imageCell(row.left)}
                   <td className="px-2 py-1" style={{ fontSize: fonts.product + 'px' }}><StatusBadge plu={row.left.plu} status={row.left.status} oldPlu={row.left.old_plu} style={{ fontSize: fonts.product + 'px' }} /></td>
-                  <td className="px-2 py-1 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px' }} title={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}>{getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}</td>
+                  <td className="px-2 py-1 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px' }} title={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}>
+                    <span className="inline-flex items-center gap-1.5 flex-wrap">
+                      {getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}
+                      {row.left.is_offer && (
+                        <Badge variant="secondary" className="text-xs font-normal bg-red-100 text-red-800 border-0 shrink-0">Angebot</Badge>
+                      )}
+                    </span>
+                  </td>
                   {hasAnyPrice && <td className="w-[90px] min-w-[90px] px-2 py-1 border-l border-border" style={{ fontSize: fonts.product + 'px' }}>{row.left.preis != null ? <PreisBadge value={row.left.preis} style={{ fontSize: fonts.product + 'px' }} /> : null}</td>}
                 </>
               ) : (
@@ -383,7 +398,14 @@ function RowByRowTable({
                   {selectionMode && <td className="px-1 py-1 text-center border-l-2 border-border"><input type="checkbox" checked={rightSelected} onChange={() => onToggleSelect?.(row.right!.plu)} className="h-4 w-4 rounded border-border" /></td>}
                   {showImageColumn && imageCell(row.right)}
                   <td className={cn('px-2 py-1', !selectionMode && !showImageColumn && 'border-l-2 border-border')} style={{ fontSize: fonts.product + 'px' }}><StatusBadge plu={row.right.plu} status={row.right.status} oldPlu={row.right.old_plu} style={{ fontSize: fonts.product + 'px' }} /></td>
-                  <td className="px-2 py-1 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px' }} title={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}>{getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}</td>
+                  <td className="px-2 py-1 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px' }} title={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}>
+                    <span className="inline-flex items-center gap-1.5 flex-wrap">
+                      {getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}
+                      {row.right.is_offer && (
+                        <Badge variant="secondary" className="text-xs font-normal bg-red-100 text-red-800 border-0 shrink-0">Angebot</Badge>
+                      )}
+                    </span>
+                  </td>
                   {hasAnyPrice && <td className="w-[90px] min-w-[90px] px-2 py-1 border-l border-border" style={{ fontSize: fonts.product + 'px' }}>{row.right.preis != null ? <PreisBadge value={row.right.preis} style={{ fontSize: fonts.product + 'px' }} /> : null}</td>}
                 </>
               ) : (
