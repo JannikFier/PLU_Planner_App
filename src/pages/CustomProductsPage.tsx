@@ -15,6 +15,7 @@ import { usePLUData } from '@/hooks/usePLUData'
 import { useBlocks } from '@/hooks/useBlocks'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
 import { useAuth } from '@/hooks/useAuth'
+import { EXCEL_READ_ERROR_FALLBACK, formatError } from '@/lib/error-messages'
 import { formatPreisEur, getDisplayPlu, generatePriceOnlyPlu } from '@/lib/plu-helpers'
 import { parseCustomProductsExcel } from '@/lib/excel-parser'
 import { toast } from 'sonner'
@@ -94,7 +95,7 @@ export function CustomProductsPage() {
       setExcelParseResult(result)
       setExcelOverrides({})
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Excel konnte nicht gelesen werden.')
+      toast.error(formatError(err, EXCEL_READ_ERROR_FALLBACK))
     }
   }, [])
 

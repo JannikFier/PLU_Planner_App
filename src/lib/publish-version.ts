@@ -1,9 +1,8 @@
 // Publish-Logik: Version veröffentlichen, Items schreiben, Benachrichtigungen erstellen
 
+import { PUBLISH_BATCH_SIZE } from '@/lib/constants'
 import { supabase } from '@/lib/supabase'
 import type { Database, MasterPLUItem } from '@/types/database'
-
-const BATCH_SIZE = 500
 
 interface PublishInput {
   /** KW-Nummer der neuen Version */
@@ -59,14 +58,13 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
     }
   }
 
-  // 1. Alte aktive Version(en) einfrieren
+  // 1. Alte aktive Version(en) einfrieren (delete_after nicht setzen – Retention über Cron „max. 3 Versionen“)
   const { error: freezeError } = await supabase
     .from('versions')
     .update(
     ({
       status: 'frozen',
       frozen_at: new Date().toISOString(),
-      delete_after: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     } as Database['public']['Tables']['versions']['Update']) as never
   )
     .eq('status', 'active')
@@ -110,15 +108,15 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
     preis: item.preis,
   }))
 
-  for (let i = 0; i < itemsToInsert.length; i += BATCH_SIZE) {
-    const batch = itemsToInsert.slice(i, i + BATCH_SIZE)
+  for (let i = 0; i < itemsToInsert.length; i += PUBLISH_BATCH_SIZE) {
+    const batch = itemsToInsert.slice(i, i + PUBLISH_BATCH_SIZE)
     const { error: insertError } = await supabase
       .from('master_plu_items')
       .insert((batch as Database['public']['Tables']['master_plu_items']['Insert'][]) as never)
 
     if (insertError) {
       await supabase.from('versions').delete().eq('id', versionId)
-      throw new Error(`Items einfügen fehlgeschlagen (Batch ${Math.floor(i / BATCH_SIZE) + 1}): ${insertError.message}`)
+      throw new Error(`Items einfügen fehlgeschlagen (Batch ${Math.floor(i / PUBLISH_BATCH_SIZE) + 1}): ${insertError.message}`)
     }
   }
 
@@ -159,8 +157,8 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
       }))
 
       // Batch-Insert version_notifications
-      for (let i = 0; i < notifications.length; i += BATCH_SIZE) {
-        const batch = notifications.slice(i, i + BATCH_SIZE)
+      for (let i = 0; i < notifications.length; i += PUBLISH_BATCH_SIZE) {
+        const batch = notifications.slice(i, i + PUBLISH_BATCH_SIZE)
         const { error: notifError } = await supabase
           .from('version_notifications')
           .insert((batch as Database['public']['Tables']['version_notifications']['Insert'][]) as never)

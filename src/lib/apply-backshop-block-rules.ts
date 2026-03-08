@@ -3,7 +3,8 @@
 
 import type { BackshopBlockRule, BackshopMasterPLUItem } from '@/types/database'
 
-function nameContains(
+/** Prüft, ob name das keyword enthält (optional case-insensitive). Wiederverwendbar z. B. für Upload-Vorauswahl. */
+export function nameContains(
   name: string,
   keyword: string,
   caseSensitive: boolean,

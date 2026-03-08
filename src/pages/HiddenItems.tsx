@@ -40,6 +40,7 @@ import { useBlocks } from '@/hooks/useBlocks'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
 import { useAuth } from '@/hooks/useAuth'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { EXCEL_READ_ERROR_FALLBACK, formatError } from '@/lib/error-messages'
 import { formatPreisEur, generatePriceOnlyPlu, getDisplayPlu, parseBlockNameToItemType } from '@/lib/plu-helpers'
 import { parseCustomProductsExcel, parseHiddenItemsExcel } from '@/lib/excel-parser'
 import { supabase } from '@/lib/supabase'
@@ -217,7 +218,7 @@ export function HiddenItems() {
       }
       setHiddenExcelResult(result)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Excel konnte nicht gelesen werden.')
+      toast.error(formatError(err, EXCEL_READ_ERROR_FALLBACK))
     }
   }, [])
 
@@ -267,7 +268,7 @@ export function HiddenItems() {
       setExcelParseResult(result)
       setExcelOverrides({})
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Excel konnte nicht gelesen werden.')
+      toast.error(formatError(err, EXCEL_READ_ERROR_FALLBACK))
     }
   }, [])
 

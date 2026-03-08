@@ -108,6 +108,7 @@ Alle Rollen arbeiten an EINER gemeinsamen Liste. Änderungen gelten für alle.
   - Setzt `is_manually_renamed = true`; nur `display_name` wird geändert, `system_name` bleibt für Excel-Abgleich unverändert.
   - Layout-Engine überspringt dann Bezeichnungsregeln für dieses Item.
   - **Zurücksetzen:** Auf der Seite Umbenannte Produkte pro Zeile „Zurücksetzen“ (mit Bestätigung) → `display_name = system_name`, `is_manually_renamed = false`.
+  - **Backshop: Umbenennungen global** (wie eigene Produkte, ausgeblendete): In `backshop_renamed_items` gespeichert, bleiben erhalten auch wenn eine KW-Version gelöscht wird. Orphan-Renames (PLU existiert nirgends mehr) werden täglich automatisch entfernt.
 - **Suche in der Masterliste:** Die Find-in-Page-Suchleiste in der Masterliste ist aktuell **deaktiviert**. Zum Suchen in der PLU-Tabelle kann die Browser-Suche (z. B. Strg+F / Cmd+F) genutzt werden. Im Dialog „Produkte umbenennen“ gibt es weiterhin die Filter-Suche (PLU/Name) wie bei „Produkte ausblenden“, ohne Pfeile.
 
 ## Feature: Warengruppen (Blöcke)
@@ -195,5 +196,5 @@ Nach einem KW-Upload erhalten alle User (außer dem Uploader) eine Benachrichtig
 | Job | Zeitplan | Funktion |
 |-----|---------|----------|
 | KW-Switch | Sa 23:59 | Aktive Version einfrieren, nächste aktivieren |
-| Auto-Delete | Täglich 02:00 | Alte frozen Versionen löschen (nach delete_after) |
+| Auto-Delete | Täglich 02:00 | Nur älteste Versionen löschen – es bleiben maximal 3 (neueste nach Jahr/KW); PLU-Listen bleiben dauerhaft erhalten. |
 | Notification Cleanup | Täglich 03:00 | Erledigte Notifications nach 30 Tagen löschen |

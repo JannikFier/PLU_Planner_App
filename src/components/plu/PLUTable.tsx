@@ -3,6 +3,11 @@
 
 import { useMemo, useState, useEffect } from 'react'
 import {
+  PLU_TABLE_HEADER_CLASS,
+  PLU_TABLE_HEADER_GEWICHT_CLASS,
+  PLU_TABLE_HEADER_STUECK_CLASS,
+} from '@/lib/constants'
+import {
   groupItemsByLetter,
   groupItemsByBlock,
   splitLetterGroupsIntoColumns,
@@ -566,7 +571,7 @@ export function PLUTable({
         {pieceItems.length > 0 && (
           <div>
             <div
-              className="rounded-t-lg bg-blue-500/10 border border-b-0 border-blue-200 px-4 py-2 font-semibold text-blue-700 uppercase tracking-wider text-center"
+              className={PLU_TABLE_HEADER_STUECK_CLASS}
               style={{ fontSize: fonts.header + 'px' }}
             >
               PLU-Liste Stück
@@ -589,7 +594,7 @@ export function PLUTable({
         {weightItems.length > 0 && (
           <div>
             <div
-              className="rounded-t-lg bg-amber-500/10 border border-b-0 border-amber-200 px-4 py-2 font-semibold text-amber-700 uppercase tracking-wider text-center"
+              className={PLU_TABLE_HEADER_GEWICHT_CLASS}
               style={{ fontSize: fonts.header + 'px' }}
             >
               PLU-Liste Gewicht
@@ -617,7 +622,7 @@ export function PLUTable({
   return (
     <div>
       <div
-        className="rounded-t-lg bg-gray-500/10 border border-b-0 border-gray-300 px-4 py-2 font-semibold text-gray-700 uppercase tracking-wider text-center"
+        className={PLU_TABLE_HEADER_CLASS}
         style={{ fontSize: fonts.header + 'px' }}
       >
         {listType === 'backshop' ? 'PLU-Liste Backshop' : 'PLU-Liste'}

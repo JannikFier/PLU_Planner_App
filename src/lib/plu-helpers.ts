@@ -20,6 +20,21 @@ export interface PLUItemBase {
 }
 
 // ============================================================
+// PLU-Validierung (zentral für Excel-Parser und Backshop-Parser)
+// ============================================================
+
+/** Regex für gültige PLU: genau 5 Ziffern (Standard-Masterliste). */
+export const PLU_REGEX = /^\d{5}$/
+
+/** Regex für eigene Produkte: 4 oder 5 Ziffern. */
+export const CUSTOM_PLU_REGEX = /^\d{4,5}$/
+
+/** Prüft, ob ein String eine gültige 5-stellige PLU ist. */
+export function isValidPlu(plu: string): boolean {
+  return PLU_REGEX.test(plu)
+}
+
+// ============================================================
 // Formatierung
 // ============================================================
 

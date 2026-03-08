@@ -82,28 +82,27 @@ export function BackshopWarengruppenPanel() {
     return counts
   }, [items])
 
-  /** Rechte Spalte: ohne Auswahl = nur Unzugeordnete, mit Auswahl = nur Produkte dieser Gruppe; danach Suche. */
-  const rightColumnItems = useMemo(() => {
-    const scope =
-      selectedBlockId === null
-        ? items.filter((i) => i.block_id == null)
-        : items.filter((i) => i.block_id === selectedBlockId)
-    if (!search.trim()) return scope
+  const selectedBlockItems = useMemo(
+    () => (selectedBlockId ? items.filter((i) => i.block_id === selectedBlockId) : []),
+    [items, selectedBlockId],
+  )
+
+  const unassignedItems = useMemo(
+    () => items.filter((i) => i.block_id == null),
+    [items],
+  )
+
+  const filteredUnassignedItems = useMemo(() => {
+    if (!search.trim()) return unassignedItems
     const lower = search.toLowerCase()
-    return scope.filter(
+    return unassignedItems.filter(
       (item) =>
         item.system_name.toLowerCase().includes(lower) ||
         item.plu.includes(lower),
     )
-  }, [items, search, selectedBlockId])
+  }, [unassignedItems, search])
 
-  const rightColumnCount = rightColumnItems.length
-  const rightColumnLabel =
-    selectedBlockId === null
-      ? `Nur unzugeordnete Produkte (${rightColumnCount} Stück)`
-      : selectedBlock
-        ? `Produkte in ${selectedBlock.name} (${rightColumnCount} Stück)`
-        : `Produkte (${rightColumnCount} Stück)`
+  const rightColumnLabel = `Noch nicht zugeordnet (${unassignedItems.length} Stück)`
 
   const handleBlockSelect = useCallback(
     (blockId: string) => {
@@ -271,39 +270,104 @@ export function BackshopWarengruppenPanel() {
           </Card>
 
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Produkte</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">{rightColumnLabel}</p>
+            <CardHeader className="pb-3 space-y-3">
+              <div>
+                <CardTitle className="text-sm">Produkte</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {selectedBlock
+                    ? `Produkte in ${selectedBlock.name} und unzugeordnete Artikel`
+                    : 'Produkte nach Warengruppe und Zuordnung'}
+                </p>
+              </div>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Nach Name oder PLU suchen..."
+                  placeholder="In unzugeordneten Produkten nach Name oder PLU suchen..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-8"
-                  aria-label="Suche"
+                  aria-label="Suche in unzugeordneten Produkten"
                 />
               </div>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <ScrollArea className="h-[300px]">
-                <div className="space-y-0.5">
-                  {rightColumnItems.map((item) => {
-                    const isChecked = checkedIds.has(item.id)
-                    const assignedBlock = item.block_id ? blocks.find((b) => b.id === item.block_id) : null
-                    const isOtherBlock = assignedBlock && assignedBlock.id !== selectedBlockId
-                    return (
-                      <DraggableBackshopProduct
-                        key={item.id}
-                        item={item}
-                        isChecked={isChecked}
-                        onToggle={() => toggleItem(item.id)}
-                        assignedBlockName={assignedBlock?.name}
-                        isOtherBlock={!!isOtherBlock}
-                      />
-                    )
-                  })}
+            <CardContent className="space-y-3">
+              <ScrollArea className="h-[320px]">
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-semibold text-muted-foreground">
+                        Produkte in {selectedBlock?.name ?? '…'}
+                      </p>
+                      {selectedBlock && (
+                        <span className="text-[11px] text-muted-foreground">
+                          {selectedBlockItems.length} Artikel
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-0.5">
+                      {selectedBlock ? (
+                        selectedBlockItems.length > 0 ? (
+                          selectedBlockItems.map((item) => {
+                            const isChecked = checkedIds.has(item.id)
+                            const assignedBlock = item.block_id ? blocks.find((b) => b.id === item.block_id) : null
+                            const isOtherBlock = assignedBlock && assignedBlock.id !== selectedBlockId
+                            return (
+                              <DraggableBackshopProduct
+                                key={item.id}
+                                item={item}
+                                isChecked={isChecked}
+                                onToggle={() => toggleItem(item.id)}
+                                assignedBlockName={assignedBlock?.name}
+                                isOtherBlock={!!isOtherBlock}
+                              />
+                            )
+                          })
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic">
+                            Noch keine Produkte in dieser Warengruppe.
+                          </p>
+                        )
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">
+                          Warengruppe links auswählen, um Inhalte zu sehen.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border pt-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-semibold text-muted-foreground">
+                        {rightColumnLabel}
+                      </p>
+                      <span className="text-[11px] text-muted-foreground">
+                        {filteredUnassignedItems.length} Treffer
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      {filteredUnassignedItems.map((item) => {
+                        const isChecked = checkedIds.has(item.id)
+                        const assignedBlock = item.block_id ? blocks.find((b) => b.id === item.block_id) : null
+                        const isOtherBlock = assignedBlock && assignedBlock.id !== selectedBlockId
+                        return (
+                          <DraggableBackshopProduct
+                            key={item.id}
+                            item={item}
+                            isChecked={isChecked}
+                            onToggle={() => toggleItem(item.id)}
+                            assignedBlockName={assignedBlock?.name}
+                            isOtherBlock={!!isOtherBlock}
+                          />
+                        )
+                      })}
+                      {filteredUnassignedItems.length === 0 && (
+                        <p className="text-xs text-muted-foreground italic">
+                          Keine unzugeordneten Produkte im aktuellen Suchfilter.
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </ScrollArea>
               <div className="flex flex-col gap-2 pt-2 border-t border-border">
@@ -314,7 +378,11 @@ export function BackshopWarengruppenPanel() {
                     disabled={!selectedBlockId || checkedIds.size === 0 || assignProducts.isPending}
                     className="flex-1"
                   >
-                    {assignProducts.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Auswahl → {selectedBlock?.name ?? '...'} zuweisen</>}
+                    {assignProducts.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>Auswahl → {selectedBlock?.name ?? '...'} zuweisen</>
+                    )}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => setCheckedIds(new Set())}>
                     Alle abwählen

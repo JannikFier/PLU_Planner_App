@@ -29,7 +29,7 @@ Backshop-PLU-Liste (getrennt von Obst/Gemüse, gleiche profiles):
 backshop_versions → backshop_master_plu_items (inkl. image_url)
                   → backshop_version_notifications
 backshop_blocks → backshop_block_rules
-backshop_custom_products, backshop_hidden_items, backshop_offer_items (Bild Pflicht bei custom)
+backshop_custom_products, backshop_hidden_items, backshop_renamed_items (global, plu unique), backshop_offer_items (Bild Pflicht bei custom)
 backshop_layout_settings (Singleton), backshop_bezeichnungsregeln
 ```
 
@@ -66,7 +66,7 @@ Jede Kalenderwoche bekommt eine eigene Version.
 | `status` | TEXT | `draft`, `active` oder `frozen` |
 | `published_at` | TIMESTAMPTZ | Wann aktiviert |
 | `frozen_at` | TIMESTAMPTZ | Wann eingefroren |
-| `delete_after` | TIMESTAMPTZ | Auto-Löschung nach X Tagen |
+| `delete_after` | TIMESTAMPTZ | Nicht mehr für Löschung genutzt (Migration 019); Retention über „max. 3 Versionen behalten“. |
 | `created_by` | UUID | Erstellt von (Super-Admin) |
 
 **Regel:** Nur eine Version kann `status = 'active'` sein.
@@ -281,3 +281,4 @@ Die Datenbank wird über nummerierte SQL-Scripts aufgebaut:
 10. **010_four_roles_viewer.sql** – Rolle viewer
 11. **011_backshop_schema.sql** – Backshop-Tabellen (Versionen, Items mit image_url, Custom, Hidden, Notifications, Layout, Regeln, Blöcke) + RLS + get_active_backshop_version()
 12. **013_backshop_cron.sql** – Backshop-Cron-Jobs (backshop-kw-switch, backshop-auto-delete-old-versions, backshop-notification-cleanup)
+13. **019_retention_keep_3_versions.sql** – Retention: Es werden nur die 3 neuesten Versionen (Jahr/KW) behalten; ältere werden täglich gelöscht. KW-Switch setzt beim Einfrieren kein delete_after mehr.

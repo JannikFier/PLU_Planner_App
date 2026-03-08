@@ -16,6 +16,7 @@ import {
 } from '@dnd-kit/core'
 import { snapCenterToCursor } from '@dnd-kit/modifiers'
 import { GripVertical } from 'lucide-react'
+import { PLU_TABLE_HEADER_CLASS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
 import { StatusBadge } from './StatusBadge'
@@ -61,6 +62,8 @@ export function InteractiveBackshopPLUTable() {
     () => groupItemsByBlock<BackshopItemForGroup>(itemsWithType, sortedBlocks as import('@/types/database').Block[]),
     [itemsWithType, sortedBlocks],
   )
+
+  const unassignedItems = useMemo(() => items.filter((i) => i.block_id == null), [items])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const [dragType, setDragType] = useState<'block' | 'item' | null>(null)
@@ -151,11 +154,9 @@ export function InteractiveBackshopPLUTable() {
     )
   }
 
-  const unassignedItems = useMemo(() => items.filter((i) => i.block_id == null), [items])
-
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="rounded-t-lg bg-gray-500/10 border border-b-0 border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 uppercase tracking-wider text-center">
+      <div className={PLU_TABLE_HEADER_CLASS}>
         PLU-Liste Backshop
       </div>
       <BackshopCategoriesLeftUnassignedRight
@@ -328,7 +329,7 @@ function BackshopBlockDropZone({
   )
 }
 
-/** Kompaktes Produkt mit Bild + PLU + Name, draggable (z. B. in Kategorie-Karte oder nach „Ohne Zuordnung“ ziehen). */
+/** Kompaktes Produkt mit Bild + PLU + Name, draggable (z.B. in Kategorie-Karte oder nach „Ohne Zuordnung“ ziehen). */
 function BackshopDraggableProductChip({ item }: { item: BackshopMasterPLUItem }) {
   const dragId = `drag-item-${item.id}`
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: dragId })

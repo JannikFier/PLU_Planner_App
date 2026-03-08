@@ -160,9 +160,12 @@ export interface BackshopCompareItem {
   plu: string
   system_name: string
   display_name: string | null
+  is_manually_renamed: boolean
   status: string
   old_plu: string | null
   image_url: string | null
+  /** Im Upload-Flow: vorgeschlagene oder vom User gewählte Warengruppe (block_id) */
+  block_id?: string | null
 }
 
 /** Ergebnis des Backshop-Vergleichs (Items inkl. image_url, Bild-Erhalt aus Vorversion) */

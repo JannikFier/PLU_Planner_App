@@ -75,6 +75,11 @@ export function AppHeader() {
         return getViewerAreaBackTarget(path)
       }
       if (path === '/super-admin') return null
+      // Backshop: PLU-Liste → Backshop-Dashboard; Warengruppen-Seite + Unter-Seiten der Liste → PLU-Liste; sonstige Backshop-Seiten → Backshop-Dashboard
+      if (path === '/super-admin/backshop-list') return '/super-admin/backshop'
+      if (path === '/super-admin/backshop-warengruppen') return '/super-admin/backshop-list'
+      const SUPER_ADMIN_BACKSHOP_LIST_SUB = ['/super-admin/backshop-custom-products', '/super-admin/backshop-hidden-products', '/super-admin/backshop-offer-products', '/super-admin/backshop-renamed-products']
+      if (SUPER_ADMIN_BACKSHOP_LIST_SUB.includes(path)) return '/super-admin/backshop-list'
       if (path.startsWith('/super-admin/backshop-')) return '/super-admin/backshop'
       if (path === '/super-admin/backshop') return '/super-admin'
       const obstSubPaths = ['/super-admin/layout', '/super-admin/rules', '/super-admin/block-sort', '/super-admin/versions', '/super-admin/masterlist', '/super-admin/custom-products', '/super-admin/hidden-products', '/super-admin/offer-products', '/super-admin/renamed-products', '/super-admin/plu-upload', '/super-admin/hidden-items']

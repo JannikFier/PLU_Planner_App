@@ -18,6 +18,7 @@ import {
 import { Pencil, Undo2 } from 'lucide-react'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
+import { useBackshopRenamedItems } from '@/hooks/useBackshopRenamedItems'
 import { useResetBackshopProductName } from '@/hooks/useBackshopRename'
 import { useAuth } from '@/hooks/useAuth'
 import { getDisplayPlu } from '@/lib/plu-helpers'
@@ -31,12 +32,20 @@ export function BackshopRenamedProductsPage() {
 
   const { data: activeVersion } = useActiveBackshopVersion()
   const { data: masterItems = [], isLoading: itemsLoading } = useBackshopPLUData(activeVersion?.id)
+  const { data: globalRenamed = [], isLoading: renamedLoading } = useBackshopRenamedItems()
   const resetName = useResetBackshopProductName()
 
-  const renamedItems = useMemo(
-    () => masterItems.filter((m) => m.is_manually_renamed === true),
-    [masterItems],
-  )
+  // Produkte, die in der aktuellen Version vorkommen UND global umbenannt sind
+  const renamedItems = useMemo(() => {
+    const renamedPlus = new Set(globalRenamed.map((r) => r.plu))
+    const byPlu = new Map(globalRenamed.map((r) => [r.plu, r]))
+    return masterItems
+      .filter((m) => renamedPlus.has(m.plu))
+      .map((m) => {
+        const r = byPlu.get(m.plu)!
+        return { ...m, display_name: r.display_name }
+      })
+  }, [masterItems, globalRenamed])
 
   const handleResetConfirm = async () => {
     if (!resetConfirmItem) return
@@ -75,7 +84,7 @@ export function BackshopRenamedProductsPage() {
           </Button>
         </div>
 
-        {itemsLoading && (
+        {(itemsLoading || renamedLoading) && (
           <Card>
             <CardContent className="p-6 space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -89,7 +98,7 @@ export function BackshopRenamedProductsPage() {
           </Card>
         )}
 
-        {!itemsLoading && renamedItems.length === 0 && (
+        {!itemsLoading && !renamedLoading && renamedItems.length === 0 && (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <Pencil className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -101,7 +110,7 @@ export function BackshopRenamedProductsPage() {
           </Card>
         )}
 
-        {!itemsLoading && renamedItems.length > 0 && (
+        {!itemsLoading && !renamedLoading && renamedItems.length > 0 && (
           <Card>
             <CardContent className="p-0">
               <table className="w-full">
@@ -143,6 +152,7 @@ export function BackshopRenamedProductsPage() {
           onOpenChange={setShowRenameDialog}
           searchableItems={masterItems}
           listType="backshop"
+          renamedOverrides={globalRenamed.map((r) => ({ plu: r.plu, display_name: r.display_name }))}
         />
 
         <AlertDialog open={!!resetConfirmItem} onOpenChange={(open) => !open && setResetConfirmItem(null)}>

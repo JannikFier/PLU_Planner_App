@@ -279,6 +279,46 @@ function findExistingImageUrl(
   return null
 }
 
+/** Sucht einen bestehenden Anzeigenamen (nur wenn wirklich manuell umbenannt). */
+function findExistingDisplayName(
+  plu: string,
+  systemName: string,
+  currentByPLU: Map<string, BackshopCompareItem>,
+  currentByNameUnique: Map<string, BackshopCompareItem | null>,
+  previousByNameUnique: Map<string, BackshopCompareItem | null>,
+): { display_name: string | null; is_manually_renamed: boolean } {
+  const byPlu = currentByPLU.get(plu)
+  if (byPlu?.display_name && byPlu.is_manually_renamed === true) {
+    return { display_name: byPlu.display_name, is_manually_renamed: true }
+  }
+  const nameKey = systemName.toLowerCase()
+  const byName = currentByNameUnique.get(nameKey) ?? null
+  if (byName?.display_name && byName.is_manually_renamed === true) {
+    return { display_name: byName.display_name, is_manually_renamed: true }
+  }
+  const prev = previousByNameUnique.get(nameKey) ?? null
+  if (prev?.display_name && prev.is_manually_renamed === true) {
+    return { display_name: prev.display_name, is_manually_renamed: true }
+  }
+  return { display_name: null, is_manually_renamed: false }
+}
+
+function buildUniqueNameLookupBackshop(items: BackshopCompareItem[]): Map<string, BackshopCompareItem | null> {
+  const counts = new Map<string, number>()
+  for (const it of items) {
+    const key = it.system_name.toLowerCase()
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const unique = new Map<string, BackshopCompareItem | null>()
+  for (const it of items) {
+    const key = it.system_name.toLowerCase()
+    const c = counts.get(key) ?? 0
+    if (c === 1) unique.set(key, it)
+    else unique.set(key, null)
+  }
+  return unique
+}
+
 /**
  * Vergleicht neue Backshop-Excel-Daten mit der bestehenden Version.
  * Gleiche Logik wie Obst/Gemüse, aber ohne item_type.
@@ -293,12 +333,14 @@ export function compareBackshopWithCurrentVersion(input: CompareBackshopInput): 
     currentByPLU.set(item.plu, item)
     currentByName.set(item.system_name.toLowerCase(), item)
   }
+  const currentByNameUnique = buildUniqueNameLookupBackshop(currentItems)
 
   const previousByName = new Map<string, BackshopCompareItem>()
   for (const item of previousItems) {
     const key = item.system_name.toLowerCase()
     if (!currentByName.has(key)) previousByName.set(key, item)
   }
+  const previousByNameUnique = buildUniqueNameLookupBackshop(previousItems)
 
   const unchanged: BackshopCompareItem[] = []
   const pluChanged: BackshopCompareItem[] = []
@@ -324,11 +366,20 @@ export function compareBackshopWithCurrentVersion(input: CompareBackshopInput): 
       row.imageUrl
     )
 
+    const existingRename = findExistingDisplayName(
+      row.plu,
+      row.systemName,
+      currentByPLU,
+      currentByNameUnique,
+      previousByNameUnique,
+    )
+
     const baseItem: BackshopCompareItem = {
       id: generateUUID(),
       plu: row.plu,
       system_name: row.systemName,
-      display_name: null,
+      display_name: existingRename.display_name,
+      is_manually_renamed: existingRename.is_manually_renamed,
       status: 'UNCHANGED',
       old_plu: null,
       image_url: imageUrl,

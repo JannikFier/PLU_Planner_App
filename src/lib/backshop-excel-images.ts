@@ -12,6 +12,111 @@ const SIGNED_URL_EXPIRES_IN = 60 * 60 * 24 * 365
 const RESIZE_TARGET = 192
 
 /**
+ * Extrahiert das größte eingebettete Bitmap aus einer EMF-Datei.
+ * EMF besteht aus Records; EMR_STRETCHDIBITS (0x51) enthält ein DIB (Device Independent Bitmap).
+ * Das DIB wird in ein vollständiges BMP umgewandelt, das Browser via createImageBitmap laden können.
+ */
+function extractBitmapFromEmf(buffer: ArrayBuffer): ArrayBuffer | null {
+  const view = new DataView(buffer)
+  const len = buffer.byteLength
+  if (len < 108) return null
+  const EMR_STRETCHDIBITS = 0x51
+  let bestDib: { bmiOffset: number; bmiSize: number; bitsOffset: number; bitsSize: number } | null = null
+  let offset = 0
+  while (offset + 8 <= len) {
+    const recType = view.getUint32(offset, true)
+    const recSize = view.getUint32(offset + 4, true)
+    if (recSize < 8 || offset + recSize > len) break
+    if (recType === EMR_STRETCHDIBITS && recSize >= 80) {
+      const offBmiSrc = view.getUint32(offset + 48, true)
+      const cbBmiSrc = view.getUint32(offset + 52, true)
+      const offBitsSrc = view.getUint32(offset + 56, true)
+      const cbBitsSrc = view.getUint32(offset + 60, true)
+      if (cbBmiSrc > 0 && cbBitsSrc > 0 && offBmiSrc + cbBmiSrc <= recSize && offBitsSrc + cbBitsSrc <= recSize) {
+        if (!bestDib || cbBitsSrc > bestDib.bitsSize) {
+          bestDib = {
+            bmiOffset: offset + offBmiSrc,
+            bmiSize: cbBmiSrc,
+            bitsOffset: offset + offBitsSrc,
+            bitsSize: cbBitsSrc,
+          }
+        }
+      }
+    }
+    offset += recSize
+  }
+  if (!bestDib) return null
+  const fileHeaderSize = 14
+  const totalSize = fileHeaderSize + bestDib.bmiSize + bestDib.bitsSize
+  const pixelDataOffset = fileHeaderSize + bestDib.bmiSize
+  const bmp = new ArrayBuffer(totalSize)
+  const bmpView = new DataView(bmp)
+  const bmpBytes = new Uint8Array(bmp)
+  bmpView.setUint8(0, 0x42) // 'B'
+  bmpView.setUint8(1, 0x4D) // 'M'
+  bmpView.setUint32(2, totalSize, true)
+  bmpView.setUint32(6, 0, true)
+  bmpView.setUint32(10, pixelDataOffset, true)
+  bmpBytes.set(new Uint8Array(buffer, bestDib.bmiOffset, bestDib.bmiSize), fileHeaderSize)
+  bmpBytes.set(new Uint8Array(buffer, bestDib.bitsOffset, bestDib.bitsSize), pixelDataOffset)
+  return bmp
+}
+
+/**
+ * Versucht, ein EMF/WMF-Bild nach PNG zu konvertieren.
+ * 1) Erst: Eingebettetes Bitmap aus EMF-Records extrahieren → BMP → createImageBitmap → PNG
+ * 2) Fallback: Direkt createImageBitmap versuchen (funktioniert evtl. auf Windows-Chrome)
+ */
+async function tryConvertEmfToPng(buffer: ArrayBuffer): Promise<{ buffer: ArrayBuffer; extension: string } | null> {
+  // Versuch 1: Eingebettete Bitmap-Daten aus EMF extrahieren
+  const bmpBuffer = extractBitmapFromEmf(buffer)
+  if (bmpBuffer) {
+    try {
+      const blob = new Blob([bmpBuffer], { type: 'image/bmp' })
+      const bitmap = await createImageBitmap(blob)
+      const w = bitmap.width
+      const h = bitmap.height
+      if (w > 0 && h > 0) {
+        const scale = RESIZE_TARGET / Math.max(w, h, 1)
+        const outW = Math.max(1, Math.round(w * scale))
+        const outH = Math.max(1, Math.round(h * scale))
+        const canvas = new OffscreenCanvas(outW, outH)
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(bitmap, 0, 0, outW, outH)
+          bitmap.close()
+          const outBlob = await canvas.convertToBlob({ type: 'image/png' })
+          if (outBlob && outBlob.size >= 100) {
+            return { buffer: await outBlob.arrayBuffer(), extension: 'png' }
+          }
+        } else { bitmap.close() }
+      } else { bitmap.close() }
+    } catch { /* BMP-Weg fehlgeschlagen, weiter zu Fallback */ }
+  }
+  // Versuch 2: Direkt als EMF probieren (Windows-Browser können das manchmal)
+  try {
+    const blob = new Blob([buffer], { type: 'image/x-emf' })
+    const bitmap = await createImageBitmap(blob)
+    const w = bitmap.width
+    const h = bitmap.height
+    if (w <= 0 || h <= 0) { bitmap.close(); return null }
+    const scale = RESIZE_TARGET / Math.max(w, h, 1)
+    const outW = Math.max(1, Math.round(w * scale))
+    const outH = Math.max(1, Math.round(h * scale))
+    const canvas = new OffscreenCanvas(outW, outH)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) { bitmap.close(); return null }
+    ctx.drawImage(bitmap, 0, 0, outW, outH)
+    bitmap.close()
+    const outBlob = await canvas.convertToBlob({ type: 'image/png' })
+    if (!outBlob || outBlob.size < 100) return null
+    return { buffer: await outBlob.arrayBuffer(), extension: 'png' }
+  } catch {
+    return null
+  }
+}
+
+/**
  * Skaliert ein Bild auf RESIZE_TARGET (längere Kante), erhält Seitenverhältnis.
  * Nutzt Canvas API; bei Fehler wird der Original-Buffer zurückgegeben.
  */
@@ -52,6 +157,144 @@ export interface ExtractedImage {
   col: number
   buffer: ArrayBuffer
   extension: string
+}
+
+/**
+ * Konvertiert Excel-Zellreferenz (z. B. A1, B4, AA10) in 0-basierte (row, col).
+ * Excel-Zeile in r ist 1-basiert; Spalte A=0, B=1, …, Z=25, AA=26, …
+ */
+function cellRefToRowCol(cellRef: string): { row: number; col: number } | null {
+  const match = cellRef.match(/^([A-Z]+)(\d+)$/i)
+  if (!match) return null
+  const colStr = match[1].toUpperCase()
+  const row1Based = parseInt(match[2], 10)
+  if (Number.isNaN(row1Based) || row1Based < 1) return null
+  let col1Based = 0
+  for (let i = 0; i < colStr.length; i++) {
+    col1Based = col1Based * 26 + (colStr.charCodeAt(i) - 64)
+  }
+  return { row: row1Based - 1, col: col1Based - 1 }
+}
+
+/**
+ * Cell Images (Excel 365 „Bild in Zelle“): Liest Zellen mit vm-Attribut aus sheet,
+ * löst Rich-Data-Relationen auf und lädt Bilder aus xl/media/. Nur PNG/JPEG.
+ * Liefert 0-basierte row/col. Wird mit Drawing-Bildern zusammengeführt.
+ */
+async function extractCellImagesFromXlsxZip(arrayBuffer: ArrayBuffer): Promise<ExtractedImage[]> {
+  const out: ExtractedImage[] = []
+  try {
+    const zip = await JSZip.loadAsync(arrayBuffer)
+
+    const sheetNames = Object.keys(zip.files).filter((n) => n.match(/^xl\/worksheets\/sheet\d+\.xml$/))
+    sheetNames.sort((a, b) => {
+      const na = parseInt(a.replace(/^xl\/worksheets\/sheet(\d+)\.xml$/, '$1'), 10)
+      const nb = parseInt(b.replace(/^xl\/worksheets\/sheet(\d+)\.xml$/, '$1'), 10)
+      return na - nb
+    })
+    const sheetPath = sheetNames[0]
+    if (!sheetPath) return out
+    const sheetXml = await zip.file(sheetPath)?.async('string')
+    if (!sheetXml) return out
+
+    // Zellen mit vm-Attribut (value metadata) = Rich Value / Zellbild (r und vm in beliebiger Reihenfolge)
+    const cellVmList: { row: number; col: number; vmIndex: number }[] = []
+    for (const cellMatch of sheetXml.matchAll(/<c\s[^>]+>/gi)) {
+      const tag = cellMatch[0]
+      const rMatch = tag.match(/\sr="([^"]+)"/)
+      const vmMatch = tag.match(/\svm="(\d+)"/)
+      if (!rMatch || !vmMatch) continue
+      const vm = parseInt(vmMatch[1], 10)
+      if (Number.isNaN(vm)) continue
+      const rc = cellRefToRowCol(rMatch[1])
+      if (!rc) continue
+      cellVmList.push({ row: rc.row, col: rc.col, vmIndex: vm - 1 })
+    }
+    if (cellVmList.length === 0) return out
+
+    // Rich-Data-Relationen: workbook.xml.rels enthält Verweis auf rdArray oder rdData
+    const workbookRelsPath = 'xl/_rels/workbook.xml.rels'
+    const workbookRels = await zip.file(workbookRelsPath)?.async('string')
+    if (!workbookRels) return out
+    const rdTargetMatch = workbookRels.match(
+      /Target="(richData\/[^"]+\.xml)"|Target="([^"]*richData[^"]*\.xml)"/
+    )
+    const rdTarget = rdTargetMatch?.[1] ?? rdTargetMatch?.[2]
+    if (!rdTarget) return out
+    const rdDir = rdTarget.includes('/') ? rdTarget.replace(/\/[^/]+$/, '/') : ''
+    const rdFileName = rdTarget.split('/').pop() ?? 'rdArray.xml'
+    const rdRelsPath = 'xl/' + rdDir + '_rels/' + rdFileName + '.rels'
+    let rdRels = await zip.file(rdRelsPath)?.async('string')
+    // Falls rdArray.xml.rels nur auf rdData verweist: rdData.xml.rels für Medien nutzen
+    if (rdRels) {
+      const rdDataMatch = rdRels.match(/Target="([^"]*rdData[^"]*\.xml)"|Target="(richData\/rdData\.xml)"/)
+      const rdDataTarget = rdDataMatch?.[1] ?? rdDataMatch?.[2]
+      if (rdDataTarget) {
+        const rdDataDir = rdDataTarget.includes('/') ? rdDataTarget.replace(/\/[^/]+$/, '/') : ''
+        const rdDataFileName = rdDataTarget.split('/').pop() ?? 'rdData.xml'
+        const rdDataRelsPath = 'xl/' + rdDir + rdDataDir + '_rels/' + rdDataFileName + '.rels'
+        const rdDataRels = await zip.file(rdDataRelsPath)?.async('string')
+        if (rdDataRels) rdRels = rdDataRels
+      }
+    }
+
+    // Zusätzlich: richValueRel.xml direkt prüfen (Hauptweg für Excel 365 Cell Images)
+    const richValueRelPath = 'xl/richData/richValueRel.xml'
+    const richValueRelRelsPath = 'xl/richData/_rels/richValueRel.xml.rels'
+    const richValueRelXml = await zip.file(richValueRelPath)?.async('string')
+    const richValueRelRels = await zip.file(richValueRelRelsPath)?.async('string')
+
+    // richValueRel.xml.rels bevorzugen (Hauptweg für Excel 365 Cell Images)
+    const effectiveRels = richValueRelRels ?? rdRels
+    if (!effectiveRels) return out
+
+    const rIdToTarget: Record<string, string> = {}
+    for (const rel of effectiveRels.matchAll(/Id="(rId\d+)"[^>]+Target="([^"]+)"/g)) rIdToTarget[rel[1]] = rel[2]
+    for (const rel of effectiveRels.matchAll(/Target="([^"]+)"[^>]+Id="(rId\d+)"/g)) rIdToTarget[rel[2]] = rel[1]
+
+    // Document-Order aus richValueRel.xml verwenden (nicht rId-Sortierung),
+    // da vm-Index auf die Position im XML verweist, nicht auf die rId-Nummer.
+    const imageTargets: string[] = []
+    if (richValueRelXml) {
+      for (const relMatch of richValueRelXml.matchAll(/<rel\s[^>]*r:id="(rId\d+)"[^>]*\/?>/gi)) {
+        const t = rIdToTarget[relMatch[1]] ?? ''
+        if (t) imageTargets.push(t)
+      }
+    }
+    if (imageTargets.length === 0) {
+      const rIds = Object.keys(rIdToTarget).sort((a, b) => {
+        const na = parseInt(a.replace(/rId/, ''), 10)
+        const nb = parseInt(b.replace(/rId/, ''), 10)
+        return na - nb
+      })
+      for (const rId of rIds) {
+        const t = rIdToTarget[rId] ?? ''
+        if (t) imageTargets.push(t)
+      }
+    }
+    if (imageTargets.length === 0) return out
+
+    for (const { row, col, vmIndex } of cellVmList) {
+      if (vmIndex < 0 || vmIndex >= imageTargets.length) continue
+      const target = imageTargets[vmIndex]
+      const mediaRelative = target.replace(/^\.\.\/media\//, '').replace(/^media\//, '').replace(/^\.\.\//, '') || target.split('/').pop() || 'image.png'
+      const mediaPath = target.startsWith('xl/') ? target : 'xl/media/' + mediaRelative
+      const file = zip.file(mediaPath) ?? zip.file('xl/media/' + mediaRelative)
+      if (!file) continue
+      const ext = (mediaPath.split('.').pop() || 'png').toLowerCase().replace(/jpeg/, 'jpg')
+      const buffer = await file.async('arraybuffer')
+      if (ext === 'emf' || ext === 'wmf') {
+        const converted = await tryConvertEmfToPng(buffer)
+        if (converted) out.push({ row, col, buffer: converted.buffer, extension: converted.extension })
+        continue
+      }
+      const extension = ext === 'jpg' || ext === 'jpeg' || ext === 'png' ? ext : 'png'
+      out.push({ row, col, buffer, extension: extension === 'jpeg' ? 'jpg' : extension })
+    }
+  } catch (e) {
+    if (import.meta.env.DEV) console.warn('[Backshop-Bilder] Cell-Images ZIP Fehler:', e)
+  }
+  return out
 }
 
 /**
@@ -116,8 +359,14 @@ async function extractImagesFromXlsxZip(arrayBuffer: ArrayBuffer): Promise<Extra
       const mediaPath = target.startsWith('xl/') ? target : 'xl/media/' + mediaRelative
       const file = zip.file(mediaPath) ?? zip.file('xl/media/' + mediaRelative)
       if (!file) continue
-      const buffer = await file.async('arraybuffer')
       const ext = (mediaPath.split('.').pop() || 'png').toLowerCase().replace(/jpeg/, 'jpg')
+      if (ext === 'emf' || ext === 'wmf') {
+        const emfBuffer = await file.async('arraybuffer')
+        const converted = await tryConvertEmfToPng(emfBuffer)
+        if (converted) out.push({ row, col, buffer: converted.buffer, extension: converted.extension })
+        continue
+      }
+      const buffer = await file.async('arraybuffer')
       const extension = ext === 'jpg' || ext === 'jpeg' || ext === 'png' ? ext : 'png'
       out.push({ row, col, buffer, extension: extension === 'jpeg' ? 'jpg' : extension })
     }
@@ -190,6 +439,7 @@ export async function extractImagesFromBackshopExcel(
       const imageId = typeof first.imageId === 'string' ? parseInt(first.imageId, 10) : first.imageId
       console.log('[Backshop-Bilder Diagnose] Erstes Bild: nativeRow=', first.range?.tl?.nativeRow, 'nativeCol=', first.range?.tl?.nativeCol, 'imageId=', imageId, 'media[imageId] vorhanden=', media[imageId] != null)
     }
+    // ExcelJS nativeRow/nativeCol sind 0-basiert (wie OOXML Drawing) – keine Verschiebung nötig
     for (const img of images) {
       const row = Math.max(0, Math.floor(Number(img.range?.tl?.nativeRow ?? img.range?.tl?.row ?? 0)))
       const col = Math.max(0, Math.floor(Number(img.range?.tl?.nativeCol ?? img.range?.tl?.col ?? 0)))
@@ -197,6 +447,13 @@ export async function extractImagesFromBackshopExcel(
       if (Number.isNaN(imageId) || imageId < 0) continue
       const mediaItem = media[imageId]
       if (!mediaItem?.buffer) continue
+      const rawExt = (mediaItem.extension && mediaItem.extension.toLowerCase().replace(/^\./, '')) || ''
+      if (rawExt === 'emf' || rawExt === 'wmf') {
+        const { buffer: rawBuf } = mediaItemToBufferAndExt(mediaItem)
+        const converted = await tryConvertEmfToPng(rawBuf)
+        if (converted) out.push({ row, col, buffer: converted.buffer, extension: converted.extension })
+        continue
+      }
       const { buffer, extension } = mediaItemToBufferAndExt(mediaItem)
       out.push({ row, col, buffer, extension })
     }
@@ -206,9 +463,9 @@ export async function extractImagesFromBackshopExcel(
     const zipFallback = await extractImagesFromXlsxZip(arrayBuffer)
     if (zipFallback.length > 0) {
       if (import.meta.env.DEV) console.log('[Backshop-Bilder] Fallback (ZIP/XML):', zipFallback.length, 'Bilder extrahiert (Position aus Drawing)')
-      return zipFallback
+      for (const e of zipFallback) out.push(e)
     }
-    if (media && Array.isArray(media) && media.length > 0 && parsedRows && parsedRows.length > 0) {
+    if (out.length === 0 && media && Array.isArray(media) && media.length > 0 && parsedRows && parsedRows.length > 0) {
       const rowsWithPos = parsedRows
         .filter((r) => r.imageSheetRow0 != null && r.imageSheetCol0 != null)
         .sort((a, b) => (a.imageSheetRow0! - b.imageSheetRow0!) || (a.imageSheetCol0! - b.imageSheetCol0!))
@@ -217,6 +474,13 @@ export async function extractImagesFromBackshopExcel(
         const row = rowsWithPos[i]
         const mediaItem = media[i]
         if (!mediaItem?.buffer) continue
+        const rawExt = (mediaItem.extension && mediaItem.extension.toLowerCase().replace(/^\./, '')) || ''
+        if (rawExt === 'emf' || rawExt === 'wmf') {
+          const { buffer: rawBuf } = mediaItemToBufferAndExt(mediaItem)
+          const converted = await tryConvertEmfToPng(rawBuf)
+          if (converted) out.push({ row: row.imageSheetRow0!, col: row.imageSheetCol0!, buffer: converted.buffer, extension: converted.extension })
+          continue
+        }
         const { buffer, extension } = mediaItemToBufferAndExt(mediaItem)
         out.push({
           row: row.imageSheetRow0!,
@@ -231,7 +495,31 @@ export async function extractImagesFromBackshopExcel(
     }
   }
 
+  // Cell Images (Excel 365 „Bild in Zelle“): ergänzen, ohne bestehende (row,col) zu überschreiben
+  const cellImages = await extractCellImagesFromXlsxZip(arrayBuffer)
+  const outKeys = new Set(out.map((e) => `${e.row},${e.col}`))
+  for (const img of cellImages) {
+    const key = `${img.row},${img.col}`
+    if (outKeys.has(key)) continue
+    out.push(img)
+    outKeys.add(key)
+  }
+  if (cellImages.length > 0 && import.meta.env.DEV) {
+    console.log('[Backshop-Bilder] Cell Images:', cellImages.length, 'ergänzt')
+  }
+
   return out
+}
+
+/** Produkt ohne automatisch zugeordnetes Bild (für manuelle Zuordnung in der UI). */
+export interface UnmatchedProduct {
+  plu: string
+  name: string
+  /** Erwartete Bildzeile (0-basiert) – für Sortierung „nahe zuerst“ im Dialog. */
+  expectedRow?: number
+  /** Erwartete Bildspalte (0-basiert) – für Sortierung „nahe zuerst“ im Dialog. */
+  expectedCol?: number
+  availableImages: { dataUrl: string; row: number; col: number }[]
 }
 
 /**
@@ -245,10 +533,10 @@ export async function uploadBackshopImagesAndAssignUrls(
   options: {
     versionIdOrUploadId: string
     fileIndex?: number
-    /** Optional: wird nach jedem Batch mit (hochgeladen, gesamt) aufgerufen (für Fortschrittsanzeige). */
     onProgress?: (uploaded: number, total: number) => void
-    /** Optional: wird am Ende mit (Zeilen ohne Bild-URL, Bilder keiner Zeile zugeordnet, Anzahl aus Datei extrahierter Bilder) aufgerufen (für Toast/Diagnose). */
     onDiagnostic?: (rowsWithoutUrl: number, imagesUnassigned: number, extractedCount: number) => void
+    /** Optional: wird aufgerufen wenn Produkte ohne Bild existieren (für manuelle Zuordnung in der UI). */
+    onUnmatchedProducts?: (products: UnmatchedProduct[]) => void
   }
 ): Promise<Map<string, string>> {
   const pluToUrl = new Map<string, string>()
@@ -271,8 +559,7 @@ export async function uploadBackshopImagesAndAssignUrls(
 
   const byKey = (r: number, c: number) => `${r},${c}`
   const used = new Set<string>()
-  /** Findet ein Bild bei (row0, col0) – exakt oder Toleranz nur in der Zeile (gleiche Spalte).
-   * Kein dc≠0: Bild aus Nachbarspalte wird nie zugeordnet (Log-Befund: 100% Roggen col2→col3, Heidelbeer col17→col18). */
+
   const findImageAt = (row0: number, col0: number): ExtractedImage | null => {
     const exact = extracted.find((e) => e.row === row0 && e.col === col0 && !used.has(byKey(e.row, e.col)))
     if (exact) return exact
@@ -282,44 +569,50 @@ export async function uploadBackshopImagesAndAssignUrls(
       )
       if (e) return e
     }
+    // Kein Fallback auf Nachbarspalte (±1): führt zu falschen Zuordnungen (z. B. Avocado bekommt Börek-Bild).
+    // Produkte ohne Treffer erscheinen im Dialog „Bilder manuell zuordnen“.
     return null
-  }
-  /** Fallback: nächstes freies Bild in gleicher Spalte (Kassenblatt: Bilder in verschiedenen Zeilen-Bändern).
-   * Toleranz ±50 Zeilen, damit auch Bilder weiter unten (z. B. Zeile 25, 30) noch zugeordnet werden. */
-  const findNearestImageSameCol = (row0: number, col0: number): ExtractedImage | null => {
-    const candidates = extracted.filter(
-      (e) => e.col === col0 && !used.has(byKey(e.row, e.col)) && Math.abs(e.row - row0) <= 50
-    )
-    if (candidates.length === 0) return null
-    candidates.sort((a, b) => Math.abs(a.row - row0) - Math.abs(b.row - row0))
-    return candidates[0] ?? null
-  }
-  /** Letzter Fallback: nur gleiche Spalte (beliebige Zeile). Kein Bild aus anderer Spalte (verhindert Fehlzuordnung). */
-  const findAnyUnusedForCol = (col0: number): ExtractedImage | null => {
-    return extracted.find((e) => e.col === col0 && !used.has(byKey(e.row, e.col))) ?? null
   }
   const pathPrefix =
     options.fileIndex != null
       ? `${options.versionIdOrUploadId}/${options.fileIndex}`
       : options.versionIdOrUploadId
 
-  // Phase 1: Zuordnungen sammeln (wie bisher, damit kein Bild doppelt vergeben wird)
+  // Phase 1a: Nur strenge Zuordnung (exakt oder ±2 Zeilen, gleiche Spalte).
+  // Keine 1b/1c: Produkte ohne Treffer bekommen bewusst KEIN Bild und erscheinen im
+  // Dialog zur manuellen Zuordnung – so wird nie ein falsches Bild (z. B. Schokobrötchen bei Heidelbeer) zugeordnet.
   const jobs: { row: ParsedBackshopRow; image: ExtractedImage }[] = []
   for (const row of parsedRows) {
     const row0 = row.imageSheetRow0
     const col0 = row.imageSheetCol0
     if (row0 == null || col0 == null) continue
-
-    let image = findImageAt(row0, col0)
-    if (!image) image = findNearestImageSameCol(row0, col0)
-    if (!image) image = findAnyUnusedForCol(col0)
+    const image = findImageAt(row0, col0)
     if (!image) continue
-
     used.add(byKey(image.row, image.col))
     jobs.push({ row, image })
   }
 
-  // Phase 2: Resize + Upload parallel in Batches (schneller bei vielen Bildern)
+  const withPos = parsedRows.filter((r) => r.imageSheetRow0 != null && r.imageSheetCol0 != null)
+  const productsWithoutImage = withPos.filter((r) => !jobs.some((j) => j.row.plu === r.plu))
+  if (productsWithoutImage.length > 0 && options.onUnmatchedProducts) {
+    const remainingImages = extracted.filter((e) => !used.has(byKey(e.row, e.col)))
+    const availableImages = remainingImages.map((e) => {
+      const mime = e.extension === 'jpg' ? 'image/jpeg' : `image/${e.extension}`
+      const dataUrl = URL.createObjectURL(new Blob([e.buffer], { type: mime }))
+      return { dataUrl, row: e.row, col: e.col }
+    })
+    options.onUnmatchedProducts(
+      productsWithoutImage.map((r) => ({
+        plu: r.plu,
+        name: r.systemName,
+        expectedRow: r.imageSheetRow0 ?? undefined,
+        expectedCol: r.imageSheetCol0 ?? undefined,
+        availableImages,
+      }))
+    )
+  }
+
+  // Phase 2: Resize + Upload parallel in Batches
   options.onProgress?.(0, jobs.length)
   const CONCURRENCY = 8
   for (let i = 0; i < jobs.length; i += CONCURRENCY) {
@@ -358,10 +651,9 @@ export async function uploadBackshopImagesAndAssignUrls(
     options.onProgress?.(pluToUrl.size, jobs.length)
   }
 
-  const withPos = parsedRows.filter((r) => r.imageSheetRow0 != null && r.imageSheetCol0 != null)
   const withoutUrl = withPos.filter((r) => !pluToUrl.has(r.plu))
-  const unassignedImages = extracted.filter((e) => !used.has(byKey(e.row, e.col)))
-  options.onDiagnostic?.(withoutUrl.length, unassignedImages.length, extracted.length)
+  const unassignedImagesFinal = extracted.filter((e) => !used.has(byKey(e.row, e.col)))
+  options.onDiagnostic?.(withoutUrl.length, unassignedImagesFinal.length, extracted.length)
 
   if (import.meta.env.DEV) {
     console.log('[Backshop-Bilder]', pluToUrl.size, 'PLUs mit Bild-URL zugeordnet')
@@ -369,10 +661,49 @@ export async function uploadBackshopImagesAndAssignUrls(
       const firstMissing = withoutUrl.slice(0, 10).map((r) => `${r.plu}@(${r.imageSheetRow0},${r.imageSheetCol0})`)
       console.log('[Backshop-Bilder Diagnose] Parser-Zeilen ohne Bild-URL:', withoutUrl.length, '| erste 10:', firstMissing)
     }
-    if (unassignedImages.length > 0) {
-      const firstUnassigned = unassignedImages.slice(0, 10).map((e) => `(${e.row},${e.col})`)
-      console.log('[Backshop-Bilder Diagnose] Extrahierte Bilder keiner PLU zugeordnet:', unassignedImages.length, '| erste 10 Positionen:', firstUnassigned)
+    if (unassignedImagesFinal.length > 0) {
+      const firstUnassigned = unassignedImagesFinal.slice(0, 10).map((e) => `(${e.row},${e.col})`)
+      console.log('[Backshop-Bilder Diagnose] Extrahierte Bilder keiner PLU zugeordnet:', unassignedImagesFinal.length, '| erste 10 Positionen:', firstUnassigned)
     }
   }
   return pluToUrl
+}
+
+/**
+ * Lädt ein manuell zugeordnetes Bild (dataUrl/blob) in Supabase Storage hoch.
+ * Wird von der UI aufgerufen, wenn der User ein Bild für ein Produkt ohne automatisches Bild auswählt.
+ */
+export async function uploadManualImage(
+  dataUrl: string,
+  plu: string,
+  uploadId: string,
+  fileIndex: number
+): Promise<string | null> {
+  try {
+    const resp = await fetch(dataUrl)
+    const blob = await resp.blob()
+    const rawBuffer = await blob.arrayBuffer()
+    const ext = blob.type === 'image/jpeg' ? 'jpg' : 'png'
+    const { buffer: resized, extension: resizedExt } = await resizeImageToTarget(rawBuffer, ext)
+
+    const safePlu = plu.replace(/[^a-zA-Z0-9_-]/g, '_')
+    const path = `${uploadId}/${fileIndex}/${safePlu}.${resizedExt}`
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, resized, {
+        contentType: resizedExt === 'jpg' ? 'image/jpeg' : `image/${resizedExt}`,
+        upsert: true,
+      })
+    if (error) {
+      console.warn(`Manuelles Bild-Upload fehlgeschlagen für PLU ${plu}:`, error.message)
+      return null
+    }
+    const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_EXPIRES_IN)
+    if (signed?.signedUrl) return signed.signedUrl
+    const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(path)
+    return publicData.publicUrl
+  } catch (err) {
+    console.warn('Manuelles Bild-Upload Fehler:', err)
+    return null
+  }
 }

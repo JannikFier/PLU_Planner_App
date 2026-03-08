@@ -1,7 +1,9 @@
 // Backshop-Excel-Parser: PLU, Name (Warentext), Abbildung
 // Intelligente Spalten-Erkennung; Namens-Bereinigung: nur Teil bis erstes Komma
 
-import * as XLSX from 'xlsx'
+import { formatError } from '@/lib/error-messages'
+import { loadExcelSheetAsRows } from '@/lib/excel-read-helper'
+import { PLU_REGEX } from '@/lib/plu-helpers'
 import type {
   ParsedBackshopRow,
   BackshopParseResult,
@@ -9,9 +11,6 @@ import type {
   BackshopSkippedDetails,
   SameNameDifferentPluEntry,
 } from '@/types/plu'
-
-/** PLU: genau 5 Ziffern (nach Normalisierung). */
-const PLU_REGEX = /^\d{5}$/
 
 /** Ermittelt „Gleiche Bezeichnung, verschiedene PLU“ aus geparsten Zeilen (mit pluSheetRow/pluSheetCol). */
 function computeSameNameDifferentPlu(rows: ParsedBackshopRow[]): SameNameDifferentPluEntry[] {
@@ -316,8 +315,18 @@ function parseKassenblattColumnLayout(rowsStr: string[][]): {
     const nameRow = rowsStr[nameRowIndex] ?? []
     const pluRow = rowsStr[nameRowIndex + 1] ?? []
     const maxCol = Math.max(nameRow.length, pluRow.length)
-    const hasImageRow = nameRowIndex + 2 < rowsStr.length
-    const imageRowIndex = nameRowIndex + 2
+
+    // Kassenblätter haben oft eine *PLU*-Formelzeile (z.B. *81593*) zwischen PLU-Zeile und Bild-Zeile.
+    // Erkennung: Wenn ≥3 Zellen in Zeile N+2 nach normalizePLU gültige PLUs sind, ist es eine Formelzeile → Bilder bei N+3.
+    const candidateFormulaRow = rowsStr[nameRowIndex + 2] ?? []
+    const formulaCellsLikePlu = candidateFormulaRow.filter((cell) => {
+      const raw = String(cell).trim()
+      return raw.length > 0 && PLU_REGEX.test(normalizePLU(raw))
+    }).length
+    const hasFormulaRow = formulaCellsLikePlu >= 3
+    const imageRowOffset = hasFormulaRow ? 3 : 2
+    const imageRowIndex = nameRowIndex + imageRowOffset
+    const hasImageRow = imageRowIndex < rowsStr.length
 
     for (let c = 0; c < maxCol; c++) {
       const nameRaw = String(nameRow[c] ?? '').trim()
@@ -379,28 +388,11 @@ function parseKassenblattColumnLayout(rowsStr: string[][]): {
  * - Name: Warentext/Etikettentext, nur Teil bis erstes Komma
  * - Abbildung: Spalte wird erkannt; Bild-URL wird hier nicht aus Excel gelesen (kommt nach Upload in Storage)
  */
-export function parseBackshopExcelFile(file: File): Promise<BackshopParseResult> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
+export async function parseBackshopExcelFile(file: File): Promise<BackshopParseResult> {
+  try {
+    const rawRows = await loadExcelSheetAsRows(file)
 
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer)
-        const workbook = XLSX.read(data, { type: 'array' })
-
-        const sheetName = workbook.SheetNames[0]
-        if (!sheetName) {
-          reject(new Error('Excel-Datei enthält keine Sheets'))
-          return
-        }
-
-        const sheet = workbook.Sheets[sheetName]
-        const rawRows: unknown[][] = XLSX.utils.sheet_to_json(sheet, {
-          header: 1,
-          defval: '',
-        })
-
-        const rowsStr: string[][] = rawRows.map((row) =>
+    const rowsStr: string[][] = rawRows.map((row) =>
           (row as unknown[]).map((cell) => (cell != null ? String(cell).trim() : ''))
         )
 
@@ -473,7 +465,7 @@ export function parseBackshopExcelFile(file: File): Promise<BackshopParseResult>
             const rowSkipped =
               rowSkippedReasons.invalidPlu + rowSkippedReasons.emptyName + rowSkippedReasons.duplicatePlu
             if (rowRows.length > colRows.length) {
-              resolve({
+              return {
                 rows: rowRows,
                 fileName: file.name,
                 totalRows: rowRows.length,
@@ -484,11 +476,10 @@ export function parseBackshopExcelFile(file: File): Promise<BackshopParseResult>
                 pluColumnIndex: pluCol,
                 nameColumnIndex: nameCol,
                 hasImageColumn: imageCol >= 0,
-              })
-              return
+              }
             }
           }
-          resolve({
+          return {
             rows: colRows,
             fileName: file.name,
             totalRows: colRows.length,
@@ -499,8 +490,7 @@ export function parseBackshopExcelFile(file: File): Promise<BackshopParseResult>
             pluColumnIndex: 1,
             nameColumnIndex: 0,
             hasImageColumn: true,
-          })
-          return
+          }
         }
 
         // Klassisches Zeilen-Layout: Header-Zeile mit PLU/WARENTEXT/ABBILDUNG, eine Zeile pro Produkt
@@ -581,7 +571,7 @@ export function parseBackshopExcelFile(file: File): Promise<BackshopParseResult>
             const hasKassenblattImages = kassenblatt.rows.some(
               (r) => r.imageSheetRow0 !== undefined && r.imageSheetCol0 !== undefined
             )
-            resolve({
+            return {
               rows: kassenblatt.rows,
               fileName: file.name,
               totalRows: kassenblatt.rows.length,
@@ -592,31 +582,23 @@ export function parseBackshopExcelFile(file: File): Promise<BackshopParseResult>
               pluColumnIndex: 0,
               nameColumnIndex: 0,
               hasImageColumn: hasKassenblattImages,
-            })
-            return
+            }
           }
         }
 
-        resolve({
-          rows,
-          fileName: file.name,
-          totalRows: rows.length,
-          skippedRows,
-          skippedReasons: skippedRows > 0 ? skippedReasons : undefined,
-          skippedDetails: skippedRows > 0 ? skippedDetails : undefined,
-          sameNameDifferentPlu: computeSameNameDifferentPlu(rows),
-          pluColumnIndex: pluCol,
-          nameColumnIndex: nameCol,
-          hasImageColumn: imageCol >= 0,
-        })
-      } catch (err) {
-        reject(
-          new Error(`Backshop-Excel-Parsing fehlgeschlagen: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`)
-        )
-      }
+    return {
+      rows,
+      fileName: file.name,
+      totalRows: rows.length,
+      skippedRows,
+      skippedReasons: skippedRows > 0 ? skippedReasons : undefined,
+      skippedDetails: skippedRows > 0 ? skippedDetails : undefined,
+      sameNameDifferentPlu: computeSameNameDifferentPlu(rows),
+      pluColumnIndex: pluCol,
+      nameColumnIndex: nameCol,
+      hasImageColumn: imageCol >= 0,
     }
-
-    reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'))
-    reader.readAsArrayBuffer(file)
-  })
+  } catch (err) {
+    throw new Error(`Backshop-Excel-Parsing fehlgeschlagen: ${formatError(err)}`)
+  }
 }

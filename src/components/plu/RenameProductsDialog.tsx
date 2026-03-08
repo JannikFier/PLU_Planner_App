@@ -101,6 +101,9 @@ function backshopMasterItemToDisplayItem(m: BackshopMasterPLUItem): DisplayItem 
   }
 }
 
+/** Globale Umbenennung (plu → display_name) für Backshop */
+export type RenamedItemOverride = { plu: string; display_name: string }
+
 export interface RenameProductsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -108,6 +111,8 @@ export interface RenameProductsDialogProps {
   searchableItems: MasterPLUItem[] | BackshopMasterPLUItem[]
   /** Bei 'backshop': Backshop-RPCs, RenameDialog mit Bild. */
   listType?: 'default' | 'backshop'
+  /** Bei 'backshop': Globale Umbenennungen (überschreiben display_name aus searchableItems) */
+  renamedOverrides?: RenamedItemOverride[]
 }
 
 export function RenameProductsDialog({
@@ -115,21 +120,31 @@ export function RenameProductsDialog({
   onOpenChange,
   searchableItems,
   listType = 'default',
+  renamedOverrides = [],
 }: RenameProductsDialogProps) {
   const [searchText, setSearchText] = useState('')
   const [renameItem, setRenameItem] = useState<DisplayItem | null>(null)
   const queryClient = useQueryClient()
   const listRef = useRef<HTMLTableSectionElement | null>(null)
 
+  const overrideByPlu = useMemo(
+    () => new Map(renamedOverrides.map((r) => [r.plu, r.display_name])),
+    [renamedOverrides],
+  )
+
   const searchableAsList: SearchableItem[] = useMemo(
     () =>
-      searchableItems.map((m) => ({
-        id: m.id,
-        plu: m.plu,
-        display_name: (m as MasterPLUItem & BackshopMasterPLUItem).display_name ?? (m as MasterPLUItem & BackshopMasterPLUItem).system_name,
-        system_name: (m as MasterPLUItem & BackshopMasterPLUItem).system_name,
-      })),
-    [searchableItems],
+      searchableItems.map((m) => {
+        const base = m as MasterPLUItem & BackshopMasterPLUItem
+        const display = overrideByPlu.get(m.plu) ?? base.display_name ?? base.system_name
+        return {
+          id: m.id,
+          plu: m.plu,
+          display_name: display,
+          system_name: base.system_name,
+        }
+      }),
+    [searchableItems, overrideByPlu],
   )
 
   const filteredItems = useMemo(
@@ -168,7 +183,10 @@ export function RenameProductsDialog({
     const master = searchableItems.find((m) => m.id === item.id)
     if (!master) return
     if (listType === 'backshop') {
-      setRenameItem(backshopMasterItemToDisplayItem(master as BackshopMasterPLUItem))
+      const display = backshopMasterItemToDisplayItem(master as BackshopMasterPLUItem)
+      // display_name aus Override (globale Umbenennung) oder aus Master
+      display.display_name = overrideByPlu.get(master.plu) ?? display.display_name
+      setRenameItem(display)
     } else {
       setRenameItem(masterItemToDisplayItem(master as MasterPLUItem))
     }

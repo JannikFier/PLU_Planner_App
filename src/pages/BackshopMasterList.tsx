@@ -22,6 +22,7 @@ import { useBackshopHiddenItems } from '@/hooks/useBackshopHiddenItems'
 import { useBackshopOfferItems } from '@/hooks/useBackshopOfferItems'
 import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
 import { useBackshopBezeichnungsregeln } from '@/hooks/useBackshopBezeichnungsregeln'
+import { useBackshopRenamedItems } from '@/hooks/useBackshopRenamedItems'
 import { buildBackshopDisplayList } from '@/lib/layout-engine'
 import type { PLUStats } from '@/lib/plu-helpers'
 import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
@@ -43,6 +44,7 @@ export function BackshopMasterList() {
     : '/user'
   const isViewer = profile?.role === 'viewer'
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
+  const isSuperAdmin = profile?.role === 'super_admin'
 
   const { data: activeVersion, isLoading: versionLoading } = useActiveBackshopVersion()
   const { data: versions = [], isLoading: versionsLoading } = useBackshopVersions()
@@ -67,6 +69,7 @@ export function BackshopMasterList() {
 
   const { data: customProducts = [] } = useBackshopCustomProducts()
   const { data: hiddenItems = [] } = useBackshopHiddenItems()
+  const { data: renamedItems = [] } = useBackshopRenamedItems()
   const { data: offerItems = [] } = useBackshopOfferItems()
   const { data: blocks = [] } = useBackshopBlocks()
   const { data: bezeichnungsregeln = [] } = useBackshopBezeichnungsregeln()
@@ -98,6 +101,7 @@ export function BackshopMasterList() {
       blocks,
       customProducts,
       bezeichnungsregeln,
+      renamedItems,
     })
     const pluStats: PLUStats = {
       total: result.stats.total,
@@ -108,7 +112,7 @@ export function BackshopMasterList() {
       customCount: result.stats.customCount,
     }
     return { displayItems: result.items, stats: pluStats }
-  }, [rawItems, hiddenPLUs, offerPLUs, sortMode, blocks, customProducts, bezeichnungsregeln])
+  }, [rawItems, hiddenPLUs, offerPLUs, sortMode, blocks, customProducts, bezeichnungsregeln, renamedItems])
 
   const currentVersion = useMemo(
     () => versions.find((v) => v.id === effectiveVersionId) ?? activeVersion,
@@ -129,8 +133,9 @@ export function BackshopMasterList() {
       blocks,
       customProducts,
       bezeichnungsregeln,
+      renamedItems,
     })
-  }, [showPdfDialog, pdfDialogVersionId, pdfRawItems, hiddenPLUs, sortMode, blocks, customProducts, bezeichnungsregeln])
+  }, [showPdfDialog, pdfDialogVersionId, pdfRawItems, hiddenPLUs, sortMode, blocks, customProducts, bezeichnungsregeln, renamedItems])
 
   const pdfStats: PLUStats = useMemo(
     () => ({
@@ -217,6 +222,15 @@ export function BackshopMasterList() {
                   <Megaphone className="h-4 w-4 mr-1" />
                   Werbung
                 </Button>
+                {isSuperAdmin && location.pathname.startsWith('/super-admin') && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`${rolePrefix}/backshop-warengruppen`)}
+                  >
+                    Warengruppen bearbeiten
+                  </Button>
+                )}
               </>
             )}
             {isAdmin && (

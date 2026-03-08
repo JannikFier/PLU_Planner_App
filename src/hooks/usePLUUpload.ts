@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { formatError } from '@/lib/error-messages'
 import { parseExcelFile } from '@/lib/excel-parser'
 import { clampKWToUploadRange, getCurrentKW, getNextFreeKW, versionExistsForKW } from '@/lib/date-kw-utils'
 import { compareWithCurrentVersion, resolveConflicts } from '@/lib/comparison-logic'
@@ -192,7 +193,7 @@ export function usePLUUpload() {
       setConflicts(allConflicts)
       setStep(2)
     } catch (err) {
-      toast.error(`Vergleich fehlgeschlagen: ${err instanceof Error ? err.message : 'Unbekannt'}`)
+      toast.error(`Vergleich fehlgeschlagen: ${formatError(err)}`)
     } finally {
       setIsProcessing(false)
     }
@@ -231,7 +232,7 @@ export function usePLUUpload() {
       setStep(3)
       toast.success('Version erfolgreich veröffentlicht!')
     } catch (err) {
-      toast.error(`Veröffentlichung fehlgeschlagen: ${err instanceof Error ? err.message : 'Unbekannt'}`)
+      toast.error(`Veröffentlichung fehlgeschlagen: ${formatError(err)}`)
     } finally {
       setIsProcessing(false)
     }

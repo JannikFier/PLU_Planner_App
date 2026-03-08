@@ -16,6 +16,11 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { GripVertical } from 'lucide-react'
+import {
+  PLU_TABLE_HEADER_CLASS,
+  PLU_TABLE_HEADER_GEWICHT_CLASS,
+  PLU_TABLE_HEADER_STUECK_CLASS,
+} from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
 import { PreisBadge } from './PreisBadge'
@@ -184,7 +189,7 @@ export function InteractivePLUTable() {
         <div className="space-y-8">
           {pieceGroups.length > 0 && (
             <div>
-              <div className="rounded-t-lg bg-blue-500/10 border border-b-0 border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 uppercase tracking-wider text-center">
+              <div className={PLU_TABLE_HEADER_STUECK_CLASS}>
                 PLU-Liste Stück
               </div>
               <TwoColumnInteractive groups={pieceGroups} />
@@ -192,7 +197,7 @@ export function InteractivePLUTable() {
           )}
           {weightGroups.length > 0 && (
             <div>
-              <div className="rounded-t-lg bg-amber-500/10 border border-b-0 border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700 uppercase tracking-wider text-center">
+              <div className={PLU_TABLE_HEADER_GEWICHT_CLASS}>
                 PLU-Liste Gewicht
               </div>
               <TwoColumnInteractive groups={weightGroups} />
@@ -207,7 +212,7 @@ export function InteractivePLUTable() {
   // MIXED
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="rounded-t-lg bg-gray-500/10 border border-b-0 border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 uppercase tracking-wider text-center">
+      <div className={PLU_TABLE_HEADER_CLASS}>
         PLU-Liste
       </div>
       <TwoColumnInteractive groups={groups} />

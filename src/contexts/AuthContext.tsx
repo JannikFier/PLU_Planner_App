@@ -67,8 +67,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const PROFILE_CACHE_KEY = 'plu_planner_profile'
   const SESSION_CACHE_KEY = 'plu_planner_session'
   const FETCH_PROFILE_TIMEOUT = 8000
+  const PROFILE_ERROR_TOAST_DELAY_MS = 1500
   /** true wenn wir in diesem Init bereits aus Cache angezeigt haben – dann getSession-Update minimal halten */
   const displayedFromCacheRef = useRef(false)
+  /** Timeout für verzögerten Profil-Fehler-Toast; wird gecleart sobald ein Profil gesetzt wird */
+  const profileErrorToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const clearProfileErrorToast = useCallback(() => {
+    if (profileErrorToastTimeoutRef.current != null) {
+      clearTimeout(profileErrorToastTimeoutRef.current)
+      profileErrorToastTimeoutRef.current = null
+    }
+  }, [])
 
   /** State „nicht eingeloggt“ + Cache leeren. Wird genutzt wenn Auth-Check fehlschlägt oder abgebrochen wird (z. B. anderer Tab) – dann immer zum Login. */
   const setLoggedOutAndClearCache = useCallback(() => {
@@ -92,6 +102,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
+    clearProfileErrorToast()
+
+    const scheduleProfileErrorToast = (msg: string) => {
+      if (profileErrorToastTimeoutRef.current != null) clearTimeout(profileErrorToastTimeoutRef.current)
+      profileErrorToastTimeoutRef.current = setTimeout(() => {
+        profileErrorToastTimeoutRef.current = null
+        toast.error(msg)
+      }, PROFILE_ERROR_TOAST_DELAY_MS)
+    }
+
     const fetchOnce = async (): Promise<Profile | null> => {
       const { data, error } = await supabase
         .from('profiles')
@@ -103,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const err = error as { message?: string; cause?: unknown }
         const isAbort = isAbortError(err) || isAbortError(err.cause) || (err.message?.includes?.('AbortError') ?? false)
         if (!isAbort) {
-          toast.error('Profil laden fehlgeschlagen: ' + (error?.message ?? 'Unbekannter Fehler'))
+          scheduleProfileErrorToast('Profil laden fehlgeschlagen: ' + (error?.message ?? 'Unbekannter Fehler'))
         }
         throw error
       }
@@ -123,10 +143,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ])
       return result
     } catch (e) {
-      toast.error('Profil laden fehlgeschlagen: ' + (e instanceof Error ? e.message : 'Unbekannter Fehler'))
+      if (!isAbortError(e)) {
+        scheduleProfileErrorToast('Profil laden fehlgeschlagen: ' + (e instanceof Error ? e.message : 'Unbekannter Fehler'))
+      }
       return null
     }
-  }, [])
+  }, [clearProfileErrorToast])
 
   useEffect(() => {
     let mounted = true
@@ -162,6 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
 
           if (cached && mounted) {
+            clearProfileErrorToast()
             setState((prev) => ({
               ...prev,
               ...authReducer(session.user, session, cached!.profile),
@@ -173,6 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!displayedFromCacheRef.current) {
             const profile = await fetchProfile(userId)
             if (!mounted) return
+            if (profile) clearProfileErrorToast()
             setState((prev) => ({
               ...prev,
               ...authReducer(session.user, session, profile),
@@ -212,6 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (cachedProfile && cachedSession && cachedProfile.userId === cachedSession.userId && mounted) {
           displayedFromCacheRef.current = true
+          clearProfileErrorToast()
           const minimalUser = { id: cachedProfile.userId, email: cachedSession.email ?? '' } as User
           setState((prev) => ({
             ...prev,
@@ -237,7 +262,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         void runGetSessionAndContinue()
-      } catch (e) {
+      } catch {
         if (!mounted) return
         // Auth-Check fehlgeschlagen oder abgebrochen → ausloggen, Redirect zum Login
         setLoggedOutAndClearCache()
@@ -265,6 +290,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 /* Cache ungültig */
               }
             }
+            if (profile) clearProfileErrorToast()
             setState((prev) => ({
               ...prev,
               ...authReducer(session.user, session, profile),
@@ -290,7 +316,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             error: null,
           })
         }
-        } catch (e) {
+        } catch {
           if (mounted) {
             // Auth-Update fehlgeschlagen oder abgebrochen → ausloggen, Redirect zum Login
             setLoggedOutAndClearCache()
@@ -303,7 +329,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [fetchProfile, setLoggedOutAndClearCache])
+  }, [fetchProfile, setLoggedOutAndClearCache, clearProfileErrorToast])
 
   const loginWithEmail = useCallback(async (email: string, password: string) => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
@@ -338,6 +364,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setTimeout(() => reject(new Error('TIMEOUT')), LOGIN_TIMEOUT)
         ),
       ])
+      if (result.profile) clearProfileErrorToast()
       setState((prev) => ({
         ...prev,
         ...authReducer(result.user, result.session, result.profile),
@@ -366,7 +393,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }))
       throw new Error(userMessage)
     }
-  }, [fetchProfile])
+  }, [fetchProfile, clearProfileErrorToast])
 
   const loginWithPersonalnummer = useCallback(async (personalnummer: string, password: string) => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
@@ -432,13 +459,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (uid) {
       const profile = await fetchProfile(uid)
       if (profile) {
+        clearProfileErrorToast()
         setState((prev) => ({
           ...prev,
           ...authReducer(prev.user, prev.session, profile),
         }))
       }
     }
-  }, [state.user?.id, fetchProfile])
+  }, [state.user?.id, fetchProfile, clearProfileErrorToast])
 
   const value: AuthContextValue = {
     ...state,

@@ -24,7 +24,7 @@ export default defineConfig({
           vendor: ['react', 'react-dom', 'react-router-dom'],
           supabase: ['@supabase/supabase-js'],
           query: ['@tanstack/react-query'],
-          xlsx: ['xlsx'],
+          exceljs: ['exceljs'],
           jspdf: ['jspdf'],
           ui: ['sonner'],
         },

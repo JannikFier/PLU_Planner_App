@@ -1,6 +1,6 @@
 // BackshopRulesPage: Bezeichnungsregeln + Warengruppen für Backshop
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
@@ -37,10 +37,27 @@ import {
   useCreateBackshopBlockRule,
   useDeleteBackshopBlockRule,
   useAssignBackshopProducts,
+  useCreateBackshopBlock,
 } from '@/hooks/useBackshopBlocks'
 import { BackshopSchlagwortManager } from '@/components/plu/BackshopSchlagwortManager'
 import { BackshopWarengruppenPanel } from '@/components/plu/BackshopWarengruppenPanel'
 import { applyBackshopBlockRules } from '@/lib/apply-backshop-block-rules'
+import { parseBackshopBlockExcel } from '@/lib/backshop-block-excel-import'
+import { formatError } from '@/lib/error-messages'
+import type { BackshopMasterPLUItem } from '@/types/database'
+
+interface ExcelBlockAssignmentPreview {
+  blockName: string
+  isNewBlock: boolean
+  itemIds: string[]
+}
+
+interface ExcelImportSummary {
+  fileName: string
+  blocksFromExcel: { name: string; columnIndex: number }[]
+  assignments: ExcelBlockAssignmentPreview[]
+  unmatched: { blockName: string; productName: string; reason: 'no_match' | 'ambiguous' }[]
+}
 
 export function BackshopRulesPage() {
   const navigate = useNavigate()
@@ -53,6 +70,7 @@ export function BackshopRulesPage() {
   const createBlockRule = useCreateBackshopBlockRule()
   const deleteBlockRule = useDeleteBackshopBlockRule()
   const assignProducts = useAssignBackshopProducts()
+  const createBackshopBlock = useCreateBackshopBlock()
 
   const [showSchlagwortManager, setShowSchlagwortManager] = useState(false)
   const [showAddBlockRuleDialog, setShowAddBlockRuleDialog] = useState(false)
@@ -60,9 +78,167 @@ export function BackshopRulesPage() {
   const [newRuleBlockId, setNewRuleBlockId] = useState<string>('')
   const [applyOnlyUnassigned, setApplyOnlyUnassigned] = useState(true)
   const [isApplying, setIsApplying] = useState(false)
+  const [excelSummary, setExcelSummary] = useState<ExcelImportSummary | null>(null)
+  const [isExcelParsing, setIsExcelParsing] = useState(false)
+  const [isApplyingExcel, setIsApplyingExcel] = useState(false)
 
   const nameContainsRules = blockRules.filter((r) => r.rule_type === 'NAME_CONTAINS')
   const sortedBlocks = [...blocks].sort((a, b) => a.order_index - b.order_index)
+
+  const existingBlockByNameNorm = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const b of blocks) {
+      map.set(b.name.trim().toLowerCase(), b.id)
+    }
+    return map
+  }, [blocks])
+
+  const normalizeName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, ' ')
+
+  const buildNameLookups = useCallback((items: BackshopMasterPLUItem[]) => {
+    const byDisplay = new Map<string, BackshopMasterPLUItem[]>()
+    const bySystem = new Map<string, BackshopMasterPLUItem[]>()
+    for (const it of items) {
+      if (it.display_name) {
+        const key = normalizeName(it.display_name)
+        const list = byDisplay.get(key) ?? []
+        list.push(it)
+        byDisplay.set(key, list)
+      }
+      if (it.system_name) {
+        const key = normalizeName(it.system_name)
+        const list = bySystem.get(key) ?? []
+        list.push(it)
+        bySystem.set(key, list)
+      }
+    }
+    return { byDisplay, bySystem }
+  }, [])
+
+  const handleExcelFileSelected = useCallback(
+    async (file: File | null) => {
+      if (!file) return
+      if (!activeVersion?.id) {
+        toast.error('Keine aktive Backshop-Version vorhanden.')
+        return
+      }
+      setIsExcelParsing(true)
+      try {
+        const parsed = await parseBackshopBlockExcel(file)
+        if (parsed.blocksFromExcel.length === 0 || parsed.entries.length === 0) {
+          toast.error('In der Excel wurden keine Warengruppen oder Produktnamen gefunden.')
+          setExcelSummary(null)
+          return
+        }
+
+        const { byDisplay, bySystem } = buildNameLookups(masterItems as BackshopMasterPLUItem[])
+
+        const assignmentsByBlock = new Map<string, string[]>()
+        const unmatched: ExcelImportSummary['unmatched'] = []
+
+        for (const entry of parsed.entries) {
+          const normName = normalizeName(entry.productName)
+          const displayMatches = byDisplay.get(normName) ?? []
+          const systemMatches = bySystem.get(normName) ?? []
+
+          let uniqueItem: BackshopMasterPLUItem | null = null
+
+          const allIds = new Set<string>()
+          for (const it of displayMatches) allIds.add(it.id)
+          for (const it of systemMatches) allIds.add(it.id)
+
+          if (allIds.size === 1) {
+            const id = Array.from(allIds)[0]
+            uniqueItem =
+              displayMatches.find((i) => i.id === id) ??
+              systemMatches.find((i) => i.id === id) ??
+              null
+          }
+
+          if (!uniqueItem) {
+            if ((displayMatches.length === 0 && systemMatches.length === 0)) {
+              unmatched.push({ blockName: entry.blockName, productName: entry.productName, reason: 'no_match' })
+            } else {
+              unmatched.push({ blockName: entry.blockName, productName: entry.productName, reason: 'ambiguous' })
+            }
+            continue
+          }
+
+          const current = assignmentsByBlock.get(entry.blockName) ?? []
+          current.push(uniqueItem.id)
+          assignmentsByBlock.set(entry.blockName, current)
+        }
+
+        const assignments: ExcelBlockAssignmentPreview[] = []
+        for (const [blockName, itemIds] of assignmentsByBlock) {
+          const isNewBlock = !existingBlockByNameNorm.has(blockName.trim().toLowerCase())
+          assignments.push({ blockName, isNewBlock, itemIds })
+        }
+
+        setExcelSummary({
+          fileName: parsed.fileName,
+          blocksFromExcel: parsed.blocksFromExcel,
+          assignments,
+          unmatched,
+        })
+
+        toast.success('Excel erfolgreich eingelesen. Vorschau unten aktualisiert.')
+      } catch (err) {
+        toast.error(`Excel-Import fehlgeschlagen: ${formatError(err)}`)
+        setExcelSummary(null)
+      } finally {
+        setIsExcelParsing(false)
+      }
+    },
+    [activeVersion?.id, masterItems, buildNameLookups, existingBlockByNameNorm],
+  )
+
+  const handleApplyExcelAssignments = useCallback(async () => {
+    if (!excelSummary) return
+    if (excelSummary.assignments.length === 0) {
+      toast.info('Keine automatischen Zuordnungen aus der Excel vorhanden.')
+      return
+    }
+    setIsApplyingExcel(true)
+    try {
+      const blockIdByNameNorm = new Map(existingBlockByNameNorm)
+
+      // Fehlende Warengruppen aus Excel anlegen
+      for (const assignment of excelSummary.assignments) {
+        const norm = assignment.blockName.trim().toLowerCase()
+        if (blockIdByNameNorm.has(norm)) continue
+        if (!assignment.isNewBlock) continue
+        const created = await createBackshopBlock.mutateAsync({
+          name: assignment.blockName.trim(),
+          order_index: blocks.length,
+        })
+        blockIdByNameNorm.set(norm, created.id)
+      }
+
+      // Zuweisungen pro Block durchführen
+      let totalAssigned = 0
+      for (const assignment of excelSummary.assignments) {
+        const norm = assignment.blockName.trim().toLowerCase()
+        const blockId = blockIdByNameNorm.get(norm)
+        if (!blockId || assignment.itemIds.length === 0) continue
+        await assignProducts.mutateAsync({
+          itemIds: assignment.itemIds,
+          blockId,
+        })
+        totalAssigned += assignment.itemIds.length
+      }
+
+      toast.success(
+        `${totalAssigned} Produkt(e) anhand der Excel-Warengruppen zugeordnet. Produkte ohne eindeutigen Treffer blieben unzugeordnet.`,
+      )
+      setExcelSummary(null)
+    } catch (err) {
+      toast.error(`Excel-Zuordnungen konnten nicht angewendet werden: ${formatError(err)}`)
+    } finally {
+      setIsApplyingExcel(false)
+    }
+  }, [excelSummary, existingBlockByNameNorm, createBackshopBlock, blocks.length, assignProducts])
+
 
   const handleAddBlockRule = useCallback(async () => {
     if (!newRuleKeyword.trim() || !newRuleBlockId) return
@@ -228,6 +404,143 @@ export function BackshopRulesPage() {
                 Regeln jetzt anwenden
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Excel-Import Warengruppen-Zuordnung</CardTitle>
+            <CardDescription>
+              Eigene Excel-Tabelle mit Warengruppen (oben) und Produktnamen (darunter) einlesen und passende Produkte automatisch zuordnen.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Excel-Datei</Label>
+              <Input
+                type="file"
+                accept=".xlsx,.xls"
+                disabled={isExcelParsing}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null
+                  void handleExcelFileSelected(file)
+                  e.target.value = ''
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Format: Erste Zeile = Warengruppen-Namen je Spalte, darunter die Produktnamen wie in der Backshop-Liste.
+                Es werden nur vorhandene Produkte zugeordnet; neue Produkte werden nicht angelegt.
+              </p>
+              {isExcelParsing && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Excel wird gelesen…
+                </p>
+              )}
+            </div>
+
+            {excelSummary && (
+              <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/40">
+                <div className="text-xs text-muted-foreground">
+                  <div>
+                    Datei: <span className="font-medium">{excelSummary.fileName}</span>
+                  </div>
+                  <div>
+                    Gefundene Warengruppen (Spalten):{' '}
+                    <span className="font-medium">{excelSummary.blocksFromExcel.length}</span>
+                  </div>
+                  <div>
+                    Geplante automatische Zuordnungen:{' '}
+                    <span className="font-medium">
+                      {excelSummary.assignments.reduce((sum, a) => sum + a.itemIds.length, 0)}
+                    </span>
+                  </div>
+                  <div>
+                    Davon in neuen Warengruppen:{' '}
+                    <span className="font-medium">
+                      {excelSummary.assignments
+                        .filter((a) => a.isNewBlock)
+                        .reduce((sum, a) => sum + a.itemIds.length, 0)}
+                    </span>
+                  </div>
+                  <div>
+                    Nicht eindeutig / ohne Treffer:{' '}
+                    <span className="font-medium">{excelSummary.unmatched.length}</span>
+                  </div>
+                </div>
+
+                {excelSummary.assignments.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      Warengruppen aus Excel (mit Anzahl gefundener Produkte):
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {excelSummary.assignments.map((a) => (
+                        <Badge
+                          key={a.blockName}
+                          variant={a.isNewBlock ? 'default' : 'secondary'}
+                          className="text-xs"
+                        >
+                          {a.blockName} · {a.itemIds.length}{' '}
+                          {a.isNewBlock ? '(neu)' : ''}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {excelSummary.unmatched.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      Namen ohne eindeutigen Treffer (werden nicht automatisch zugeordnet):
+                    </p>
+                    <div className="max-h-32 overflow-auto border border-dashed border-border rounded p-2 bg-background/60">
+                      <ul className="text-xs space-y-0.5">
+                        {excelSummary.unmatched.slice(0, 50).map((u, idx) => (
+                          <li key={`${u.blockName}-${u.productName}-${idx}`}>
+                            <span className="font-medium">{u.blockName}:</span>{' '}
+                            {u.productName}{' '}
+                            <span className="text-[11px] text-muted-foreground">
+                              ({u.reason === 'no_match' ? 'kein Treffer' : 'mehrere Treffer'})
+                            </span>
+                          </li>
+                        ))}
+                        {excelSummary.unmatched.length > 50 && (
+                          <li className="text-[11px] text-muted-foreground">
+                            … und {excelSummary.unmatched.length - 50} weitere.
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    onClick={handleApplyExcelAssignments}
+                    disabled={isApplyingExcel || excelSummary.assignments.length === 0}
+                  >
+                    {isApplyingExcel ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Zuordnungen werden angewendet…
+                      </>
+                    ) : (
+                      <>Zuordnungen anwenden</>
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setExcelSummary(null)}
+                    disabled={isApplyingExcel}
+                  >
+                    Vorschau zurücksetzen
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

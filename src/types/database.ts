@@ -555,6 +555,34 @@ export interface Database {
         }
         Update: Record<string, never>
       }
+      backshop_renamed_items: {
+        Row: {
+          id: string
+          plu: string
+          display_name: string
+          is_manually_renamed: boolean
+          image_url: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          plu: string
+          display_name: string
+          is_manually_renamed?: boolean
+          image_url?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          display_name?: string
+          is_manually_renamed?: boolean
+          image_url?: string | null
+          updated_at?: string
+        }
+      }
       backshop_offer_items: {
         Row: {
           id: string
@@ -738,6 +766,7 @@ export type BackshopMasterPLUItem = Database['public']['Tables']['backshop_maste
 export type BackshopBlock = Database['public']['Tables']['backshop_blocks']['Row']
 export type BackshopCustomProduct = Database['public']['Tables']['backshop_custom_products']['Row']
 export type BackshopHiddenItem = Database['public']['Tables']['backshop_hidden_items']['Row']
+export type BackshopRenamedItem = Database['public']['Tables']['backshop_renamed_items']['Row']
 export type BackshopOfferItem = Database['public']['Tables']['backshop_offer_items']['Row']
 export type BackshopVersionNotification = Database['public']['Tables']['backshop_version_notifications']['Row']
 export type BackshopLayoutSettings = Database['public']['Tables']['backshop_layout_settings']['Row']

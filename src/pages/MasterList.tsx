@@ -104,6 +104,7 @@ export function MasterList({ mode }: MasterListProps) {
   const {
     data: rawItems = [],
     isLoading: itemsLoading,
+    isRefetching: itemsRefetching,
     error: itemsError,
     refetch: refetchItems,
   } = usePLUData(effectiveVersionId)
@@ -386,8 +387,8 @@ export function MasterList({ mode }: MasterListProps) {
           </Card>
         )}
 
-        {/* === Loading State === */}
-        {isLoading && !hasNoVersion && (
+        {/* === Loading State (inkl. Refetch nach transientem Fehler) === */}
+        {(isLoading || (itemsError && itemsRefetching)) && !hasNoVersion && (
           <Card>
             <CardContent className="p-6 space-y-3">
               <div className="flex gap-4">
@@ -404,8 +405,8 @@ export function MasterList({ mode }: MasterListProps) {
           </Card>
         )}
 
-        {/* === Error State === */}
-        {itemsError && !isLoading && !hasNoVersion && (
+        {/* === Error State – nur wenn nicht gerade Refetch (verhindert kurzes Aufblitzen bei transientem Fehler) === */}
+        {itemsError && !isLoading && !itemsRefetching && !hasNoVersion && (
           <Card>
             <CardContent className="flex items-center gap-4 p-6">
               <AlertCircle className="h-8 w-8 text-destructive shrink-0" />

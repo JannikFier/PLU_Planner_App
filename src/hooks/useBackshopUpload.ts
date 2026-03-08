@@ -3,8 +3,10 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { formatError } from '@/lib/error-messages'
 import { parseBackshopExcelFile } from '@/lib/backshop-excel-parser'
-import { uploadBackshopImagesAndAssignUrls } from '@/lib/backshop-excel-images'
+import { uploadBackshopImagesAndAssignUrls, uploadManualImage } from '@/lib/backshop-excel-images'
+import type { UnmatchedProduct } from '@/lib/backshop-excel-images'
 import { compareBackshopWithCurrentVersion } from '@/lib/comparison-logic'
 import { publishBackshopVersion } from '@/lib/publish-backshop-version'
 import { useAuth } from '@/hooks/useAuth'
@@ -18,7 +20,7 @@ import {
   parseKWAndYearFromFilename,
 } from '@/lib/date-kw-utils'
 
-export type BackshopUploadStep = 1 | 2 | 3
+export type BackshopUploadStep = 1 | 2 | 3 | 4
 
 function masterToCompareItem(row: BackshopMasterPLUItem): BackshopCompareItem {
   return {
@@ -26,6 +28,7 @@ function masterToCompareItem(row: BackshopMasterPLUItem): BackshopCompareItem {
     plu: row.plu,
     system_name: row.system_name,
     display_name: row.display_name,
+    is_manually_renamed: row.is_manually_renamed,
     status: row.status,
     old_plu: row.old_plu,
     image_url: row.image_url,
@@ -47,6 +50,9 @@ export function useBackshopUpload() {
   const [publishResult, setPublishResult] = useState<{ itemCount: number } | null>(null)
   const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false)
   const [replaceExistingVersion, setReplaceExistingVersion] = useState(false)
+  const [unmatchedProducts, setUnmatchedProducts] = useState<UnmatchedProduct[]>([])
+  const [lastUploadId, setLastUploadId] = useState('')
+  const [lastXlsxIndex, setLastXlsxIndex] = useState(0)
 
   const reset = useCallback(() => {
     setStep(1)
@@ -60,6 +66,9 @@ export function useBackshopUpload() {
     setPublishResult(null)
     setOverwriteConfirmOpen(false)
     setReplaceExistingVersion(false)
+    setUnmatchedProducts([])
+    setLastUploadId('')
+    setLastXlsxIndex(0)
   }, [])
 
   // Beim Start: Ziel-KW auf aktuelle Kalenderwoche und aktuelles Jahr setzen, wenn noch leer
@@ -80,8 +89,10 @@ export function useBackshopUpload() {
       return
     }
     setIsAddingFiles(true)
+    setUnmatchedProducts([])
     const results: BackshopParseResult[] = []
     const uploadId = crypto.randomUUID()
+    setLastUploadId(uploadId)
     let xlsxIndex = 0
     for (let i = 0; i < list.length; i++) {
       const file = list[i]
@@ -94,10 +105,13 @@ export function useBackshopUpload() {
               versionIdOrUploadId: uploadId,
               fileIndex: xlsxIndex,
               onProgress: (uploaded, total) => setImageUploadProgress(total > 0 ? { uploaded, total } : null),
+              onUnmatchedProducts: (products) => {
+                if (products.length > 0) setUnmatchedProducts((prev) => [...prev, ...products])
+              },
               onDiagnostic: (rowsWithoutUrl, imagesUnassigned, extractedCount) => {
                 if (extractedCount === 0 && rowsWithoutUrl > 0) {
                   toast.warning(
-                    `Aus "${file.name}" konnten keine Bilder gelesen werden. Bei manchen Excel-Dateien (z. B. aus Microsoft Excel) werden eingebettete Bilder derzeit nicht erkannt. PLU und Name wurden übernommen.`
+                    `Aus "${file.name}" konnten keine Bilder gelesen werden. Bei manchen Excel-Dateien (z.B. aus Microsoft Excel) werden eingebettete Bilder derzeit nicht erkannt. PLU und Name wurden übernommen.`
                   )
                 } else if (rowsWithoutUrl > 0 || imagesUnassigned > 0) {
                   const parts: string[] = []
@@ -114,6 +128,7 @@ export function useBackshopUpload() {
               },
             })
             setImageUploadProgress(null)
+            setLastXlsxIndex(xlsxIndex)
             xlsxIndex += 1
             for (const row of result.rows) {
               const url = urlMap.get(row.plu)
@@ -129,7 +144,7 @@ export function useBackshopUpload() {
         results.push(result)
       } catch (err) {
         toast.error(
-          `"${file.name}" konnte nicht gelesen werden: ${err instanceof Error ? err.message : 'Unbekannt'}`
+          `"${file.name}" konnte nicht gelesen werden: ${formatError(err)}`
         )
       }
     }
@@ -218,13 +233,13 @@ export function useBackshopUpload() {
       setComparison(result)
       setStep(2)
     } catch (err) {
-      toast.error(`Vergleich fehlgeschlagen: ${err instanceof Error ? err.message : 'Unbekannt'}`)
+      toast.error(`Vergleich fehlgeschlagen: ${formatError(err)}`)
     } finally {
       setIsProcessing(false)
     }
   }, [fileResults, targetKW, targetJahr])
 
-  const handlePublish = useCallback(async () => {
+  const handlePublish = useCallback(async (itemsWithBlockIds?: BackshopCompareItem[]) => {
     if (!user || !comparison) return
     const kw = parseInt(targetKW, 10)
     const jahr = parseInt(targetJahr, 10)
@@ -232,12 +247,13 @@ export function useBackshopUpload() {
       toast.error('Ungültige KW oder Jahr')
       return
     }
+    const itemsToPublish = itemsWithBlockIds ?? comparison.allItems
     setIsProcessing(true)
     try {
       const result = await publishBackshopVersion({
         kwNummer: kw,
         jahr,
-        items: comparison.allItems,
+        items: itemsToPublish,
         createdBy: user.id,
         replaceExistingVersion,
       })
@@ -246,14 +262,30 @@ export function useBackshopUpload() {
       await queryClient.invalidateQueries({ queryKey: ['backshop-versions'] })
       await queryClient.invalidateQueries({ queryKey: ['backshop-version', 'active'] })
       await queryClient.invalidateQueries({ queryKey: ['backshop-plu-items'] })
-      setStep(3)
+      setStep(4)
       toast.success('Backshop-Version erfolgreich veröffentlicht!')
     } catch (err) {
-      toast.error(`Veröffentlichung fehlgeschlagen: ${err instanceof Error ? err.message : 'Unbekannt'}`)
+      toast.error(`Veröffentlichung fehlgeschlagen: ${formatError(err)}`)
     } finally {
       setIsProcessing(false)
     }
   }, [user, targetKW, targetJahr, comparison, replaceExistingVersion, queryClient])
+
+  const assignImageToProduct = useCallback(async (plu: string, dataUrl: string) => {
+    const url = await uploadManualImage(dataUrl, plu, lastUploadId, lastXlsxIndex)
+    if (!url) {
+      toast.error(`Bild für PLU ${plu} konnte nicht hochgeladen werden.`)
+      return
+    }
+    setFileResults((prev) =>
+      prev.map((result) => ({
+        ...result,
+        rows: result.rows.map((r) => (r.plu === plu ? { ...r, imageUrl: url } : r)),
+      }))
+    )
+    setUnmatchedProducts((prev) => prev.filter((p) => p.plu !== plu))
+    toast.success(`Bild für ${plu} zugeordnet.`)
+  }, [lastUploadId, lastXlsxIndex])
 
   const setOverwriteConfirmOpenState = useCallback((open: boolean) => {
     setOverwriteConfirmOpen(open)
@@ -279,18 +311,17 @@ export function useBackshopUpload() {
     handlePublish,
     overwriteConfirmOpen,
     setOverwriteConfirmOpen: setOverwriteConfirmOpenState,
+    unmatchedProducts,
+    assignImageToProduct,
   }
 }
 
-/** Mehrere Backshop-Parse-Ergebnisse zu einer Liste von Zeilen zusammenführen; PLU-Duplikate: Zeile mit Bild (imageUrl) hat Vorrang, sonst erste. */
+/** Mehrere Backshop-Parse-Ergebnisse zu einer Liste zusammenführen. Pro PLU gewinnt die erste vorkommende Zeile (aus der ersten Datei); spätere Dateien überschreiben bestehende PLUs nicht. */
 function mergeAndDedupeRows(results: BackshopParseResult[]): ParsedBackshopRow[] {
   const byPlu = new Map<string, ParsedBackshopRow>()
   for (const res of results) {
     for (const row of res.rows) {
-      const existing = byPlu.get(row.plu)
-      if (!existing) {
-        byPlu.set(row.plu, row)
-      } else if (row.imageUrl && !existing.imageUrl) {
+      if (!byPlu.has(row.plu)) {
         byPlu.set(row.plu, row)
       }
     }

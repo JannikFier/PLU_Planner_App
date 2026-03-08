@@ -34,12 +34,14 @@ export function useFindInPage<T>(
 
   const [currentIndex, setCurrentIndexState] = useState(0)
 
-  // currentIndex in gültigen Bereich bringen
+  // currentIndex in gültigen Bereich bringen (async, um set-state-in-effect-Lint zu vermeiden)
   useEffect(() => {
-    setCurrentIndexState((prev) => {
-      if (totalMatches === 0) return 0
-      if (prev >= totalMatches) return totalMatches - 1
-      return prev
+    queueMicrotask(() => {
+      setCurrentIndexState((prev) => {
+        if (totalMatches === 0) return 0
+        if (prev >= totalMatches) return totalMatches - 1
+        return prev
+      })
     })
   }, [totalMatches])
 

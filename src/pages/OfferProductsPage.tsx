@@ -21,6 +21,7 @@ import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
 import { useCustomProducts } from '@/hooks/useCustomProducts'
 import { useHiddenItems } from '@/hooks/useHiddenItems'
+import { EXCEL_READ_ERROR_FALLBACK, formatError } from '@/lib/error-messages'
 import { getDisplayPlu } from '@/lib/plu-helpers'
 import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import { getActiveOfferPLUs } from '@/lib/offer-utils'
@@ -118,7 +119,7 @@ export function OfferProductsPage() {
       }
       setExcelResult(result)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Excel konnte nicht gelesen werden.')
+      toast.error(formatError(err, EXCEL_READ_ERROR_FALLBACK))
     }
   }, [])
 

@@ -48,6 +48,7 @@ const BackshopVersionsPage = lazy(() => import('@/pages/BackshopVersionsPage').t
 const BackshopLayoutSettingsPage = lazy(() => import('@/pages/BackshopLayoutSettingsPage').then((m) => ({ default: m.BackshopLayoutSettingsPage })))
 const BackshopRulesPage = lazy(() => import('@/pages/BackshopRulesPage').then((m) => ({ default: m.BackshopRulesPage })))
 const BackshopBlockSortPage = lazy(() => import('@/pages/BackshopBlockSortPage').then((m) => ({ default: m.BackshopBlockSortPage })))
+const BackshopWarengruppenPage = lazy(() => import('@/pages/BackshopWarengruppenPage').then((m) => ({ default: m.BackshopWarengruppenPage })))
 
 /** Ladeanzeige beim Wechsel zu lazy-geladenen Seiten – mit Layout-Struktur, damit der Übergang nicht abrupt wirkt */
 function PageLoadingFallback() {
@@ -450,6 +451,14 @@ function App() {
               element={
                 <ProtectedRoute requireSuperAdmin>
                   <BackshopMasterList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/backshop-warengruppen"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <BackshopWarengruppenPage />
                 </ProtectedRoute>
               }
             />

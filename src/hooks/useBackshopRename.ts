@@ -38,6 +38,7 @@ export function useRenameBackshopMasterProduct() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['backshop-plu-items'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-renamed-items'] })
       toast.success('Produktname geändert')
     },
     onError: (error) => {
@@ -61,6 +62,7 @@ export function useResetBackshopProductName() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['backshop-plu-items'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-renamed-items'] })
       toast.success('Produktname zurückgesetzt')
     },
     onError: (error) => {
@@ -80,6 +82,7 @@ export function useClearBackshopRenamedFlag() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['backshop-plu-items'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-renamed-items'] })
       toast.success('Aus Liste entfernt')
     },
     onError: (error) => {

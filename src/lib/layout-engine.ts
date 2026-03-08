@@ -199,6 +199,14 @@ export type BackshopBezeichnungsregelInput = {
   is_active: boolean
 }
 
+/** Globale Umbenennung pro PLU (display_name, is_manually_renamed, image_url) */
+export type BackshopRenamedItemInput = {
+  plu: string
+  display_name: string
+  is_manually_renamed: boolean
+  image_url?: string | null
+}
+
 export interface BackshopDisplayListInput {
   masterItems: BackshopMasterPLUItem[]
   hiddenPLUs?: Set<string>
@@ -210,6 +218,8 @@ export interface BackshopDisplayListInput {
   customProducts?: BackshopCustomProductInput[]
   /** Bezeichnungsregeln für Anzeige (nur aktive werden angewendet) */
   bezeichnungsregeln?: BackshopBezeichnungsregelInput[]
+  /** Globale Umbenennungen (überschreiben display_name, is_manually_renamed, image_url aus Master) */
+  renamedItems?: BackshopRenamedItemInput[]
 }
 
 /**
@@ -226,28 +236,34 @@ export function buildBackshopDisplayList(input: BackshopDisplayListInput): Layou
     blocks = [],
     customProducts = [],
     bezeichnungsregeln = [],
+    renamedItems = [],
   } = input
+
+  const renamedByPlu = new Map(renamedItems.map((r) => [r.plu, r]))
 
   const masterFiltered = masterItems.filter((item) => !hiddenPLUs.has(item.plu))
   const masterPLUs = new Set(masterFiltered.map((i) => i.plu))
 
-  let items: DisplayItem[] = masterFiltered.map((item) => ({
-    id: item.id,
-    plu: item.plu,
-    system_name: item.system_name,
-    display_name: item.display_name ?? item.system_name,
-    item_type: 'PIECE' as const,
-    status: item.status as import('@/types/plu').PLUStatus,
-    old_plu: item.old_plu,
-    warengruppe: item.warengruppe,
-    block_id: item.block_id,
-    block_name: null as string | null,
-    preis: null,
-    is_custom: false,
-    is_manually_renamed: item.is_manually_renamed ?? false,
-    image_url: item.image_url ?? undefined,
-    is_offer: offerPLUs?.has(item.plu) ?? false,
-  }))
+  let items: DisplayItem[] = masterFiltered.map((item) => {
+    const renamed = renamedByPlu.get(item.plu)
+    return {
+      id: item.id,
+      plu: item.plu,
+      system_name: item.system_name,
+      display_name: renamed?.display_name ?? item.display_name ?? item.system_name,
+      item_type: 'PIECE' as const,
+      status: item.status as import('@/types/plu').PLUStatus,
+      old_plu: item.old_plu,
+      warengruppe: item.warengruppe,
+      block_id: item.block_id,
+      block_name: null as string | null,
+      preis: null,
+      is_custom: false,
+      is_manually_renamed: renamed?.is_manually_renamed ?? item.is_manually_renamed ?? false,
+      image_url: (renamed?.image_url ?? item.image_url) ?? undefined,
+      is_offer: offerPLUs?.has(item.plu) ?? false,
+    }
+  })
 
   for (const cp of customProducts) {
     if (!masterPLUs.has(cp.plu)) {

@@ -835,7 +835,6 @@ function renderBackshopSection(
   let currentGroupLabel: string | null = null
 
   if (flowDirection === 'ROW_BY_ROW') {
-    let rowIndex = 0
     let i = 0
     while (i < pdfRows.length) {
       const row = pdfRows[i]
@@ -854,7 +853,6 @@ function renderBackshopSection(
         yPos += 1.5
         drawColumnHeaders()
         skipTopBorderForNextProductRow = true
-        rowIndex = 0
         i++
         continue
       }
@@ -873,7 +871,6 @@ function renderBackshopSection(
       }
       drawRowLine(yPos + BACKSHOP_ROW_HEIGHT)
       yPos += BACKSHOP_ROW_HEIGHT
-      rowIndex++
     }
   } else {
     const itemCount = pdfRows.filter((r) => r.type === 'item').length
