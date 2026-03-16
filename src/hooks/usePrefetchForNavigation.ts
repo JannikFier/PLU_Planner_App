@@ -26,9 +26,6 @@ export function runMasterListPrefetch(queryClient: QueryClient): void {
   const versionsPromise = queryClient.prefetchQuery({ queryKey: ['versions'] })
   void queryClient.prefetchQuery({ queryKey: ['layout-settings'] })
   void queryClient.prefetchQuery({ queryKey: ['blocks'] })
-  void queryClient.prefetchQuery({ queryKey: ['custom-products'] })
-  void queryClient.prefetchQuery({ queryKey: ['hidden-items'] })
-  void queryClient.prefetchQuery({ queryKey: ['offer-items'] })
   void queryClient.prefetchQuery({ queryKey: ['bezeichnungsregeln'] })
 
   // Sobald eine der beiden Queries fertig ist: Version-ID aus Cache holen und plu-items prefetchen (kein Waterfall).
@@ -39,6 +36,13 @@ export function runMasterListPrefetch(queryClient: QueryClient): void {
         void queryClient.prefetchQuery({ queryKey: ['plu-items', versionId] })
       }
     })
+}
+
+/** Prefetch fuer marktspezifische Daten, sobald currentStoreId verfuegbar ist. */
+export function runStorePrefetch(queryClient: QueryClient, storeId: string): void {
+  void queryClient.prefetchQuery({ queryKey: ['custom-products', storeId] })
+  void queryClient.prefetchQuery({ queryKey: ['hidden-items', storeId] })
+  void queryClient.prefetchQuery({ queryKey: ['offer-items', storeId] })
 }
 
 /** Prefetch für Benutzerverwaltung (Admin/Super-Admin). Damit der "Alle Benutzer"-Kasten nach Reload schnell gefüllt ist. */

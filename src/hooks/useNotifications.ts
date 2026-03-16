@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
 import { useAuth } from '@/hooks/useAuth'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { toast } from 'sonner'
 import type { Database, VersionNotification, MasterPLUItem } from '@/types/database'
@@ -31,9 +32,10 @@ export function useActiveVersionChangeCount() {
 /** Notification für aktuellen User + Version laden */
 export function useVersionNotification(versionId: string | undefined) {
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
 
   return useQuery({
-    queryKey: ['version-notification', versionId],
+    queryKey: ['version-notification', versionId, currentStoreId],
     queryFn: async () => {
       if (!user || !versionId) return null
 
@@ -42,21 +44,23 @@ export function useVersionNotification(versionId: string | undefined) {
         .select('*')
         .eq('user_id', user.id)
         .eq('version_id', versionId)
+        .eq('store_id', currentStoreId!)
         .maybeSingle()
 
       if (error) throw error
       return (data ?? null) as VersionNotification | null
     },
-    enabled: !!user && !!versionId,
+    enabled: !!user && !!versionId && !!currentStoreId,
   })
 }
 
 /** Anzahl ungelesener Notifications für aktuellen User */
 export function useUnreadNotificationCount() {
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
 
   return useQuery({
-    queryKey: ['notification-count'],
+    queryKey: ['notification-count', currentStoreId],
     queryFn: () =>
       withRetryOnAbort(async () => {
         if (!user) return 0
@@ -65,11 +69,11 @@ export function useUnreadNotificationCount() {
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id)
           .eq('is_read', false)
+          .eq('store_id', currentStoreId!)
         if (error) throw error
         return count ?? 0
       }),
-    enabled: !!user,
-    // Alle 30 Sekunden automatisch prüfen
+    enabled: !!user && !!currentStoreId,
     refetchInterval: 30000,
   })
 }
@@ -78,6 +82,7 @@ export function useUnreadNotificationCount() {
 export function useMarkNotificationRead() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (versionId: string) => {
@@ -93,12 +98,13 @@ export function useMarkNotificationRead() {
       )
         .eq('user_id', user.id)
         .eq('version_id', versionId)
+        .eq('store_id', currentStoreId!)
 
       if (error) throw error
     },
     onSuccess: (_, versionId) => {
-      queryClient.invalidateQueries({ queryKey: ['version-notification', versionId] })
-      queryClient.invalidateQueries({ queryKey: ['notification-count'] })
+      queryClient.invalidateQueries({ queryKey: ['version-notification', versionId, currentStoreId] })
+      queryClient.invalidateQueries({ queryKey: ['notification-count', currentStoreId] })
     },
     onError: (error) => {
       toast.error(`Fehler: ${error instanceof Error ? error.message : 'Unbekannt'}`)
@@ -109,9 +115,10 @@ export function useMarkNotificationRead() {
 /** Alle ungelesenen Notifications für den aktuellen User laden */
 export function useUnreadNotifications() {
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
 
   return useQuery({
-    queryKey: ['unread-notifications'],
+    queryKey: ['unread-notifications', currentStoreId],
     queryFn: () =>
       withRetryOnAbort(async () => {
         if (!user) return []
@@ -129,11 +136,12 @@ export function useUnreadNotifications() {
           `)
           .eq('user_id', user.id)
           .eq('is_read', false)
+          .eq('store_id', currentStoreId!)
           .order('created_at', { ascending: false })
         if (error) throw error
         return data ?? []
       }),
-    enabled: !!user,
+    enabled: !!user && !!currentStoreId,
   })
 }
 

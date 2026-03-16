@@ -7,10 +7,12 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
-import { runMasterListPrefetch, runAdminPrefetch } from '@/hooks/usePrefetchForNavigation'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
+import { runMasterListPrefetch, runAdminPrefetch, runStorePrefetch } from '@/hooks/usePrefetchForNavigation'
 
 export function AuthPrefetch() {
   const { user, isLoading: authLoading, mustChangePassword, profile } = useAuth()
+  const { currentStoreId } = useCurrentStore()
   const queryClient = useQueryClient()
 
   useEffect(() => {
@@ -21,6 +23,12 @@ export function AuthPrefetch() {
       runAdminPrefetch(queryClient)
     }
   }, [authLoading, user, mustChangePassword, queryClient, profile?.role])
+
+  // Marktspezifische Daten prefetchen sobald currentStoreId verfuegbar
+  useEffect(() => {
+    if (!currentStoreId || authLoading || !user || mustChangePassword) return
+    runStorePrefetch(queryClient, currentStoreId)
+  }, [currentStoreId, authLoading, user, mustChangePassword, queryClient])
 
   // Dashboard-Chunk der Rolle vorladen, damit Redirect/Navigation sofort den Chunk nutzen kann
   useEffect(() => {

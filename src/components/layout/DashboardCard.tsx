@@ -47,6 +47,7 @@ export interface DashboardGroupCardItem {
   description: string
   icon: React.ComponentType<{ className?: string }>
   to: string
+  state?: Record<string, unknown>
   color: string
   bg: string
 }
@@ -75,6 +76,7 @@ export const DashboardGroupCard = React.memo(function DashboardGroupCard({
           <Link
             key={item.title}
             to={item.to}
+            state={item.state}
             className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/60"
           >
             <div className={cn('rounded-md p-2', item.bg)}>

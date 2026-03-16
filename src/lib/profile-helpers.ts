@@ -38,3 +38,21 @@ export function formatProfileDisplayPersonalnummer(personalnummer: string | null
   if (!personalnummer) return '–'
   return isPlaceholderPersonalnummer(personalnummer) ? '–' : personalnummer
 }
+
+/** Lesbare Rollen-Bezeichnung fuer Badges und Labels */
+export function roleBadgeLabel(role: string): string {
+  switch (role) {
+    case 'super_admin': return 'Super-Admin'
+    case 'admin': return 'Admin'
+    case 'viewer': return 'Viewer'
+    default: return 'User'
+  }
+}
+
+/** Einmalpasswort generieren (8 Zeichen, ohne verwechselbare Zeichen) */
+export function generateOneTimePassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  let pw = ''
+  for (let i = 0; i < 8; i++) pw += chars.charAt(Math.floor(Math.random() * chars.length))
+  return pw
+}

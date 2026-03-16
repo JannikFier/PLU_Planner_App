@@ -1,5 +1,9 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
+import { useStoreAccessByUser } from '@/hooks/useStoreAccess'
+import { useAllStores } from '@/hooks/useStores'
+import { buildStoreUrl } from '@/lib/subdomain'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -7,9 +11,13 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { LogOut, Settings, User, Shield, Crown, ChevronLeft, Eye } from 'lucide-react'
+import { LogOut, Settings, User, Shield, Crown, ChevronLeft, Eye, Store, FlaskConical } from 'lucide-react'
+import { useTestMode } from '@/contexts/TestModeContext'
 import { NotificationBell } from '@/components/plu/NotificationBell'
 import { BackshopNotificationBell } from '@/components/plu/BackshopNotificationBell'
 import { cn } from '@/lib/utils'
@@ -20,9 +28,20 @@ import { cn } from '@/lib/utils'
  * Passt sich an die drei Rollen an: Super-Admin, Admin, User.
  */
 export function AppHeader() {
-  const { profile, isAdmin, isSuperAdmin, isViewer, logout } = useAuth()
+  const { profile, isAdmin, isSuperAdmin, isViewer, logout, user } = useAuth()
+  const { isTestMode, enableTestMode, setShowExitConfirm } = useTestMode()
+  const { storeName, isAdminDomain, currentStoreId } = useCurrentStore()
+  const { data: userStoreAccess } = useStoreAccessByUser(user?.id)
+  const { data: allStores } = useAllStores()
   const navigate = useNavigate()
   const location = useLocation()
+
+  const appDomain = import.meta.env.VITE_APP_DOMAIN || 'localhost'
+
+  // Verfuegbare Maerkte fuer den Markt-Switcher
+  const accessibleStoreIds = userStoreAccess?.map(a => a.store_id) ?? []
+  const accessibleStores = allStores?.filter(s => accessibleStoreIds.includes(s.id) && s.is_active) ?? []
+  const showStoreSwitcher = accessibleStores.length > 1
 
   // Home-Pfad = Dashboard je nach Rolle
   const homePath = isSuperAdmin ? '/super-admin' : isAdmin ? '/admin' : isViewer ? '/viewer' : '/user'
@@ -67,6 +86,63 @@ export function AppHeader() {
     return '/admin'
   }
 
+  /** Zurueck-Ziel fuer Super-Admin-Bereich – neue Hierarchie mit Upload/Firmen-Trennung */
+  function getSuperAdminBackTarget(path: string): string | null {
+    // Wurde von einer Markt-Detailseite hierher navigiert? location.state.backTo nutzen.
+    const stateBackTo = (location.state as { backTo?: string } | null)?.backTo
+    if (stateBackTo && path.startsWith('/super-admin/') && !path.startsWith('/super-admin/companies')) {
+      return stateBackTo
+    }
+
+    // Dashboard = Startseite
+    if (path === '/super-admin') return null
+
+    // Upload-Bereich (global)
+    if (path === '/super-admin/upload') return '/super-admin'
+    if (path === '/super-admin/obst') return '/super-admin/upload'
+    if (path === '/super-admin/backshop') return '/super-admin/upload'
+
+    // Obst-Global-Unterseiten → Obst-Bereichsseite
+    const obstGlobalSub = ['/super-admin/plu-upload', '/super-admin/versions']
+    if (obstGlobalSub.includes(path)) return '/super-admin/obst'
+
+    // Backshop-Global-Unterseiten → Backshop-Bereichsseite
+    const backshopGlobalSub = ['/super-admin/backshop-upload', '/super-admin/backshop-versions', '/super-admin/backshop-warengruppen']
+    if (backshopGlobalSub.includes(path)) return '/super-admin/backshop'
+
+    // Firmen-Verwaltung
+    if (path === '/super-admin/companies') return '/super-admin'
+    if (path === '/super-admin/users') return '/super-admin'
+
+    // Firma-Detail → Firmen-Uebersicht
+    if (path.match(/^\/super-admin\/companies\/[^/]+$/)) return '/super-admin/companies'
+
+    // Store-Detail: Zurueck haengt vom ?view-Parameter ab
+    const storeMatch = path.match(/^\/super-admin\/companies\/([^/]+)\/stores\/[^/]+$/)
+    if (storeMatch) {
+      const viewParam = new URLSearchParams(location.search).get('view')
+      const companyPath = `/super-admin/companies/${storeMatch[1]}`
+      const storePath = path
+
+      if (!viewParam || viewParam === 'overview') return companyPath
+      if (viewParam === 'listen') return storePath
+      if (viewParam === 'listen-obst' || viewParam === 'listen-backshop') return `${storePath}?view=listen`
+      if (viewParam === 'benutzer' || viewParam === 'einstellungen') return storePath
+      return storePath
+    }
+
+    // Marktspezifische Listen-/Konfig-Seiten (masterlist, custom-products, etc.)
+    // Wurden mit state.backTo navigiert → oben schon abgefangen.
+    // Fallback: Obst-Unterseiten → /super-admin/obst, Backshop → /super-admin/backshop
+    const obstSub = ['/super-admin/masterlist', '/super-admin/custom-products', '/super-admin/hidden-products', '/super-admin/offer-products', '/super-admin/renamed-products', '/super-admin/hidden-items', '/super-admin/layout', '/super-admin/rules', '/super-admin/block-sort']
+    if (obstSub.includes(path)) return '/super-admin/obst'
+
+    const backshopSub = ['/super-admin/backshop-list', '/super-admin/backshop-custom-products', '/super-admin/backshop-hidden-products', '/super-admin/backshop-offer-products', '/super-admin/backshop-renamed-products', '/super-admin/backshop-layout', '/super-admin/backshop-rules', '/super-admin/backshop-block-sort']
+    if (backshopSub.includes(path)) return '/super-admin/backshop'
+
+    return '/super-admin'
+  }
+
   const backTarget = (() => {
     const path = location.pathname
     if (isSuperAdmin) {
@@ -74,19 +150,7 @@ export function AppHeader() {
         if (path.startsWith('/user')) return getUserAreaBackTarget(path)
         return getViewerAreaBackTarget(path)
       }
-      if (path === '/super-admin') return null
-      // Backshop: PLU-Liste → Backshop-Dashboard; Warengruppen-Seite + Unter-Seiten der Liste → PLU-Liste; sonstige Backshop-Seiten → Backshop-Dashboard
-      if (path === '/super-admin/backshop-list') return '/super-admin/backshop'
-      if (path === '/super-admin/backshop-warengruppen') return '/super-admin/backshop-list'
-      const SUPER_ADMIN_BACKSHOP_LIST_SUB = ['/super-admin/backshop-custom-products', '/super-admin/backshop-hidden-products', '/super-admin/backshop-offer-products', '/super-admin/backshop-renamed-products']
-      if (SUPER_ADMIN_BACKSHOP_LIST_SUB.includes(path)) return '/super-admin/backshop-list'
-      if (path.startsWith('/super-admin/backshop-')) return '/super-admin/backshop'
-      if (path === '/super-admin/backshop') return '/super-admin'
-      const obstSubPaths = ['/super-admin/layout', '/super-admin/rules', '/super-admin/block-sort', '/super-admin/versions', '/super-admin/masterlist', '/super-admin/custom-products', '/super-admin/hidden-products', '/super-admin/offer-products', '/super-admin/renamed-products', '/super-admin/plu-upload', '/super-admin/hidden-items']
-      if (obstSubPaths.some((p) => path === p)) return '/super-admin/obst'
-      if (path === '/super-admin/obst') return '/super-admin'
-      if (path === '/super-admin/users') return '/super-admin'
-      return homePath
+      return getSuperAdminBackTarget(path)
     }
     if (path.startsWith('/user')) return getUserAreaBackTarget(path)
     if (path.startsWith('/viewer')) return getViewerAreaBackTarget(path)
@@ -134,15 +198,18 @@ export function AppHeader() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
               PLU
             </div>
-            <div>
+            <div className="min-w-0">
               <h1 className="text-lg font-semibold leading-tight">PLU Planner</h1>
-              {isSuperAdmin && (
+              {storeName && !isAdminDomain && (
+                <span className="text-xs text-muted-foreground truncate block max-w-[150px] sm:max-w-none">{storeName}</span>
+              )}
+              {isAdminDomain && isSuperAdmin && (
                 <span className="text-xs text-muted-foreground">Super-Administration</span>
               )}
-              {isAdmin && !isSuperAdmin && (
+              {!isAdminDomain && !storeName && isAdmin && !isSuperAdmin && (
                 <span className="text-xs text-muted-foreground">Administration</span>
               )}
-              {isViewer && (
+              {!isAdminDomain && !storeName && isViewer && (
                 <span className="text-xs text-muted-foreground">Nur Ansicht</span>
               )}
             </div>
@@ -213,6 +280,47 @@ export function AppHeader() {
                   <Settings className="mr-2 h-4 w-4" />
                   Admin-Bereich
                 </DropdownMenuItem>
+              )}
+
+              {/* Testmodus-Toggle */}
+              {!isViewer && (
+                <DropdownMenuItem onClick={() => {
+                  if (isTestMode) {
+                    setShowExitConfirm(true)
+                  } else {
+                    enableTestMode()
+                  }
+                }}>
+                  <FlaskConical className="mr-2 h-4 w-4" />
+                  {isTestMode ? 'Testmodus beenden' : 'Testmodus starten'}
+                </DropdownMenuItem>
+              )}
+
+              {/* Markt wechseln (nur wenn User mehrere Maerkte hat) */}
+              {showStoreSwitcher && (
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Store className="mr-2 h-4 w-4" />
+                    Markt wechseln
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {accessibleStores.map(store => (
+                      <DropdownMenuItem
+                        key={store.id}
+                        disabled={store.id === currentStoreId}
+                        onClick={() => {
+                          const url = buildStoreUrl(store.subdomain, appDomain)
+                          window.location.href = url
+                        }}
+                      >
+                        {store.name}
+                        {store.id === currentStoreId && (
+                          <span className="ml-auto text-xs text-muted-foreground">Aktiv</span>
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
               )}
 
               <DropdownMenuSeparator />

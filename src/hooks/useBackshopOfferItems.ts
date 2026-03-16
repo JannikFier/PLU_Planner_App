@@ -3,24 +3,29 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { toast } from 'sonner'
 import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import type { BackshopOfferItem, Database } from '@/types/database'
 
 /** Alle Backshop-Werbung/Angebot-Einträge laden */
 export function useBackshopOfferItems() {
+  const { currentStoreId } = useCurrentStore()
+
   return useQuery({
-    queryKey: ['backshop-offer-items'],
+    queryKey: ['backshop-offer-items', currentStoreId],
     staleTime: 2 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('backshop_offer_items')
         .select('*')
+        .eq('store_id', currentStoreId!)
         .order('created_at', { ascending: false })
 
       if (error) throw error
       return (data ?? []) as BackshopOfferItem[]
     },
+    enabled: !!currentStoreId,
   })
 }
 
@@ -28,6 +33,7 @@ export function useBackshopOfferItems() {
 export function useBackshopAddOfferItem() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async ({ plu, durationWeeks }: { plu: string; durationWeeks: number }) => {
@@ -40,6 +46,7 @@ export function useBackshopAddOfferItem() {
         start_jahr: year,
         duration_weeks: Math.max(1, Math.min(4, durationWeeks)),
         created_by: user.id,
+        store_id: currentStoreId!,
       }
 
       const { error } = await supabase.from('backshop_offer_items').upsert(row as never, {
@@ -50,7 +57,7 @@ export function useBackshopAddOfferItem() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-offer-items'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-offer-items', currentStoreId] })
       toast.success('Produkt zur Werbung hinzugefügt')
     },
     onError: (err) => {
@@ -62,6 +69,7 @@ export function useBackshopAddOfferItem() {
 /** Laufzeit eines Backshop-Werbung-Eintrags ändern (1–4 Wochen) */
 export function useBackshopUpdateOfferItem() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async ({ plu, durationWeeks }: { plu: string; durationWeeks: number }) => {
@@ -70,11 +78,12 @@ export function useBackshopUpdateOfferItem() {
         .from('backshop_offer_items')
         .update({ duration_weeks: weeks } as never)
         .eq('plu', plu)
+        .eq('store_id', currentStoreId!)
 
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-offer-items'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-offer-items', currentStoreId] })
       toast.success('Laufzeit aktualisiert')
     },
     onError: (err) => {
@@ -86,6 +95,7 @@ export function useBackshopUpdateOfferItem() {
 /** Backshop-Produkt aus der Werbung entfernen */
 export function useBackshopRemoveOfferItem() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (plu: string) => {
@@ -93,26 +103,27 @@ export function useBackshopRemoveOfferItem() {
         .from('backshop_offer_items')
         .delete()
         .eq('plu', plu)
+        .eq('store_id', currentStoreId!)
 
       if (error) throw error
     },
     onMutate: async (plu) => {
-      await queryClient.cancelQueries({ queryKey: ['backshop-offer-items'] })
-      const prev = queryClient.getQueryData<BackshopOfferItem[]>(['backshop-offer-items'])
-      queryClient.setQueryData<BackshopOfferItem[]>(['backshop-offer-items'], (old = []) =>
+      await queryClient.cancelQueries({ queryKey: ['backshop-offer-items', currentStoreId] })
+      const prev = queryClient.getQueryData<BackshopOfferItem[]>(['backshop-offer-items', currentStoreId])
+      queryClient.setQueryData<BackshopOfferItem[]>(['backshop-offer-items', currentStoreId], (old = []) =>
         old.filter((o) => o.plu !== plu),
       )
       return { prev }
     },
     onError: (err, _plu, ctx) => {
-      if (ctx?.prev != null) queryClient.setQueryData(['backshop-offer-items'], ctx.prev)
+      if (ctx?.prev != null) queryClient.setQueryData(['backshop-offer-items', currentStoreId], ctx.prev)
       toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
     },
     onSuccess: () => {
       toast.success('Aus Werbung entfernt')
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-offer-items'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-offer-items', currentStoreId] })
     },
   })
 }
@@ -121,6 +132,7 @@ export function useBackshopRemoveOfferItem() {
 export function useBackshopAddOfferItemsBatch() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (rows: { plu: string; durationWeeks: number }[]) => {
@@ -135,6 +147,7 @@ export function useBackshopAddOfferItemsBatch() {
           start_jahr: year,
           duration_weeks: Math.max(1, Math.min(4, durationWeeks)),
           created_by: user.id,
+          store_id: currentStoreId!,
         }
         const { error } = await supabase.from('backshop_offer_items').upsert(row as never, {
           onConflict: 'plu',
@@ -150,7 +163,7 @@ export function useBackshopAddOfferItemsBatch() {
       return { added, skipped }
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-offer-items'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-offer-items', currentStoreId] })
       if (result.added > 0) {
         toast.success(`${result.added} Produkt${result.added === 1 ? '' : 'e'} zur Werbung hinzugefügt`)
       }

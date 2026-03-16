@@ -22,10 +22,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const authHeader = req.headers.get('Authorization')!
-    const { data: { user: caller } } = await supabaseAdmin.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
+    const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization')
+    const jwt = authHeader?.replace(/^Bearer\s+/i, '').trim()
+    if (!jwt) {
+      return new Response(
+        JSON.stringify({ error: 'Authorization-Header fehlt' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    const { data: { user: caller } } = await supabaseAdmin.auth.getUser(jwt)
 
     if (!caller) {
       return new Response(
@@ -87,8 +92,13 @@ serve(async (req) => {
 
     // Admin und Super-Admin dürfen alle außer Super-Admin löschen (User, Admin, Viewer)
 
-    // Auth-User löschen (Profile wird über DB-Trigger/Cascade entfernt oder wir löschen manuell)
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
+    // 1. Verknuepfte Daten explizit loeschen (user_store_access, profiles)
+    //    CASCADE koennte nicht feuern wenn Auth nur soft-deleted.
+    await supabaseAdmin.from('user_store_access').delete().eq('user_id', userId)
+    await supabaseAdmin.from('profiles').delete().eq('id', userId)
+
+    // 2. Auth-User hart loeschen (kein Soft Delete)
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId, false)
 
     if (error) {
       return new Response(

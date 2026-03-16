@@ -3,23 +3,28 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { toast } from 'sonner'
 import type { Database, HiddenItem } from '@/types/database'
 
 /** Alle ausgeblendeten PLUs laden */
 export function useHiddenItems() {
+  const { currentStoreId } = useCurrentStore()
+
   return useQuery({
-    queryKey: ['hidden-items'],
+    queryKey: ['hidden-items', currentStoreId],
     staleTime: 2 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('hidden_items')
         .select('*')
+        .eq('store_id', currentStoreId!)
         .order('created_at', { ascending: false })
 
       if (error) throw error
       return (data ?? []) as HiddenItem[]
     },
+    enabled: !!currentStoreId,
   })
 }
 
@@ -27,6 +32,7 @@ export function useHiddenItems() {
 export function useHideProduct() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (plu: string) => {
@@ -35,27 +41,27 @@ export function useHideProduct() {
       const { error } = await supabase
         .from('hidden_items')
         .insert(
-        ({ plu, hidden_by: user.id } as Database['public']['Tables']['hidden_items']['Insert']) as never
+        ({ plu, hidden_by: user.id, store_id: currentStoreId! } as Database['public']['Tables']['hidden_items']['Insert']) as never
       )
 
       if (error) throw error
     },
     onMutate: async (plu) => {
-      await queryClient.cancelQueries({ queryKey: ['hidden-items'] })
-      const prev = queryClient.getQueryData<HiddenItem[]>(['hidden-items'])
-      queryClient.setQueryData<HiddenItem[]>(['hidden-items'], (old = []) => {
+      await queryClient.cancelQueries({ queryKey: ['hidden-items', currentStoreId] })
+      const prev = queryClient.getQueryData<HiddenItem[]>(['hidden-items', currentStoreId])
+      queryClient.setQueryData<HiddenItem[]>(['hidden-items', currentStoreId], (old = []) => {
         if (old.some((h) => h.plu === plu)) return old
         return [...old, { id: `opt-${plu}`, plu, hidden_by: user?.id ?? '', created_at: new Date().toISOString() } as HiddenItem]
       })
       return { prev }
     },
     onError: (err, _plu, ctx) => {
-      if (ctx?.prev != null) queryClient.setQueryData(['hidden-items'], ctx.prev)
+      if (ctx?.prev != null) queryClient.setQueryData(['hidden-items', currentStoreId], ctx.prev)
       if ((err as { code?: string })?.code === '23505') return
       toast.error(`Fehler beim Ausblenden: ${err instanceof Error ? err.message : 'Unbekannt'}`)
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['hidden-items'] })
+      queryClient.invalidateQueries({ queryKey: ['hidden-items', currentStoreId] })
     },
   })
 }
@@ -64,6 +70,7 @@ export function useHideProduct() {
 export function useHideProductsBatch() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (plus: string[]) => {
@@ -74,7 +81,7 @@ export function useHideProductsBatch() {
         const { error } = await supabase
           .from('hidden_items')
           .insert(
-            ({ plu, hidden_by: user.id } as Database['public']['Tables']['hidden_items']['Insert']) as never
+            ({ plu, hidden_by: user.id, store_id: currentStoreId! } as Database['public']['Tables']['hidden_items']['Insert']) as never
           )
         if (error) {
           if ((error as { code?: string }).code === '23505') skipped++
@@ -86,7 +93,7 @@ export function useHideProductsBatch() {
       return { added, skipped }
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['hidden-items'] })
+      queryClient.invalidateQueries({ queryKey: ['hidden-items', currentStoreId] })
       if (result.added > 0) {
         toast.success(`${result.added} Produkt${result.added === 1 ? '' : 'e'} ausgeblendet`)
       }
@@ -103,6 +110,7 @@ export function useHideProductsBatch() {
 /** PLU wieder einblenden (delete from hidden_items) – mit Optimistic Update */
 export function useUnhideProduct() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (plu: string) => {
@@ -110,26 +118,27 @@ export function useUnhideProduct() {
         .from('hidden_items')
         .delete()
         .eq('plu', plu)
+        .eq('store_id', currentStoreId!)
 
       if (error) throw error
     },
     onMutate: async (plu) => {
-      await queryClient.cancelQueries({ queryKey: ['hidden-items'] })
-      const prev = queryClient.getQueryData<HiddenItem[]>(['hidden-items'])
-      queryClient.setQueryData<HiddenItem[]>(['hidden-items'], (old = []) =>
+      await queryClient.cancelQueries({ queryKey: ['hidden-items', currentStoreId] })
+      const prev = queryClient.getQueryData<HiddenItem[]>(['hidden-items', currentStoreId])
+      queryClient.setQueryData<HiddenItem[]>(['hidden-items', currentStoreId], (old = []) =>
         old.filter((h) => h.plu !== plu),
       )
       return { prev }
     },
     onError: (err, _plu, ctx) => {
-      if (ctx?.prev != null) queryClient.setQueryData(['hidden-items'], ctx.prev)
+      if (ctx?.prev != null) queryClient.setQueryData(['hidden-items', currentStoreId], ctx.prev)
       toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
     },
     onSuccess: () => {
       toast.success('Produkt wieder eingeblendet')
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['hidden-items'] })
+      queryClient.invalidateQueries({ queryKey: ['hidden-items', currentStoreId] })
     },
   })
 }
@@ -137,19 +146,19 @@ export function useUnhideProduct() {
 /** Alle Produkte wieder einblenden */
 export function useUnhideAll() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async () => {
-      // Alle hidden_items löschen
       const { error } = await supabase
         .from('hidden_items')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000') // Supabase braucht eine Bedingung bei delete
+        .eq('store_id', currentStoreId!)
 
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hidden-items'] })
+      queryClient.invalidateQueries({ queryKey: ['hidden-items', currentStoreId] })
       toast.success('Alle Produkte wieder eingeblendet')
     },
     onError: (error) => {

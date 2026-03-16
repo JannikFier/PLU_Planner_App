@@ -9,6 +9,8 @@ import { Loader2 } from 'lucide-react'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AuthPrefetch } from '@/components/AuthPrefetch'
 import { HomeRedirect } from '@/components/HomeRedirect'
+import { TestModeProvider } from '@/contexts/TestModeContext'
+import { TestModeBanner } from '@/components/layout/TestModeBanner'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 
 // Layout (nicht lazy – wird überall gebraucht)
@@ -22,6 +24,10 @@ const ChangePasswordPage = lazy(() => import('@/pages/ChangePasswordPage').then(
 const UserDashboard = lazy(() => import('@/pages/UserDashboard').then((m) => ({ default: m.UserDashboard })))
 const AdminDashboard = lazy(() => import('@/pages/AdminDashboard').then((m) => ({ default: m.AdminDashboard })))
 const SuperAdminDashboard = lazy(() => import('@/pages/SuperAdminDashboard').then((m) => ({ default: m.SuperAdminDashboard })))
+const SuperAdminCompaniesPage = lazy(() => import('@/pages/SuperAdminCompaniesPage').then((m) => ({ default: m.SuperAdminCompaniesPage })))
+const SuperAdminCompanyDetailPage = lazy(() => import('@/pages/SuperAdminCompanyDetailPage').then((m) => ({ default: m.SuperAdminCompanyDetailPage })))
+const SuperAdminStoreDetailPage = lazy(() => import('@/pages/SuperAdminStoreDetailPage').then((m) => ({ default: m.SuperAdminStoreDetailPage })))
+const SuperAdminUploadPage = lazy(() => import('@/pages/SuperAdminUploadPage').then((m) => ({ default: m.SuperAdminUploadPage })))
 const SuperAdminObstBereichPage = lazy(() => import('@/pages/SuperAdminObstBereichPage').then((m) => ({ default: m.SuperAdminObstBereichPage })))
 const SuperAdminBackshopBereichPage = lazy(() => import('@/pages/SuperAdminBackshopBereichPage').then((m) => ({ default: m.SuperAdminBackshopBereichPage })))
 const MasterList = lazy(() => import('@/pages/MasterList').then((m) => ({ default: m.MasterList })))
@@ -116,10 +122,12 @@ function App() {
         dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
       }}
     >
+      <TestModeProvider>
       <AuthPrefetch />
       <TooltipProvider>
         <BrowserRouter>
           <ErrorBoundary>
+          <TestModeBanner />
           <Suspense fallback={<PageLoadingFallback />}>
           <Routes>
             {/* === Öffentlich === */}
@@ -375,6 +383,38 @@ function App() {
               }
             />
             <Route
+              path="/super-admin/companies"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <SuperAdminCompaniesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/companies/:companyId"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <SuperAdminCompanyDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/companies/:companyId/stores/:storeId"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <SuperAdminStoreDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/upload"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <SuperAdminUploadPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/super-admin/obst"
               element={
                 <ProtectedRoute requireSuperAdmin>
@@ -587,6 +627,7 @@ function App() {
         <Toaster position="top-right" richColors closeButton />
         <SpeedInsights />
       </TooltipProvider>
+      </TestModeProvider>
     </PersistQueryClientProvider>
   )
 }

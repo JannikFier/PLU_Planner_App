@@ -1,12 +1,12 @@
 import { useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { BereichsauswahlCard } from '@/components/layout/BereichsauswahlCard'
-import { Apple, Croissant, Users } from 'lucide-react'
+import { Building2, Upload } from 'lucide-react'
 
 /**
- * Super-Admin Dashboard – Startseite für den Inhaber.
- * Drei Karten: Obst und Gemüse | Backshop | Benutzer.
- * Details und Benachrichtigungen auf den Bereichsseiten /super-admin/obst und /super-admin/backshop.
+ * Super-Admin Dashboard – Startseite fuer den Inhaber.
+ * Zwei Karten: Firmen & Maerkte | Upload
+ * (Obst/Gemuese und Backshop sind marktspezifisch und werden auf der Markt-Detailseite verwaltet)
  */
 export function SuperAdminDashboard() {
   const navigate = useNavigate()
@@ -17,31 +17,24 @@ export function SuperAdminDashboard() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Super-Administration</h2>
           <p className="text-muted-foreground">
-            Bereich wählen: Obst und Gemüse, Backshop oder Benutzerverwaltung.
+            Firmen und Märkte verwalten, PLU-Listen hochladen.
           </p>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2">
           <BereichsauswahlCard
-            title="Obst und Gemüse"
-            description="PLU-Listen, Upload, Konfiguration und Versionen"
-            icon={Apple}
-            onClick={() => navigate('/super-admin/obst')}
-            variant="obst"
-          />
-          <BereichsauswahlCard
-            title="Backshop"
-            description="Backshop-Listen, Upload, Konfiguration und Versionen"
-            icon={Croissant}
-            onClick={() => navigate('/super-admin/backshop')}
-            variant="backshop"
-          />
-          <BereichsauswahlCard
-            title="Benutzer"
-            description="Admins und Personal verwalten"
-            icon={Users}
-            onClick={() => navigate('/super-admin/users')}
+            title="Firmen & Märkte"
+            description="Firmen, Märkte und Benutzer verwalten"
+            icon={Building2}
+            onClick={() => navigate('/super-admin/companies')}
             variant="benutzer"
+          />
+          <BereichsauswahlCard
+            title="Upload"
+            description="PLU-Listen hochladen (Obst/Gemüse + Backshop)"
+            icon={Upload}
+            onClick={() => navigate('/super-admin/upload')}
+            variant="obst"
           />
         </div>
       </div>

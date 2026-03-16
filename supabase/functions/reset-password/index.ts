@@ -23,10 +23,15 @@ serve(async (req) => {
     )
 
     // Aufrufer authentifizieren
-    const authHeader = req.headers.get('Authorization')!
-    const { data: { user: caller } } = await supabaseAdmin.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
+    const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization')
+    const jwt = authHeader?.replace(/^Bearer\s+/i, '').trim()
+    if (!jwt) {
+      return new Response(
+        JSON.stringify({ error: 'Authorization-Header fehlt' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    const { data: { user: caller } } = await supabaseAdmin.auth.getUser(jwt)
 
     if (!caller) {
       return new Response(

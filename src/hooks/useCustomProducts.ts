@@ -3,23 +3,28 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { toast } from 'sonner'
 import type { CustomProduct, Database } from '@/types/database'
 
 /** Alle globalen Custom Products laden */
 export function useCustomProducts() {
+  const { currentStoreId } = useCurrentStore()
+
   return useQuery({
-    queryKey: ['custom-products'],
+    queryKey: ['custom-products', currentStoreId],
     staleTime: 2 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('custom_products')
         .select('*')
+        .eq('store_id', currentStoreId!)
         .order('name')
 
       if (error) throw error
       return (data ?? []) as CustomProduct[]
     },
+    enabled: !!currentStoreId,
   })
 }
 
@@ -27,6 +32,7 @@ export function useCustomProducts() {
 export function useAddCustomProduct() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (product: {
@@ -48,6 +54,7 @@ export function useAddCustomProduct() {
           preis: product.preis ?? null,
           block_id: product.block_id ?? null,
           created_by: user.id,
+          store_id: currentStoreId!,
         } as Database['public']['Tables']['custom_products']['Insert']) as never
       )
         .select()
@@ -57,7 +64,7 @@ export function useAddCustomProduct() {
       return data as CustomProduct
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom-products'] })
+      queryClient.invalidateQueries({ queryKey: ['custom-products', currentStoreId] })
       toast.success('Eigenes Produkt hinzugefügt')
     },
     onError: () => {
@@ -70,6 +77,7 @@ export function useAddCustomProduct() {
 export function useAddCustomProductsBatch() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (
@@ -91,6 +99,7 @@ export function useAddCustomProductsBatch() {
         preis: p.preis ?? null,
         block_id: p.block_id ?? null,
         created_by: user.id,
+        store_id: currentStoreId!,
       }))
 
       const { data, error } = await supabase
@@ -102,7 +111,7 @@ export function useAddCustomProductsBatch() {
       return (data ?? []) as CustomProduct[]
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['custom-products'] })
+      queryClient.invalidateQueries({ queryKey: ['custom-products', currentStoreId] })
       const count = data.length
       toast.success(`${count} Produkt${count === 1 ? '' : 'e'} hinzugefügt`)
     },
@@ -115,6 +124,7 @@ export function useAddCustomProductsBatch() {
 /** Custom Product aktualisieren (Name, Preis, Block) */
 export function useUpdateCustomProduct() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async ({
@@ -135,7 +145,7 @@ export function useUpdateCustomProduct() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom-products'] })
+      queryClient.invalidateQueries({ queryKey: ['custom-products', currentStoreId] })
       toast.success('Produkt aktualisiert')
     },
     onError: (error) => {
@@ -147,6 +157,7 @@ export function useUpdateCustomProduct() {
 /** Custom Product löschen */
 export function useDeleteCustomProduct() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -158,7 +169,7 @@ export function useDeleteCustomProduct() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom-products'] })
+      queryClient.invalidateQueries({ queryKey: ['custom-products', currentStoreId] })
       toast.success('Eigenes Produkt gelöscht')
     },
     onError: (error) => {

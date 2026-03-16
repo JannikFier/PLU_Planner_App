@@ -10,23 +10,35 @@ Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
 |----------|:-----------:|:-----:|:----:|:------:|
 | PLU-Liste ansehen | ✅ | ✅ | ✅ | ✅ |
 | PDF exportieren / drucken | ✅ | ✅ | ✅ | ✅ |
-| Eigene Produkte hinzufügen (global) | ✅ | ✅ | ✅ | ❌ |
-| Produkte ausblenden (global) | ✅ | ✅ | ✅ | ❌ |
-| Produkte wieder einblenden (global) | ✅ | ✅ | ✅ | ❌ |
+| Eigene Produkte hinzufuegen (pro Markt) | ✅ | ✅ | ✅ | ❌ |
+| Produkte ausblenden (pro Markt) | ✅ | ✅ | ✅ | ❌ |
+| Produkte wieder einblenden (pro Markt) | ✅ | ✅ | ✅ | ❌ |
 | Benachrichtigungen (Glocke) | ✅ | ✅ | ✅ | ❌ |
 | **Custom Product umbenennen** | ✅ (alle) | Nur eigene | Nur eigene | ❌ |
 | **Master Product umbenennen** | ✅ | ✅ | ❌ | ❌ |
 | **Benutzerverwaltung sehen** | ✅ | ✅ | ❌ | ❌ |
-| **User/Admin/Viewer anlegen** | ✅ (Rolle wählbar) | ✅ (nur User) | ❌ | ❌ |
-| **Passwort zurücksetzen** (alle außer Super-Admin) | ✅ | ✅ | ❌ | ❌ |
-| **User/Admin/Viewer löschen** | ✅ | ✅ | ❌ | ❌ |
-| **Rollen ändern (hoch-/runterstufen)** | ✅ | ❌ | ❌ | ❌ |
-| **Excel (neue Produkte / ausblenden)** | ✅ | ❌ | ❌ | ❌ |
+| **User/Admin/Viewer anlegen** | ✅ (Rolle waehlbar) | ✅ (nur User) | ❌ | ❌ |
+| **Passwort zuruecksetzen** (alle ausser Super-Admin) | ✅ | ✅ | ❌ | ❌ |
+| **User/Admin/Viewer loeschen** | ✅ | ✅ | ❌ | ❌ |
+| **Rollen aendern (hoch-/runterstufen)** | ✅ | ❌ | ❌ | ❌ |
 | **Excel Upload / KW-Vergleich** | ✅ | ❌ | ❌ | ❌ |
 | **Layout konfigurieren** | ✅ | ❌ | ❌ | ❌ |
 | **Bezeichnungsregeln verwalten** | ✅ | ❌ | ❌ | ❌ |
-| **Warengruppen/Blöcke verwalten** | ✅ | ❌ | ❌ | ❌ |
+| **Warengruppen/Bloecke verwalten** | ✅ | ❌ | ❌ | ❌ |
 | **KW-Versionen verwalten** | ✅ | ❌ | ❌ | ❌ |
+| **Firmen/Maerkte anlegen** | ✅ | ❌ | ❌ | ❌ |
+| **Firmen/Maerkte pausieren/loeschen** | ✅ | ❌ | ❌ | ❌ |
+| **Listen-Sichtbarkeit aendern** | ✅ | ❌ | ❌ | ❌ |
+| **Markt-Zuordnung aendern** | ✅ | ❌ | ❌ | ❌ |
+| **Testmodus starten** | ✅ | ✅ | ✅ | ❌ |
+
+### Markt-Zugriff (Multi-Tenancy)
+
+- Jeder User (ausser Super-Admin) ist ueber `user_store_access` einem oder mehreren Maerkten zugeordnet
+- `is_home_store = true` markiert den Heimatmarkt
+- Super-Admin hat globalen Zugriff auf alle Maerkte (kein user_store_access noetig)
+- RLS-Policies filtern alle marktspezifischen Daten anhand des `store_id`
+- Markt-Switcher im Header ermoeglicht Wechsel zwischen freigegebenen Maerkten
 
 ### Rollen-Beschreibung
 

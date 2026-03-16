@@ -24,6 +24,14 @@ export const PERSIST_QUERY_KEY_PREFIXES: readonly string[] = [
   'offer-items',
   'bezeichnungsregeln',
   'all-profiles',
+  // Multi-Tenancy
+  'companies',
+  'stores',
+  'store-access',
+  'store-list-visibility',
+  'store-user-profiles',
+  'home-store-id',
+  'first-active-store',
   // Backshop
   'backshop-layout-settings',
   'backshop-blocks',

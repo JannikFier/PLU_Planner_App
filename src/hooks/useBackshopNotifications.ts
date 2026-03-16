@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
 import { useAuth } from '@/hooks/useAuth'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { toast } from 'sonner'
 import type { Database, BackshopMasterPLUItem } from '@/types/database'
@@ -31,9 +32,10 @@ export function useBackshopActiveVersionChangeCount() {
 /** Anzahl ungelesener Backshop-Notifications für aktuellen User */
 export function useBackshopUnreadNotificationCount() {
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
 
   return useQuery({
-    queryKey: ['backshop-notification-count'],
+    queryKey: ['backshop-notification-count', currentStoreId],
     queryFn: () =>
       withRetryOnAbort(async () => {
         if (!user) return 0
@@ -42,10 +44,11 @@ export function useBackshopUnreadNotificationCount() {
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id)
           .eq('is_read', false)
+          .eq('store_id', currentStoreId!)
         if (error) throw error
         return count ?? 0
       }),
-    enabled: !!user,
+    enabled: !!user && !!currentStoreId,
     refetchInterval: 30000,
   })
 }
@@ -54,6 +57,7 @@ export function useBackshopUnreadNotificationCount() {
 export function useBackshopMarkNotificationRead() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (versionId: string) => {
@@ -68,11 +72,12 @@ export function useBackshopMarkNotificationRead() {
         )
         .eq('user_id', user.id)
         .eq('version_id', versionId)
+        .eq('store_id', currentStoreId!)
       if (error) throw error
     },
     onSuccess: (_, versionId) => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-notification-count'] })
-      queryClient.invalidateQueries({ queryKey: ['backshop-version-notification', versionId] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-notification-count', currentStoreId] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-version-notification', versionId, currentStoreId] })
     },
     onError: (err) => {
       toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)

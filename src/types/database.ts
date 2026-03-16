@@ -4,6 +4,91 @@
 export interface Database {
   public: {
     Tables: {
+      companies: {
+        Row: {
+          id: string
+          name: string
+          logo_url: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          logo_url?: string | null
+          is_active?: boolean
+        }
+        Update: {
+          name?: string
+          logo_url?: string | null
+          is_active?: boolean
+          updated_at?: string
+        }
+      }
+      stores: {
+        Row: {
+          id: string
+          company_id: string
+          name: string
+          subdomain: string
+          logo_url: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          name: string
+          subdomain: string
+          logo_url?: string | null
+          is_active?: boolean
+        }
+        Update: {
+          company_id?: string
+          name?: string
+          subdomain?: string
+          logo_url?: string | null
+          is_active?: boolean
+          updated_at?: string
+        }
+      }
+      user_store_access: {
+        Row: {
+          id: string
+          user_id: string
+          store_id: string
+          is_home_store: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          store_id: string
+          is_home_store?: boolean
+        }
+        Update: {
+          is_home_store?: boolean
+        }
+      }
+      store_list_visibility: {
+        Row: {
+          id: string
+          store_id: string
+          list_type: string
+          is_visible: boolean
+        }
+        Insert: {
+          id?: string
+          store_id: string
+          list_type: string
+          is_visible?: boolean
+        }
+        Update: {
+          is_visible?: boolean
+        }
+      }
       profiles: {
         Row: {
           id: string
@@ -15,6 +100,7 @@ export interface Database {
           created_by: string | null
           created_at: string
           last_login: string | null
+          current_store_id: string | null
         }
         Insert: {
           id: string
@@ -26,6 +112,7 @@ export interface Database {
           created_by?: string | null
           created_at?: string
           last_login?: string | null
+          current_store_id?: string | null
         }
         Update: {
           id?: string
@@ -35,6 +122,7 @@ export interface Database {
           role?: 'super_admin' | 'admin' | 'user' | 'viewer'
           must_change_password?: boolean
           last_login?: string | null
+          current_store_id?: string | null
         }
       }
       versions: {
@@ -310,6 +398,7 @@ export interface Database {
           created_by: string
           created_at: string
           updated_at: string
+          store_id: string
         }
         Insert: {
           id?: string
@@ -319,6 +408,7 @@ export interface Database {
           preis?: number | null
           block_id?: string | null
           created_by: string
+          store_id?: string
         }
         Update: {
           name?: string
@@ -333,11 +423,13 @@ export interface Database {
           plu: string
           hidden_by: string
           created_at: string
+          store_id: string
         }
         Insert: {
           id?: string
           plu: string
           hidden_by: string
+          store_id?: string
         }
         Update: {
           plu?: string
@@ -352,6 +444,7 @@ export interface Database {
           duration_weeks: number
           created_by: string
           created_at: string
+          store_id?: string
         }
         Insert: {
           id?: string
@@ -360,6 +453,7 @@ export interface Database {
           start_jahr: number
           duration_weeks: number
           created_by: string
+          store_id?: string
         }
         Update: {
           plu?: string
@@ -376,6 +470,7 @@ export interface Database {
           is_read: boolean
           read_at: string | null
           created_at: string
+          store_id: string
         }
         Insert: {
           id?: string
@@ -383,6 +478,7 @@ export interface Database {
           version_id: string
           is_read?: boolean
           read_at?: string | null
+          store_id?: string
         }
         Update: {
           is_read?: boolean
@@ -521,6 +617,7 @@ export interface Database {
           created_by: string
           created_at: string
           updated_at: string
+          store_id: string
         }
         Insert: {
           id?: string
@@ -529,6 +626,7 @@ export interface Database {
           image_url: string
           block_id?: string | null
           created_by: string
+          store_id?: string
           created_at?: string
           updated_at?: string
         }
@@ -546,11 +644,13 @@ export interface Database {
           plu: string
           hidden_by: string
           created_at: string
+          store_id: string
         }
         Insert: {
           id?: string
           plu: string
           hidden_by: string
+          store_id?: string
           created_at?: string
         }
         Update: Record<string, never>
@@ -565,6 +665,7 @@ export interface Database {
           created_by: string | null
           created_at: string
           updated_at: string
+          store_id: string
         }
         Insert: {
           id?: string
@@ -573,6 +674,7 @@ export interface Database {
           is_manually_renamed?: boolean
           image_url?: string | null
           created_by?: string | null
+          store_id?: string
           created_at?: string
           updated_at?: string
         }
@@ -592,6 +694,7 @@ export interface Database {
           duration_weeks: number
           created_by: string
           created_at: string
+          store_id?: string
         }
         Insert: {
           id?: string
@@ -600,6 +703,7 @@ export interface Database {
           start_jahr: number
           duration_weeks: number
           created_by: string
+          store_id?: string
         }
         Update: {
           plu?: string
@@ -616,6 +720,7 @@ export interface Database {
           is_read: boolean
           read_at: string | null
           created_at: string
+          store_id: string
         }
         Insert: {
           id?: string
@@ -623,6 +728,7 @@ export interface Database {
           version_id: string
           is_read?: boolean
           read_at?: string | null
+          store_id?: string
           created_at?: string
         }
         Update: {
@@ -739,11 +845,33 @@ export interface Database {
         Args: { item_id: string; system_name: string }
         Returns: undefined
       }
+      get_user_store_ids: {
+        Args: Record<string, never>
+        Returns: string[]
+      }
+      get_current_store_id: {
+        Args: Record<string, never>
+        Returns: string | null
+      }
+      get_store_company_id: {
+        Args: { p_store_id: string }
+        Returns: string | null
+      }
+      get_home_store_subdomain: {
+        Args: { p_user_id: string }
+        Returns: string | null
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
   }
 }
+
+// Convenience Types – Multi-Tenancy
+export type Company = Database['public']['Tables']['companies']['Row']
+export type Store = Database['public']['Tables']['stores']['Row']
+export type UserStoreAccess = Database['public']['Tables']['user_store_access']['Row']
+export type StoreListVisibility = Database['public']['Tables']['store_list_visibility']['Row']
 
 // Convenience Types
 export type Profile = Database['public']['Tables']['profiles']['Row']

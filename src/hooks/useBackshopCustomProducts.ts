@@ -3,23 +3,28 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { toast } from 'sonner'
 import type { BackshopCustomProduct, Database } from '@/types/database'
 
 /** Alle Backshop-Custom-Products laden */
 export function useBackshopCustomProducts() {
+  const { currentStoreId } = useCurrentStore()
+
   return useQuery({
-    queryKey: ['backshop-custom-products'],
+    queryKey: ['backshop-custom-products', currentStoreId],
     staleTime: 2 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('backshop_custom_products')
         .select('*')
+        .eq('store_id', currentStoreId!)
         .order('name')
 
       if (error) throw error
       return (data ?? []) as BackshopCustomProduct[]
     },
+    enabled: !!currentStoreId,
   })
 }
 
@@ -27,6 +32,7 @@ export function useBackshopCustomProducts() {
 export function useAddBackshopCustomProduct() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (product: {
@@ -43,6 +49,7 @@ export function useAddBackshopCustomProduct() {
         image_url: product.image_url,
         block_id: product.block_id ?? null,
         created_by: user.id,
+        store_id: currentStoreId!,
       }
 
       const { data, error } = await supabase
@@ -55,7 +62,7 @@ export function useAddBackshopCustomProduct() {
       return data as BackshopCustomProduct
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-custom-products'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-custom-products', currentStoreId] })
       toast.success('Eigenes Produkt (Backshop) hinzugefügt')
     },
   })
@@ -64,6 +71,7 @@ export function useAddBackshopCustomProduct() {
 /** Backshop-Custom-Product aktualisieren (Name, optional image_url) */
 export function useUpdateBackshopCustomProduct() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async ({
@@ -83,7 +91,7 @@ export function useUpdateBackshopCustomProduct() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-custom-products'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-custom-products', currentStoreId] })
       toast.success('Produkt aktualisiert')
     },
     onError: (error) => {
@@ -95,6 +103,7 @@ export function useUpdateBackshopCustomProduct() {
 /** Backshop-Custom-Product löschen */
 export function useDeleteBackshopCustomProduct() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -106,7 +115,7 @@ export function useDeleteBackshopCustomProduct() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-custom-products'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-custom-products', currentStoreId] })
       toast.success('Eigenes Produkt (Backshop) gelöscht')
     },
     onError: (error) => {

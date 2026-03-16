@@ -3,35 +3,109 @@
 ## ER-Diagramm
 
 ```
+== Multi-Tenancy (Firma → Maerkte) ==
+
+companies (1:n → stores)
+    │
+    └──→ stores (1:n → user_store_access, store_list_visibility)
+             │
+             ├──→ user_store_access (n:m Zuordnung User ↔ Store)
+             └──→ store_list_visibility (welche Listen sichtbar sind)
+
 profiles (Supabase Auth + App-Daten)
     │
-    ├──→ custom_products (1:n) – Globale eigene Produkte (created_by)
-    ├──→ hidden_items (1:n) – Global ausgeblendete PLUs (hidden_by)
-    ├──→ plu_offer_items (1:n) – Werbung/Angebot (Obst/Gemüse), Laufzeit in Wochen
-    ├──→ version_notifications (1:n) – Gelesen/Ungelesen pro Version
+    ├──→ user_store_access (1:n) – User-Markt-Zuordnung (is_home_store)
+    │
+    ├──→ custom_products (1:n, pro store_id) – Eigene Produkte
+    ├──→ hidden_items (1:n, pro store_id) – Ausgeblendete PLUs
+    ├──→ plu_offer_items (1:n, pro store_id) – Werbung/Angebot (Obst/Gemuese)
+    ├──→ version_notifications (1:n, pro store_id) – Gelesen/Ungelesen pro Version
     │
     ├──→ user_overrides (1:n) – LEGACY, nicht mehr aktiv genutzt
     ├──→ notifications_queue (1:n) – LEGACY, ersetzt durch version_notifications
     │
-versions (KW-Versionen)
+versions (KW-Versionen) – NATIONAL, kein store_id
     │
-    ├──→ master_plu_items (1:n) – Alle PLU-Einträge einer Version
-    └──→ version_notifications (1:n) – Benachrichtigungen pro Version
+    ├──→ master_plu_items (1:n) – Alle PLU-Eintraege einer Version
+    └──→ version_notifications (1:n, pro store_id)
 
-layout_settings (Singleton – genau 1 Zeile)
-bezeichnungsregeln (Keyword-Regeln)
+layout_settings (Singleton) – NATIONAL
+bezeichnungsregeln (Keyword-Regeln) – NATIONAL
 
-blocks (Warengruppen/Blöcke)
+blocks (Warengruppen/Bloecke) – NATIONAL
     │
     └──→ block_rules (1:n) – Zuweisungsregeln pro Block
 
-Backshop-PLU-Liste (getrennt von Obst/Gemüse, gleiche profiles):
-backshop_versions → backshop_master_plu_items (inkl. image_url)
-                  → backshop_version_notifications
-backshop_blocks → backshop_block_rules
-backshop_custom_products, backshop_hidden_items, backshop_renamed_items (global, plu unique), backshop_offer_items (Bild Pflicht bei custom)
-backshop_layout_settings (Singleton), backshop_bezeichnungsregeln
+Backshop-PLU-Liste (getrennt von Obst/Gemuese, gleiche profiles):
+backshop_versions → backshop_master_plu_items (inkl. image_url) – NATIONAL
+                  → backshop_version_notifications (pro store_id)
+backshop_blocks → backshop_block_rules – NATIONAL
+backshop_custom_products (pro store_id), backshop_hidden_items (pro store_id)
+backshop_renamed_items (pro store_id), backshop_offer_items (pro store_id)
+backshop_layout_settings (Singleton), backshop_bezeichnungsregeln – NATIONAL
 ```
+
+## Multi-Tenancy-Tabellen
+
+### companies
+
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `id` | UUID (PK) | Firmen-ID |
+| `name` | TEXT | Firmenname (z.B. Friedrich-Tonscheit-KG) |
+| `logo_url` | TEXT | URL zum Firmenlogo |
+| `is_active` | BOOLEAN | Firma aktiv/pausiert |
+| `created_at` | TIMESTAMPTZ | Erstellt am |
+| `updated_at` | TIMESTAMPTZ | Aktualisiert am |
+
+### stores
+
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `id` | UUID (PK) | Markt-ID |
+| `company_id` | UUID (FK → companies) | Gehoert zu welcher Firma |
+| `name` | TEXT | Marktname (z.B. Angerbogen) |
+| `subdomain` | TEXT (UNIQUE) | Subdomain fuer diesen Markt |
+| `logo_url` | TEXT | URL zum Markt-Logo |
+| `is_active` | BOOLEAN | Markt aktiv/pausiert |
+
+### user_store_access
+
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `id` | UUID (PK) | Zuordnungs-ID |
+| `user_id` | UUID (FK → profiles) | Welcher User |
+| `store_id` | UUID (FK → stores) | Welcher Markt |
+| `is_home_store` | BOOLEAN | Ist das der Heimatmarkt des Users? |
+
+### store_list_visibility
+
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `id` | UUID (PK) | ID |
+| `store_id` | UUID (FK → stores) | Welcher Markt |
+| `list_type` | TEXT | `obst_gemuese` oder `backshop` |
+| `is_visible` | BOOLEAN | Liste fuer diesen Markt sichtbar? |
+
+### store_id in marktspezifischen Tabellen
+
+Folgende Tabellen haben eine `store_id`-Spalte (FK → stores, NOT NULL):
+- `custom_products`
+- `hidden_items`
+- `plu_offer_items`
+- `version_notifications`
+- `backshop_custom_products`
+- `backshop_hidden_items`
+- `backshop_offer_items`
+- `backshop_renamed_items`
+- `backshop_version_notifications`
+
+### DB-Funktionen (Multi-Tenancy)
+
+- `get_user_store_ids()` – Gibt alle Store-IDs zurueck, auf die der aktuelle User Zugriff hat
+- `get_current_store_id()` – Gibt die aktuelle Store-ID aus profiles.current_store_id zurueck
+- `get_store_company_id(p_store_id)` – Gibt die Company-ID eines Stores zurueck
+- `get_home_store_subdomain(p_user_id)` – Gibt die Subdomain des Heimatmarkts zurueck
 
 ## Tabellen im Detail
 
@@ -50,8 +124,9 @@ Erweitert Supabase Auth um App-spezifische Daten.
 | `created_by` | UUID | Wer hat diesen User angelegt |
 | `created_at` | TIMESTAMPTZ | Erstellt am |
 | `last_login` | TIMESTAMPTZ | Letzter Login |
+| `current_store_id` | UUID (FK → stores) | Aktuell aktiver Markt des Users |
 
-**Trigger:** Bei neuem Auth-User wird automatisch ein Profil erstellt (`handle_new_user()`).
+**Trigger:** Bei neuem Auth-User wird automatisch ein Profil erstellt (`handle_new_user()`). Anonyme User werden ignoriert.
 
 ### versions
 

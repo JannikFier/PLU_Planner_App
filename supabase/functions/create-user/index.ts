@@ -25,10 +25,15 @@ serve(async (req) => {
     )
 
     // Aufrufer authentifizieren
-    const authHeader = req.headers.get('Authorization')!
-    const { data: { user: caller } } = await supabaseAdmin.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
+    const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization')
+    const jwt = authHeader?.replace(/^Bearer\s+/i, '').trim()
+    if (!jwt) {
+      return new Response(
+        JSON.stringify({ error: 'Authorization-Header fehlt' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    const { data: { user: caller } } = await supabaseAdmin.auth.getUser(jwt)
 
     if (!caller) {
       return new Response(
@@ -52,7 +57,15 @@ serve(async (req) => {
     }
 
     // Request Body lesen
-    const { email, password, personalnummer, displayName, role } = await req.json()
+    const {
+      email,
+      password,
+      personalnummer,
+      displayName,
+      role,
+      home_store_id,
+      additional_store_ids,
+    } = await req.json()
 
     const emailTrimmed = typeof email === 'string' ? email.trim() : ''
     const personalnummerTrimmed = typeof personalnummer === 'string' ? personalnummer.trim() : ''
@@ -84,6 +97,48 @@ serve(async (req) => {
     // Erlaubte Rollen: user, admin, viewer (super_admin bereits oben abgefangen)
     const allowedRoles = ['user', 'admin', 'viewer'] as const
     const roleToSet = allowedRoles.includes(role) ? role : 'user'
+
+    // home_store_id ist Pflicht
+    if (!home_store_id || typeof home_store_id !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'home_store_id ist erforderlich.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const additionalStoreIds: string[] = Array.isArray(additional_store_ids)
+      ? additional_store_ids.filter((id: unknown) => typeof id === 'string')
+      : []
+
+    const allStoreIds = [home_store_id, ...additionalStoreIds]
+
+    // Stores muessen existieren und aktiv sein
+    const { data: stores, error: storesError } = await supabaseAdmin
+      .from('stores')
+      .select('id, is_active')
+      .in('id', allStoreIds)
+
+    if (storesError) {
+      return new Response(
+        JSON.stringify({ error: storesError.message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (!stores || stores.length !== allStoreIds.length) {
+      return new Response(
+        JSON.stringify({ error: 'Mindestens einer der angegebenen Märkte existiert nicht.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const inactiveStore = stores.find((s) => !s.is_active)
+    if (inactiveStore) {
+      return new Response(
+        JSON.stringify({ error: 'Mindestens einer der angegebenen Märkte ist pausiert.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Auth-E-Mail: E-Mail wenn angegeben, sonst Personalnummer@plu-planner.local
     const authEmail = emailTrimmed
@@ -117,12 +172,44 @@ serve(async (req) => {
 
     // must_change_password in profiles setzen (falls Trigger es nicht gesetzt hat)
     if (data.user) {
+      // Profil aktualisieren (created_by, must_change_password)
       await supabaseAdmin
         .from('profiles')
         .update({
           must_change_password: true,
           created_by: caller.id,
         })
+        .eq('id', data.user.id)
+
+      // user_store_access: Heimatmarkt + zusaetzliche Maerkte
+      const accessRows = [
+        {
+          user_id: data.user.id,
+          store_id: home_store_id,
+          is_home_store: true,
+        },
+        ...additionalStoreIds.map((storeId) => ({
+          user_id: data.user.id,
+          store_id: storeId,
+          is_home_store: false,
+        })),
+      ]
+
+      const { error: accessError } = await supabaseAdmin
+        .from('user_store_access')
+        .insert(accessRows)
+
+      if (accessError) {
+        return new Response(
+          JSON.stringify({ error: accessError.message }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // current_store_id im Profil auf Heimatmarkt setzen
+      await supabaseAdmin
+        .from('profiles')
+        .update({ current_store_id: home_store_id })
         .eq('id', data.user.id)
     }
 

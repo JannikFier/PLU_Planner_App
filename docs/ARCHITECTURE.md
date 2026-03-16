@@ -47,10 +47,44 @@
 7. PDF-EXPORT der personalisierten Ansicht
 ```
 
+### Multi-Tenancy-Architektur
+
+```
+Browser-URL: angerbogen.domain.de
+    │
+    ├── StoreProvider extrahiert Subdomain "angerbogen"
+    │   └── Laedt Store + Company aus DB
+    │       └── Stellt currentStoreId, storeName, companyName bereit
+    │
+    ├── Alle marktspezifischen Hooks (useCustomProducts, useHiddenItems, ...)
+    │   └── Filtern per .eq('store_id', currentStoreId)
+    │   └── QueryKeys enthalten currentStoreId fuer Cache-Isolation
+    │
+    └── Login-Seite zeigt Markt-Branding (Logo, Name)
+
+Sonderfaelle:
+  admin.domain.de    → isAdminDomain = true (Superadmin-Modus)
+  ?store=angerbogen  → Dev-Override (nur im DEV-Modus)
+  Kein Subdomain     → Root-Domain, kein Store geladen
+```
+
+### Testmodus
+
+```
+TestModeProvider (innerhalb PersistQueryClientProvider)
+    │
+    ├── enableTestMode() → Cache-Snapshot erstellen
+    ├── Mutationen werden abgefangen (kein API-Call)
+    ├── Gelbe Hinweisleiste + gelber Rahmen
+    └── disableTestMode() → Cache auf Snapshot zuruecksetzen
+```
+
 ### Auth-Flow
 
 ```
-Login-Seite (ein Eingabefeld für E-Mail ODER Personalnummer)
+Login-Seite (ein Eingabefeld fuer E-Mail ODER Personalnummer)
+    ├── Markt-Branding aus StoreContext (Logo, Name)
+    │
     ├── E-Mail erkannt → direkt signInWithPassword()
     │
     └── Personalnummer erkannt → lookup_email_by_personalnummer()
@@ -93,9 +127,12 @@ MasterList-Seite
 
 ## State Management
 
-**Grundregel: KEIN globaler Context für Daten.** Stattdessen TanStack Query für alles.
+**Grundregel: KEIN globaler Context fuer Daten.** Stattdessen TanStack Query fuer alles.
 
-**Ausnahme – Auth:** Ein `AuthProvider` (React Context) hält den Auth-State zentral. Das verhindert, dass Rollen (Admin/User) beim Navigieren zwischen Seiten kurz flackern, weil der State sonst pro Komponente neu geladen würde.
+**Ausnahmen – Contexts:**
+- `AuthProvider` – Auth-State (Session, Profil, Rolle)
+- `StoreProvider` – Markt-Kontext (currentStoreId, storeName, isAdminDomain)
+- `TestModeProvider` – Testmodus-State (isTestMode, enableTestMode, disableTestMode)
 
 ```
 Server State (Supabase DB)

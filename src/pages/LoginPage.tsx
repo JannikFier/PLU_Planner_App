@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -26,6 +27,10 @@ export function LoginPage() {
     loginWithPersonalnummer,
     requestPasswordReset,
   } = useAuth()
+
+  const { storeName, storeLogo, companyLogo, isAdminDomain, error: storeError } = useCurrentStore()
+  const brandLogo = storeLogo ?? companyLogo
+  const brandName = storeName ?? 'PLU Planner'
 
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -90,15 +95,28 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 px-4">
       <div className="w-full max-w-md">
-        {/* Logo + Titel */}
+        {/* Logo + Titel mit Markt-Branding */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground font-bold text-2xl shadow-lg">
-            PLU
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight">PLU Planner</h1>
+          {brandLogo ? (
+            <img
+              src={brandLogo}
+              alt={brandName}
+              className="mx-auto mb-4 h-16 w-auto object-contain"
+            />
+          ) : (
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground font-bold text-2xl shadow-lg">
+              PLU
+            </div>
+          )}
+          <h1 className="text-3xl font-bold tracking-tight">
+            {isAdminDomain ? 'PLU Planner' : brandName}
+          </h1>
           <p className="mt-2 text-muted-foreground">
             Melde dich an, um auf deine PLU-Listen zuzugreifen
           </p>
+          {storeError && (
+            <p className="mt-2 text-sm text-destructive">{storeError}</p>
+          )}
         </div>
 
         {/* Login Card */}

@@ -46,9 +46,9 @@ serve(async (req) => {
       .eq('id', caller.id)
       .single()
 
-    if (!callerProfile || (callerProfile.role !== 'super_admin' && callerProfile.role !== 'admin')) {
+    if (!callerProfile || callerProfile.role !== 'super_admin') {
       return new Response(
-        JSON.stringify({ error: 'Nur Super-Admins und Admins dürfen Rollen ändern.' }),
+        JSON.stringify({ error: 'Nur Super-Admins dürfen Rollen ändern.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -69,10 +69,31 @@ serve(async (req) => {
       )
     }
 
-    // Aufrufer darf sich nicht selbst runterstufen
+    // Aufrufer darf sich nicht selbst aendern
     if (userId === caller.id) {
       return new Response(
         JSON.stringify({ error: 'Sie können Ihre eigene Rolle nicht ändern.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Super-Admin-Rolle darf nicht geaendert werden
+    const { data: targetProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single()
+
+    if (!targetProfile) {
+      return new Response(
+        JSON.stringify({ error: 'Benutzer nicht gefunden.' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (targetProfile.role === 'super_admin') {
+      return new Response(
+        JSON.stringify({ error: 'Super-Admin Rolle kann nicht geändert werden.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, invokeEdgeFunction } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
@@ -43,22 +43,13 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { UserPlus, KeyRound, Loader2, Copy, Check, Users, Trash2 } from 'lucide-react'
+import { UserPlus, KeyRound, Loader2, Copy, Check, Users, Trash2, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Profile } from '@/types/database'
-import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer } from '@/lib/profile-helpers'
-
-/**
- * Generiert ein zufälliges 8-stelliges Einmalpasswort.
- */
-function generateOneTimePassword(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
-  let password = ''
-  for (let i = 0; i < 8; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return password
-}
+import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer, roleBadgeLabel, generateOneTimePassword } from '@/lib/profile-helpers'
+import { useAllStores } from '@/hooks/useStores'
+import { useStoreAccessByUser, useAddUserToStore, useRemoveUserFromStore } from '@/hooks/useStoreAccess'
+import { Checkbox } from '@/components/ui/checkbox'
 
 /**
  * Benutzerverwaltung – für Admin und Super-Admin.
@@ -85,11 +76,45 @@ export function UserManagement() {
     },
   })
 
-  // Gefilterte User: Super-Admin sieht alle, Admin sieht alle außer Super-Admin
-  const filteredUsers = users?.filter(u => {
-    if (isSuperAdmin) return true
-    return u.role !== 'super_admin'
+  // Heimatmarkt des aktuellen Users laden (fuer User-Erstellung)
+  const { data: homeStoreId } = useQuery({
+    queryKey: ['home-store-id', currentUserId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_store_access' as never)
+        .select('store_id')
+        .eq('user_id', currentUserId!)
+        .eq('is_home_store', true)
+        .single()
+
+      if (error) throw error
+      return (data as { store_id: string } | null)?.store_id ?? null
+    },
+    enabled: !!currentUserId && !isSuperAdmin,
   })
+
+  // Fuer Super-Admin: Ersten aktiven Store laden (SA hat kein user_store_access)
+  const { data: firstStoreId } = useQuery({
+    queryKey: ['first-active-store'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('stores' as never)
+        .select('id')
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single()
+
+      if (error) throw error
+      return (data as { id: string } | null)?.id ?? null
+    },
+    enabled: isSuperAdmin,
+  })
+
+  const defaultStoreId = (isSuperAdmin ? firstStoreId : homeStoreId) ?? undefined
+
+  // Super-Admin wird nie angezeigt (verwaltet global, gehoert keinem Markt)
+  const filteredUsers = users?.filter(u => u.role !== 'super_admin')
 
   // Dialog States
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -101,6 +126,14 @@ export function UserManagement() {
   const [userToDelete, setUserToDelete] = useState<Profile | null>(null)
   const [copied, setCopied] = useState(false)
 
+  // Märkte-Dialog State
+  const [storeDialogUser, setStoreDialogUser] = useState<Profile | null>(null)
+  const { data: allStores } = useAllStores()
+  const { data: userStoreAccess } = useStoreAccessByUser(storeDialogUser?.id)
+  const addUserToStore = useAddUserToStore()
+  const removeUserFromStore = useRemoveUserFromStore()
+  const userAssignedStoreIds = new Set(userStoreAccess?.map(a => a.store_id) ?? [])
+
   // Formular States für neuen User
   const [newDisplayName, setNewDisplayName] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -110,31 +143,21 @@ export function UserManagement() {
   // User erstellen
   const createUserMutation = useMutation({
     mutationFn: async () => {
-      const { data: { session: currentSession }, error: refreshError } =
-        await supabase.auth.refreshSession()
-      if (refreshError || !currentSession?.access_token) {
-        throw new Error('Nicht angemeldet oder Sitzung abgelaufen. Bitte erneut einloggen.')
+      if (!defaultStoreId) {
+        throw new Error('Standard-Markt konnte nicht geladen werden. Bitte versuche es später erneut.')
       }
 
       const oneTimePassword = generateOneTimePassword()
-
-      // Edge Function aufrufen (erstellt User über Admin API)
-      // Admin darf nur User anlegen (Rolle immer 'user'); Super-Admin wählt Rolle
       const roleToCreate = isSuperAdmin ? newRole : 'user'
-      const { data, error } = await supabase.functions.invoke('create-user', {
-        body: {
-          email: newEmail.trim() || undefined,
-          password: oneTimePassword,
-          personalnummer: newPersonalnummer.trim() || undefined,
-          displayName: newDisplayName,
-          role: roleToCreate,
-        },
-        headers: {
-          Authorization: `Bearer ${currentSession.access_token}`,
-        },
+      const data = await invokeEdgeFunction<{ user?: unknown }>('create-user', {
+        email: newEmail.trim() || undefined,
+        password: oneTimePassword,
+        personalnummer: newPersonalnummer.trim() || undefined,
+        displayName: newDisplayName,
+        role: roleToCreate,
+        home_store_id: defaultStoreId,
+        additional_store_ids: [],
       })
-      if (error) throw error
-      if (data?.error) throw new Error(data.error)
 
       return { oneTimePassword, user: data?.user }
     },
@@ -159,27 +182,8 @@ export function UserManagement() {
   // Passwort zurücksetzen
   const resetPasswordMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { data: { session: currentSession }, error: refreshError } =
-        await supabase.auth.refreshSession()
-      if (refreshError || !currentSession?.access_token) {
-        throw new Error('Nicht angemeldet oder Sitzung abgelaufen. Bitte erneut einloggen.')
-      }
-
       const oneTimePassword = generateOneTimePassword()
-
-      const { data, error } = await supabase.functions.invoke('reset-password', {
-        body: {
-          userId,
-          newPassword: oneTimePassword,
-        },
-        headers: {
-          Authorization: `Bearer ${currentSession.access_token}`,
-        },
-      })
-
-      if (error) throw error
-      if (data?.error) throw new Error(data.error)
-
+      await invokeEdgeFunction('reset-password', { userId, newPassword: oneTimePassword })
       return oneTimePassword
     },
     onSuccess: (password) => {
@@ -197,19 +201,7 @@ export function UserManagement() {
   // Benutzer löschen
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { data: { session: currentSession }, error: refreshError } =
-        await supabase.auth.refreshSession()
-      if (refreshError || !currentSession?.access_token) {
-        throw new Error('Nicht angemeldet oder Sitzung abgelaufen. Bitte erneut einloggen.')
-      }
-
-      const { data, error } = await supabase.functions.invoke('delete-user', {
-        body: { userId },
-        headers: { Authorization: `Bearer ${currentSession.access_token}` },
-      })
-
-      if (error) throw error
-      if (data?.error) throw new Error(data.error)
+      await invokeEdgeFunction('delete-user', { userId })
     },
     onSuccess: () => {
       setShowDeleteConfirmDialog(false)
@@ -255,26 +247,11 @@ export function UserManagement() {
     }
   }
 
-  const roleBadgeLabel = (role: string) => {
-    switch (role) {
-      case 'super_admin': return 'Super-Admin'
-      case 'admin': return 'Admin'
-      case 'viewer': return 'Viewer'
-      default: return 'User'
-    }
-  }
 
   // Rolle ändern (nur Super-Admin)
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, newRole }: { userId: string; newRole: 'user' | 'admin' | 'viewer' }) => {
-      const { data: { session } } = await supabase.auth.refreshSession()
-      if (!session?.access_token) throw new Error('Nicht angemeldet.')
-      const { data, error } = await supabase.functions.invoke('update-user-role', {
-        body: { userId, newRole },
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      if (error) throw error
-      if (data?.error) throw new Error(data.error)
+      await invokeEdgeFunction('update-user-role', { userId, newRole })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
@@ -288,8 +265,8 @@ export function UserManagement() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="text-2xl font-bold tracking-tight">Benutzerverwaltung</h2>
             <p className="text-muted-foreground">
               {isSuperAdmin
@@ -525,6 +502,7 @@ export function UserManagement() {
                     <TableHead>Personalnr.</TableHead>
                     <TableHead>E-Mail</TableHead>
                     <TableHead>Rolle</TableHead>
+                    <TableHead>Märkte</TableHead>
                     <TableHead className="text-right">Aktionen</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -562,10 +540,18 @@ export function UserManagement() {
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
-                        {/* Super-Admin kann nicht bearbeitet werden */}
+                      <TableCell>
                         {user.role !== 'super_admin' && (
-                          <div className="flex justify-end gap-1">
+                          <Button variant="outline" size="sm" className="gap-1"
+                            onClick={() => setStoreDialogUser(user)}
+                          >
+                            <Building2 className="h-3 w-3" /> Märkte
+                          </Button>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {user.role !== 'super_admin' && (
+                          <div className="flex flex-wrap justify-end gap-1">
                             <Button
                               variant="outline"
                               size="sm"
@@ -609,7 +595,7 @@ export function UserManagement() {
 
                   {filteredUsers?.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                         Noch keine Benutzer angelegt.
                       </TableCell>
                     </TableRow>
@@ -619,6 +605,53 @@ export function UserManagement() {
             )}
           </CardContent>
         </Card>
+
+        {/* Märkte-Zuordnung Dialog */}
+        <Dialog open={!!storeDialogUser} onOpenChange={(open) => { if (!open) setStoreDialogUser(null) }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Märkte für {storeDialogUser?.display_name || storeDialogUser?.personalnummer}</DialogTitle>
+              <DialogDescription>
+                Märkte zuweisen oder entfernen. Änderungen werden sofort gespeichert.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[320px] overflow-y-auto space-y-3 py-2">
+              {allStores?.map(store => {
+                const assigned = userAssignedStoreIds.has(store.id)
+                const isPending = addUserToStore.isPending || removeUserFromStore.isPending
+                return (
+                  <label key={store.id} className="flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer hover:bg-muted/50">
+                    <Checkbox
+                      checked={assigned}
+                      disabled={isPending}
+                      onCheckedChange={async (checked) => {
+                        if (!storeDialogUser) return
+                        if (checked) {
+                          await addUserToStore.mutateAsync({ userId: storeDialogUser.id, storeId: store.id })
+                        } else {
+                          await removeUserFromStore.mutateAsync({ userId: storeDialogUser.id, storeId: store.id })
+                        }
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{store.name}</p>
+                      <p className="text-xs text-muted-foreground">{store.subdomain}</p>
+                    </div>
+                    {!store.is_active && (
+                      <Badge variant="secondary" className="text-xs">Pausiert</Badge>
+                    )}
+                  </label>
+                )
+              })}
+              {(!allStores || allStores.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center py-4">Keine Märkte vorhanden.</p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setStoreDialogUser(null)}>Schließen</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   )

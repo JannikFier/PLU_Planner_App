@@ -1,30 +1,17 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { DashboardCard, DashboardGroupCard } from '@/components/layout/DashboardCard'
+import { DashboardCard } from '@/components/layout/DashboardCard'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
 import { BackshopNotificationDialog } from '@/components/plu/BackshopNotificationDialog'
-import { Upload, Palette, FileText, Package, ClipboardList, Plus, EyeOff, Bell, Pencil, Megaphone } from 'lucide-react'
+import { Upload, Package, Bell, ListTree } from 'lucide-react'
 import { toast } from 'sonner'
 
-const BACKSHOP_ITEMS = [
-  { title: 'Backshop-Liste', description: 'Backshop-Liste mit Bild, PLU und Name', icon: ClipboardList, to: '/super-admin/backshop-list', color: 'text-slate-600', bg: 'bg-slate-100' },
-  { title: 'Eigene Produkte (Backshop)', description: 'Eigene Backshop-Produkte mit Bild anlegen', icon: Plus, to: '/super-admin/backshop-custom-products', color: 'text-slate-600', bg: 'bg-slate-100' },
-  { title: 'Ausgeblendete (Backshop)', description: 'Ausgeblendete Backshop-Produkte einblenden', icon: EyeOff, to: '/super-admin/backshop-hidden-products', color: 'text-slate-600', bg: 'bg-slate-100' },
-  { title: 'Werbung (Backshop)', description: 'Angebote verwalten (Backshop)', icon: Megaphone, to: '/super-admin/backshop-offer-products', color: 'text-slate-600', bg: 'bg-slate-100' },
-  { title: 'Umbenannte (Backshop)', description: 'Anzeigenamen und Bilder anpassen', icon: Pencil, to: '/super-admin/backshop-renamed-products', color: 'text-slate-600', bg: 'bg-slate-100' },
-]
-const BACKSHOP_CONFIG_ITEMS = [
-  { title: 'Layout (Backshop)', description: 'Sortierung und Schriftgrößen für Backshop', icon: Palette, to: '/super-admin/backshop-layout', color: 'text-violet-600', bg: 'bg-violet-50' },
-  { title: 'Inhalt & Regeln (Backshop)', description: 'Bezeichnungsregeln und Warengruppen Backshop', icon: FileText, to: '/super-admin/backshop-rules', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-]
-const BACKSHOP_ADMIN_ITEMS = [
-  { title: 'Backshop-Versionen', description: 'KW-Versionen der Backshop-Liste verwalten', icon: Package, to: '/super-admin/backshop-versions', color: 'text-orange-600', bg: 'bg-orange-50' },
-]
-
 /**
- * Super-Admin: Bereich Backshop – alle Optionen (Upload, Benachrichtigungen, Listen, Konfiguration, Versionen).
+ * Super-Admin: Bereich Backshop – NUR globale Aktionen
+ * (Upload, Benachrichtigungen, Versionen, Warengruppen).
+ * Marktspezifische Listen/Konfiguration werden auf der Markt-Detailseite verwaltet.
  */
 export function SuperAdminBackshopBereichPage() {
   const navigate = useNavigate()
@@ -38,7 +25,7 @@ export function SuperAdminBackshopBereichPage() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800">Backshop</h2>
           <p className="text-muted-foreground">
-            Backshop-Listen, Konfiguration und Versionen.
+            Backshop-Listen hochladen, Versionen und Benachrichtigungen verwalten.
           </p>
         </div>
 
@@ -62,22 +49,21 @@ export function SuperAdminBackshopBereichPage() {
             color="text-amber-600"
             bg="bg-amber-50"
           />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <DashboardGroupCard
-            title="Backshop-Listen"
-            description="Liste, eigene und ausgeblendete Produkte"
-            items={BACKSHOP_ITEMS}
+          <DashboardCard
+            title="Backshop-Versionen"
+            description="KW-Versionen der Backshop-Liste verwalten"
+            icon={Package}
+            onClick={() => navigate('/super-admin/backshop-versions')}
+            color="text-orange-600"
+            bg="bg-orange-50"
           />
-          <DashboardGroupCard
-            title="Konfiguration (Backshop)"
-            description="Layout und Inhaltsregeln"
-            items={BACKSHOP_CONFIG_ITEMS}
-          />
-          <DashboardGroupCard
-            title="Verwaltung (Backshop)"
-            description="Backshop-Versionen"
-            items={BACKSHOP_ADMIN_ITEMS}
+          <DashboardCard
+            title="Warengruppen (global)"
+            description="Globale Warengruppen-Konfiguration für alle Märkte"
+            icon={ListTree}
+            onClick={() => navigate('/super-admin/backshop-warengruppen')}
+            color="text-violet-600"
+            bg="bg-violet-50"
           />
         </div>
       </div>

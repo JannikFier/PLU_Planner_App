@@ -301,6 +301,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             sessionStorage.removeItem(PROFILE_CACHE_KEY)
             sessionStorage.removeItem(SESSION_CACHE_KEY)
+            sessionStorage.removeItem('PLU_PLANNER_QUERY_CACHE')
           } catch {
             // ignorieren
           }
