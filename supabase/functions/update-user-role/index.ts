@@ -46,9 +46,9 @@ serve(async (req) => {
       .eq('id', caller.id)
       .single()
 
-    if (!callerProfile || callerProfile.role !== 'super_admin') {
+    if (!callerProfile || (callerProfile.role !== 'super_admin' && callerProfile.role !== 'admin')) {
       return new Response(
-        JSON.stringify({ error: 'Nur Super-Admins dürfen Rollen ändern.' }),
+        JSON.stringify({ error: 'Nur Super-Admins und Admins dürfen Rollen ändern.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -98,6 +98,24 @@ serve(async (req) => {
       )
     }
 
+    // Admin darf nur Rollen von Benutzern derselben Firma aendern (RPC braucht User-JWT fuer auth.uid())
+    if (callerProfile.role === 'admin') {
+      const supabaseUser = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_ANON_KEY')!,
+        { global: { headers: { Authorization: `Bearer ${jwt}` } } }
+      )
+      const { data: sameCompany, error: rpcError } = await supabaseUser.rpc('is_same_company_user', {
+        target_user_id: userId,
+      })
+      if (rpcError || !sameCompany) {
+        return new Response(
+          JSON.stringify({ error: 'Sie können nur Rollen von Benutzern derselben Firma ändern.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
     const { error } = await supabaseAdmin
       .from('profiles')
       .update({ role: newRole })
@@ -115,8 +133,9 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err ?? 'Unbekannter Fehler')
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: msg }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

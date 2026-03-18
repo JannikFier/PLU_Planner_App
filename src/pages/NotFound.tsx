@@ -9,10 +9,10 @@ import { useAuth } from '@/hooks/useAuth'
  */
 export function NotFound() {
   const navigate = useNavigate()
-  const { profile } = useAuth()
+  const { isSuperAdmin, isAdmin, isViewer } = useAuth()
 
   const dashboardPath =
-    profile?.role === 'super_admin' ? '/super-admin/masterlist' : profile?.role === 'admin' ? '/admin' : profile?.role === 'viewer' ? '/viewer' : '/user'
+    isSuperAdmin ? '/super-admin' : isAdmin ? '/admin' : isViewer ? '/viewer' : '/user'
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">

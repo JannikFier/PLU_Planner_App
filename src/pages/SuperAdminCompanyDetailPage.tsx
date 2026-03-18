@@ -36,7 +36,7 @@ export function SuperAdminCompanyDetailPage() {
   const { companyId } = useParams<{ companyId: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { data: companies } = useCompanies()
+  const { data: companies, isLoading: companiesLoading } = useCompanies()
   const company = companies?.find(c => c.id === companyId)
   const { data: stores, isLoading: storesLoading } = useStoresByCompany(companyId)
   const updateCompany = useUpdateCompany()
@@ -52,10 +52,21 @@ export function SuperAdminCompanyDetailPage() {
   const [newSubdomain, setNewSubdomain] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  if (!company) {
+  if (companiesLoading) {
     return (
       <DashboardLayout>
         <Skeleton className="h-32 w-full" />
+      </DashboardLayout>
+    )
+  }
+
+  if (!company) {
+    return (
+      <DashboardLayout>
+        <div className="p-6 text-center">
+          <p className="text-muted-foreground">Eintrag nicht gefunden.</p>
+          <Button variant="outline" onClick={() => navigate(-1)} className="mt-4">Zurück</Button>
+        </div>
       </DashboardLayout>
     )
   }
@@ -79,8 +90,12 @@ export function SuperAdminCompanyDetailPage() {
 
     setIsSubmitting(true)
     try {
+      if (!companyId) {
+        toast.error('Keine Firma angegeben.')
+        return
+      }
       const store = await createStore.mutateAsync({
-        companyId: companyId!,
+        companyId,
         name: newStoreName.trim(),
         subdomain: newSubdomain.trim(),
       })
@@ -93,15 +108,17 @@ export function SuperAdminCompanyDetailPage() {
   }
 
   async function handleToggleActive() {
-    await updateCompany.mutateAsync({ id: companyId!, isActive: !companyIsActive })
+    if (!companyId) return
+    await updateCompany.mutateAsync({ id: companyId, isActive: !companyIsActive })
   }
 
   async function handleDeleteCompany() {
+    if (!companyId) return
     if (deleteConfirm !== companyName) {
       toast.error('Firmenname stimmt nicht überein.')
       return
     }
-    await deleteCompany.mutateAsync(companyId!)
+    await deleteCompany.mutateAsync(companyId)
     navigate('/super-admin/companies')
   }
 
@@ -210,7 +227,8 @@ export function SuperAdminCompanyDetailPage() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowEditName(false)}>Abbrechen</Button>
               <Button onClick={async () => {
-                await updateCompany.mutateAsync({ id: companyId!, name: editName.trim() })
+                if (!companyId) return
+                await updateCompany.mutateAsync({ id: companyId, name: editName.trim() })
                 setShowEditName(false)
               }}>Speichern</Button>
             </DialogFooter>

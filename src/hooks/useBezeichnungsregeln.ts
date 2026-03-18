@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryRest } from '@/lib/supabase'
 import { applyAllRulesToItems } from '@/lib/keyword-rules'
 import type { Bezeichnungsregel, Database, MasterPLUItem } from '@/types/database'
 
@@ -20,13 +20,11 @@ export function useBezeichnungsregeln() {
     queryKey: ['bezeichnungsregeln'],
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('bezeichnungsregeln')
-        .select('*')
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-      return (data ?? []) as Bezeichnungsregel[]
+      const data = await queryRest<Bezeichnungsregel[]>('bezeichnungsregeln', {
+        select: '*',
+        order: 'created_at.asc',
+      })
+      return data ?? []
     },
   })
 }

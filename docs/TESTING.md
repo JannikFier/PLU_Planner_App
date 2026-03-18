@@ -45,11 +45,37 @@ User-Journeys (Login, Navigation, Rollen-Redirects) werden mit **Playwright** in
 - **Smoke:** Login-Seite lädt, Root und geschützte Routen leiten zu `/login` um.
 - **Journey-Tests:** Pro Rolle (Viewer, User, Admin, Super-Admin) Login und Hauptseiten; fehlende Berechtigung führt zu Redirect.
 
+### Abgedeckte Flows (Stand)
+
+| Rolle | Getestet |
+|-------|----------|
+| **Smoke** | Login-Seite, Redirects (/, /user → /login) |
+| **Viewer** | Login → Dashboard → PLU-Liste Obst/Backshop öffnen, kein /admin |
+| **User** | Login → Dashboard → Masterliste, Backshop-Liste, PDF-Button, Eigene, Ausgeblendete, Werbung, Umbenannte, Backshop-Seiten, kein /super-admin |
+| **Admin** | Login → Dashboard → Masterliste, Benutzerverwaltung, Neuer-Benutzer-Button, alle User-Seiten, Backshop-Seiten, kein /super-admin |
+| **Super-Admin** | Login → Dashboard → Upload, Obst/Backshop-Bereich, Benutzerverwaltung, **alle** Super-Admin-Seiten (PLU-Upload, Masterliste, Layout, Regeln, Block-Sort, Versionen, Firmen & Märkte, alle Obst- und Backshop-Seiten) |
+
+**Super-Admin-Tests** laufen nur, wenn `E2E_SUPER_ADMIN_EMAIL` und `E2E_SUPER_ADMIN_PASSWORD` in `.env.e2e` gesetzt sind.
+
+**Nicht automatisiert:** Excel-Upload, Benutzer anlegen, Layout-Änderungen, PDF-Inhalt prüfen.
+
+### Zwei Stufen
+
+| Befehl | Was läuft | Wann |
+|--------|-----------|------|
+| `npm run test:e2e` | Nur **@smoke** (Login, Redirects) | Schnell, vor jedem Commit, ohne .env.e2e |
+| `npm run test:e2e:full` | **Alle** Tests (inkl. Journeys mit Login) | Vor Publish, braucht .env.e2e |
+
+**Vor dem Publish:** `npm run test:e2e:full` ausführen – alle Tests müssen grün sein.
+
 ### Ausführung
 
 ```bash
-# Dev-Server starten (in einem Terminal), dann in anderem Terminal:
+# Standard (schnell, ohne Credentials):
 npm run test:e2e
+
+# Vollständig (vor Publish, braucht .env.e2e):
+npm run test:e2e:full
 
 # Mit UI (empfohlen zum Debuggen):
 npm run test:e2e:ui
@@ -63,7 +89,9 @@ Die Journey-Tests (viewer, user, admin, super_admin) benötigen echte Supabase-A
 
 1. `.env.e2e.example` nach `.env.e2e` kopieren.
 2. Werte eintragen (E-Mail + Passwort pro Rolle). `.env.e2e` ist in `.gitignore` und wird nicht committet.
-3. Entweder: Dediziertes Supabase-Test-Projekt mit Test-Usern anlegen, oder Staging-Projekt mit Test-Accounts nutzen.
+3. **Empfohlen:** Test-User über die App (Benutzerverwaltung) anlegen – Markt-Zuweisung und Berechtigungen sind dann korrekt.
+
+**User direkt in Supabase anlegen:** Wenn du „Add user“ im Supabase Dashboard nutzt, muss **User Metadata** gesetzt werden, sonst schlägt die Erstellung mit „Database error creating new user“ fehl (personalnummer ist UNIQUE, Standardwert `""` kollidiert bei mehreren Usern). Beispiel: `{"personalnummer": "e2e-admin-1", "role": "admin"}`. Super-Admin: Nach Erstellung in `profiles` die Spalte `role` auf `super_admin` setzen.
 
 Details und manuelle Checkliste vor Release: [TEST_UND_RELEASE.md](TEST_UND_RELEASE.md).
 

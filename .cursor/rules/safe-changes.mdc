@@ -1,0 +1,28 @@
+---
+description: Sichere Änderungen – Vermeidung von Nebenwirkungen bei Bugfixes und Optimierungen
+alwaysApply: true
+---
+
+# Sichere Änderungen – Vermeidung von Nebenwirkungen
+
+## Vor jeder Änderung
+
+1. **Problem genau eingrenzen:** Was genau ist das Problem? Wo tritt es auf?
+2. **Abhängigkeiten erfassen:** Welche Teile der App hängen davon ab? Was könnte betroffen sein?
+3. **Minimale Lösung wählen:** Was ist die kleinste Änderung, die das Problem löst?
+
+## Bevorzugte Reihenfolge
+
+1. **Additiv vor modifikativ:** Neue Logik hinzufügen statt bestehende ändern.
+2. **Eine Sache pro Änderung:** Keine Kombination mehrerer Fixes in einem Schritt.
+3. **Nach jeder Änderung testen:** Reload, Navigation, betroffene Flows prüfen.
+
+## Checkliste vor dem Abschluss
+
+- [ ] `npm run build` läuft ohne Fehler
+- [ ] Reload auf der betroffenen Seite getestet
+- [ ] Keine neuen Fehler in der Konsole
+- [ ] Bestehende Funktionen (Login, Marktwechsel, PLU-Liste) weiterhin korrekt
+- [ ] User-Erstellung (Admin/Super-Admin) funktioniert
+- [ ] Reload auf geschützten Seiten (MasterList, UserManagement)
+- [ ] Logout und erneuter Login

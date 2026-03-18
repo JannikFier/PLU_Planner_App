@@ -39,8 +39,8 @@ import { useBlocks } from '@/hooks/useBlocks'
 import { useCustomProducts } from '@/hooks/useCustomProducts'
 import { useHiddenItems } from '@/hooks/useHiddenItems'
 import { useOfferItems } from '@/hooks/useOfferItems'
+import { useRenamedItems } from '@/hooks/useRenamedItems'
 import { useBezeichnungsregeln } from '@/hooks/useBezeichnungsregeln'
-import { useAuth } from '@/hooks/useAuth'
 // Layout-Engine + Helpers
 import { buildDisplayList } from '@/lib/layout-engine'
 import type { PLUStats } from '@/lib/plu-helpers'
@@ -66,7 +66,6 @@ export function MasterList({ mode }: MasterListProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
-  const { isAdmin } = useAuth()
   // Prefix aus aktueller URL (nicht aus Rolle), damit Super-Admin in User-Ansicht dort bleibt
   const rolePrefix =
     location.pathname.startsWith('/super-admin') ? '/super-admin'
@@ -82,6 +81,7 @@ export function MasterList({ mode }: MasterListProps) {
   const { data: customProducts = [] } = useCustomProducts()
   const { data: hiddenItems = [] } = useHiddenItems()
   const { data: offerItems = [] } = useOfferItems()
+  const { data: renamedItems = [] } = useRenamedItems()
   const { data: regeln = [] } = useBezeichnungsregeln()
 
   const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
@@ -145,6 +145,7 @@ export function MasterList({ mode }: MasterListProps) {
       customProducts,
       hiddenPLUs: new Set(hiddenItems.map((h) => h.plu)),
       offerPLUs,
+      renamedItems: renamedItems.map((r) => ({ plu: r.plu, display_name: r.display_name, is_manually_renamed: r.is_manually_renamed })),
       bezeichnungsregeln: activeRegeln,
       blocks,
       sortMode,
@@ -168,7 +169,7 @@ export function MasterList({ mode }: MasterListProps) {
     }
 
     return { displayItems: result.items, stats: pluStats }
-  }, [rawItems, customProducts, hiddenItems, offerPLUs, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion, selectedVersionId, versions])
+  }, [rawItems, customProducts, hiddenItems, offerPLUs, renamedItems, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion, selectedVersionId, versions])
 
   // Aktuelle Version finden (für Anzeige im Header)
   const currentVersion = useMemo(
@@ -194,6 +195,7 @@ export function MasterList({ mode }: MasterListProps) {
       customProducts,
       hiddenPLUs: new Set(hiddenItems.map((h) => h.plu)),
       offerPLUs,
+      renamedItems: renamedItems.map((r) => ({ plu: r.plu, display_name: r.display_name, is_manually_renamed: r.is_manually_renamed })),
       bezeichnungsregeln: activeRegeln,
       blocks,
       sortMode,
@@ -216,7 +218,7 @@ export function MasterList({ mode }: MasterListProps) {
         customCount: result.stats.customCount,
       } as PLUStats,
     }
-  }, [pdfRawItems, customProducts, hiddenItems, offerPLUs, regeln, blocks, layoutSettings, sortMode, displayMode, pdfVersion, activeVersion])
+  }, [pdfRawItems, customProducts, hiddenItems, offerPLUs, renamedItems, regeln, blocks, layoutSettings, sortMode, displayMode, pdfVersion, activeVersion])
 
   // Loading-State
   const isLoading = versionLoading || versionsLoading || itemsLoading
@@ -321,7 +323,10 @@ export function MasterList({ mode }: MasterListProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate(`${rolePrefix}/custom-products`)}
+                  onClick={() => {
+                    const backTo = location.pathname + location.search
+                    navigate(`${rolePrefix}/custom-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                  }}
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   Eigene Produkte
@@ -329,7 +334,10 @@ export function MasterList({ mode }: MasterListProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate(`${rolePrefix}/hidden-products`)}
+                  onClick={() => {
+                    const backTo = location.pathname + location.search
+                    navigate(`${rolePrefix}/hidden-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                  }}
                 >
                   <EyeOff className="h-4 w-4 mr-1" />
                   Ausgeblendete
@@ -337,18 +345,24 @@ export function MasterList({ mode }: MasterListProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate(`${rolePrefix}/offer-products`)}
+                  onClick={() => {
+                    const backTo = location.pathname + location.search
+                    navigate(`${rolePrefix}/offer-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                  }}
                 >
                   <Megaphone className="h-4 w-4 mr-1" />
                   Werbung
                 </Button>
               </>
             )}
-            {(mode === 'admin' || (mode === 'user' && isAdmin)) && (
+            {mode !== 'viewer' && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(`${rolePrefix}/renamed-products`)}
+                onClick={() => {
+                  const backTo = location.pathname + location.search
+                  navigate(`${rolePrefix}/renamed-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                }}
               >
                 <Pencil className="h-4 w-4 mr-1" />
                 Umbenennen

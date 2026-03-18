@@ -5,21 +5,22 @@
 
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { Loader2 } from 'lucide-react'
+import { LoadingSkeleton } from '@/components/layout/ProtectedRoute'
 
 export function HomeRedirect() {
-  const { user, isLoading, isSuperAdmin, isAdmin, isViewer } = useAuth()
+  const { user, profile, isLoading, isSuperAdmin, isAdmin, isViewer } = useAuth()
 
   if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+    return <LoadingSkeleton />
   }
 
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+
+  // Profil muss geladen sein, sonst falscher Redirect (z.B. Admin landet in /user)
+  if (!profile) {
+    return <LoadingSkeleton />
   }
 
   if (isSuperAdmin) return <Navigate to="/super-admin" replace />

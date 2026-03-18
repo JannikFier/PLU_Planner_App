@@ -1,7 +1,7 @@
 // Benachrichtigungen: Version-Notifications (gelesen/ungelesen)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryRest, queryRestCount } from '@/lib/supabase'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
@@ -17,15 +17,14 @@ export function useActiveVersionChangeCount() {
     queryKey: ['active-version-change-count', activeVersion?.id],
     queryFn: async () => {
       if (!activeVersion?.id) return 0
-      const { count, error } = await supabase
-        .from('master_plu_items')
-        .select('*', { count: 'exact', head: true })
-        .eq('version_id', activeVersion.id)
-        .in('status', ['NEW_PRODUCT_YELLOW', 'PLU_CHANGED_RED'])
-      if (error) throw error
-      return count ?? 0
+      return queryRestCount('master_plu_items', {
+        select: '*',
+        version_id: `eq.${activeVersion.id}`,
+        status: 'in.(NEW_PRODUCT_YELLOW,PLU_CHANGED_RED)',
+      })
     },
     enabled: !!activeVersion?.id,
+    staleTime: 30 * 1000,
   })
 }
 
@@ -39,18 +38,19 @@ export function useVersionNotification(versionId: string | undefined) {
     queryFn: async () => {
       if (!user || !versionId) return null
 
-      const { data, error } = await supabase
-        .from('version_notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('version_id', versionId)
-        .eq('store_id', currentStoreId!)
-        .maybeSingle()
-
-      if (error) throw error
-      return (data ?? null) as VersionNotification | null
+      if (!currentStoreId) return null
+      const data = await queryRest<VersionNotification[]>('version_notifications', {
+        select: '*',
+        user_id: `eq.${user.id}`,
+        version_id: `eq.${versionId}`,
+        store_id: `eq.${currentStoreId}`,
+        limit: '1',
+      })
+      const arr = Array.isArray(data) ? data : []
+      return (arr[0] ?? null) as VersionNotification | null
     },
     enabled: !!user && !!versionId && !!currentStoreId,
+    staleTime: 30 * 1000,
   })
 }
 
@@ -63,18 +63,17 @@ export function useUnreadNotificationCount() {
     queryKey: ['notification-count', currentStoreId],
     queryFn: () =>
       withRetryOnAbort(async () => {
-        if (!user) return 0
-        const { count, error } = await supabase
-          .from('version_notifications')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('is_read', false)
-          .eq('store_id', currentStoreId!)
-        if (error) throw error
-        return count ?? 0
+        if (!user || !currentStoreId) return 0
+        return queryRestCount('version_notifications', {
+          select: '*',
+          user_id: `eq.${user.id}`,
+          is_read: 'eq.false',
+          store_id: `eq.${currentStoreId}`,
+        })
       }),
     enabled: !!user && !!currentStoreId,
     refetchInterval: 30000,
+    staleTime: 30 * 1000,
   })
 }
 
@@ -87,6 +86,7 @@ export function useMarkNotificationRead() {
   return useMutation({
     mutationFn: async (versionId: string) => {
       if (!user) throw new Error('Nicht eingeloggt')
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
 
       const { error } = await supabase
         .from('version_notifications')
@@ -98,7 +98,7 @@ export function useMarkNotificationRead() {
       )
         .eq('user_id', user.id)
         .eq('version_id', versionId)
-        .eq('store_id', currentStoreId!)
+        .eq('store_id', currentStoreId)
 
       if (error) throw error
     },
@@ -121,27 +121,18 @@ export function useUnreadNotifications() {
     queryKey: ['unread-notifications', currentStoreId],
     queryFn: () =>
       withRetryOnAbort(async () => {
-        if (!user) return []
-        const { data, error } = await supabase
-          .from('version_notifications')
-          .select(`
-            *,
-            versions:version_id (
-              id,
-              kw_nummer,
-              jahr,
-              kw_label,
-              status
-            )
-          `)
-          .eq('user_id', user.id)
-          .eq('is_read', false)
-          .eq('store_id', currentStoreId!)
-          .order('created_at', { ascending: false })
-        if (error) throw error
-        return data ?? []
+        if (!user || !currentStoreId) return []
+        const data = await queryRest<unknown[]>('version_notifications', {
+          select: '*,versions:version_id(id,kw_nummer,jahr,kw_label,status)',
+          user_id: `eq.${user.id}`,
+          is_read: 'eq.false',
+          store_id: `eq.${currentStoreId}`,
+          order: 'created_at.desc',
+        })
+        return Array.isArray(data) ? data : []
       }),
     enabled: !!user && !!currentStoreId,
+    staleTime: 30 * 1000,
   })
 }
 
@@ -152,17 +143,16 @@ export function useNewProducts(versionId: string | undefined) {
     queryFn: async () => {
       if (!versionId) return []
 
-      const { data, error } = await supabase
-        .from('master_plu_items')
-        .select('*')
-        .eq('version_id', versionId)
-        .eq('status', 'NEW_PRODUCT_YELLOW')
-        .order('system_name')
-
-      if (error) throw error
-      return (data ?? []) as MasterPLUItem[]
+      const data = await queryRest<MasterPLUItem[]>('master_plu_items', {
+        select: '*',
+        version_id: `eq.${versionId}`,
+        status: 'eq.NEW_PRODUCT_YELLOW',
+        order: 'system_name.asc',
+      })
+      return data ?? []
     },
     enabled: !!versionId,
+    staleTime: 30 * 1000,
   })
 }
 
@@ -173,16 +163,15 @@ export function useChangedProducts(versionId: string | undefined) {
     queryFn: async () => {
       if (!versionId) return []
 
-      const { data, error } = await supabase
-        .from('master_plu_items')
-        .select('*')
-        .eq('version_id', versionId)
-        .eq('status', 'PLU_CHANGED_RED')
-        .order('system_name')
-
-      if (error) throw error
-      return (data ?? []) as MasterPLUItem[]
+      const data = await queryRest<MasterPLUItem[]>('master_plu_items', {
+        select: '*',
+        version_id: `eq.${versionId}`,
+        status: 'eq.PLU_CHANGED_RED',
+        order: 'system_name.asc',
+      })
+      return data ?? []
     },
     enabled: !!versionId,
+    staleTime: 30 * 1000,
   })
 }

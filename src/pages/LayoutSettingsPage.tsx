@@ -45,6 +45,11 @@ export function LayoutSettingsPage() {
     features_keyword_rules: true,
   })
 
+  // Separater visueller State fuer Font-Inputs (String, damit Feld frei editierbar ist)
+  const [headerText, setHeaderText] = useState(String(form.font_header_px))
+  const [columnText, setColumnText] = useState(String(form.font_column_px))
+  const [productText, setProductText] = useState(String(form.font_product_px))
+
   // Speicher-Status für die Anzeige
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
 
@@ -53,24 +58,34 @@ export function LayoutSettingsPage() {
   // Nur ein Save gleichzeitig (verhindert hängende parallele Supabase-Calls)
   const saveInProgressRef = useRef(false)
   const pendingFormRef = useRef<typeof form | null>(null)
+  // Letzte Form-Werte für Flush beim Unmount (Debounce würde sonst verworfen)
+  const pendingSaveFormRef = useRef<typeof form | null>(null)
 
-  // Formular mit DB-Werten initialisieren
+  // Formular mit DB-Werten initialisieren (nur beim ersten Laden aus der DB)
+  const settingsSyncedId = useRef<string | null>(null)
   useEffect(() => {
-    if (settings) {
+    if (settings && settingsSyncedId.current !== settings.id) {
+      settingsSyncedId.current = settings.id
+      const hdr = settings.font_header_px ?? 24
+      const col = settings.font_column_px ?? 16
+      const prod = settings.font_product_px ?? 12
       setForm({
-        sort_mode: settings.sort_mode,
-        display_mode: settings.display_mode,
-        flow_direction: settings.flow_direction,
-        font_header_px: settings.font_header_px,
-        font_column_px: settings.font_column_px,
-        font_product_px: settings.font_product_px,
-        mark_red_kw_count: settings.mark_red_kw_count,
-        mark_yellow_kw_count: settings.mark_yellow_kw_count,
-        features_custom_products: settings.features_custom_products,
-        features_hidden_items: settings.features_hidden_items,
-        features_blocks: settings.features_blocks,
-        features_keyword_rules: settings.features_keyword_rules,
+        sort_mode: settings.sort_mode ?? 'ALPHABETICAL',
+        display_mode: settings.display_mode ?? 'MIXED',
+        flow_direction: settings.flow_direction ?? 'ROW_BY_ROW',
+        font_header_px: hdr,
+        font_column_px: col,
+        font_product_px: prod,
+        mark_red_kw_count: [1, 2, 3, 4].includes(Number(settings.mark_red_kw_count)) ? settings.mark_red_kw_count : 2,
+        mark_yellow_kw_count: [1, 2, 3, 4].includes(Number(settings.mark_yellow_kw_count)) ? settings.mark_yellow_kw_count : 3,
+        features_custom_products: settings.features_custom_products ?? true,
+        features_hidden_items: settings.features_hidden_items ?? true,
+        features_blocks: settings.features_blocks ?? true,
+        features_keyword_rules: settings.features_keyword_rules ?? true,
       })
+      setHeaderText(String(hdr))
+      setColumnText(String(col))
+      setProductText(String(prod))
       // Kleine Verzögerung damit der initiale setForm nicht gleich Auto-Save auslöst
       const timeoutId = setTimeout(() => {
         isInitialized.current = true
@@ -79,7 +94,7 @@ export function LayoutSettingsPage() {
     }
   }, [settings])
 
-  // Auto-Save mit 500ms Debounce
+  // Auto-Save mit 500ms Debounce (fuer Radio-Buttons, Switches, Selects)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const autoSave = useCallback(
     (newForm: typeof form) => {
@@ -88,38 +103,39 @@ export function LayoutSettingsPage() {
       setSaveStatus('saving')
       if (debounceRef.current) clearTimeout(debounceRef.current)
 
-      debounceRef.current = setTimeout(async () => {
+      pendingSaveFormRef.current = newForm
+      debounceRef.current = setTimeout(() => {
+        pendingSaveFormRef.current = null
         if (saveInProgressRef.current) {
           pendingFormRef.current = newForm
           return
         }
         saveInProgressRef.current = true
-        try {
-          await updateMutation.mutateAsync(newForm)
-          setSaveStatus('saved')
-          setTimeout(() => setSaveStatus('idle'), 2000)
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : 'Fehler beim Speichern')
-          setSaveStatus('idle')
-        } finally {
-          saveInProgressRef.current = false
-          const pending = pendingFormRef.current
-          pendingFormRef.current = null
-          if (pending) {
-            setSaveStatus('saving')
-            saveInProgressRef.current = true
-            try {
-              await updateMutation.mutateAsync(pending)
-              setSaveStatus('saved')
-              setTimeout(() => setSaveStatus('idle'), 2000)
-            } catch {
-              toast.error('Fehler beim Speichern')
+        setSaveStatus('saving')
+
+        const runSave = (formToSave: typeof form) => {
+          updateMutation.mutate(formToSave, {
+            onError: (err) => {
+              toast.error(err instanceof Error ? err.message : 'Fehler beim Speichern')
               setSaveStatus('idle')
-            } finally {
+            },
+            onSettled: () => {
               saveInProgressRef.current = false
-            }
-          }
+              const pending = pendingFormRef.current
+              pendingFormRef.current = null
+              if (pending) {
+                saveInProgressRef.current = true
+                setSaveStatus('saving')
+                runSave(pending)
+              }
+            },
+          })
+          // Sofort „Gespeichert“ anzeigen – Speicherung läuft im Hintergrund (optimistisch)
+          setSaveStatus('saved')
+          setTimeout(() => setSaveStatus('idle'), 3000)
         }
+
+        runSave(newForm)
       }, 500)
     },
     [updateMutation],
@@ -135,6 +151,25 @@ export function LayoutSettingsPage() {
       })
     },
     [autoSave],
+  )
+
+  // Stabile Ref fuer die Mutation-Funktion (verhindert Effect-Re-Execution bei jedem Render)
+  const mutateRef = useRef(updateMutation.mutate)
+  mutateRef.current = updateMutation.mutate
+
+  // Beim Unmount: ausstehende Speicherung sofort ausführen (sonst geht sie verloren)
+  useEffect(
+    () => () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+        debounceRef.current = null
+      }
+      const toSave = pendingSaveFormRef.current
+      if (toSave && isInitialized.current && !saveInProgressRef.current) {
+        mutateRef.current(toSave)
+      }
+    },
+    [],
   )
 
   // Tab wurde sichtbar: Browser throttelt Hintergrund-Tabs – Re-Render erzwingen
@@ -250,15 +285,15 @@ export function LayoutSettingsPage() {
                     <Input
                       type="number"
                       min={10}
-                      max={48}
-                      value={form.font_header_px}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value)
-                        if (!isNaN(v) && v > 0) updateForm({ font_header_px: v })
-                      }}
-                      onBlur={(e) => {
-                        const v = parseInt(e.target.value)
-                        if (isNaN(v) || v < 10) updateForm({ font_header_px: 24 })
+                      max={50}
+                      placeholder="24"
+                      value={headerText}
+                      onChange={(e) => setHeaderText(e.target.value)}
+                      onBlur={() => {
+                        const v = parseInt(headerText, 10)
+                        const normalized = isNaN(v) || v < 10 ? 24 : Math.min(50, v)
+                        setHeaderText(String(normalized))
+                        updateForm({ font_header_px: normalized })
                       }}
                     />
                   </div>
@@ -267,15 +302,15 @@ export function LayoutSettingsPage() {
                     <Input
                       type="number"
                       min={8}
-                      max={36}
-                      value={form.font_column_px}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value)
-                        if (!isNaN(v) && v > 0) updateForm({ font_column_px: v })
-                      }}
-                      onBlur={(e) => {
-                        const v = parseInt(e.target.value)
-                        if (isNaN(v) || v < 8) updateForm({ font_column_px: 16 })
+                      max={48}
+                      placeholder="16"
+                      value={columnText}
+                      onChange={(e) => setColumnText(e.target.value)}
+                      onBlur={() => {
+                        const v = parseInt(columnText, 10)
+                        const normalized = isNaN(v) || v < 8 ? 16 : Math.min(48, v)
+                        setColumnText(String(normalized))
+                        updateForm({ font_column_px: normalized })
                       }}
                     />
                   </div>
@@ -285,14 +320,14 @@ export function LayoutSettingsPage() {
                       type="number"
                       min={6}
                       max={24}
-                      value={form.font_product_px}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value)
-                        if (!isNaN(v) && v > 0) updateForm({ font_product_px: v })
-                      }}
-                      onBlur={(e) => {
-                        const v = parseInt(e.target.value)
-                        if (isNaN(v) || v < 6) updateForm({ font_product_px: 12 })
+                      placeholder="12"
+                      value={productText}
+                      onChange={(e) => setProductText(e.target.value)}
+                      onBlur={() => {
+                        const v = parseInt(productText, 10)
+                        const normalized = isNaN(v) || v < 6 ? 12 : Math.min(24, v)
+                        setProductText(String(normalized))
+                        updateForm({ font_product_px: normalized })
                       }}
                     />
                   </div>
@@ -313,8 +348,8 @@ export function LayoutSettingsPage() {
                   <div className="space-y-2">
                     <Label>Rot (PLU geändert)</Label>
                     <Select
-                      value={String(form.mark_red_kw_count)}
-                      onValueChange={(v) => updateForm({ mark_red_kw_count: parseInt(v) })}
+                      value={String([1, 2, 3, 4].includes(form.mark_red_kw_count) ? form.mark_red_kw_count : 2)}
+                      onValueChange={(v) => updateForm({ mark_red_kw_count: parseInt(v, 10) })}
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -327,8 +362,8 @@ export function LayoutSettingsPage() {
                   <div className="space-y-2">
                     <Label>Gelb (Neues Produkt)</Label>
                     <Select
-                      value={String(form.mark_yellow_kw_count)}
-                      onValueChange={(v) => updateForm({ mark_yellow_kw_count: parseInt(v) })}
+                      value={String([1, 2, 3, 4].includes(form.mark_yellow_kw_count) ? form.mark_yellow_kw_count : 3)}
+                      onValueChange={(v) => updateForm({ mark_yellow_kw_count: parseInt(v, 10) })}
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -367,14 +402,14 @@ export function LayoutSettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Auto-Save Statusanzeige */}
+            {/* Auto-Save Statusanzeige – sichtbar bis Speicherung abgeschlossen */}
             {saveStatus !== 'idle' && (
-              <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center justify-end gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
                 {saveStatus === 'saving' && (
-                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Speichert...</>
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Speichert...</>
                 )}
                 {saveStatus === 'saved' && (
-                  <><Check className="h-3.5 w-3.5 text-green-600" /> Gespeichert</>
+                  <><Check className="h-4 w-4 text-green-600" /> Gespeichert</>
                 )}
               </div>
             )}

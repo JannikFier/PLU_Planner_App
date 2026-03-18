@@ -1,69 +1,95 @@
 import { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
+import { useAuth } from '@/hooks/useAuth'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { DashboardCard } from '@/components/layout/DashboardCard'
 import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
-import { ClipboardList, Users, Layers, EyeOff, Pencil } from 'lucide-react'
+import { useUserListVisibility } from '@/hooks/useStoreListVisibility'
+import { ClipboardList, Users } from 'lucide-react'
 
 /**
  * Admin Dashboard – Startseite für Admins (z.B. Abteilungsleiter).
- * PLU-Liste, Benutzerverwaltung. Benachrichtigungen über die Glocke oben rechts.
- * Eigene/Ausgeblendete Produkte über die Masterliste erreichbar.
+ * Zeigt nur die Bereiche, die für den Admin freigeschaltet sind.
  */
 export function AdminDashboard() {
   const navigate = useNavigate()
+  const { isSuperAdmin } = useAuth()
+  const { currentStoreId } = useCurrentStore()
   usePrefetchForNavigation()
 
-  const cards = useMemo(() => [
-    {
-      title: 'PLU-Liste Obst/Gemüse',
-      description: 'Aktuelle PLU-Liste anzeigen und exportieren',
-      icon: ClipboardList,
-      onClick: () => navigate('/admin/masterlist'),
-      color: 'text-primary',
-      bg: 'bg-primary/10',
-    },
-    {
-      title: 'PLU-Liste Backshop',
-      description: 'Backshop-Liste mit Bild, PLU und Name',
-      icon: ClipboardList,
-      onClick: () => navigate('/admin/backshop-list'),
-      color: 'text-slate-600',
-      bg: 'bg-slate-100',
-    },
-    {
-      title: 'Eigene Produkte (Backshop)',
-      description: 'Eigene Backshop-Produkte mit Bild anlegen und verwalten',
-      icon: Layers,
-      onClick: () => navigate('/admin/backshop-custom-products'),
-      color: 'text-slate-600',
-      bg: 'bg-slate-100',
-    },
-    {
-      title: 'Ausgeblendete Produkte (Backshop)',
-      description: 'Ausgeblendete Backshop-Produkte einblenden',
-      icon: EyeOff,
-      onClick: () => navigate('/admin/backshop-hidden-products'),
-      color: 'text-slate-600',
-      bg: 'bg-slate-100',
-    },
-    {
-      title: 'Umbenannte Produkte (Backshop)',
-      description: 'Anzeigenamen und Bilder in der Backshop-Liste anpassen',
-      icon: Pencil,
-      onClick: () => navigate('/admin/backshop-renamed-products'),
-      color: 'text-slate-600',
-      bg: 'bg-slate-100',
-    },
-    {
+  const { data: visibility, isLoading: visibilityLoading } = useUserListVisibility()
+  const obstVisible = visibility?.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
+  const backshopVisible = visibility?.find(v => v.list_type === 'backshop')?.is_visible ?? true
+
+  const cards = useMemo(() => {
+    const result: {
+      title: string
+      description: string
+      icon: typeof ClipboardList
+      onClick: () => void
+      color: string
+      bg: string
+    }[] = []
+
+    if (obstVisible) {
+      result.push({
+        title: 'PLU-Liste Obst/Gemüse',
+        description: 'Aktuelle PLU-Liste anzeigen und exportieren',
+        icon: ClipboardList,
+        onClick: () => navigate('/admin/masterlist'),
+        color: 'text-primary',
+        bg: 'bg-primary/10',
+      })
+    }
+
+    if (backshopVisible) {
+      result.push({
+        title: 'PLU-Liste Backshop',
+        description: 'Backshop-Liste mit Bild, PLU und Name',
+        icon: ClipboardList,
+        onClick: () => navigate('/admin/backshop-list'),
+        color: 'text-slate-600',
+        bg: 'bg-slate-100',
+      })
+    }
+
+    result.push({
       title: 'Benutzerverwaltung',
       description: 'Personal anlegen und Passwörter zurücksetzen',
       icon: Users,
       onClick: () => navigate('/admin/users'),
       color: 'text-sky-600',
       bg: 'bg-sky-50',
-    },
-  ], [navigate])
+    })
+
+    return result
+  }, [navigate, obstVisible, backshopVisible])
+
+  // Super-Admin gehoert auf /super-admin (Schutz-Redirect bei falschem Routing)
+  if (isSuperAdmin) {
+    return <Navigate to="/super-admin" replace />
+  }
+
+  if (!currentStoreId) {
+    return (
+      <DashboardLayout>
+        <div className="p-6 text-center">
+          <p className="text-muted-foreground">Kein Markt zugewiesen. Bitte wende dich an deinen Administrator.</p>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (visibilityLoading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="animate-pulse bg-muted h-32 rounded-lg" />
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   return (
     <DashboardLayout>

@@ -1,7 +1,7 @@
 // Backshop Custom Products: Eigene Produkte Backshop (Bild Pflicht)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryRest, isTestModeActive } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { toast } from 'sonner'
@@ -15,14 +15,12 @@ export function useBackshopCustomProducts() {
     queryKey: ['backshop-custom-products', currentStoreId],
     staleTime: 2 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('backshop_custom_products')
-        .select('*')
-        .eq('store_id', currentStoreId!)
-        .order('name')
-
-      if (error) throw error
-      return (data ?? []) as BackshopCustomProduct[]
+      const data = await queryRest<BackshopCustomProduct[]>('backshop_custom_products', {
+        select: '*',
+        store_id: `eq.${currentStoreId}`,
+        order: 'name.asc',
+      })
+      return data ?? []
     },
     enabled: !!currentStoreId,
   })
@@ -42,6 +40,25 @@ export function useAddBackshopCustomProduct() {
       block_id?: string | null
     }) => {
       if (!user) throw new Error('Nicht eingeloggt')
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+
+      if (isTestModeActive()) {
+        const fake: BackshopCustomProduct = {
+          id: crypto.randomUUID(),
+          plu: product.plu,
+          name: product.name,
+          image_url: product.image_url,
+          block_id: product.block_id ?? null,
+          created_by: user.id,
+          store_id: currentStoreId,
+          created_at: new Date().toISOString(),
+        } as BackshopCustomProduct
+        queryClient.setQueryData<BackshopCustomProduct[]>(
+          ['backshop-custom-products', currentStoreId],
+          (old) => [...(old ?? []), fake],
+        )
+        return fake
+      }
 
       const insertRow: Database['public']['Tables']['backshop_custom_products']['Insert'] = {
         plu: product.plu,
@@ -49,7 +66,7 @@ export function useAddBackshopCustomProduct() {
         image_url: product.image_url,
         block_id: product.block_id ?? null,
         created_by: user.id,
-        store_id: currentStoreId!,
+        store_id: currentStoreId,
       }
 
       const { data, error } = await supabase
@@ -62,7 +79,9 @@ export function useAddBackshopCustomProduct() {
       return data as BackshopCustomProduct
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-custom-products', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['backshop-custom-products', currentStoreId] })
+      }
       toast.success('Eigenes Produkt (Backshop) hinzugefügt')
     },
   })
@@ -83,6 +102,14 @@ export function useUpdateBackshopCustomProduct() {
       image_url?: string
       block_id?: string | null
     }) => {
+      if (isTestModeActive()) {
+        queryClient.setQueryData<BackshopCustomProduct[]>(
+          ['backshop-custom-products', currentStoreId],
+          (old) => (old ?? []).map((p) => p.id === id ? { ...p, ...updates } : p),
+        )
+        return
+      }
+
       const { error } = await supabase
         .from('backshop_custom_products')
         .update(updates as never)
@@ -91,7 +118,9 @@ export function useUpdateBackshopCustomProduct() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-custom-products', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['backshop-custom-products', currentStoreId] })
+      }
       toast.success('Produkt aktualisiert')
     },
     onError: (error) => {
@@ -107,6 +136,14 @@ export function useDeleteBackshopCustomProduct() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isTestModeActive()) {
+        queryClient.setQueryData<BackshopCustomProduct[]>(
+          ['backshop-custom-products', currentStoreId],
+          (old) => (old ?? []).filter((p) => p.id !== id),
+        )
+        return
+      }
+
       const { error } = await supabase
         .from('backshop_custom_products')
         .delete()
@@ -115,7 +152,9 @@ export function useDeleteBackshopCustomProduct() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-custom-products', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['backshop-custom-products', currentStoreId] })
+      }
       toast.success('Eigenes Produkt (Backshop) gelöscht')
     },
     onError: (error) => {

@@ -206,22 +206,22 @@ function BackshopPreviewRowByRow({
       </colgroup>
       <thead>
         <tr className="border-b-2 border-border">
-          <th className="px-1 py-0.5 text-center font-semibold text-muted-foreground uppercase border-b border-r border-border" style={{ fontSize: fonts.column }}>
+          <th className="px-1 text-center font-semibold text-muted-foreground uppercase border-b border-r border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             Bild
           </th>
-          <th className="px-1 py-0.5 text-center font-semibold text-muted-foreground uppercase border-b border-r border-border" style={{ fontSize: fonts.column }}>
+          <th className="px-1 text-center font-semibold text-muted-foreground uppercase border-b border-r border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             PLU
           </th>
-          <th className="px-1 py-0.5 text-center font-semibold text-muted-foreground uppercase border-b border-border" style={{ fontSize: fonts.column }}>
+          <th className="px-1 text-center font-semibold text-muted-foreground uppercase border-b border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             Name
           </th>
-          <th className="px-1 py-0.5 text-center font-semibold text-muted-foreground uppercase border-b-2 border-l-2 border-r border-border bg-muted/30" style={{ fontSize: fonts.column }}>
+          <th className="px-1 text-center font-semibold text-muted-foreground uppercase border-b-2 border-l-2 border-r border-border bg-muted/30" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             Bild
           </th>
-          <th className="px-1 py-0.5 text-center font-semibold text-muted-foreground uppercase border-b border-r border-border" style={{ fontSize: fonts.column }}>
+          <th className="px-1 text-center font-semibold text-muted-foreground uppercase border-b border-r border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             PLU
           </th>
-          <th className="px-1 py-0.5 text-center font-semibold text-muted-foreground uppercase border-b border-border" style={{ fontSize: fonts.column }}>
+          <th className="px-1 text-center font-semibold text-muted-foreground uppercase border-b border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             Name
           </th>
         </tr>
@@ -230,7 +230,7 @@ function BackshopPreviewRowByRow({
         {tableRows.map((row, i) =>
           row.type === 'group' ? (
             <tr key={`g-${i}`} className="border-b border-border">
-              <td colSpan={6} className="bg-muted/70 px-2 py-1 font-semibold text-muted-foreground text-center border-b border-border" style={{ fontSize: fonts.column }}>
+              <td colSpan={6} className="bg-muted/70 px-2 font-semibold text-muted-foreground text-center border-b border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
                 — {row.label} —
               </td>
             </tr>
@@ -281,13 +281,13 @@ function BackshopPreviewColumnFirst({
     <table className="w-full table-fixed border-collapse">
       <thead>
         <tr className="border-b-2 border-border">
-          <th className="w-12 px-1 py-0.5 text-center font-semibold text-muted-foreground uppercase border-b border-r border-border" style={{ fontSize: fonts.column }}>
+          <th className="w-12 px-1 text-center font-semibold text-muted-foreground uppercase border-b border-r border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             Bild
           </th>
-          <th className="w-14 px-1 py-0.5 text-center font-semibold text-muted-foreground uppercase border-b border-r border-border" style={{ fontSize: fonts.column }}>
+          <th className="w-14 px-1 text-center font-semibold text-muted-foreground uppercase border-b border-r border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             PLU
           </th>
-          <th className="px-1 py-0.5 text-center font-semibold text-muted-foreground uppercase border-b border-border" style={{ fontSize: fonts.column }}>
+          <th className="px-1 text-center font-semibold text-muted-foreground uppercase border-b border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             Name
           </th>
         </tr>
@@ -296,17 +296,17 @@ function BackshopPreviewColumnFirst({
         {columnRows.map((r, i) =>
           r.type === 'group' ? (
             <tr key={`g-${i}`} className="border-b border-border">
-              <td colSpan={3} className="bg-muted/70 px-2 py-1 font-semibold text-muted-foreground text-center border-b border-border" style={{ fontSize: fonts.column }}>
+              <td colSpan={3} className="bg-muted/70 px-2 font-semibold text-muted-foreground text-center border-b border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
                 — {r.label} —
               </td>
             </tr>
           ) : (
             <tr key={r.item.id} className="border-b border-border last:border-b-0">
-              <td className="px-1 py-0.5 align-middle text-center border-b border-r border-border" style={{ fontSize: fonts.product }}>
+              <td className="px-1 align-middle text-center border-b border-r border-border" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
                 <span className="inline-block h-8 w-8 rounded bg-muted mx-auto" />
               </td>
-              <td className="px-1 py-0.5 text-center border-b border-r border-border" style={{ fontSize: fonts.product }}>{r.item.plu}</td>
-              <td className="px-1 py-0.5 text-center break-words min-w-0 border-b border-border" style={{ fontSize: fonts.product }} title={r.item.display_name}>
+              <td className="px-1 text-center border-b border-r border-border" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }}>{r.item.plu}</td>
+              <td className="px-1 text-center break-words min-w-0 border-b border-border" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }} title={r.item.display_name}>
                 {r.item.display_name}
               </td>
             </tr>
@@ -335,7 +335,7 @@ function PreviewCell({
   isRight?: boolean
 }) {
   const cellBorder = 'border-b border-border'
-  const emptyCell = (extra?: string) => <td className={`px-1 py-0.5 text-center ${cellBorder} ${extra ?? ''}`} />
+  const emptyCell = (extra?: string) => <td className={`px-1 text-center ${cellBorder} ${extra ?? ''}`} style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }} />
 
   if (!item) {
     return (
@@ -348,11 +348,11 @@ function PreviewCell({
   }
   return (
     <>
-      <td className={`px-1 py-0.5 align-middle text-center ${cellBorder} ${isRight ? 'border-l-2 border-border bg-muted/20' : 'border-r border-border'}`} style={{ fontSize: fonts.product }}>
+      <td className={`px-1 align-middle text-center ${cellBorder} ${isRight ? 'border-l-2 border-border bg-muted/20' : 'border-r border-border'}`} style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
         <span className="inline-block h-8 w-8 rounded bg-muted mx-auto" />
       </td>
-      <td className={`px-1 py-0.5 text-center ${cellBorder} border-r border-border`} style={{ fontSize: fonts.product }}>{item.plu}</td>
-      <td className={`px-1 py-0.5 text-center break-words min-w-0 ${cellBorder}`} style={{ fontSize: fonts.product }} title={item.display_name}>
+      <td className={`px-1 text-center ${cellBorder} border-r border-border`} style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }}>{item.plu}</td>
+      <td className={`px-1 text-center break-words min-w-0 ${cellBorder}`} style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }} title={item.display_name}>
         {item.display_name}
       </td>
     </>

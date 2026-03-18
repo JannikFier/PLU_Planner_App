@@ -1,6 +1,7 @@
 // BackshopWarengruppenPanel: Warengruppen für Backshop-Liste (Split-Panel, DnD)
 
 import { useState, useMemo, useCallback } from 'react'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from 'sonner'
 import {
   DndContext,
@@ -65,6 +66,7 @@ export function BackshopWarengruppenPanel() {
 
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const deferredSearch = useDebouncedValue(search, 200)
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
   const [showAddBlock, setShowAddBlock] = useState(false)
   const [showRenameBlock, setShowRenameBlock] = useState(false)
@@ -93,14 +95,14 @@ export function BackshopWarengruppenPanel() {
   )
 
   const filteredUnassignedItems = useMemo(() => {
-    if (!search.trim()) return unassignedItems
-    const lower = search.toLowerCase()
+    if (!deferredSearch.trim()) return unassignedItems
+    const lower = deferredSearch.toLowerCase()
     return unassignedItems.filter(
       (item) =>
         item.system_name.toLowerCase().includes(lower) ||
         item.plu.includes(lower),
     )
-  }, [unassignedItems, search])
+  }, [unassignedItems, deferredSearch])
 
   const rightColumnLabel = `Noch nicht zugeordnet (${unassignedItems.length} Stück)`
 

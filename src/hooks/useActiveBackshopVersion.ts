@@ -2,43 +2,37 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
-import { withRetryOnAbort } from '@/lib/supabase-retry'
+import { queryRest } from '@/lib/supabase'
 import type { BackshopVersion } from '@/types/database'
 
 /**
  * Lädt die aktuell aktive Backshop-KW-Version.
  * Fallback: Neueste Version (nach Jahr + KW absteigend).
+ * Nutzt queryRest (direkter REST-Call) statt supabase.from() um Hanging zu vermeiden.
  */
 export function useActiveBackshopVersion() {
   return useQuery<BackshopVersion | null>({
     queryKey: ['backshop-version', 'active'],
     staleTime: 60_000,
-    queryFn: () =>
-      withRetryOnAbort(async () => {
-        const { data: active, error: activeError } = await supabase
-          .from('backshop_versions')
-          .select('*')
-          .eq('status', 'active')
-          .limit(1)
-          .maybeSingle()
+    queryFn: async ({ signal }) => {
+      try {
+        const active = await queryRest<BackshopVersion[]>('backshop_versions', {
+          select: '*',
+          status: 'eq.active',
+          limit: '1',
+        }, { signal })
+        if (active && active.length > 0) return active[0]
 
-        if (!activeError && active) return active as BackshopVersion
-
-        const { data: latest, error: latestError } = await supabase
-          .from('backshop_versions')
-          .select('*')
-          .order('jahr', { ascending: false })
-          .order('kw_nummer', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        if (latestError) {
-          if ((latestError as { message?: string }).message?.includes?.('AbortError')) throw latestError
-          toast.error('Keine Backshop-Version gefunden: ' + (latestError?.message ?? 'Unbekannter Fehler'))
-          return null
-        }
-        return (latest ?? null) as BackshopVersion | null
-      }),
+        const latest = await queryRest<BackshopVersion[]>('backshop_versions', {
+          select: '*',
+          order: 'jahr.desc,kw_nummer.desc',
+          limit: '1',
+        }, { signal })
+        return latest?.[0] ?? null
+      } catch (err) {
+        toast.error('Keine Backshop-Version gefunden: ' + ((err as Error)?.message ?? 'Unbekannter Fehler'))
+        throw err
+      }
+    },
   })
 }

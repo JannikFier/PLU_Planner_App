@@ -303,12 +303,13 @@ function InteractiveColumn({ rows }: { rows: FlatRow[] }) {
               return (
                 <InteractiveBlockHeader
                   key={`hdr-${row.blockId ?? 'unassigned'}-${i}`}
-                  label={row.label!}
+                  label={row.label ?? ''}
                   blockId={row.blockId}
                 />
               )
             }
-            return <InteractiveProductRow key={row.item!.id} item={row.item!} />
+            if (!row.item) return null
+            return <InteractiveProductRow key={row.item.id} item={row.item} />
           })}
         </tbody>
       </table>
@@ -393,7 +394,7 @@ function InteractiveProductRow({ item }: { item: MasterPLUItem }) {
       </td>
       <td className="px-2 py-1 border-l border-border">
         {(item as unknown as DisplayItem).preis != null ? (
-          <PreisBadge value={(item as unknown as DisplayItem).preis!} />
+          <PreisBadge value={(item as unknown as DisplayItem).preis as number} />
         ) : null}
       </td>
     </tr>

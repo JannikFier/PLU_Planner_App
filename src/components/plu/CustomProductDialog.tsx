@@ -154,8 +154,9 @@ export function CustomProductDialog({
       }
     }
 
-    if (hasPlu && existingPLUs.has(baseResult.data.plu!)) {
-      setErrors({ plu: `PLU ${baseResult.data.plu} existiert bereits` })
+    const pluVal = baseResult.data.plu
+    if (hasPlu && pluVal != null && existingPLUs.has(pluVal)) {
+      setErrors({ plu: `PLU ${pluVal} existiert bereits` })
       return
     }
 
@@ -163,8 +164,8 @@ export function CustomProductDialog({
       sortMode === 'BY_BLOCK' ? 'PIECE' : (itemType === 'WEIGHT' ? 'WEIGHT' : 'PIECE')
     const block_id = sortMode === 'BY_BLOCK' ? blockId : (blockId || null)
 
-    const pluToSave = hasPlu ? baseResult.data.plu! : generatePriceOnlyPlu()
-    const preisToSave = hasPreis ? baseResult.data.preis! : null
+    const pluToSave = hasPlu && baseResult.data.plu != null ? baseResult.data.plu : generatePriceOnlyPlu()
+    const preisToSave = hasPreis && baseResult.data.preis != null ? baseResult.data.preis : null
 
     try {
       await addProduct.mutateAsync({
@@ -219,6 +220,7 @@ export function CustomProductDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
         <div className="space-y-4 py-4">
           {/* PLU-Nummer */}
           <div className="space-y-2">
@@ -375,6 +377,24 @@ export function CustomProductDialog({
           )}
         </div>
 
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={handleClose}>
+            Abbrechen
+          </Button>
+          <Button
+            type="submit"
+            disabled={
+              addProduct.isPending ||
+              !hasExactlyOne ||
+              (sortMode === 'BY_BLOCK' && !blockId) ||
+              (sortMode === 'ALPHABETICAL' && !itemType)
+            }
+          >
+            {addProduct.isPending ? 'Wird hinzugefügt...' : 'Hinzufügen'}
+          </Button>
+        </DialogFooter>
+        </form>
+
         <AlertDialog open={!!errorPopupMessage} onOpenChange={(open) => !open && setErrorPopupMessage(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -390,23 +410,6 @@ export function CustomProductDialog({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            Abbrechen
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={
-              addProduct.isPending ||
-              !hasExactlyOne ||
-              (sortMode === 'BY_BLOCK' && !blockId) ||
-              (sortMode === 'ALPHABETICAL' && !itemType)
-            }
-          >
-            {addProduct.isPending ? 'Wird hinzugefügt...' : 'Hinzufügen'}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

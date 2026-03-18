@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { Loader2 } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -8,6 +8,32 @@ interface ProtectedRouteProps {
   requireAdmin?: boolean
   /** Nur super_admin hat Zugang */
   requireSuperAdmin?: boolean
+}
+
+/** App-Shell-Skeleton statt blankem Spinner – wirkt sofort schneller. Exportiert für HomeRedirect. */
+export function LoadingSkeleton() {
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header-Skeleton */}
+      <div className="border-b bg-card">
+        <div className="flex h-14 items-center gap-4 px-4">
+          <Skeleton className="h-6 w-32" />
+          <div className="flex-1" />
+          <Skeleton className="h-8 w-8 rounded-full" />
+        </div>
+      </div>
+      {/* Content-Skeleton */}
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-64" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-32 rounded-lg" />
+          <Skeleton className="h-32 rounded-lg" />
+          <Skeleton className="h-32 rounded-lg" />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -31,18 +57,13 @@ export function ProtectedRoute({
     return <Navigate to="/viewer" replace />
   }
 
-  // Laden: Spinner anzeigen
   if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+    return <LoadingSkeleton />
   }
 
-  // Nicht eingeloggt → Login-Seite
+  // Nicht eingeloggt → Login-Seite (ursprüngliche Route merken für Redirect nach Login)
   if (!user) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" state={{ from: location }} replace />
   }
 
   // Einmalpasswort: Muss zuerst Passwort ändern (außer wenn bereits auf der Seite)

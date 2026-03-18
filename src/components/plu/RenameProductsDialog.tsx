@@ -1,6 +1,7 @@
 // RenameProductsDialog: Dialog „Produkte umbenennen“ – PLU-Liste mit Suche (Filter wie Ausgeblenden), Stift pro Zeile
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   Dialog,
@@ -12,48 +13,25 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pencil, Search } from 'lucide-react'
-import { filterItemsBySearch, getDisplayPlu, itemMatchesSearch } from '@/lib/plu-helpers'
+import { filterItemsBySearch, getDisplayPlu, itemMatchesSearch, groupItemsForDialog } from '@/lib/plu-helpers'
 import { RenameDialog } from '@/components/plu/RenameDialog'
 import { cn } from '@/lib/utils'
 import type { MasterPLUItem, BackshopMasterPLUItem } from '@/types/database'
 import type { DisplayItem } from '@/types/plu'
-
-/** Ä→A, Ö→O, Ü→U für Gruppierung */
-function normalizeLetterForGrouping(char: string): string {
-  const upper = char.toUpperCase()
-  if (upper === 'Ä') return 'A'
-  if (upper === 'Ö') return 'O'
-  if (upper === 'Ü') return 'U'
-  return upper
-}
 
 interface SearchableItem {
   id: string
   plu: string
   display_name: string
   system_name: string
-}
-
-function groupByLetter(items: SearchableItem[]): { letter: string; items: SearchableItem[] }[] {
-  const grouped = new Map<string, SearchableItem[]>()
-  for (const item of items) {
-    const name = item.display_name ?? item.system_name ?? ''
-    const firstChar = name.charAt(0)
-    const letter = normalizeLetterForGrouping(firstChar) || '?'
-    const existing = grouped.get(letter)
-    if (existing) existing.push(item)
-    else grouped.set(letter, [item])
-  }
-  return Array.from(grouped.entries())
-    .sort(([a], [b]) => a.localeCompare(b, 'de'))
-    .map(([letter, items]) => ({ letter, items }))
+  item_type?: 'PIECE' | 'WEIGHT' | string | null
 }
 
 type TableRow = { type: 'header'; label: string } | { type: 'row'; left?: SearchableItem; right?: SearchableItem }
-function buildTableRows(groups: { letter: string; items: SearchableItem[] }[]): TableRow[] {
+function buildTableRows(groups: { label: string; items: SearchableItem[] }[]): TableRow[] {
   const rows: TableRow[] = []
   for (const group of groups) {
-    rows.push({ type: 'header', label: `— ${group.letter} —` })
+    rows.push({ type: 'header', label: group.label })
     const items = group.items
     for (let i = 0; i < items.length; i += 2) {
       rows.push({ type: 'row', left: items[i], right: items[i + 1] })
@@ -113,6 +91,8 @@ export interface RenameProductsDialogProps {
   listType?: 'default' | 'backshop'
   /** Bei 'backshop': Globale Umbenennungen (überschreiben display_name aus searchableItems) */
   renamedOverrides?: RenamedItemOverride[]
+  /** Anzeige-Modus: SEPARATED = nach Stück/Gewicht getrennt, MIXED = nur alphabetisch */
+  displayMode?: 'MIXED' | 'SEPARATED'
 }
 
 export function RenameProductsDialog({
@@ -121,8 +101,10 @@ export function RenameProductsDialog({
   searchableItems,
   listType = 'default',
   renamedOverrides = [],
+  displayMode = 'MIXED',
 }: RenameProductsDialogProps) {
   const [searchText, setSearchText] = useState('')
+  const deferredSearch = useDebouncedValue(searchText, 200)
   const [renameItem, setRenameItem] = useState<DisplayItem | null>(null)
   const queryClient = useQueryClient()
   const listRef = useRef<HTMLTableSectionElement | null>(null)
@@ -142,21 +124,22 @@ export function RenameProductsDialog({
           plu: m.plu,
           display_name: display,
           system_name: base.system_name,
+          item_type: 'item_type' in base ? base.item_type : undefined,
         }
       }),
     [searchableItems, overrideByPlu],
   )
 
   const filteredItems = useMemo(
-    () => filterItemsBySearch(searchableAsList, searchText),
-    [searchableAsList, searchText],
+    () => filterItemsBySearch(searchableAsList, deferredSearch),
+    [searchableAsList, deferredSearch],
   )
 
-  const groups = useMemo(() => groupByLetter(filteredItems), [filteredItems])
+  const groups = useMemo(() => groupItemsForDialog(filteredItems, displayMode), [filteredItems, displayMode])
   const tableRows = useMemo(() => buildTableRows(groups), [groups])
 
   // Bei Suchänderung zum ersten Treffer scrollen (wie HideProductsDialog)
-  const searchLower = searchText.trim().toLowerCase()
+  const searchLower = deferredSearch.trim().toLowerCase()
   useEffect(() => {
     if (!open || !searchLower || filteredItems.length === 0 || !listRef.current) return
     const first = listRef.current.querySelector('[data-highlight="true"]')
@@ -271,8 +254,8 @@ export function RenameProductsDialog({
                             </tr>
                           )
                         }
-                        const leftMatch = row.left ? itemMatchesSearch(row.left, searchText) : false
-                        const rightMatch = row.right ? itemMatchesSearch(row.right, searchText) : false
+                        const leftMatch = row.left ? itemMatchesSearch(row.left, deferredSearch) : false
+                        const rightMatch = row.right ? itemMatchesSearch(row.right, deferredSearch) : false
                         const highlightRow = leftMatch || rightMatch
                         return (
                           <tr
@@ -295,7 +278,7 @@ export function RenameProductsDialog({
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7 shrink-0"
-                                    onClick={() => handleOpenRename(row.left!)}
+                                    onClick={() => { if (row.left) handleOpenRename(row.left) }}
                                     aria-label="Umbenennen"
                                   >
                                     <Pencil className="h-3.5 w-3.5" />
@@ -320,7 +303,7 @@ export function RenameProductsDialog({
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7 shrink-0"
-                                    onClick={() => handleOpenRename(row.right!)}
+                                    onClick={() => { if (row.right) handleOpenRename(row.right) }}
                                     aria-label="Umbenennen"
                                   >
                                     <Pencil className="h-3.5 w-3.5" />

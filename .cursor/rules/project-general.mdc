@@ -48,6 +48,11 @@ alwaysApply: true
 - Erfolg per sonner toast.success() anzeigen
 - Supabase Errors immer prüfen: if (error) throw error;
 
+## Auth-Fehler
+- Supabase Auth-Fehler nicht pauschal als „Zugangsdaten falsch“ anzeigen.
+- Unterschied: Invalid credentials vs. Netzwerk/Rate-Limit/Email not confirmed.
+- Original-Fehlermeldung in Konsole loggen (console.error) für Debugging.
+
 ## Vier-Rollen-System
 - super_admin = Inhaber (voller Zugriff, Upload, Layout, Versionen, Rollen tauschen; User/Admin/Viewer anlegen)
 - admin = Abteilungsleiter (PLU-Liste + Umbenennen; Benutzerverwaltung: alle außer Super-Admin sehen, Passwort zurücksetzen + Löschen; nur User anlegen; keine Rollenänderung)

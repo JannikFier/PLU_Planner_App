@@ -15,12 +15,12 @@ Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
 | Produkte wieder einblenden (pro Markt) | ✅ | ✅ | ✅ | ❌ |
 | Benachrichtigungen (Glocke) | ✅ | ✅ | ✅ | ❌ |
 | **Custom Product umbenennen** | ✅ (alle) | Nur eigene | Nur eigene | ❌ |
-| **Master Product umbenennen** | ✅ | ✅ | ❌ | ❌ |
+| **Master Product umbenennen** | ✅ | ✅ | ✅ | ❌ |
 | **Benutzerverwaltung sehen** | ✅ | ✅ | ❌ | ❌ |
-| **User/Admin/Viewer anlegen** | ✅ (Rolle waehlbar) | ✅ (nur User) | ❌ | ❌ |
+| **User/Admin/Viewer anlegen** | ✅ (Rolle waehlbar) | ✅ (Rolle waehlbar) | ❌ | ❌ |
 | **Passwort zuruecksetzen** (alle ausser Super-Admin) | ✅ | ✅ | ❌ | ❌ |
 | **User/Admin/Viewer loeschen** | ✅ | ✅ | ❌ | ❌ |
-| **Rollen aendern (hoch-/runterstufen)** | ✅ | ❌ | ❌ | ❌ |
+| **Rollen aendern (hoch-/runterstufen)** | ✅ | ✅ (nicht sich selbst) | ❌ | ❌ |
 | **Excel Upload / KW-Vergleich** | ✅ | ❌ | ❌ | ❌ |
 | **Layout konfigurieren** | ✅ | ❌ | ❌ | ❌ |
 | **Bezeichnungsregeln verwalten** | ✅ | ❌ | ❌ | ❌ |
@@ -28,8 +28,9 @@ Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
 | **KW-Versionen verwalten** | ✅ | ❌ | ❌ | ❌ |
 | **Firmen/Maerkte anlegen** | ✅ | ❌ | ❌ | ❌ |
 | **Firmen/Maerkte pausieren/loeschen** | ✅ | ❌ | ❌ | ❌ |
-| **Listen-Sichtbarkeit aendern** | ✅ | ❌ | ❌ | ❌ |
-| **Markt-Zuordnung aendern** | ✅ | ❌ | ❌ | ❌ |
+| **Listen-Sichtbarkeit aendern (pro Markt)** | ✅ | ❌ | ❌ | ❌ |
+| **Bereichs-Sichtbarkeit pro User** | ✅ | ✅ | ❌ | ❌ |
+| **Markt-Zuordnung aendern** | ✅ | ✅ (nur eigene Maerkte) | ❌ | ❌ |
 | **Testmodus starten** | ✅ | ✅ | ✅ | ❌ |
 
 ### Markt-Zugriff (Multi-Tenancy)
@@ -44,21 +45,24 @@ Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
 
 **Super-Admin (Inhaber)** – `role: 'super_admin'`
 - Hat vollen Zugriff auf alle Funktionen
-- Einziger, der Rollen tauschen darf (User/Admin/Viewer hoch- oder runterstufen)
+- Darf Rollen tauschen (User/Admin/Viewer hoch- oder runterstufen), außer sich selbst
 - Kann Admins, User und Viewer erstellen; sieht alle in der Benutzerverwaltung
 - Verwaltet Upload, Layout, Regeln, Versionen
 - Es gibt nur einen Super-Admin
 
 **Admin (Abteilungsleiter)** – `role: 'admin'`
 - Sieht in der Benutzerverwaltung alle außer Super-Admin (User, Admin, Viewer)
-- Darf für diese Passwort zurücksetzen und löschen; **kein** Rollen-Dropdown (nur Super-Admin ändert Rollen)
-- Kann nur **User** anlegen (keine Admins/Viewer)
+- Darf für diese Passwort zurücksetzen und löschen; Rollen ändern (außer sich selbst)
+- Kann **User, Admin und Viewer** anlegen
+- Kann Märkte zuweisen (nur Märkte, auf die der Admin selbst Zugriff hat)
+- Darf sich nicht selbst Bereiche wegnehmen
 - PLU-Rechte wie User inkl. Master-Produkte umbenennen
 - Loggt sich mit **E-Mail-Adresse** ein
 
 **User (Personal)** – `role: 'user'`
-- Volle PLU-Funktionen: eigene Produkte, ausblenden, umbenennen, PDF, Benachrichtigungen
+- Volle PLU-Funktionen: eigene Produkte, ausblenden, **Master-Produkte umbenennen**, PDF, Benachrichtigungen
 - **Keine** Benutzerverwaltung (kein Zugriff auf andere Personen)
+- Sieht nur die Bereiche (Obst/Gemüse, Backshop), die per `user_list_visibility` freigeschaltet sind
 - Loggt sich mit **7-stelliger Personalnummer** oder E-Mail ein
 
 **Viewer** – `role: 'viewer'`
@@ -96,19 +100,20 @@ Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
 ```
 1. Admin/Super-Admin → Benutzerverwaltung → "Neuer Benutzer"
 2. Name + Personalnummer/E-Mail eingeben
-3. Nur Super-Admin kann Rolle wählen (User, Admin, Viewer); Admin legt immer nur User an
+3. Admin und Super-Admin können Rolle wählen (User, Admin, Viewer)
 4. System generiert 8-stelliges Einmalpasswort
 5. Einmalpasswort wird dem Admin angezeigt (zum Weitergeben)
 6. In der Datenbank: must_change_password = true
 ```
 
-### Rolle ändern (nur Super-Admin)
+### Rolle ändern (Super-Admin und Admin)
 
 ```
-1. Super-Admin → Benutzerverwaltung → bei einer Person Rollen-Dropdown (User / Admin / Viewer)
+1. Super-Admin oder Admin → Benutzerverwaltung → bei einer Person Rollen-Dropdown (User / Admin / Viewer)
 2. Auswahl ändern → Edge Function update-user-role wird aufgerufen
 3. Profile.role wird in der Datenbank aktualisiert
-4. Super-Admin kann sich nicht selbst runterstufen
+4. Weder Super-Admin noch Admin können sich selbst runterstufen
+5. Admin kann nur Rollen von Benutzern derselben Firma ändern
 ```
 
 ### Erster Login des neuen Users
@@ -163,6 +168,8 @@ Die Datenbank-Sicherheit wird durch PostgreSQL RLS Policies gewährleistet:
 - `custom_products` → alle lesen/einfügen; Ersteller oder Super-Admin updaten/löschen
 - `hidden_items` → alle lesen/einfügen/löschen (jeder kann ein-/ausblenden)
 - `version_notifications` → eigene lesen/updaten; Super-Admin einfügen
-- `master_plu_items` (Umbenennen): Admin und Super-Admin über RPC-Funktionen `rename_master_plu_item` / `reset_master_plu_item_display_name` (nur display_name, is_manually_renamed)
+- `master_plu_items` (Umbenennen): Alle Rollen außer Viewer über RPC `rename_master_plu_item` / `reset_master_plu_item_display_name` (Prüfung: `is_not_viewer()`, Migration 037)
+- `user_list_visibility`: User liest eigene Einträge; Admin/Super-Admin liest/schreibt alle im eigenen Markt (Migration 038)
+- **stores / companies (anon):** Anonymes Lesen nur für Subdomain-Branding auf der Login-Seite (Migration 048). Anon darf aktive Stores mit Subdomain und deren Firmen lesen – Name, Logo für Markt-Branding.
 
-Die **Seite Umbenannte Produkte** und der Dialog **„Produkte umbenennen“** sind nur für Admin und Super-Admin erreichbar (Routen `/admin/renamed-products`, `/super-admin/renamed-products`). Der **Umbenennen-Button** in der Masterliste wird für Admin und Super-Admin angezeigt (auch unter `/admin/masterlist`). Die **Vergleichslogik** beim Excel-Upload verwendet weiterhin den ursprünglichen Namen (`system_name`), nicht den Anzeigenamen (`display_name`). **Excel** (neue Produkte per Excel, Excel ausblenden) ist nur für Super-Admin sichtbar.
+Die **Seite Umbenannte Produkte** und der Dialog **„Produkte umbenennen“** sind für User, Admin und Super-Admin erreichbar. Der **Umbenennen-Button** in der Masterliste wird für alle Rollen außer Viewer angezeigt (auch unter `/admin/masterlist`). Die **Vergleichslogik** beim Excel-Upload verwendet weiterhin den ursprünglichen Namen (`system_name`), nicht den Anzeigenamen (`display_name`). **Excel** (neue Produkte per Excel, Excel ausblenden) ist nur für Super-Admin sichtbar.

@@ -3,6 +3,24 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import type { Company } from '@/types/database'
 
+export function useCompanyById(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ['companies', 'detail', companyId],
+    queryFn: async () => {
+      if (!companyId) throw new Error('Keine Firma angegeben.')
+      const { data, error } = await supabase
+        .from('companies' as never)
+        .select('*')
+        .eq('id', companyId)
+        .single()
+      if (error) throw error
+      return data as unknown as Company
+    },
+    enabled: !!companyId,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 export function useCompanies() {
   return useQuery({
     queryKey: ['companies'],
@@ -14,6 +32,7 @@ export function useCompanies() {
       if (error) throw error
       return data as unknown as Company[]
     },
+    staleTime: 5 * 60 * 1000,
   })
 }
 

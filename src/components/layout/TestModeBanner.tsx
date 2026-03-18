@@ -9,11 +9,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { FlaskConical, X } from 'lucide-react'
+import { FlaskConical } from 'lucide-react'
 
 /**
- * Gelbe Hinweisleiste und Rahmen im Testmodus.
- * Wird nur angezeigt wenn isTestMode === true.
+ * Dezenter gelber Glow-Rahmen um das gesamte Fenster im Testmodus.
+ * Kleiner schwebender Badge unten rechts zum Beenden.
  */
 export function TestModeBanner() {
   const { isTestMode, showExitConfirm, setShowExitConfirm, disableTestMode } = useTestMode()
@@ -22,20 +22,18 @@ export function TestModeBanner() {
 
   return (
     <>
-      {/* Gelbe Hinweisleiste */}
-      <div className="sticky top-0 z-[60] flex items-center justify-between gap-4 bg-yellow-400 px-4 py-2 text-yellow-900">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <FlaskConical className="h-4 w-4" />
-          <span>Testmodus aktiv – Änderungen werden <strong>nicht</strong> gespeichert</span>
-        </div>
+      {/* Gelber Glow-Rahmen um das gesamte Fenster (4 Seiten) */}
+      <div className="pointer-events-none fixed inset-0 z-[100] border-[3px] border-yellow-400 rounded-sm" style={{ boxShadow: 'inset 0 0 20px rgba(250, 204, 21, 0.4), 0 0 20px rgba(250, 204, 21, 0.3)' }} />
+
+      {/* Schwebender Badge unten rechts */}
+      <div className="fixed bottom-4 right-4 z-[101]">
         <Button
           size="sm"
-          variant="outline"
-          className="h-7 gap-1 border-yellow-600 bg-yellow-300 hover:bg-yellow-200 text-yellow-900"
+          className="gap-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 shadow-lg shadow-yellow-400/30"
           onClick={() => setShowExitConfirm(true)}
         >
-          <X className="h-3 w-3" />
-          Beenden
+          <FlaskConical className="h-4 w-4" />
+          Testmodus beenden
         </Button>
       </div>
 

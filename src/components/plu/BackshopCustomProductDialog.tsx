@@ -205,6 +205,7 @@ export function BackshopCustomProductDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="backshop-plu">PLU (4–5 Ziffern)</Label>
@@ -426,16 +427,17 @@ export function BackshopCustomProductDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => handleClose()}>
+          <Button type="button" variant="outline" onClick={() => handleClose()}>
             Abbrechen
           </Button>
           <Button
-            onClick={handleSubmit}
+            type="submit"
             disabled={addProduct.isPending || !canSubmit}
           >
             {addProduct.isPending ? 'Wird hinzugefügt…' : 'Hinzufügen'}
           </Button>
         </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

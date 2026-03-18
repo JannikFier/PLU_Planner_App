@@ -31,7 +31,7 @@ export const StatusBadge = React.memo(function StatusBadge({ plu, status, oldPlu
   return (
     <span
       className={cn(
-        'inline-block rounded px-1.5 py-0.5 font-mono text-sm tabular-nums',
+        'inline-flex items-center rounded px-1.5 py-0.5 font-mono text-sm tabular-nums',
         colorClass,
         className,
       )}

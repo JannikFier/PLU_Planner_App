@@ -1,7 +1,7 @@
 // Backshop Renamed Items: Globale Umbenennungen (wie eigene Produkte, ausgeblendete)
 
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { queryRest } from '@/lib/supabase'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import type { BackshopRenamedItem } from '@/types/database'
 
@@ -13,14 +13,13 @@ export function useBackshopRenamedItems() {
     queryKey: ['backshop-renamed-items', currentStoreId],
     staleTime: 2 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('backshop_renamed_items')
-        .select('*')
-        .eq('store_id', currentStoreId!)
-        .order('plu', { ascending: true })
-
-      if (error) throw error
-      return (data ?? []) as BackshopRenamedItem[]
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+      const data = await queryRest<BackshopRenamedItem[]>('backshop_renamed_items', {
+        select: '*',
+        store_id: `eq.${currentStoreId}`,
+        order: 'plu.asc',
+      })
+      return data ?? []
     },
     enabled: !!currentStoreId,
   })

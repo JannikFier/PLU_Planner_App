@@ -1,8 +1,9 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
+import { supabase, clearSupabaseAuthStorage } from '@/lib/supabase'
 import { isAbortError } from '@/lib/error-utils'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
+import { loginEmailSchema, loginPersonalnummerSchema } from '@/lib/validation'
 import type { User, Session } from '@supabase/supabase-js'
 import type { Database, Profile } from '@/types/database'
 
@@ -30,6 +31,7 @@ interface AuthContextValue extends AuthState {
   requestPasswordReset: (email: string) => Promise<void>
   logout: () => Promise<void>
   refreshProfile: () => Promise<void>
+  clearError: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -187,14 +189,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             clearProfileErrorToast()
             setState((prev) => ({
               ...prev,
-              ...authReducer(session.user, session, cached!.profile),
+              ...authReducer(session.user, session, cached.profile),
               isLoading: false,
               error: null,
             }))
           }
 
           if (!displayedFromCacheRef.current) {
-            const profile = await fetchProfile(userId)
+            let profile = await fetchProfile(userId)
+            if (!profile) {
+              try {
+                const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
+                if (raw) {
+                  const parsed = JSON.parse(raw) as { userId: string; profile: Profile }
+                  if (parsed.userId === userId && parsed.profile) profile = parsed.profile
+                }
+              } catch {
+                /* Cache ungültig */
+              }
+            }
             if (!mounted) return
             if (profile) clearProfileErrorToast()
             setState((prev) => ({
@@ -253,7 +266,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (typeof cancelIdleCallback !== 'undefined' && idleId !== undefined) cancelIdleCallback(idleId)
             void runGetSessionAndContinue()
           }
-          const timeoutId = setTimeout(runOnce, 120)
+          const timeoutId = setTimeout(runOnce, 50)
           const idleId =
             typeof requestIdleCallback !== 'undefined'
               ? requestIdleCallback(runOnce, { timeout: 2000 })
@@ -297,6 +310,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               isLoading: false,
               error: null,
             }))
+          } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+            setState((prev) => ({ ...prev, session }))
+            try {
+              // userId + email fuer initAuth-Cache beibehalten (nicht mit access_token ueberschreiben)
+              sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify({
+                userId: session.user.id,
+                email: session.user.email ?? '',
+              }))
+            } catch { /* ignorieren */ }
+          } else if (event === 'INITIAL_SESSION' && session?.user) {
+            // Wenn der Cache bereits angezeigt wurde, nicht erneut fetchen – runGetSessionAndContinue erledigt das
+            if (displayedFromCacheRef.current) return
+            const userId = session.user.id
+            let profile = await fetchProfile(userId)
+            if (!mounted) return
+            if (!profile) {
+              try {
+                const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
+                if (raw) {
+                  const parsed = JSON.parse(raw) as { userId: string; profile: Profile }
+                  if (parsed.userId === userId && parsed.profile) profile = parsed.profile
+                }
+              } catch { /* Cache ungültig */ }
+            }
+            if (profile) clearProfileErrorToast()
+            setState((prev) => {
+              // Wenn inzwischen (durch runGetSessionAndContinue) bereits ein Profil gesetzt wurde, nicht ueberschreiben
+              if (prev.profile) return prev
+              return {
+                ...prev,
+                ...authReducer(session.user, session, profile),
+                isLoading: false,
+                error: null,
+              }
+            })
           } else if (event === 'SIGNED_OUT') {
           try {
             sessionStorage.removeItem(PROFILE_CACHE_KEY)
@@ -333,6 +381,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchProfile, setLoggedOutAndClearCache, clearProfileErrorToast])
 
   const loginWithEmail = useCallback(async (email: string, password: string) => {
+    const parsed = loginEmailSchema.safeParse({ email, password })
+    if (!parsed.success) {
+      const msg = parsed.error.issues[0]?.message ?? 'Ungültige Eingabe'
+      setState((prev) => ({ ...prev, error: msg }))
+      throw new Error(msg)
+    }
+
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
 
     const LOGIN_TIMEOUT = 15000
@@ -382,11 +437,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }))
         return
       }
-      const err = e as { type?: string }
-      const userMessage =
-        err?.type === 'auth' || err?.type === 'no_session'
-          ? 'Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.'
-          : 'Ein Fehler ist aufgetreten. Bitte versuche es erneut.'
+      const err = e as { type?: string; error?: { message?: string } }
+      const supabaseMsg = err?.error?.message?.toLowerCase() ?? ''
+      let userMessage: string
+      if (err?.type === 'auth' || err?.type === 'no_session') {
+        if (
+          supabaseMsg.includes('invalid login credentials') ||
+          supabaseMsg.includes('invalid_credentials')
+        ) {
+          userMessage = 'Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.'
+        } else if (supabaseMsg.includes('email not confirmed')) {
+          userMessage = 'Bitte bestätige zuerst deine E-Mail-Adresse.'
+        } else if (supabaseMsg.includes('too many') || supabaseMsg.includes('rate')) {
+          userMessage = 'Zu viele Anmeldeversuche. Bitte warte einen Moment.'
+        } else {
+          userMessage = 'Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.'
+          console.error('[Auth] Supabase-Fehler:', err?.error)
+        }
+      } else {
+        userMessage = 'Ein Fehler ist aufgetreten. Bitte versuche es erneut.'
+        console.error('[Auth] Login-Fehler:', e)
+      }
       setState((prev) => ({
         ...prev,
         isLoading: false,
@@ -397,6 +468,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchProfile, clearProfileErrorToast])
 
   const loginWithPersonalnummer = useCallback(async (personalnummer: string, password: string) => {
+    const parsed = loginPersonalnummerSchema.safeParse({ personalnummer, password })
+    if (!parsed.success) {
+      const msg = parsed.error.issues[0]?.message ?? 'Ungültige Eingabe'
+      setState((prev) => ({ ...prev, error: msg }))
+      throw new Error(msg)
+    }
+
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
 
     // RPC: Args-Typ aus Database['public']['Functions']['lookup_email_by_personalnummer']['Args']
@@ -406,13 +484,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ) as { data: string | null; error: { message: string } | null }
 
     if (lookupError || !email) {
-      const userMessage = 'Personalnummer nicht gefunden.'
+      const userMessage = 'Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.'
       setState((prev) => ({
         ...prev,
         isLoading: false,
         error: userMessage,
       }))
-      throw new Error(lookupError?.message || userMessage)
+      throw new Error(userMessage)
     }
 
     return loginWithEmail(email, password)
@@ -436,11 +514,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (profileError) throw profileError
 
-      setState((prev) => ({
-        ...prev,
-        mustChangePassword: false,
-        profile: prev.profile ? { ...prev.profile, must_change_password: false } : null,
-      }))
+      setState((prev) => {
+        const updatedProfile = prev.profile ? { ...prev.profile, must_change_password: false } : null
+        if (updatedProfile) {
+          try {
+            sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ userId: uid, profile: updatedProfile }))
+          } catch { /* sessionStorage voll – ignorieren */ }
+        }
+        return {
+          ...prev,
+          mustChangePassword: false,
+          profile: updatedProfile,
+        }
+      })
     }
   }, [state.user?.id])
 
@@ -452,8 +538,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
-    await supabase.auth.signOut()
-  }, [])
+    // Sofort: UI zuruecksetzen (optimistisches Logout)
+    setLoggedOutAndClearCache()
+    const LOGOUT_TIMEOUT_MS = 5000
+    try {
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Logout-Timeout')), LOGOUT_TIMEOUT_MS),
+        ),
+      ])
+    } catch {
+      // signOut fehlgeschlagen (Netzwerk, Timeout) – Auth-Daten lokal loeschen
+      clearSupabaseAuthStorage()
+    }
+  }, [setLoggedOutAndClearCache])
 
   const refreshProfile = useCallback(async () => {
     const uid = state.user?.id
@@ -469,7 +568,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.user?.id, fetchProfile, clearProfileErrorToast])
 
-  const value: AuthContextValue = {
+  const clearError = useCallback(() => {
+    setState((prev) => (prev.error ? { ...prev, error: null } : prev))
+  }, [])
+
+  const value: AuthContextValue = useMemo(() => ({
     ...state,
     loginWithEmail,
     loginWithPersonalnummer,
@@ -477,7 +580,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     requestPasswordReset,
     logout,
     refreshProfile,
-  }
+    clearError,
+  }), [state, loginWithEmail, loginWithPersonalnummer, changePassword, requestPasswordReset, logout, refreshProfile, clearError])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -7,15 +7,17 @@ export function useStoresByCompany(companyId: string | undefined) {
   return useQuery({
     queryKey: ['stores', companyId],
     queryFn: async () => {
+      if (!companyId) throw new Error('Keine Firma angegeben.')
       const { data, error } = await supabase
         .from('stores' as never)
         .select('*')
-        .eq('company_id', companyId!)
+        .eq('company_id', companyId)
         .order('created_at', { ascending: true })
       if (error) throw error
       return data as unknown as Store[]
     },
     enabled: !!companyId,
+    staleTime: 5 * 60 * 1000,
   })
 }
 
@@ -30,6 +32,7 @@ export function useAllStores() {
       if (error) throw error
       return data as unknown as Store[]
     },
+    staleTime: 5 * 60 * 1000,
   })
 }
 
@@ -37,15 +40,17 @@ export function useStoreById(storeId: string | undefined) {
   return useQuery({
     queryKey: ['stores', 'detail', storeId],
     queryFn: async () => {
+      if (!storeId) throw new Error('Kein Markt angegeben.')
       const { data, error } = await supabase
         .from('stores' as never)
         .select('*')
-        .eq('id', storeId!)
+        .eq('id', storeId)
         .single()
       if (error) throw error
       return data as unknown as Store
     },
     enabled: !!storeId,
+    staleTime: 5 * 60 * 1000,
   })
 }
 

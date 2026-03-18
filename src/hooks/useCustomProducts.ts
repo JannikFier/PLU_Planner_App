@@ -1,11 +1,11 @@
 // Custom Products: Globale eigene Produkte (CRUD)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryRest, isTestModeActive } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { toast } from 'sonner'
-import type { CustomProduct, Database } from '@/types/database'
+import type { CustomProduct, Database, MasterPLUItem } from '@/types/database'
 
 /** Alle globalen Custom Products laden */
 export function useCustomProducts() {
@@ -15,14 +15,12 @@ export function useCustomProducts() {
     queryKey: ['custom-products', currentStoreId],
     staleTime: 2 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('custom_products')
-        .select('*')
-        .eq('store_id', currentStoreId!)
-        .order('name')
-
-      if (error) throw error
-      return (data ?? []) as CustomProduct[]
+      const data = await queryRest<CustomProduct[]>('custom_products', {
+        select: '*',
+        store_id: `eq.${currentStoreId}`,
+        order: 'name.asc',
+      })
+      return data ?? []
     },
     enabled: !!currentStoreId,
   })
@@ -43,6 +41,27 @@ export function useAddCustomProduct() {
       block_id?: string | null
     }) => {
       if (!user) throw new Error('Nicht eingeloggt')
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+
+      if (isTestModeActive()) {
+        const fake: CustomProduct = {
+          id: crypto.randomUUID(),
+          plu: product.plu,
+          name: product.name,
+          item_type: product.item_type,
+          preis: product.preis ?? null,
+          block_id: product.block_id ?? null,
+          created_by: user.id,
+          store_id: currentStoreId,
+          created_at: new Date().toISOString(),
+        } as CustomProduct
+
+        queryClient.setQueryData<CustomProduct[]>(
+          ['custom-products', currentStoreId],
+          (old) => [...(old ?? []), fake],
+        )
+        return fake
+      }
 
       const { data, error } = await supabase
         .from('custom_products')
@@ -54,7 +73,7 @@ export function useAddCustomProduct() {
           preis: product.preis ?? null,
           block_id: product.block_id ?? null,
           created_by: user.id,
-          store_id: currentStoreId!,
+          store_id: currentStoreId,
         } as Database['public']['Tables']['custom_products']['Insert']) as never
       )
         .select()
@@ -64,7 +83,9 @@ export function useAddCustomProduct() {
       return data as CustomProduct
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom-products', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['custom-products', currentStoreId] })
+      }
       toast.success('Eigenes Produkt hinzugefügt')
     },
     onError: () => {
@@ -90,7 +111,27 @@ export function useAddCustomProductsBatch() {
       }>,
     ) => {
       if (!user) throw new Error('Nicht eingeloggt')
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       if (products.length === 0) return []
+
+      if (isTestModeActive()) {
+        const fakes = products.map((p) => ({
+          id: crypto.randomUUID(),
+          plu: p.plu,
+          name: p.name,
+          item_type: p.item_type,
+          preis: p.preis ?? null,
+          block_id: p.block_id ?? null,
+          created_by: user.id,
+          store_id: currentStoreId,
+          created_at: new Date().toISOString(),
+        } as CustomProduct))
+        queryClient.setQueryData<CustomProduct[]>(
+          ['custom-products', currentStoreId],
+          (old) => [...(old ?? []), ...fakes],
+        )
+        return fakes
+      }
 
       const rows = products.map((p) => ({
         plu: p.plu,
@@ -99,7 +140,7 @@ export function useAddCustomProductsBatch() {
         preis: p.preis ?? null,
         block_id: p.block_id ?? null,
         created_by: user.id,
-        store_id: currentStoreId!,
+        store_id: currentStoreId,
       }))
 
       const { data, error } = await supabase
@@ -111,7 +152,9 @@ export function useAddCustomProductsBatch() {
       return (data ?? []) as CustomProduct[]
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['custom-products', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['custom-products', currentStoreId] })
+      }
       const count = data.length
       toast.success(`${count} Produkt${count === 1 ? '' : 'e'} hinzugefügt`)
     },
@@ -137,6 +180,14 @@ export function useUpdateCustomProduct() {
       block_id?: string | null
       item_type?: 'PIECE' | 'WEIGHT'
     }) => {
+      if (isTestModeActive()) {
+        queryClient.setQueryData<CustomProduct[]>(
+          ['custom-products', currentStoreId],
+          (old) => (old ?? []).map((p) => p.id === id ? { ...p, ...updates } : p),
+        )
+        return
+      }
+
       const { error } = await supabase
         .from('custom_products')
         .update((updates as Database['public']['Tables']['custom_products']['Update']) as never)
@@ -145,7 +196,9 @@ export function useUpdateCustomProduct() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom-products', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['custom-products', currentStoreId] })
+      }
       toast.success('Produkt aktualisiert')
     },
     onError: (error) => {
@@ -161,6 +214,14 @@ export function useDeleteCustomProduct() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isTestModeActive()) {
+        queryClient.setQueryData<CustomProduct[]>(
+          ['custom-products', currentStoreId],
+          (old) => (old ?? []).filter((p) => p.id !== id),
+        )
+        return
+      }
+
       const { error } = await supabase
         .from('custom_products')
         .delete()
@@ -169,7 +230,9 @@ export function useDeleteCustomProduct() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['custom-products', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['custom-products', currentStoreId] })
+      }
       toast.success('Eigenes Produkt gelöscht')
     },
     onError: (error) => {
@@ -184,6 +247,16 @@ export function useRenameMasterProduct() {
 
   return useMutation({
     mutationFn: async ({ id, displayName }: { id: string; displayName: string }) => {
+      if (isTestModeActive()) {
+        queryClient.setQueriesData<MasterPLUItem[]>(
+          { queryKey: ['plu-items'] },
+          (old) => (old ?? []).map((item) =>
+            item.id === id ? { ...item, display_name: displayName, is_manually_renamed: true } : item,
+          ),
+        )
+        return
+      }
+
       const { error } = await supabase.rpc('rename_master_plu_item', {
         item_id: id,
         new_display_name: displayName,
@@ -192,7 +265,10 @@ export function useRenameMasterProduct() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['plu-items'] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['plu-items'] })
+        queryClient.invalidateQueries({ queryKey: ['renamed-items'] })
+      }
       toast.success('Produktname geändert')
     },
     onError: (error) => {
@@ -207,6 +283,16 @@ export function useResetProductName() {
 
   return useMutation({
     mutationFn: async ({ id, systemName }: { id: string; systemName: string }) => {
+      if (isTestModeActive()) {
+        queryClient.setQueriesData<MasterPLUItem[]>(
+          { queryKey: ['plu-items'] },
+          (old) => (old ?? []).map((item) =>
+            item.id === id ? { ...item, display_name: systemName, is_manually_renamed: false } : item,
+          ),
+        )
+        return
+      }
+
       const { error } = await supabase.rpc('reset_master_plu_item_display_name', {
         item_id: id,
         system_name: systemName,
@@ -215,7 +301,10 @@ export function useResetProductName() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['plu-items'] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['plu-items'] })
+        queryClient.invalidateQueries({ queryKey: ['renamed-items'] })
+      }
       toast.success('Produktname zurückgesetzt')
     },
     onError: (error) => {

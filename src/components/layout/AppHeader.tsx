@@ -1,8 +1,9 @@
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useStoreAccessByUser } from '@/hooks/useStoreAccess'
 import { useAllStores } from '@/hooks/useStores'
+import { useCompanyById } from '@/hooks/useCompanies'
 import { buildStoreUrl } from '@/lib/subdomain'
 import { Button } from '@/components/ui/button'
 import {
@@ -35,6 +36,19 @@ export function AppHeader() {
   const { data: allStores } = useAllStores()
   const navigate = useNavigate()
   const location = useLocation()
+  const { companyId, storeId } = useParams<{ companyId?: string; storeId?: string }>()
+  const { data: headerCompany } = useCompanyById(
+    isSuperAdmin && companyId && !storeId ? companyId : undefined
+  )
+
+  // Super-Admin: Kontext für Kopfzeile – Dashboard/Global = kein Markt, Firma = Firmenname, Laden = Marktname
+  const isSuperAdminStoreDetail = Boolean(
+    isSuperAdmin && location.pathname.match(/^\/super-admin\/companies\/[^/]+\/stores\/[^/]+$/)
+  )
+  const isSuperAdminCompanyDetail = Boolean(
+    isSuperAdmin && companyId && !storeId && location.pathname.startsWith(`/super-admin/companies/${companyId}`)
+  )
+  const isSuperAdminGlobal = isSuperAdmin && !isSuperAdminStoreDetail && !isSuperAdminCompanyDetail
 
   const appDomain = import.meta.env.VITE_APP_DOMAIN || 'localhost'
 
@@ -88,10 +102,12 @@ export function AppHeader() {
 
   /** Zurueck-Ziel fuer Super-Admin-Bereich – neue Hierarchie mit Upload/Firmen-Trennung */
   function getSuperAdminBackTarget(path: string): string | null {
-    // Wurde von einer Markt-Detailseite hierher navigiert? location.state.backTo nutzen.
+    // Wurde von einer Markt-Detailseite hierher navigiert? state oder URL (bleibt nach Reload erhalten)
     const stateBackTo = (location.state as { backTo?: string } | null)?.backTo
-    if (stateBackTo && path.startsWith('/super-admin/') && !path.startsWith('/super-admin/companies')) {
-      return stateBackTo
+    const queryBackTo = new URLSearchParams(location.search).get('backTo')
+    const backTo = stateBackTo || queryBackTo
+    if (backTo && path.startsWith('/super-admin/') && !path.startsWith('/super-admin/companies')) {
+      return backTo
     }
 
     // Dashboard = Startseite
@@ -171,8 +187,13 @@ export function AppHeader() {
   const RoleIcon = isSuperAdmin ? Crown : isAdmin ? Shield : Eye
 
   const handleLogout = async () => {
-    await logout()
-    navigate('/login')
+    try {
+      await logout()
+    } catch {
+      // State ist trotzdem geleert, Redirect ausführen
+    } finally {
+      navigate('/login')
+    }
   }
 
   return (
@@ -200,16 +221,27 @@ export function AppHeader() {
             </div>
             <div className="min-w-0">
               <h1 className="text-lg font-semibold leading-tight">PLU Planner</h1>
-              {storeName && !isAdminDomain && (
-                <span className="text-xs text-muted-foreground truncate block max-w-[150px] sm:max-w-none">{storeName}</span>
-              )}
-              {isAdminDomain && isSuperAdmin && (
+              {/* Super-Admin: Dashboard/Global = kein Markt, Firma = Firmenname, Laden = Marktname */}
+              {isSuperAdminGlobal && (
                 <span className="text-xs text-muted-foreground">Super-Administration</span>
               )}
-              {!isAdminDomain && !storeName && isAdmin && !isSuperAdmin && (
+              {isSuperAdminStoreDetail && storeName && (
+                <span className="text-xs text-muted-foreground truncate block max-w-[150px] sm:max-w-none">{storeName}</span>
+              )}
+              {isSuperAdminCompanyDetail && headerCompany?.name && (
+                <span className="text-xs text-muted-foreground truncate block max-w-[150px] sm:max-w-none">{headerCompany.name}</span>
+              )}
+              {/* Admin/User/Viewer (nicht Super-Admin) */}
+              {!isSuperAdmin && storeName && !isAdminDomain && (
+                <span className="text-xs text-muted-foreground truncate block max-w-[150px] sm:max-w-none">{storeName}</span>
+              )}
+              {!isSuperAdmin && isAdminDomain && isAdmin && (
                 <span className="text-xs text-muted-foreground">Administration</span>
               )}
-              {!isAdminDomain && !storeName && isViewer && (
+              {!isSuperAdmin && !isAdminDomain && !storeName && isAdmin && (
+                <span className="text-xs text-muted-foreground">Administration</span>
+              )}
+              {!isSuperAdmin && !isAdminDomain && !storeName && isViewer && (
                 <span className="text-xs text-muted-foreground">Nur Ansicht</span>
               )}
             </div>

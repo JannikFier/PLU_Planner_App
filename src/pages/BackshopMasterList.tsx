@@ -1,6 +1,6 @@
 // BackshopMasterList – Backshop-PLU-Tabelle (Bild | PLU | Name)
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
@@ -12,7 +12,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { KWSelector } from '@/components/plu/KWSelector'
 import { PLUTable } from '@/components/plu/PLUTable'
 import { PLUFooter } from '@/components/plu/PLUFooter'
-import { ExportBackshopPDFDialog } from '@/components/plu/ExportBackshopPDFDialog'
+const ExportBackshopPDFDialog = lazy(() =>
+  import('@/components/plu/ExportBackshopPDFDialog').then((m) => ({ default: m.ExportBackshopPDFDialog })),
+)
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useBackshopVersions } from '@/hooks/useBackshopVersions'
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
@@ -35,16 +37,13 @@ import { getActiveOfferPLUs } from '@/lib/offer-utils'
 export function BackshopMasterList() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { profile } = useAuth()
+  const { isViewer, isSuperAdmin } = useAuth()
 
   const rolePrefix =
     location.pathname.startsWith('/super-admin') ? '/super-admin'
     : location.pathname.startsWith('/admin') ? '/admin'
     : location.pathname.startsWith('/viewer') ? '/viewer'
     : '/user'
-  const isViewer = profile?.role === 'viewer'
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
-  const isSuperAdmin = profile?.role === 'super_admin'
 
   const { data: activeVersion, isLoading: versionLoading } = useActiveBackshopVersion()
   const { data: versions = [], isLoading: versionsLoading } = useBackshopVersions()
@@ -59,6 +58,7 @@ export function BackshopMasterList() {
   const {
     data: rawItems = [],
     isLoading: itemsLoading,
+    isRefetching: itemsRefetching,
     error: itemsError,
     refetch: refetchItems,
   } = useBackshopPLUData(effectiveVersionId)
@@ -154,6 +154,16 @@ export function BackshopMasterList() {
     setShowPdfDialog(true)
   }
 
+  // Tab wurde sichtbar: Browser throttelt Hintergrund-Tabs – Re-Render erzwingen
+  const [, setVisibilityTick] = useState(0)
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') setVisibilityTick((t) => t + 1)
+    }
+    document.addEventListener('visibilitychange', handler)
+    return () => document.removeEventListener('visibilitychange', handler)
+  }, [])
+
   const isLoading = versionLoading || versionsLoading || itemsLoading
   const hasNoVersion = !versionLoading && !versionsLoading && !activeVersion && versions.length === 0
 
@@ -201,7 +211,10 @@ export function BackshopMasterList() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate(`${rolePrefix}/backshop-custom-products`)}
+                  onClick={() => {
+                    const backTo = location.pathname + location.search
+                    navigate(`${rolePrefix}/backshop-custom-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                  }}
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   Eigene Produkte
@@ -209,7 +222,10 @@ export function BackshopMasterList() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate(`${rolePrefix}/backshop-hidden-products`)}
+                  onClick={() => {
+                    const backTo = location.pathname + location.search
+                    navigate(`${rolePrefix}/backshop-hidden-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                  }}
                 >
                   <EyeOff className="h-4 w-4 mr-1" />
                   Ausgeblendete
@@ -217,7 +233,10 @@ export function BackshopMasterList() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate(`${rolePrefix}/backshop-offer-products`)}
+                  onClick={() => {
+                    const backTo = location.pathname + location.search
+                    navigate(`${rolePrefix}/backshop-offer-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                  }}
                 >
                   <Megaphone className="h-4 w-4 mr-1" />
                   Werbung
@@ -226,18 +245,24 @@ export function BackshopMasterList() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate(`${rolePrefix}/backshop-warengruppen`)}
+                    onClick={() => {
+                      const backTo = location.pathname + location.search
+                      navigate(`${rolePrefix}/backshop-warengruppen?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                    }}
                   >
                     Warengruppen bearbeiten
                   </Button>
                 )}
               </>
             )}
-            {isAdmin && (
+            {!isViewer && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(`${rolePrefix}/backshop-renamed-products`)}
+                onClick={() => {
+                  const backTo = location.pathname + location.search
+                  navigate(`${rolePrefix}/backshop-renamed-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                }}
               >
                 <Pencil className="h-4 w-4 mr-1" />
                 Umbenennen
@@ -269,7 +294,7 @@ export function BackshopMasterList() {
           </Card>
         )}
 
-        {isLoading && !hasNoVersion && (
+        {(isLoading || (itemsError && itemsRefetching)) && !hasNoVersion && (
           <Card>
             <CardContent className="p-6 space-y-3">
               <div className="flex gap-4">
@@ -286,7 +311,7 @@ export function BackshopMasterList() {
           </Card>
         )}
 
-        {itemsError && !isLoading && !hasNoVersion && (
+        {itemsError && !isLoading && !itemsRefetching && !hasNoVersion && (
           <Card>
             <CardContent className="flex items-center gap-4 p-6">
               <AlertCircle className="h-8 w-8 text-destructive shrink-0" />
@@ -332,7 +357,8 @@ export function BackshopMasterList() {
         )}
 
         {showPdfDialog && (
-          <ExportBackshopPDFDialog
+          <Suspense fallback={null}>
+            <ExportBackshopPDFDialog
             open={showPdfDialog}
             onOpenChange={setShowPdfDialog}
             items={pdfDisplayResult.items}
@@ -347,6 +373,7 @@ export function BackshopMasterList() {
             fontSizes={fontSizes}
             pageBreakPerBlock={layoutSettings?.page_break_per_block ?? false}
           />
+          </Suspense>
         )}
       </div>
     </DashboardLayout>

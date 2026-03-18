@@ -110,6 +110,7 @@ export function EditBackshopCustomProductDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
         <div className="space-y-4 py-4">
           <div className="rounded-md bg-muted px-3 py-2 text-sm font-mono text-muted-foreground">
             PLU: {product.plu}
@@ -212,16 +213,17 @@ export function EditBackshopCustomProductDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Abbrechen
           </Button>
           <Button
-            onClick={handleSubmit}
+            type="submit"
             disabled={updateProduct.isPending || !name.trim() || name.trim().length < 2}
           >
             {updateProduct.isPending ? 'Speichern…' : 'Speichern'}
           </Button>
         </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

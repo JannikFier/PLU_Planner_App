@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
+import { queryRest } from '@/lib/supabase'
 import type { BackshopMasterPLUItem } from '@/types/database'
 
 export interface UseBackshopPLUDataOptions {
@@ -11,7 +11,7 @@ export interface UseBackshopPLUDataOptions {
 
 /**
  * Lädt alle backshop_master_plu_items für eine gegebene Backshop-Version-ID.
- * Sortierung: alphabetisch nach system_name.
+ * Nutzt queryRest (direkter REST-Call) statt supabase.from() um Hanging zu vermeiden.
  */
 export function useBackshopPLUData(
   versionId: string | undefined,
@@ -25,18 +25,17 @@ export function useBackshopPLUData(
     queryFn: async () => {
       if (!versionId) return []
 
-      const { data, error } = await supabase
-        .from('backshop_master_plu_items')
-        .select('*')
-        .eq('version_id', versionId)
-        .order('system_name', { ascending: true })
-
-      if (error) {
-        toast.error('Backshop-PLU-Items laden fehlgeschlagen: ' + (error?.message ?? 'Unbekannter Fehler'))
-        throw error
+      try {
+        const data = await queryRest<BackshopMasterPLUItem[]>('backshop_master_plu_items', {
+          select: '*',
+          version_id: `eq.${versionId}`,
+          order: 'system_name.asc',
+        })
+        return data ?? []
+      } catch (err) {
+        toast.error('Backshop-PLU-Items laden fehlgeschlagen: ' + ((err as Error)?.message ?? 'Unbekannter Fehler'))
+        throw err
       }
-
-      return (data ?? []) as BackshopMasterPLUItem[]
     },
   })
 }

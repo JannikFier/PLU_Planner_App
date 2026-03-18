@@ -467,8 +467,9 @@ export async function extractImagesFromBackshopExcel(
     }
     if (out.length === 0 && media && Array.isArray(media) && media.length > 0 && parsedRows && parsedRows.length > 0) {
       const rowsWithPos = parsedRows
-        .filter((r) => r.imageSheetRow0 != null && r.imageSheetCol0 != null)
-        .sort((a, b) => (a.imageSheetRow0! - b.imageSheetRow0!) || (a.imageSheetCol0! - b.imageSheetCol0!))
+        .filter((r): r is typeof r & { imageSheetRow0: number; imageSheetCol0: number } =>
+          r.imageSheetRow0 != null && r.imageSheetCol0 != null)
+        .sort((a, b) => (a.imageSheetRow0 - b.imageSheetRow0) || (a.imageSheetCol0 - b.imageSheetCol0))
       const n = Math.min(rowsWithPos.length, media.length)
       for (let i = 0; i < n; i++) {
         const row = rowsWithPos[i]
@@ -478,13 +479,13 @@ export async function extractImagesFromBackshopExcel(
         if (rawExt === 'emf' || rawExt === 'wmf') {
           const { buffer: rawBuf } = mediaItemToBufferAndExt(mediaItem)
           const converted = await tryConvertEmfToPng(rawBuf)
-          if (converted) out.push({ row: row.imageSheetRow0!, col: row.imageSheetCol0!, buffer: converted.buffer, extension: converted.extension })
+          if (converted) out.push({ row: row.imageSheetRow0, col: row.imageSheetCol0, buffer: converted.buffer, extension: converted.extension })
           continue
         }
         const { buffer, extension } = mediaItemToBufferAndExt(mediaItem)
         out.push({
-          row: row.imageSheetRow0!,
-          col: row.imageSheetCol0!,
+          row: row.imageSheetRow0,
+          col: row.imageSheetCol0,
           buffer,
           extension,
         })
@@ -635,7 +636,7 @@ export async function uploadBackshopImagesAndAssignUrls(
           })
 
         if (uploadErr) {
-          console.warn(`Backshop-Bild Upload fehlgeschlagen für PLU ${row.plu}:`, uploadErr.message)
+          if (import.meta.env.DEV) console.warn(`Backshop-Bild Upload fehlgeschlagen für PLU ${row.plu}:`, uploadErr.message)
           return null
         }
 
@@ -695,7 +696,7 @@ export async function uploadManualImage(
         upsert: true,
       })
     if (error) {
-      console.warn(`Manuelles Bild-Upload fehlgeschlagen für PLU ${plu}:`, error.message)
+      if (import.meta.env.DEV) console.warn(`Manuelles Bild-Upload fehlgeschlagen für PLU ${plu}:`, error.message)
       return null
     }
     const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_EXPIRES_IN)
@@ -703,7 +704,7 @@ export async function uploadManualImage(
     const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(path)
     return publicData.publicUrl
   } catch (err) {
-    console.warn('Manuelles Bild-Upload Fehler:', err)
+    if (import.meta.env.DEV) console.warn('Manuelles Bild-Upload Fehler:', err)
     return null
   }
 }

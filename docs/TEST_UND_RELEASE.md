@@ -6,7 +6,8 @@ Diese Datei dient als zentrale Übersicht aller App-Bereiche und als Checkliste 
 
 - [ ] **Unit-Tests:** `npm run test:run` – alle grün
 - [ ] **Build:** `npm run build` – ohne Fehler
-- [ ] **E2E (optional):** Dev-Server starten, dann `npm run test:e2e` – siehe Abschnitt E2E unten
+- [ ] **E2E Standard:** `npm run test:e2e` – Smoke-Tests (Login, Redirects), ohne .env.e2e
+- [ ] **E2E Full (empfohlen vor Publish):** `npm run test:e2e:full` – alle Journeys, braucht .env.e2e mit Test-Accounts
 - [ ] **Manuelle Checkliste** unten pro Rolle durchgehen (mindestens Smoke)
 
 ---
@@ -25,9 +26,12 @@ Welche Rolle darf welche Route nutzen? Super-Admin hat Zugriff auf alle Bereiche
 | `/user/hidden-items` | ❌ | ✅ | ❌ | ❌ |
 | `/user/custom-products` | ❌ | ✅ | ❌ | ❌ |
 | `/user/hidden-products` | ❌ | ✅ | ❌ | ❌ |
+| `/user/offer-products` | ❌ | ✅ | ❌ | ❌ |
+| `/user/renamed-products` | ❌ | ✅ | ❌ | ❌ |
 | `/user/backshop-list` | ❌ | ✅ | ❌ | ❌ |
 | `/user/backshop-custom-products` | ❌ | ✅ | ❌ | ❌ |
 | `/user/backshop-hidden-products` | ❌ | ✅ | ❌ | ❌ |
+| `/user/backshop-offer-products` | ❌ | ✅ | ❌ | ❌ |
 | `/user/backshop-renamed-products` | ❌ | ✅ | ❌ | ❌ |
 | **Viewer-Bereich** | | | | |
 | `/viewer` | ✅ | ❌→/user | ❌→/admin | ❌→/super-admin |
@@ -39,10 +43,12 @@ Welche Rolle darf welche Route nutzen? Super-Admin hat Zugriff auf alle Bereiche
 | `/admin/hidden-items` | ❌ | ❌ | ✅ | ❌ |
 | `/admin/custom-products` | ❌ | ❌ | ✅ | ❌ |
 | `/admin/hidden-products` | ❌ | ❌ | ✅ | ❌ |
+| `/admin/offer-products` | ❌ | ❌ | ✅ | ❌ |
 | `/admin/renamed-products` | ❌ | ❌ | ✅ | ❌ |
 | `/admin/backshop-list` | ❌ | ❌ | ✅ | ❌ |
 | `/admin/backshop-custom-products` | ❌ | ❌ | ✅ | ❌ |
 | `/admin/backshop-hidden-products` | ❌ | ❌ | ✅ | ❌ |
+| `/admin/backshop-offer-products` | ❌ | ❌ | ✅ | ❌ |
 | `/admin/backshop-renamed-products` | ❌ | ❌ | ✅ | ❌ |
 | `/admin/users` | ❌ | ❌ | ✅ | ❌ |
 | **Super-Admin-Bereich** | | | | |
@@ -53,11 +59,13 @@ Welche Rolle darf welche Route nutzen? Super-Admin hat Zugriff auf alle Bereiche
 | `/super-admin/hidden-items` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/custom-products` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/hidden-products` | ❌ | ❌ | ❌ | ✅ |
+| `/super-admin/offer-products` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/renamed-products` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/plu-upload` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/backshop-list` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/backshop-custom-products` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/backshop-hidden-products` | ❌ | ❌ | ❌ | ✅ |
+| `/super-admin/backshop-offer-products` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/backshop-renamed-products` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/backshop-upload` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/layout` | ❌ | ❌ | ❌ | ✅ |

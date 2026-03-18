@@ -1,7 +1,7 @@
 // Backshop-Benachrichtigungen: backshop_version_notifications, neue/geänderte Backshop-Items
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryRest, queryRestCount } from '@/lib/supabase'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
@@ -17,15 +17,14 @@ export function useBackshopActiveVersionChangeCount() {
     queryKey: ['backshop-active-version-change-count', activeVersion?.id],
     queryFn: async () => {
       if (!activeVersion?.id) return 0
-      const { count, error } = await supabase
-        .from('backshop_master_plu_items')
-        .select('*', { count: 'exact', head: true })
-        .eq('version_id', activeVersion.id)
-        .in('status', ['NEW_PRODUCT_YELLOW', 'PLU_CHANGED_RED'])
-      if (error) throw error
-      return count ?? 0
+      return queryRestCount('backshop_master_plu_items', {
+        select: '*',
+        version_id: `eq.${activeVersion.id}`,
+        status: 'in.(NEW_PRODUCT_YELLOW,PLU_CHANGED_RED)',
+      })
     },
     enabled: !!activeVersion?.id,
+    staleTime: 30 * 1000,
   })
 }
 
@@ -38,18 +37,17 @@ export function useBackshopUnreadNotificationCount() {
     queryKey: ['backshop-notification-count', currentStoreId],
     queryFn: () =>
       withRetryOnAbort(async () => {
-        if (!user) return 0
-        const { count, error } = await supabase
-          .from('backshop_version_notifications')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('is_read', false)
-          .eq('store_id', currentStoreId!)
-        if (error) throw error
-        return count ?? 0
+        if (!user || !currentStoreId) return 0
+        return queryRestCount('backshop_version_notifications', {
+          select: '*',
+          user_id: `eq.${user.id}`,
+          is_read: 'eq.false',
+          store_id: `eq.${currentStoreId}`,
+        })
       }),
     enabled: !!user && !!currentStoreId,
     refetchInterval: 30000,
+    staleTime: 30 * 1000,
   })
 }
 
@@ -62,6 +60,7 @@ export function useBackshopMarkNotificationRead() {
   return useMutation({
     mutationFn: async (versionId: string) => {
       if (!user) throw new Error('Nicht eingeloggt')
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       const { error } = await supabase
         .from('backshop_version_notifications')
         .update(
@@ -72,7 +71,7 @@ export function useBackshopMarkNotificationRead() {
         )
         .eq('user_id', user.id)
         .eq('version_id', versionId)
-        .eq('store_id', currentStoreId!)
+        .eq('store_id', currentStoreId)
       if (error) throw error
     },
     onSuccess: (_, versionId) => {
@@ -91,16 +90,16 @@ export function useBackshopNewProducts(versionId: string | undefined) {
     queryKey: ['backshop-new-products', versionId],
     queryFn: async () => {
       if (!versionId) return []
-      const { data, error } = await supabase
-        .from('backshop_master_plu_items')
-        .select('*')
-        .eq('version_id', versionId)
-        .eq('status', 'NEW_PRODUCT_YELLOW')
-        .order('system_name')
-      if (error) throw error
-      return (data ?? []) as BackshopMasterPLUItem[]
+      const data = await queryRest<BackshopMasterPLUItem[]>('backshop_master_plu_items', {
+        select: '*',
+        version_id: `eq.${versionId}`,
+        status: 'eq.NEW_PRODUCT_YELLOW',
+        order: 'system_name.asc',
+      })
+      return data ?? []
     },
     enabled: !!versionId,
+    staleTime: 30 * 1000,
   })
 }
 
@@ -110,15 +109,15 @@ export function useBackshopChangedProducts(versionId: string | undefined) {
     queryKey: ['backshop-changed-products', versionId],
     queryFn: async () => {
       if (!versionId) return []
-      const { data, error } = await supabase
-        .from('backshop_master_plu_items')
-        .select('*')
-        .eq('version_id', versionId)
-        .eq('status', 'PLU_CHANGED_RED')
-        .order('system_name')
-      if (error) throw error
-      return (data ?? []) as BackshopMasterPLUItem[]
+      const data = await queryRest<BackshopMasterPLUItem[]>('backshop_master_plu_items', {
+        select: '*',
+        version_id: `eq.${versionId}`,
+        status: 'eq.PLU_CHANGED_RED',
+        order: 'system_name.asc',
+      })
+      return data ?? []
     },
     enabled: !!versionId,
+    staleTime: 30 * 1000,
   })
 }

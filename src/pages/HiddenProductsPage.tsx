@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EyeOff, Undo2, Pencil } from 'lucide-react'
 import { useHiddenItems, useUnhideProduct } from '@/hooks/useHiddenItems'
+import { useLayoutSettings } from '@/hooks/useLayoutSettings'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
 import { useCustomProducts } from '@/hooks/useCustomProducts'
@@ -40,13 +41,15 @@ export function HiddenProductsPage() {
   const [showHideDialog, setShowHideDialog] = useState(false)
   const [editingProduct, setEditingProduct] = useState<CustomProduct | null>(null)
 
-  const { data: hiddenItems = [], isLoading: hiddenLoading } = useHiddenItems()
+  const { data: hiddenItems = [], isLoading: hiddenLoading, isError: hiddenError } = useHiddenItems()
   const { data: activeVersion } = useActiveVersion()
   const { data: masterItems = [] } = usePLUData(activeVersion?.id)
   const { data: customProducts = [] } = useCustomProducts()
   const { data: blocks = [] } = useBlocks()
+  const { data: layoutSettings } = useLayoutSettings()
   const unhideProduct = useUnhideProduct()
 
+  const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
   const hiddenPLUSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
   const searchableItems = useMemo(() => {
     const master = masterItems
@@ -56,6 +59,7 @@ export function HiddenProductsPage() {
         plu: m.plu,
         display_name: m.display_name ?? m.system_name,
         system_name: m.system_name,
+        item_type: m.item_type as 'PIECE' | 'WEIGHT',
       }))
     const custom = customProducts
       .filter((c) => !hiddenPLUSet.has(c.plu))
@@ -64,6 +68,7 @@ export function HiddenProductsPage() {
         plu: c.plu,
         display_name: c.name,
         system_name: c.name,
+        item_type: c.item_type as 'PIECE' | 'WEIGHT',
       }))
     return [...master, ...custom]
   }, [masterItems, customProducts, hiddenPLUSet])
@@ -134,6 +139,19 @@ export function HiddenProductsPage() {
       }
     })
   }, [hiddenItems, masterItems, customProducts, profileMap])
+
+  if (hiddenError) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+            <p className="font-medium">Fehler beim Laden der Daten</p>
+            <p className="text-sm mt-1">Bitte lade die Seite neu oder versuche es später erneut.</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   return (
     <DashboardLayout>
@@ -228,7 +246,7 @@ export function HiddenProductsPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => setEditingProduct(info.customProduct!)}
+                              onClick={() => { if (info.customProduct) setEditingProduct(info.customProduct) }}
                             >
                               <Pencil className="h-3 w-3 mr-1" />
                               Bearbeiten
@@ -257,6 +275,7 @@ export function HiddenProductsPage() {
           open={showHideDialog}
           onOpenChange={setShowHideDialog}
           searchableItems={searchableItems}
+          displayMode={displayMode}
         />
 
         {editingProduct && (

@@ -1,0 +1,28 @@
+---
+description: Auth- und Lade-Architektur – eine klare Schichtentrennung
+alwaysApply: true
+---
+
+# Auth-Architektur
+
+## Eine Struktur, keine Duplikate
+
+- **Nur AuthContext** reagiert auf Supabase Auth-Events (onAuthStateChange).
+- StoreContext, Prefetch und UI reagieren auf den **Auth-State**, nicht auf Supabase.
+- Kein zweiter Auth-Listener in StoreContext oder anderswo.
+
+## Schichten (von unten nach oben)
+
+1. **Auth:** Session + Profil. Quelle: AuthContext. Keine Abhängigkeiten.
+2. **Store:** Aktueller Markt. Nutzt Auth (user, profile). Keine eigene Profil-Abfrage.
+3. **Prefetch:** Daten vorladen. Nutzt Auth + Store. Kein blockierender Session-Check vor Prefetch.
+4. **UI:** Rendern. Nutzt Auth + Store.
+
+## Provider-Reihenfolge
+
+AuthProvider → StoreProvider (Store braucht Auth)
+
+## Fehlerbehandlung Auth
+
+- Login-Fehler: Echte Ursache anzeigen oder loggen, nicht immer „Zugangsdaten falsch“.
+- Logout: Optimistisch – sofort UI zurücksetzen, signOut im Hintergrund.

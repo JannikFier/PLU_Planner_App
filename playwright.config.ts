@@ -15,9 +15,9 @@ if (existsSync(envPath)) {
 }
 
 /**
- * Playwright-Konfiguration für E2E-Tests (User-Journeys).
- * Dev-Server wird automatisch gestartet (oder wiederverwendet).
- * Test-Accounts optional über .env.e2e (siehe .env.e2e.example).
+ * Playwright-Konfiguration für E2E-Tests.
+ * - Standard (npm run test:e2e): Nur @smoke – schnell, ohne .env.e2e
+ * - Vollständig (npm run test:e2e:full): Alle Tests – vor Publish, braucht .env.e2e
  */
 export default defineConfig({
   testDir: './e2e',

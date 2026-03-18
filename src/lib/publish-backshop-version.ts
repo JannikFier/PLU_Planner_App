@@ -10,6 +10,7 @@ export interface PublishBackshopInput {
   jahr: number
   items: BackshopCompareItem[]
   createdBy: string
+  storeId: string
   replaceExistingVersion?: boolean
 }
 
@@ -39,6 +40,27 @@ function normalizeName(name: string): string {
  * Benachrichtigungen (A8) kommen in Phase 5.
  */
 export async function publishBackshopVersion(input: PublishBackshopInput): Promise<PublishBackshopResult> {
+  // Advisory Lock (Key 2 = Backshop, Key 1 = Obst)
+  const { data: lockAcquired, error: lockError } = await supabase.rpc('acquire_publish_lock', { lock_key: 2 } as never)
+  if (lockError) {
+    throw new Error(`Publish-Lock konnte nicht geprüft werden: ${lockError.message}`)
+  }
+  if (!lockAcquired) {
+    throw new Error('Eine andere Veröffentlichung läuft gerade. Bitte warte einen Moment und versuche es erneut.')
+  }
+
+  try {
+    return await _doPublishBackshop(input)
+  } finally {
+    try {
+      await supabase.rpc('release_publish_lock', { lock_key: 2 } as never)
+    } catch {
+      // Lock-Release fehlgeschlagen – wird beim naechsten Publish automatisch freigegeben
+    }
+  }
+}
+
+async function _doPublishBackshop(input: PublishBackshopInput): Promise<PublishBackshopResult> {
   const { kwNummer, jahr, items, createdBy, replaceExistingVersion } = input
 
   // Vor dem Einfrieren die aktuell aktive Version und ihre Items laden,
@@ -180,23 +202,29 @@ export async function publishBackshopVersion(input: PublishBackshopInput): Promi
     throw new Error(`Backshop-Version aktivieren fehlgeschlagen: ${activateErr.message}`)
   }
 
-  // Benachrichtigungen: pro User (außer Uploader) eine ungelesene Notification
+  // Benachrichtigungen: pro User mit Zugang zum Store (außer Uploader)
+  const { storeId } = input
   try {
-    const { data: allUsers, error: usersErr } = await supabase
-      .from('profiles')
-      .select('id')
-      .neq('id', createdBy)
-    if (!usersErr && allUsers && allUsers.length > 0) {
-      const notifications = (allUsers as { id: string }[]).map((user) => ({
-        user_id: user.id,
+    const { data: storeUsers, error: usersErr } = await supabase
+      .from('user_store_access')
+      .select('user_id')
+      .eq('store_id', storeId)
+      .neq('user_id', createdBy)
+    if (!usersErr && storeUsers && storeUsers.length > 0) {
+      const notifications = (storeUsers as { user_id: string }[]).map((row) => ({
+        user_id: row.user_id,
         version_id: versionId,
         is_read: false,
+        store_id: storeId,
       }))
       for (let i = 0; i < notifications.length; i += PUBLISH_BATCH_SIZE) {
         const batch = notifications.slice(i, i + PUBLISH_BATCH_SIZE)
-        await supabase
+        const { error: notifErr } = await supabase
           .from('backshop_version_notifications')
           .insert((batch as Database['public']['Tables']['backshop_version_notifications']['Insert'][]) as never)
+        if (notifErr && import.meta.env.DEV) {
+          console.warn('Backshop-Benachrichtigungen konnten nicht erstellt werden:', notifErr.message)
+        }
       }
     }
   } catch {

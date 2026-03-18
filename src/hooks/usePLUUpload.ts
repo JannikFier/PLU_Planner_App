@@ -11,6 +11,7 @@ import { publishVersion } from '@/lib/publish-version'
 import { generateUUID } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useVersions } from '@/hooks/useVersions'
 import type { ExcelParseResult, ComparisonResult, ConflictItem } from '@/types/plu'
 import type { MasterPLUItem } from '@/types/database'
@@ -25,6 +26,7 @@ export type FileResultEntry = { result: ExcelParseResult; assignment: FileAssign
 
 export function usePLUUpload() {
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
   const queryClient = useQueryClient()
   const { data: versionsData } = useVersions()
   const versions = useMemo(() => versionsData ?? [], [versionsData])
@@ -89,7 +91,7 @@ export function usePLUUpload() {
       setFileResults(entries)
       const firstWithKw = entries.find((e) => e.result.kwNummer != null)
       if (firstWithKw?.result.kwNummer) {
-        setTargetKW((prev) => (prev ? prev : String(firstWithKw!.result.kwNummer!)))
+        setTargetKW((prev) => (prev ? prev : String(firstWithKw.result.kwNummer)))
       }
     } catch (err) {
       toast.error(`Fehler beim Lesen: ${err instanceof Error ? err.message : 'Unbekannt'}`)
@@ -214,11 +216,13 @@ export function usePLUUpload() {
         const resolvedItems = resolveConflicts(resolvedConflicts, newVersionId)
         allItems.push(...resolvedItems)
       }
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       const result = await publishVersion({
         kwNummer: kw,
         jahr,
         items: allItems,
         createdBy: user.id,
+        storeId: currentStoreId,
         replaceExistingVersion,
       })
       setPublishResult({

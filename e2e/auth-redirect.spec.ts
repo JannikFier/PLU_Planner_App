@@ -2,20 +2,20 @@ import { test, expect } from '@playwright/test'
 
 /**
  * Auth und Redirect: Nicht eingeloggt → Login; nach Login → richtiges Dashboard.
- * Für "nach Login" wird E2E_VIEWER_EMAIL + E2E_VIEWER_PASSWORD genutzt (falls gesetzt).
+ * @smoke = Standard (ohne Credentials), @extended = mit Login (braucht .env.e2e)
  */
 test.describe('Auth & Redirect', () => {
-  test('Nicht eingeloggt: / leitet zu /login um', async ({ page }) => {
+  test('Nicht eingeloggt: / leitet zu /login um @smoke', async ({ page }) => {
     await page.goto('/')
     await expect(page).toHaveURL(/\/login/)
   })
 
-  test('Nicht eingeloggt: /user leitet zu /login um', async ({ page }) => {
+  test('Nicht eingeloggt: /user leitet zu /login um @smoke', async ({ page }) => {
     await page.goto('/user')
     await expect(page).toHaveURL(/\/login/)
   })
 
-  test('Nach Login: Viewer landet auf /viewer', async ({ page }) => {
+  test('Nach Login: Viewer landet auf /viewer @extended', async ({ page }) => {
     const email = process.env.E2E_VIEWER_EMAIL
     const password = process.env.E2E_VIEWER_PASSWORD
     if (!email || !password) {

@@ -28,6 +28,7 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
     customProducts,
     hiddenPLUs,
     offerPLUs,
+    renamedItems = [],
     bezeichnungsregeln,
     blocks,
     sortMode,
@@ -38,6 +39,8 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
     currentJahr,
   } = input
 
+  const renamedByPlu = new Map(renamedItems.map((r) => [r.plu, r]))
+
   // Wochen-Differenz: wie viele KW seit der Version vergangen sind (für „neu“-Dauer)
   const weeksSinceVersion =
     (currentJahr - versionJahr) * 52 + (currentKwNummer - versionKwNummer)
@@ -46,6 +49,7 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
   // Master-Items können optional image_url haben (Backshop); Obst/Gemüse hat keins
   const masterWithImage = masterItems as Array<{ image_url?: string | null } & (typeof masterItems)[number]>
   let items: DisplayItem[] = masterItems.map((item, idx) => {
+    const renamed = renamedByPlu.get(item.plu)
     let status = item.status as PLUStatus
     if (
       status === 'NEW_PRODUCT_YELLOW' &&
@@ -57,7 +61,7 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
       id: item.id,
       plu: item.plu,
       system_name: item.system_name,
-      display_name: item.display_name ?? item.system_name,
+      display_name: renamed?.display_name ?? item.display_name ?? item.system_name,
       item_type: item.item_type,
       status,
       old_plu: item.old_plu,
@@ -66,7 +70,7 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
       block_name: null, // Wird in Schritt 5 gesetzt
       preis: item.preis,
       is_custom: false,
-      is_manually_renamed: item.is_manually_renamed ?? false,
+      is_manually_renamed: renamed?.is_manually_renamed ?? item.is_manually_renamed ?? false,
       image_url: masterWithImage[idx]?.image_url ?? undefined,
     }
   })

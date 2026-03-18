@@ -2,9 +2,9 @@ import { test, expect } from '@playwright/test'
 
 /**
  * Viewer-Journey: Login → Dashboard → PLU-Liste Obst → Backshop-Liste.
- * Keine Admin-Links sichtbar. Optional: /admin aufrufen → Redirect zu /viewer.
+ * @extended = Vor Publish ausführen (braucht .env.e2e mit E2E_VIEWER_*)
  */
-test.describe('Viewer-Journey', () => {
+test.describe('Viewer-Journey @extended', () => {
   test.beforeEach(async ({ page }) => {
     const email = process.env.E2E_VIEWER_EMAIL
     const password = process.env.E2E_VIEWER_PASSWORD

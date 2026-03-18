@@ -217,6 +217,8 @@ export interface LayoutEngineInput {
   hiddenPLUs: Set<string>
   /** PLUs die aktuell als Angebot/Werbung gelten (für is_offer auf DisplayItem) */
   offerPLUs?: Set<string>
+  /** Marktspezifische Umbenennungen (überschreiben display_name, is_manually_renamed aus Master) */
+  renamedItems?: { plu: string; display_name: string; is_manually_renamed: boolean }[]
   bezeichnungsregeln: { keyword: string; position: 'PREFIX' | 'SUFFIX'; case_sensitive: boolean }[]
   blocks: Block[]
   sortMode: 'ALPHABETICAL' | 'BY_BLOCK'

@@ -155,10 +155,11 @@ sequenceDiagram
 Damit Reloads und Ladezeiten auch bei wachsendem Projekt stabil schnell bleiben:
 
 1. **Auth:** Profil und Session nach jedem erfolgreichen Login und nach jedem `fetchProfile` in den Auth-Cache schreiben (sessionStorage). Cache nur bei Logout oder nachweislich ungültiger Session leeren – nicht bei Netzwerkfehlern.
-2. **Neue Daten/Listen:** Prefetch in [src/hooks/usePrefetchForNavigation.ts](src/hooks/usePrefetchForNavigation.ts) (oder Backshop-Pendant) aufnehmen und in `AuthPrefetch` oder auf dem zugehörigen Dashboard auslösen, damit nach Reload Daten schnell aus Cache oder Prefetch da sind.
-3. **Neue Routen:** Wenn eine Route direkt nach Login oft angezeigt wird, den zugehörigen Chunk vorladen (gleiches Muster wie Dashboard in [AuthPrefetch](src/components/AuthPrefetch.tsx)).
-4. **Kein globales Blockieren:** Kein Warten auf Query-Cache-Restore für die gesamte UI (`useIsRestoring()` nicht als Gate). Shell/Header sofort anzeigen, Inhalte mit Skeleton bis Daten da sind.
-5. **Persist-Allowlist:** Neue Queries, die nach Reload sofort verfügbar sein sollen, in [src/lib/query-persist-allowlist.ts](src/lib/query-persist-allowlist.ts) in `PERSIST_QUERY_KEY_PREFIXES` eintragen. Bei neuen Features oder neuen TanStack-Query-Keys prüfen, ob Persistenz nötig ist.
+2. **StoreContext:** Fetches (stores, companies, user_store_access) nur ausführen, wenn eine bestätigte Session vorliegt (`session` aus AuthContext). Bei Cache-Restore ist `session` zunächst null – erst nach `getSession()` wird sie gesetzt oder der User ausgeloggt. So werden 406-Fehler bei abgelaufener Session vermieden.
+3. **Neue Daten/Listen:** Prefetch in [src/hooks/usePrefetchForNavigation.ts](src/hooks/usePrefetchForNavigation.ts) (oder Backshop-Pendant) aufnehmen und in `AuthPrefetch` oder auf dem zugehörigen Dashboard auslösen, damit nach Reload Daten schnell aus Cache oder Prefetch da sind.
+4. **Neue Routen:** Wenn eine Route direkt nach Login oft angezeigt wird, den zugehörigen Chunk vorladen (gleiches Muster wie Dashboard in [AuthPrefetch](src/components/AuthPrefetch.tsx)).
+5. **Kein globales Blockieren:** Kein Warten auf Query-Cache-Restore für die gesamte UI (`useIsRestoring()` nicht als Gate). Shell/Header sofort anzeigen, Inhalte mit Skeleton bis Daten da sind.
+6. **Persist-Allowlist:** Neue Queries, die nach Reload sofort verfügbar sein sollen, in [src/lib/query-persist-allowlist.ts](src/lib/query-persist-allowlist.ts) in `PERSIST_QUERY_KEY_PREFIXES` eintragen. Bei neuen Features oder neuen TanStack-Query-Keys prüfen, ob Persistenz nötig ist.
 
 ---
 

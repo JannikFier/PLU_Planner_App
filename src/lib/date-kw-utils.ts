@@ -81,9 +81,10 @@ export function parseKWAndYearFromFilename(filename: string): { kw: number; year
   const match = filename.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b/)
   if (!match) return null
   const [, dayStr, monthStr, yearStr] = match
-  const day = parseInt(dayStr!, 10)
-  const month = parseInt(monthStr!, 10)
-  const year = parseInt(yearStr!, 10)
+  if (dayStr == null || monthStr == null || yearStr == null) return null
+  const day = parseInt(dayStr, 10)
+  const month = parseInt(monthStr, 10)
+  const year = parseInt(yearStr, 10)
   if (month < 1 || month > 12 || day < 1 || day > 31 || year < 2000 || year > 2100) return null
   const date = new Date(year, month - 1, day)
   if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null

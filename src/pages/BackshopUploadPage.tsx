@@ -549,9 +549,9 @@ export function BackshopUploadPage() {
                   {summary.conflicts > 0 && <span>{summary.conflicts} Konflikte</span>}
                 </div>
               </div>
-              {hasConflicts && (
+              {hasConflicts && comparison && (
                 <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  Es gibt {comparison!.conflicts.length} Konflikt(e) (gleiche PLU, anderer Name). Einspielen derzeit nur ohne Konflikte möglich. Bitte Excel anpassen oder Konflikt-Artikel manuell prüfen.
+                  Es gibt {comparison.conflicts.length} Konflikt(e) (gleiche PLU, anderer Name). Einspielen derzeit nur ohne Konflikte möglich. Bitte Excel anpassen oder Konflikt-Artikel manuell prüfen.
                 </p>
               )}
               {newProducts.length > 0 && (
@@ -605,10 +605,10 @@ export function BackshopUploadPage() {
                   </div>
                 </div>
               )}
-              {comparison!.removed.length > 0 && (
+              {comparison && comparison.removed.length > 0 && (
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
                   <p className="text-sm font-medium">
-                    {comparison!.removed.length} entfernte Produkte – optional behalten
+                    {comparison.removed.length} entfernte Produkte – optional behalten
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Diese Produkte sind in der neuen Liste nicht mehr enthalten. Aktivieren Sie „Behalten“, damit sie in der Version bleiben.
@@ -624,7 +624,7 @@ export function BackshopUploadPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {comparison!.removed.map((item) => (
+                        {comparison.removed.map((item) => (
                           <tr key={item.plu} className="border-b border-border even:bg-muted/30">
                             <td className="px-2 py-2 align-middle">
                               <BackshopThumbnail src={item.image_url} />
@@ -738,9 +738,9 @@ export function BackshopUploadPage() {
                   </div>
                 </div>
               )}
-              {expandRemoved && comparison!.removed.length > 0 && (
+              {expandRemoved && comparison && comparison.removed.length > 0 && (
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
-                  <p className="text-sm font-medium">{comparison!.removed.length} entfernte Produkte – optional behalten</p>
+                  <p className="text-sm font-medium">{comparison.removed.length} entfernte Produkte – optional behalten</p>
                   <div className="overflow-x-auto rounded-md border border-border bg-background">
                     <table className="w-full text-sm">
                       <thead>
@@ -752,7 +752,7 @@ export function BackshopUploadPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {comparison!.removed.map((item) => (
+                        {comparison.removed.map((item) => (
                           <tr key={item.plu} className="border-b border-border even:bg-muted/30">
                             <td className="px-2 py-2 align-middle"><BackshopThumbnail src={item.image_url} /></td>
                             <td className="px-3 py-2 break-words">{item.display_name ?? item.system_name}</td>

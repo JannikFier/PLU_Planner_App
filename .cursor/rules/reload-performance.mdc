@@ -13,4 +13,10 @@ alwaysApply: true
 4. **Kein globales Blockieren:** Kein `useIsRestoring()` als Gate für die ganze UI; Shell/Header sofort, Inhalte mit Skeleton bis Daten da sind.
 5. **Persist-Allowlist:** Neue Queries, die nach Reload sofort verfügbar sein sollen, in [src/lib/query-persist-allowlist.ts](src/lib/query-persist-allowlist.ts) in `PERSIST_QUERY_KEY_PREFIXES` eintragen. Bei neuen Features oder neuen TanStack-Query-Keys prüfen, ob Persistenz nötig ist.
 
+## Auth-Prefetch
+
+- Prefetch startet sofort nach Auth (user + profile da).
+- Kein Warten auf ensureValidSession() vor dem ersten Prefetch.
+- Session-Refresh nur bei 401 (bereits in supabase.ts).
+
 Ausführlich: [docs/RELOAD_UND_LAADEVERHALTEN.md](../docs/RELOAD_UND_LAADEVERHALTEN.md).

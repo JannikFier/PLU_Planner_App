@@ -109,21 +109,31 @@ export function ExportBackshopPDFDialog({
       iframe.style.border = 'none'
       iframe.src = url
       document.body.appendChild(iframe)
+      const cleanupIframe = () => {
+        if (document.body.contains(iframe)) document.body.removeChild(iframe)
+        URL.revokeObjectURL(url)
+      }
+
+      const safetyTimeout = setTimeout(cleanupIframe, 60_000)
+
+      iframe.onerror = () => {
+        clearTimeout(safetyTimeout)
+        cleanupIframe()
+        toast.error('PDF konnte nicht im Druckdialog geöffnet werden')
+      }
+
       iframe.onload = () => {
         try {
-          // Einziger Druckdialog – kein autoPrint, damit auf Mac nur ein Fenster erscheint
           iframe.contentWindow?.print()
           toast.success('Druckdialog geöffnet')
         } catch {
           toast.info('PDF heruntergeladen – öffne es und drucke mit Strg+P')
           doc.save(`PLU-Liste-Backshop_${kwLabel.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`)
         }
-        setTimeout(() => {
-          if (document.body.contains(iframe)) document.body.removeChild(iframe)
-          URL.revokeObjectURL(url)
-        }, 30_000)
+        clearTimeout(safetyTimeout)
+        setTimeout(cleanupIframe, 30_000)
+        onOpenChange(false)
       }
-      onOpenChange(false)
     } catch {
       toast.error('Fehler beim Erstellen des PDFs')
     } finally {

@@ -1,6 +1,7 @@
 // WarengruppenPanel: Split-Panel (Links Gruppen, Rechts Produkte mit Checkboxen)
 
 import { useState, useMemo, useCallback } from 'react'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from 'sonner'
 import {
   DndContext,
@@ -64,6 +65,7 @@ export function WarengruppenPanel() {
   // State
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const deferredSearch = useDebouncedValue(search, 200)
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
   const [showAddBlock, setShowAddBlock] = useState(false)
   const [showRenameBlock, setShowRenameBlock] = useState(false)
@@ -84,14 +86,14 @@ export function WarengruppenPanel() {
 
   // Gefilterte Produkte (rechte Seite)
   const filteredItems = useMemo(() => {
-    if (!search.trim()) return items
-    const lower = search.toLowerCase()
+    if (!deferredSearch.trim()) return items
+    const lower = deferredSearch.toLowerCase()
     return items.filter(
       (item) =>
         item.system_name.toLowerCase().includes(lower) ||
         item.plu.includes(lower),
     )
-  }, [items, search])
+  }, [items, deferredSearch])
 
   // Block auswählen / abwählen (nochmal klicken = deselektieren)
   const handleBlockSelect = useCallback(

@@ -124,6 +124,14 @@ export function BackshopLayoutSettingsPage() {
     [autoSave],
   )
 
+  // Debounce-Cleanup beim Unmount (verhindert Memory-Leak / Updates auf unmounted Component)
+  useEffect(
+    () => () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    },
+    [],
+  )
+
   if (isLoading) {
     return (
       <DashboardLayout>

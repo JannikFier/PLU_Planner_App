@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryRest } from '@/lib/supabase'
 import type { BackshopBlock, BackshopBlockRule, Database } from '@/types/database'
 
 const onMutationError = (error: unknown) => {
@@ -15,13 +15,11 @@ export function useBackshopBlocks() {
     queryKey: ['backshop-blocks'],
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('backshop_blocks')
-        .select('*')
-        .order('order_index', { ascending: true })
-
-      if (error) throw error
-      return (data ?? []) as BackshopBlock[]
+      const data = await queryRest<BackshopBlock[]>('backshop_blocks', {
+        select: '*',
+        order: 'order_index.asc',
+      })
+      return data ?? []
     },
   })
 }
@@ -30,14 +28,13 @@ export function useBackshopBlocks() {
 export function useBackshopBlockRules() {
   return useQuery<BackshopBlockRule[]>({
     queryKey: ['backshop-block-rules'],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('backshop_block_rules')
-        .select('*')
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-      return (data ?? []) as BackshopBlockRule[]
+      const data = await queryRest<BackshopBlockRule[]>('backshop_block_rules', {
+        select: '*',
+        order: 'created_at.asc',
+      })
+      return data ?? []
     },
   })
 }

@@ -2,6 +2,7 @@
 // Suchfeld (PLU/Name), Laufzeit 1–4 Wochen, Klick auf Treffer = hinzufügen
 
 import { useState, useMemo } from 'react'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
   Dialog,
   DialogContent,
@@ -83,13 +84,14 @@ export function AddToOfferDialog({
   isAdding = false,
 }: AddToOfferDialogProps) {
   const [searchText, setSearchText] = useState('')
+  const deferredSearch = useDebouncedValue(searchText, 200)
   const [durationWeeks, setDurationWeeks] = useState(1)
 
   const filteredItems = useMemo(() => {
-    const q = searchText.trim().toLowerCase()
+    const q = deferredSearch.trim().toLowerCase()
     if (!q) return searchableItems
-    return filterItemsBySearch(searchableItems, searchText)
-  }, [searchableItems, searchText])
+    return filterItemsBySearch(searchableItems, deferredSearch)
+  }, [searchableItems, deferredSearch])
 
   const groups = useMemo(() => groupByLetter(filteredItems), [filteredItems])
   const tableRows = useMemo(() => buildTableRows(groups), [groups])
@@ -215,7 +217,7 @@ export function AddToOfferDialog({
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 shrink-0"
-                                onClick={() => handleAdd(row.left!.plu)}
+                                onClick={() => { const p = row.left?.plu; if (p) handleAdd(p) }}
                                 disabled={isAdding}
                                 title="Zur Werbung hinzufügen"
                               >
@@ -236,7 +238,7 @@ export function AddToOfferDialog({
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 shrink-0"
-                                onClick={() => handleAdd(row.right!.plu)}
+                                onClick={() => { const p = row.right?.plu; if (p) handleAdd(p) }}
                                 disabled={isAdding}
                                 title="Zur Werbung hinzufügen"
                               >

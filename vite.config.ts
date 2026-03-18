@@ -27,6 +27,7 @@ export default defineConfig({
           vendor: ['react', 'react-dom', 'react-router-dom'],
           supabase: ['@supabase/supabase-js'],
           query: ['@tanstack/react-query'],
+          dndkit: ['@dnd-kit/core', '@dnd-kit/modifiers', '@dnd-kit/sortable', '@dnd-kit/utilities'],
           exceljs: ['exceljs'],
           jspdf: ['jspdf'],
           ui: ['sonner'],

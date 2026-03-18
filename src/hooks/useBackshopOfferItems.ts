@@ -1,7 +1,7 @@
 // Backshop Offer Items (Werbung/Angebot): CRUD + Batch
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryRest, isTestModeActive } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { toast } from 'sonner'
@@ -16,14 +16,12 @@ export function useBackshopOfferItems() {
     queryKey: ['backshop-offer-items', currentStoreId],
     staleTime: 2 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('backshop_offer_items')
-        .select('*')
-        .eq('store_id', currentStoreId!)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      return (data ?? []) as BackshopOfferItem[]
+      const data = await queryRest<BackshopOfferItem[]>('backshop_offer_items', {
+        select: '*',
+        store_id: `eq.${currentStoreId}`,
+        order: 'created_at.desc',
+      })
+      return data ?? []
     },
     enabled: !!currentStoreId,
   })
@@ -38,15 +36,37 @@ export function useBackshopAddOfferItem() {
   return useMutation({
     mutationFn: async ({ plu, durationWeeks }: { plu: string; durationWeeks: number }) => {
       if (!user) throw new Error('Nicht eingeloggt')
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       const { kw, year } = getKWAndYearFromDate(new Date())
+      const weeks = Math.max(1, Math.min(4, durationWeeks))
+
+      if (isTestModeActive()) {
+        queryClient.setQueryData<BackshopOfferItem[]>(
+          ['backshop-offer-items', currentStoreId],
+          (old) => {
+            const filtered = (old ?? []).filter((o) => o.plu !== plu)
+            return [...filtered, {
+              id: crypto.randomUUID(),
+              plu,
+              start_kw: kw,
+              start_jahr: year,
+              duration_weeks: weeks,
+              created_by: user.id,
+              store_id: currentStoreId,
+              created_at: new Date().toISOString(),
+            } as BackshopOfferItem]
+          },
+        )
+        return
+      }
 
       const row: Database['public']['Tables']['backshop_offer_items']['Insert'] = {
         plu,
         start_kw: kw,
         start_jahr: year,
-        duration_weeks: Math.max(1, Math.min(4, durationWeeks)),
+        duration_weeks: weeks,
         created_by: user.id,
-        store_id: currentStoreId!,
+        store_id: currentStoreId,
       }
 
       const { error } = await supabase.from('backshop_offer_items').upsert(row as never, {
@@ -57,7 +77,9 @@ export function useBackshopAddOfferItem() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-offer-items', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['backshop-offer-items', currentStoreId] })
+      }
       toast.success('Produkt zur Werbung hinzugefügt')
     },
     onError: (err) => {
@@ -73,17 +95,29 @@ export function useBackshopUpdateOfferItem() {
 
   return useMutation({
     mutationFn: async ({ plu, durationWeeks }: { plu: string; durationWeeks: number }) => {
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       const weeks = Math.max(1, Math.min(4, durationWeeks))
+
+      if (isTestModeActive()) {
+        queryClient.setQueryData<BackshopOfferItem[]>(
+          ['backshop-offer-items', currentStoreId],
+          (old) => (old ?? []).map((o) => o.plu === plu ? { ...o, duration_weeks: weeks } : o),
+        )
+        return
+      }
+
       const { error } = await supabase
         .from('backshop_offer_items')
         .update({ duration_weeks: weeks } as never)
         .eq('plu', plu)
-        .eq('store_id', currentStoreId!)
+        .eq('store_id', currentStoreId)
 
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-offer-items', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['backshop-offer-items', currentStoreId] })
+      }
       toast.success('Laufzeit aktualisiert')
     },
     onError: (err) => {
@@ -99,11 +133,14 @@ export function useBackshopRemoveOfferItem() {
 
   return useMutation({
     mutationFn: async (plu: string) => {
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+      if (isTestModeActive()) return
+
       const { error } = await supabase
         .from('backshop_offer_items')
         .delete()
         .eq('plu', plu)
-        .eq('store_id', currentStoreId!)
+        .eq('store_id', currentStoreId)
 
       if (error) throw error
     },
@@ -137,33 +174,46 @@ export function useBackshopAddOfferItemsBatch() {
   return useMutation({
     mutationFn: async (rows: { plu: string; durationWeeks: number }[]) => {
       if (!user) throw new Error('Nicht eingeloggt')
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       const { kw, year } = getKWAndYearFromDate(new Date())
-      let added = 0
-      let skipped = 0
-      for (const { plu, durationWeeks } of rows) {
-        const row: Database['public']['Tables']['backshop_offer_items']['Insert'] = {
-          plu,
+
+      if (isTestModeActive()) {
+        const existing = queryClient.getQueryData<BackshopOfferItem[]>(['backshop-offer-items', currentStoreId]) ?? []
+        const existingSet = new Set(existing.map((o) => o.plu))
+        const newItems = rows.filter((r) => !existingSet.has(r.plu)).map((r) => ({
+          id: crypto.randomUUID(),
+          plu: r.plu,
           start_kw: kw,
           start_jahr: year,
-          duration_weeks: Math.max(1, Math.min(4, durationWeeks)),
+          duration_weeks: Math.max(1, Math.min(4, r.durationWeeks)),
           created_by: user.id,
-          store_id: currentStoreId!,
-        }
-        const { error } = await supabase.from('backshop_offer_items').upsert(row as never, {
-          onConflict: 'plu',
-          ignoreDuplicates: false,
-        })
-        if (error) {
-          if ((error as { code?: string }).code === '23505') skipped++
-          else throw error
-        } else {
-          added++
-        }
+          store_id: currentStoreId,
+          created_at: new Date().toISOString(),
+        } as BackshopOfferItem))
+        queryClient.setQueryData<BackshopOfferItem[]>(['backshop-offer-items', currentStoreId], [...existing, ...newItems])
+        return { added: newItems.length, skipped: rows.length - newItems.length }
       }
-      return { added, skipped }
+
+      const allRows = rows.map(({ plu, durationWeeks }) => ({
+        plu,
+        start_kw: kw,
+        start_jahr: year,
+        duration_weeks: Math.max(1, Math.min(4, durationWeeks)),
+        created_by: user.id,
+        store_id: currentStoreId,
+      } as Database['public']['Tables']['backshop_offer_items']['Insert']))
+
+      const { error } = await supabase.from('backshop_offer_items').upsert(allRows as never[], {
+        onConflict: 'plu,store_id',
+        ignoreDuplicates: false,
+      })
+      if (error) throw error
+      return { added: allRows.length, skipped: 0 }
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-offer-items', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['backshop-offer-items', currentStoreId] })
+      }
       if (result.added > 0) {
         toast.success(`${result.added} Produkt${result.added === 1 ? '' : 'e'} zur Werbung hinzugefügt`)
       }

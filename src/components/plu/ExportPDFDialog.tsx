@@ -117,6 +117,20 @@ export function ExportPDFDialog({
       iframe.src = url
       document.body.appendChild(iframe)
 
+      const cleanupIframe = () => {
+        if (document.body.contains(iframe)) document.body.removeChild(iframe)
+        URL.revokeObjectURL(url)
+      }
+
+      // Safety-Timeout: Blob-URL auf jeden Fall freigeben, auch wenn onload nie feuert
+      const safetyTimeout = setTimeout(cleanupIframe, 60_000)
+
+      iframe.onerror = () => {
+        clearTimeout(safetyTimeout)
+        cleanupIframe()
+        toast.error('PDF konnte nicht im Druckdialog geöffnet werden')
+      }
+
       iframe.onload = () => {
         try {
           iframe.contentWindow?.print()
@@ -125,15 +139,10 @@ export function ExportPDFDialog({
           toast.info('PDF heruntergeladen – öffne es und drucke mit Strg+P')
           doc.save(`PLU-Liste_${kwLabel.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`)
         }
-        // Iframe/URL erst nach 30 s aufräumen, damit der Druckdialog unter Windows (Chrome/Edge) nicht sofort schließt
-        setTimeout(() => {
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe)
-          }
-          URL.revokeObjectURL(url)
-        }, 30_000)
+        clearTimeout(safetyTimeout)
+        setTimeout(cleanupIframe, 30_000)
+        onOpenChange(false)
       }
-      onOpenChange(false)
     } catch {
       toast.error('Fehler beim Erstellen des PDFs')
     } finally {

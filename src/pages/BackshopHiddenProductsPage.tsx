@@ -217,7 +217,7 @@ export function BackshopHiddenProductsPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => setEditingProduct(info.customProduct!)}
+                              onClick={() => { if (info.customProduct) setEditingProduct(info.customProduct) }}
                             >
                               <Pencil className="h-3 w-3 mr-1" />
                               Bearbeiten

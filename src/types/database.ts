@@ -89,6 +89,26 @@ export interface Database {
           is_visible?: boolean
         }
       }
+      user_list_visibility: {
+        Row: {
+          id: string
+          user_id: string
+          store_id: string
+          list_type: string
+          is_visible: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          store_id: string
+          list_type: string
+          is_visible?: boolean
+        }
+        Update: {
+          is_visible?: boolean
+        }
+      }
       profiles: {
         Row: {
           id: string
@@ -460,6 +480,33 @@ export interface Database {
           start_kw?: number
           start_jahr?: number
           duration_weeks?: number
+        }
+      }
+      renamed_items: {
+        Row: {
+          id: string
+          plu: string
+          store_id: string
+          display_name: string
+          is_manually_renamed: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          plu: string
+          store_id: string
+          display_name: string
+          is_manually_renamed?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          display_name?: string
+          is_manually_renamed?: boolean
+          updated_at?: string
         }
       }
       version_notifications: {
@@ -872,6 +919,7 @@ export type Company = Database['public']['Tables']['companies']['Row']
 export type Store = Database['public']['Tables']['stores']['Row']
 export type UserStoreAccess = Database['public']['Tables']['user_store_access']['Row']
 export type StoreListVisibility = Database['public']['Tables']['store_list_visibility']['Row']
+export type UserListVisibility = Database['public']['Tables']['user_list_visibility']['Row']
 
 // Convenience Types
 export type Profile = Database['public']['Tables']['profiles']['Row']
@@ -885,6 +933,7 @@ export type Bezeichnungsregel = Database['public']['Tables']['bezeichnungsregeln
 export type Notification = Database['public']['Tables']['notifications_queue']['Row']
 export type CustomProduct = Database['public']['Tables']['custom_products']['Row']
 export type HiddenItem = Database['public']['Tables']['hidden_items']['Row']
+export type RenamedItem = Database['public']['Tables']['renamed_items']['Row']
 export type OfferItem = Database['public']['Tables']['plu_offer_items']['Row']
 export type VersionNotification = Database['public']['Tables']['version_notifications']['Row']
 

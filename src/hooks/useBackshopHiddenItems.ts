@@ -1,7 +1,7 @@
 // Backshop Hidden Items: Ausgeblendete PLUs (Backshop)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryRest, isTestModeActive } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { toast } from 'sonner'
@@ -15,14 +15,12 @@ export function useBackshopHiddenItems() {
     queryKey: ['backshop-hidden-items', currentStoreId],
     staleTime: 2 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('backshop_hidden_items')
-        .select('*')
-        .eq('store_id', currentStoreId!)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      return (data ?? []) as BackshopHiddenItem[]
+      const data = await queryRest<BackshopHiddenItem[]>('backshop_hidden_items', {
+        select: '*',
+        store_id: `eq.${currentStoreId}`,
+        order: 'created_at.desc',
+      })
+      return data ?? []
     },
     enabled: !!currentStoreId,
   })
@@ -37,9 +35,11 @@ export function useBackshopHideProduct() {
   return useMutation({
     mutationFn: async (plu: string) => {
       if (!user) throw new Error('Nicht eingeloggt')
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+      if (isTestModeActive()) return
 
       const { error } = await supabase.from('backshop_hidden_items').insert(
-        ({ plu, hidden_by: user.id, store_id: currentStoreId! } as Database['public']['Tables']['backshop_hidden_items']['Insert']) as never,
+        ({ plu, hidden_by: user.id, store_id: currentStoreId } as Database['public']['Tables']['backshop_hidden_items']['Insert']) as never,
       )
 
       if (error) throw error
@@ -55,6 +55,7 @@ export function useBackshopHideProduct() {
             id: `opt-${plu}`,
             plu,
             hidden_by: user?.id ?? '',
+            store_id: currentStoreId,
             created_at: new Date().toISOString(),
           } as BackshopHiddenItem,
         ]
@@ -79,11 +80,14 @@ export function useBackshopUnhideProduct() {
 
   return useMutation({
     mutationFn: async (plu: string) => {
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+      if (isTestModeActive()) return
+
       const { error } = await supabase
         .from('backshop_hidden_items')
         .delete()
         .eq('plu', plu)
-        .eq('store_id', currentStoreId!)
+        .eq('store_id', currentStoreId)
 
       if (error) throw error
     },

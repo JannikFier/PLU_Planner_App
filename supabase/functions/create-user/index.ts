@@ -11,6 +11,30 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+/** Bekannte Fehlermeldungen in verstaendliche deutsche Texte uebersetzen */
+function translateCreateUserError(msg: string): string {
+  const lower = msg.toLowerCase()
+  if (lower.includes('user already registered') || lower.includes('already been registered')) {
+    return 'Diese E-Mail-Adresse wird bereits verwendet.'
+  }
+  if (lower.includes('user already exists') || lower.includes('already exists')) {
+    return 'Ein Benutzer mit dieser E-Mail-Adresse existiert bereits.'
+  }
+  if (lower.includes('personalnummer') && lower.includes('unique')) {
+    return 'Diese Personalnummer wird bereits verwendet.'
+  }
+  if (lower.includes('duplicate key') && lower.includes('personalnummer')) {
+    return 'Diese Personalnummer wird bereits verwendet.'
+  }
+  if (lower.includes('duplicate key') && lower.includes('profiles')) {
+    return 'Diese Personalnummer oder E-Mail wird bereits verwendet.'
+  }
+  if (lower.includes('gleichen firma') || lower.includes('same company')) {
+    return 'Alle Märkte müssen derselben Firma angehören.'
+  }
+  return msg
+}
+
 serve(async (req) => {
   // CORS Preflight
   if (req.method === 'OPTIONS') {
@@ -78,14 +102,6 @@ serve(async (req) => {
       )
     }
 
-    // Nur Super-Admin darf Admin oder Viewer erstellen; Admin darf nur User erstellen
-    if ((role === 'admin' || role === 'viewer') && callerProfile.role !== 'super_admin') {
-      return new Response(
-        JSON.stringify({ error: 'Nur Super-Admins können Admins oder Viewer erstellen.' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
     // Super-Admin kann nicht über diese Funktion erstellt werden
     if (role === 'super_admin') {
       return new Response(
@@ -112,10 +128,10 @@ serve(async (req) => {
 
     const allStoreIds = [home_store_id, ...additionalStoreIds]
 
-    // Stores muessen existieren und aktiv sein
+    // Stores muessen existieren, aktiv sein und alle derselben Firma angehoeren
     const { data: stores, error: storesError } = await supabaseAdmin
       .from('stores')
-      .select('id, is_active')
+      .select('id, is_active, company_id')
       .in('id', allStoreIds)
 
     if (storesError) {
@@ -138,6 +154,34 @@ serve(async (req) => {
         JSON.stringify({ error: 'Mindestens einer der angegebenen Märkte ist pausiert.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
+
+    const companyIds = [...new Set(stores.map((s) => s.company_id))]
+    if (companyIds.length > 1) {
+      return new Response(
+        JSON.stringify({ error: 'Alle Märkte müssen derselben Firma angehören.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Admin darf nur Benutzer in Maerkten anlegen, auf die er Zugriff hat
+    if (callerProfile.role === 'admin') {
+      const { data: callerAccess } = await supabaseAdmin
+        .from('user_store_access')
+        .select('store_id')
+        .eq('user_id', caller.id)
+      const callerStoreIds = new Set((callerAccess || []).map((r: { store_id: string }) => r.store_id))
+      const unauthorized =
+        !callerStoreIds.has(home_store_id) ||
+        additionalStoreIds.some((id: string) => !callerStoreIds.has(id))
+      if (unauthorized) {
+        return new Response(
+          JSON.stringify({
+            error: 'Du kannst nur Benutzer in Märkten anlegen, auf die du Zugriff hast.',
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
     // Auth-E-Mail: E-Mail wenn angegeben, sonst Personalnummer@plu-planner.local
@@ -164,8 +208,9 @@ serve(async (req) => {
     })
 
     if (error) {
+      const userMessage = translateCreateUserError(error.message)
       return new Response(
-        JSON.stringify({ error: error.message }),
+        JSON.stringify({ error: userMessage }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -200,8 +245,9 @@ serve(async (req) => {
         .insert(accessRows)
 
       if (accessError) {
+        const userMessage = translateCreateUserError(accessError.message)
         return new Response(
-          JSON.stringify({ error: accessError.message }),
+          JSON.stringify({ error: userMessage }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
@@ -219,8 +265,9 @@ serve(async (req) => {
     )
 
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err ?? 'Unbekannter Fehler')
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: msg }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

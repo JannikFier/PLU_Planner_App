@@ -11,6 +11,7 @@ import { AuthPrefetch } from '@/components/AuthPrefetch'
 import { HomeRedirect } from '@/components/HomeRedirect'
 import { TestModeProvider } from '@/contexts/TestModeContext'
 import { TestModeBanner } from '@/components/layout/TestModeBanner'
+import { OfflineBanner } from '@/components/layout/OfflineBanner'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 
 // Layout (nicht lazy – wird überall gebraucht)
@@ -123,10 +124,11 @@ function App() {
       }}
     >
       <TestModeProvider>
-      <AuthPrefetch />
       <TooltipProvider>
         <BrowserRouter>
+          <AuthPrefetch />
           <ErrorBoundary>
+          <OfflineBanner />
           <TestModeBanner />
           <Suspense fallback={<PageLoadingFallback />}>
           <Routes>
@@ -617,7 +619,7 @@ function App() {
 
             {/* === Fallbacks === */}
             <Route path="/" element={<HomeRedirect />} />
-            <Route path="*" element={<NotFound />} />
+            <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
           </Routes>
           </Suspense>
           </ErrorBoundary>

@@ -138,9 +138,9 @@ export function groupItemsByLetter<T extends PLUItemBase>(items: T[]): LetterGro
   const grouped = new Map<string, T[]>()
 
   for (const item of items) {
-    const name = item.display_name ?? item.system_name
+    const name = item.display_name ?? item.system_name ?? ''
     const firstChar = name.charAt(0)
-    const letter = normalizeLetterForGrouping(firstChar)
+    const letter = normalizeLetterForGrouping(firstChar) || '?'
     const existing = grouped.get(letter)
     if (existing) {
       existing.push(item)
@@ -153,6 +153,58 @@ export function groupItemsByLetter<T extends PLUItemBase>(items: T[]): LetterGro
   return Array.from(grouped.entries())
     .sort(([a], [b]) => a.localeCompare(b, 'de'))
     .map(([letter, items]) => ({ letter, items }))
+}
+
+/** Generische Gruppierung für Dialoge (Ausblenden, Umbenennen).
+ *  Bei SEPARATED: Zuerst Stück, dann Gewicht – jeweils alphabetisch nach Anfangsbuchstabe.
+ *  Bei MIXED: Nur alphabetisch nach Anfangsbuchstabe (wie bisher). */
+export interface DialogItemBase {
+  display_name: string
+  system_name?: string
+  item_type?: 'PIECE' | 'WEIGHT' | string | null
+}
+
+export function groupItemsForDialog<T extends DialogItemBase>(
+  items: T[],
+  displayMode: 'MIXED' | 'SEPARATED',
+): { label: string; items: T[] }[] {
+  const getName = (item: T) => item.display_name ?? item.system_name ?? ''
+  const letterGroup = (subset: T[]) => {
+    const grouped = new Map<string, T[]>()
+    for (const item of subset) {
+      const letter = normalizeLetterForGrouping(getName(item).charAt(0)) || '?'
+      const existing = grouped.get(letter)
+      if (existing) existing.push(item)
+      else grouped.set(letter, [item])
+    }
+    return Array.from(grouped.entries())
+      .sort(([a], [b]) => a.localeCompare(b, 'de'))
+  }
+
+  if (displayMode === 'SEPARATED') {
+    const piece = items.filter(i => i.item_type === 'PIECE')
+    const weight = items.filter(i => i.item_type === 'WEIGHT')
+    const result: { label: string; items: T[] }[] = []
+
+    if (piece.length > 0) {
+      result.push({ label: '═══ Stück ═══', items: [] })
+      for (const [letter, letterItems] of letterGroup(piece)) {
+        result.push({ label: `— ${letter} —`, items: letterItems })
+      }
+    }
+    if (weight.length > 0) {
+      result.push({ label: '═══ Gewicht ═══', items: [] })
+      for (const [letter, letterItems] of letterGroup(weight)) {
+        result.push({ label: `— ${letter} —`, items: letterItems })
+      }
+    }
+    return result
+  }
+
+  return letterGroup(items).map(([letter, letterItems]) => ({
+    label: `— ${letter} —`,
+    items: letterItems,
+  }))
 }
 
 /**

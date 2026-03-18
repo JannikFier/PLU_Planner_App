@@ -2,6 +2,7 @@
 // Unterstützt Auswahl-Modus (Checkboxen), optional Find-in-Page (Suche mit Pfeilen + Markierung)
 
 import { useMemo, useState, useEffect } from 'react'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
   PLU_TABLE_HEADER_CLASS,
   PLU_TABLE_HEADER_GEWICHT_CLASS,
@@ -172,28 +173,28 @@ function PLUColumn({
             {selectionMode && <th className="px-1 py-1.5" />}
             {showImageColumn && (
               <th
-                className="px-1 py-1.5 text-left font-semibold text-muted-foreground uppercase tracking-wider border-l border-r border-border"
-                style={{ fontSize: fonts.column + 'px' }}
+                className="px-1 text-left font-semibold text-muted-foreground uppercase tracking-wider border-l border-r border-border"
+                style={{ fontSize: fonts.column + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}
               >
                 Bild
               </th>
             )}
             <th
-              className="px-2 py-1.5 text-left font-semibold text-muted-foreground uppercase tracking-wider"
-              style={{ fontSize: fonts.column + 'px' }}
+              className="px-2 text-left font-semibold text-muted-foreground uppercase tracking-wider"
+              style={{ fontSize: fonts.column + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}
             >
               PLU
             </th>
             <th
-              className="px-2 py-1.5 text-left font-semibold text-muted-foreground uppercase tracking-wider border-l border-border"
-              style={{ fontSize: fonts.column + 'px' }}
+              className="px-2 text-left font-semibold text-muted-foreground uppercase tracking-wider border-l border-border"
+              style={{ fontSize: fonts.column + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}
             >
               Artikel
             </th>
             {hasAnyPrice && (
               <th
-                className="px-2 py-1.5 text-left font-medium text-muted-foreground uppercase tracking-wider border-l border-border w-[90px] min-w-[90px]"
-                style={{ fontSize: fonts.column + 'px' }}
+                className="px-2 text-left font-medium text-muted-foreground uppercase tracking-wider border-l border-border w-[90px] min-w-[90px]"
+                style={{ fontSize: fonts.column + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}
               >
                 Preis
               </th>
@@ -212,8 +213,8 @@ function PLUColumn({
                 >
                   <td
                     colSpan={colCount}
-                    className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50"
-                    style={{ fontSize: fonts.column + 'px' }}
+                    className="px-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50"
+                    style={{ fontSize: fonts.column + 'px', paddingTop: '0.35em', paddingBottom: '0.35em' }}
                   >
                     {row.label}
                   </td>
@@ -221,7 +222,8 @@ function PLUColumn({
               )
             }
 
-            const item = row.item!
+            const item = row.item
+            if (!item) return null
             const isSelected = selectedPLUs?.has(item.plu) ?? false
             const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
             const isHighlight = findInPageHighlightRowIndex !== undefined && rowIndex === findInPageHighlightRowIndex
@@ -254,7 +256,7 @@ function PLUColumn({
                     <BackshopImage src={item.image_url} />
                   </td>
                 )}
-                <td className="px-2 py-1" style={{ fontSize: fonts.product + 'px' }}>
+                <td className="px-2" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}>
                   <StatusBadge
                     plu={item.plu}
                     status={item.status}
@@ -263,8 +265,8 @@ function PLUColumn({
                   />
                 </td>
                 <td
-                  className="px-2 py-1 break-words min-w-0 border-l border-border"
-                  style={{ fontSize: fonts.product + 'px' }}
+                  className="px-2 break-words min-w-0 border-l border-border"
+                  style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}
                   title={getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
                 >
                   <span className="inline-flex items-center gap-1.5 flex-wrap">
@@ -277,7 +279,7 @@ function PLUColumn({
                   </span>
                 </td>
                 {hasAnyPrice && (
-                  <td className="w-[90px] min-w-[90px] px-2 py-1 border-l border-border" style={{ fontSize: fonts.product + 'px' }}>
+                  <td className="w-[90px] min-w-[90px] px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}>
                     {item.preis != null ? (
                       <PreisBadge value={item.preis} style={{ fontSize: fonts.product + 'px' }} />
                     ) : null}
@@ -340,15 +342,15 @@ function RowByRowTable({
       <thead>
         <tr className="border-b-2 border-border">
           {selectionMode && <th className="px-1 py-1.5" />}
-          {showImageColumn && <th className="px-1 py-1.5 text-left font-semibold text-muted-foreground uppercase tracking-wider border-l border-r border-border" style={{ fontSize: fonts.column + 'px' }}>Bild</th>}
-          <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground uppercase tracking-wider" style={{ fontSize: fonts.column + 'px' }}>PLU</th>
-          <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground uppercase tracking-wider border-l border-border" style={{ fontSize: fonts.column + 'px' }}>Artikel</th>
-          {hasAnyPrice && <th className="px-2 py-1.5 text-left font-medium text-muted-foreground uppercase tracking-wider border-l border-border w-[90px] min-w-[90px]" style={{ fontSize: fonts.column + 'px' }}>Preis</th>}
+          {showImageColumn && <th className="px-1 text-left font-semibold text-muted-foreground uppercase tracking-wider border-l border-r border-border" style={{ fontSize: fonts.column + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}>Bild</th>}
+          <th className="px-2 text-left font-semibold text-muted-foreground uppercase tracking-wider" style={{ fontSize: fonts.column + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}>PLU</th>
+          <th className="px-2 text-left font-semibold text-muted-foreground uppercase tracking-wider border-l border-border" style={{ fontSize: fonts.column + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}>Artikel</th>
+          {hasAnyPrice && <th className="px-2 text-left font-medium text-muted-foreground uppercase tracking-wider border-l border-border w-[90px] min-w-[90px]" style={{ fontSize: fonts.column + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}>Preis</th>}
           {selectionMode && <th className="px-1 py-1.5 border-l-2 border-border" />}
-          {showImageColumn && <th className="px-1 py-1.5 text-left font-semibold text-muted-foreground uppercase tracking-wider border-l-2 border-r border-border" style={{ fontSize: fonts.column + 'px' }}>Bild</th>}
-          <th className={cn('px-2 py-1.5 text-left font-semibold text-muted-foreground uppercase tracking-wider', !(selectionMode || hasAnyPrice || showImageColumn) && 'border-l-2 border-border')} style={{ fontSize: fonts.column + 'px' }}>PLU</th>
-          <th className="px-2 py-1.5 text-left font-semibold text-muted-foreground uppercase tracking-wider border-l border-border" style={{ fontSize: fonts.column + 'px' }}>Artikel</th>
-          {hasAnyPrice && <th className="px-2 py-1.5 text-left font-medium text-muted-foreground uppercase tracking-wider border-l border-border w-[90px] min-w-[90px]" style={{ fontSize: fonts.column + 'px' }}>Preis</th>}
+          {showImageColumn && <th className="px-1 text-left font-semibold text-muted-foreground uppercase tracking-wider border-l-2 border-r border-border" style={{ fontSize: fonts.column + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}>Bild</th>}
+          <th className={cn('px-2 text-left font-semibold text-muted-foreground uppercase tracking-wider', !(selectionMode || hasAnyPrice || showImageColumn) && 'border-l-2 border-border')} style={{ fontSize: fonts.column + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}>PLU</th>
+          <th className="px-2 text-left font-semibold text-muted-foreground uppercase tracking-wider border-l border-border" style={{ fontSize: fonts.column + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}>Artikel</th>
+          {hasAnyPrice && <th className="px-2 text-left font-medium text-muted-foreground uppercase tracking-wider border-l border-border w-[90px] min-w-[90px]" style={{ fontSize: fonts.column + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}>Preis</th>}
         </tr>
       </thead>
       <tbody>
@@ -357,7 +359,7 @@ function RowByRowTable({
             const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
             return (
               <tr key={`header-${i}-${row.label}`} className="border-b border-border" {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}>
-                <td colSpan={totalCols} className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50" style={{ fontSize: fonts.column + 'px' }}>{row.label}</td>
+                <td colSpan={totalCols} className="px-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50" style={{ fontSize: fonts.column + 'px', paddingTop: '0.35em', paddingBottom: '0.35em' }}>{row.label}</td>
               </tr>
             )
           }
@@ -377,10 +379,10 @@ function RowByRowTable({
             <tr key={`pair-${i}`} className={cn('border-b border-border last:border-b-0', isHighlight && 'bg-primary/10')} {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}>
               {row.left ? (
                 <>
-                  {selectionMode && <td className="px-1 py-1 text-center"><input type="checkbox" checked={leftSelected} onChange={() => onToggleSelect?.(row.left!.plu)} className="h-4 w-4 rounded border-border" /></td>}
+                  {selectionMode && <td className="px-1 py-1 text-center"><input type="checkbox" checked={leftSelected} onChange={() => { const p = row.left?.plu; if (p) onToggleSelect?.(p) }} className="h-4 w-4 rounded border-border" /></td>}
                   {showImageColumn && imageCell(row.left)}
-                  <td className="px-2 py-1" style={{ fontSize: fonts.product + 'px' }}><StatusBadge plu={row.left.plu} status={row.left.status} oldPlu={row.left.old_plu} style={{ fontSize: fonts.product + 'px' }} /></td>
-                  <td className="px-2 py-1 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px' }} title={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}>
+                  <td className="px-2" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}><StatusBadge plu={row.left.plu} status={row.left.status} oldPlu={row.left.old_plu} style={{ fontSize: fonts.product + 'px' }} /></td>
+                  <td className="px-2 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }} title={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}>
                     <span className="inline-flex items-center gap-1.5 flex-wrap">
                       {getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}
                       {row.left.is_offer && (
@@ -388,22 +390,22 @@ function RowByRowTable({
                       )}
                     </span>
                   </td>
-                  {hasAnyPrice && <td className="w-[90px] min-w-[90px] px-2 py-1 border-l border-border" style={{ fontSize: fonts.product + 'px' }}>{row.left.preis != null ? <PreisBadge value={row.left.preis} style={{ fontSize: fonts.product + 'px' }} /> : null}</td>}
+                  {hasAnyPrice && <td className="w-[90px] min-w-[90px] px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}>{row.left.preis != null ? <PreisBadge value={row.left.preis} style={{ fontSize: fonts.product + 'px' }} /> : null}</td>}
                 </>
               ) : (
                 <>
                   {selectionMode && <td className="px-1 py-1" />}
                   {showImageColumn && <td className="px-1 py-1 border-l border-r border-border" />}
-                  <td className="px-2 py-1" /><td className="px-2 py-1 border-l border-border" />
-                  {hasAnyPrice && <td className="px-2 py-1 border-l border-border" />}
+                  <td className="px-2" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }} /><td className="px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }} />
+                  {hasAnyPrice && <td className="px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }} />}
                 </>
               )}
               {row.right ? (
                 <>
-                  {selectionMode && <td className="px-1 py-1 text-center border-l-2 border-border"><input type="checkbox" checked={rightSelected} onChange={() => onToggleSelect?.(row.right!.plu)} className="h-4 w-4 rounded border-border" /></td>}
+                  {selectionMode && <td className="px-1 py-1 text-center border-l-2 border-border"><input type="checkbox" checked={rightSelected} onChange={() => { const p = row.right?.plu; if (p) onToggleSelect?.(p) }} className="h-4 w-4 rounded border-border" /></td>}
                   {showImageColumn && imageCell(row.right)}
-                  <td className={cn('px-2 py-1', !selectionMode && !showImageColumn && 'border-l-2 border-border')} style={{ fontSize: fonts.product + 'px' }}><StatusBadge plu={row.right.plu} status={row.right.status} oldPlu={row.right.old_plu} style={{ fontSize: fonts.product + 'px' }} /></td>
-                  <td className="px-2 py-1 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px' }} title={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}>
+                  <td className={cn('px-2', !selectionMode && !showImageColumn && 'border-l-2 border-border')} style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}><StatusBadge plu={row.right.plu} status={row.right.status} oldPlu={row.right.old_plu} style={{ fontSize: fonts.product + 'px' }} /></td>
+                  <td className="px-2 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }} title={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}>
                     <span className="inline-flex items-center gap-1.5 flex-wrap">
                       {getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}
                       {row.right.is_offer && (
@@ -411,15 +413,15 @@ function RowByRowTable({
                       )}
                     </span>
                   </td>
-                  {hasAnyPrice && <td className="w-[90px] min-w-[90px] px-2 py-1 border-l border-border" style={{ fontSize: fonts.product + 'px' }}>{row.right.preis != null ? <PreisBadge value={row.right.preis} style={{ fontSize: fonts.product + 'px' }} /> : null}</td>}
+                  {hasAnyPrice && <td className="w-[90px] min-w-[90px] px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}>{row.right.preis != null ? <PreisBadge value={row.right.preis} style={{ fontSize: fonts.product + 'px' }} /> : null}</td>}
                 </>
               ) : (
                 <>
                   {selectionMode && <td className="px-1 py-1 border-l-2 border-border" />}
                   {showImageColumn && <td className="px-1 py-1 border-l-2 border-r border-border" />}
-                  <td className={cn('px-2 py-1', !selectionMode && !showImageColumn && 'border-l-2 border-border')} />
-                  <td className="px-2 py-1 border-l border-border" />
-                  {hasAnyPrice && <td className="px-2 py-1 border-l border-border" />}
+                  <td className={cn('px-2', !selectionMode && !showImageColumn && 'border-l-2 border-border')} style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }} />
+                  <td className="px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }} />
+                  {hasAnyPrice && <td className="px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }} />}
                 </>
               )}
             </tr>
@@ -504,12 +506,13 @@ export function PLUTable({
   }, [showFindInPage, items, effectiveDisplayMode, sortMode, flowDirection, blocks])
 
   const [searchText, setSearchText] = useState('')
+  const deferredSearch = useDebouncedValue(searchText, 200)
   const [searchOpen, setSearchOpen] = useState(false)
   const showSearchBar = Boolean(showFindInPage && (searchOpen || searchText.trim().length > 0))
   const { matchIndices, currentIndex, goNext, goPrev, totalMatches } = useFindInPage(
     searchableRows,
-    searchText,
-    (row) => isRowMatch(row, searchText),
+    deferredSearch,
+    (row) => isRowMatch(row, deferredSearch),
   )
   const findInPageHighlightRowIndex = totalMatches > 0 ? matchIndices[currentIndex] ?? null : null
 
@@ -572,7 +575,7 @@ export function PLUTable({
           <div>
             <div
               className={PLU_TABLE_HEADER_STUECK_CLASS}
-              style={{ fontSize: fonts.header + 'px' }}
+              style={{ fontSize: fonts.header + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}
             >
               PLU-Liste Stück
             </div>
@@ -595,7 +598,7 @@ export function PLUTable({
           <div>
             <div
               className={PLU_TABLE_HEADER_GEWICHT_CLASS}
-              style={{ fontSize: fonts.header + 'px' }}
+              style={{ fontSize: fonts.header + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}
             >
               PLU-Liste Gewicht
             </div>
@@ -623,7 +626,7 @@ export function PLUTable({
     <div>
       <div
         className={PLU_TABLE_HEADER_CLASS}
-        style={{ fontSize: fonts.header + 'px' }}
+        style={{ fontSize: fonts.header + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}
       >
         {listType === 'backshop' ? 'PLU-Liste Backshop' : 'PLU-Liste'}
       </div>

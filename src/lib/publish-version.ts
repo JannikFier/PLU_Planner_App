@@ -13,6 +13,8 @@ interface PublishInput {
   items: MasterPLUItem[]
   /** ID des Super-Admins der die Version erstellt */
   createdBy: string
+  /** Aktueller Store – wird fuer Notifications benoetigt */
+  storeId: string
   /** Bei true: bestehende Version für (kwNummer, jahr) zuerst löschen (Überschreiben) */
   replaceExistingVersion?: boolean
 }
@@ -32,7 +34,28 @@ interface PublishResult {
  * 5. Benachrichtigungen für neue Produkte erstellen
  */
 export async function publishVersion(input: PublishInput): Promise<PublishResult> {
-  const { kwNummer, jahr, items, createdBy, replaceExistingVersion } = input
+  // Advisory Lock – verhindert gleichzeitigen Publish
+  const { data: lockAcquired, error: lockError } = await supabase.rpc('acquire_publish_lock', { lock_key: 1 } as never)
+  if (lockError) {
+    throw new Error(`Publish-Lock konnte nicht geprüft werden: ${lockError.message}`)
+  }
+  if (!lockAcquired) {
+    throw new Error('Eine andere Veröffentlichung läuft gerade. Bitte warte einen Moment und versuche es erneut.')
+  }
+
+  try {
+    return await _doPublish(input)
+  } finally {
+    try {
+      await supabase.rpc('release_publish_lock', { lock_key: 1 } as never)
+    } catch {
+      // Lock-Release fehlgeschlagen – wird beim naechsten Publish automatisch freigegeben
+    }
+  }
+}
+
+async function _doPublish(input: PublishInput): Promise<PublishResult> {
+  const { kwNummer, jahr, items, createdBy, storeId, replaceExistingVersion } = input
 
   // 0. Optional: Bestehende Version für (kwNummer, jahr) löschen (Überschreiben)
   if (replaceExistingVersion) {
@@ -141,19 +164,21 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
   let notificationCount = 0
 
   try {
-    const { data: allUsers, error: usersError } = await supabase
-      .from('profiles')
-      .select('id')
-      .neq('id', createdBy)
+    const { data: storeUsers, error: usersError } = await supabase
+      .from('user_store_access')
+      .select('user_id')
+      .eq('store_id', storeId)
+      .neq('user_id', createdBy)
 
     if (usersError) {
       throw new Error(`Benutzer für Benachrichtigungen laden fehlgeschlagen: ${usersError.message}`)
     }
-    if (allUsers && allUsers.length > 0) {
-      const notifications = (allUsers as { id: string }[]).map((user) => ({
-        user_id: user.id,
+    if (storeUsers && storeUsers.length > 0) {
+      const notifications = (storeUsers as { user_id: string }[]).map((row) => ({
+        user_id: row.user_id,
         version_id: versionId,
         is_read: false,
+        store_id: storeId,
       }))
 
       // Batch-Insert version_notifications
@@ -164,14 +189,14 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
           .insert((batch as Database['public']['Tables']['version_notifications']['Insert'][]) as never)
 
         if (notifError) {
-          console.warn('Version-Notifications einfügen fehlgeschlagen:', notifError)
+          if (import.meta.env.DEV) console.warn('Version-Notifications einfügen fehlgeschlagen:', notifError)
         } else {
           notificationCount += batch.length
         }
       }
     }
   } catch (err) {
-    console.warn('Benachrichtigungen konnten nicht erstellt werden:', err)
+    if (import.meta.env.DEV) console.warn('Benachrichtigungen konnten nicht erstellt werden:', err)
     throw err
   }
 
@@ -183,11 +208,9 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
     .order('kw_nummer', { ascending: false })
 
   if (!listError && allVersions && allVersions.length > 3) {
-    const toDelete = (allVersions as { id: string }[]).slice(3)
-    for (const v of toDelete) {
-      const { error: delError } = await supabase.from('versions').delete().eq('id', v.id)
-      if (delError) console.warn('Alte Version löschen fehlgeschlagen:', v.id, delError)
-    }
+    const idsToDelete = (allVersions as { id: string }[]).slice(3).map(v => v.id)
+    const { error: delError } = await supabase.from('versions').delete().in('id', idsToDelete)
+    if (delError && import.meta.env.DEV) console.warn('Alte Versionen löschen fehlgeschlagen:', delError)
   }
 
   return {

@@ -3,8 +3,7 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
-import { withRetryOnAbort } from '@/lib/supabase-retry'
+import { queryRest } from '@/lib/supabase'
 import { isAbortError } from '@/lib/error-utils'
 import type { MasterPLUItem } from '@/types/database'
 
@@ -16,9 +15,7 @@ export interface UsePLUDataOptions {
 
 /**
  * Lädt alle master_plu_items für eine gegebene Version-ID.
- * Sortierung: alphabetisch nach system_name.
- * Nur aktiv wenn versionId vorhanden (und ggf. enabled).
- * Toast erst nach Verzögerung, damit kurze Fehler (sofortiger Refetch-Erfolg) nicht aufblitzen.
+ * Nutzt queryRest (direkter REST-Call) statt supabase.from() um Hanging zu vermeiden.
  */
 export function usePLUData(
   versionId: string | undefined,
@@ -29,25 +26,18 @@ export function usePLUData(
     queryKey: ['plu-items', versionId],
     enabled: !!versionId && enabled,
     staleTime: 2 * 60_000,
-    queryFn: () =>
-      withRetryOnAbort(async () => {
-        if (!versionId) return []
+    queryFn: async () => {
+      if (!versionId) return []
 
-        const { data, error } = await supabase
-          .from('master_plu_items')
-          .select('*')
-          .eq('version_id', versionId)
-          .order('system_name', { ascending: true })
-
-        if (error) {
-          throw error
-        }
-
-        return (data ?? []) as MasterPLUItem[]
-      }),
+      const data = await queryRest<MasterPLUItem[]>('master_plu_items', {
+        select: '*',
+        version_id: `eq.${versionId}`,
+        order: 'system_name.asc',
+      })
+      return data ?? []
+    },
   })
 
-  // Toast nur nach Verzögerung anzeigen; wenn Refetch vorher erfolgreich, kein Toast
   useEffect(() => {
     if (!result.isError || result.isRefetching || !result.error) return
     const t = setTimeout(() => {

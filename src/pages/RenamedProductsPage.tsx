@@ -19,6 +19,8 @@ import {
 import { Pencil, Undo2 } from 'lucide-react'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
+import { useRenamedItems } from '@/hooks/useRenamedItems'
+import { useLayoutSettings } from '@/hooks/useLayoutSettings'
 import { useResetProductName } from '@/hooks/useCustomProducts'
 import { useAuth } from '@/hooks/useAuth'
 import { getDisplayPlu } from '@/lib/plu-helpers'
@@ -31,13 +33,23 @@ export function RenamedProductsPage() {
   const [resetConfirmItem, setResetConfirmItem] = useState<MasterPLUItem | null>(null)
 
   const { data: activeVersion } = useActiveVersion()
-  const { data: masterItems = [], isLoading: itemsLoading } = usePLUData(activeVersion?.id)
+  const { data: masterItems = [], isLoading: itemsLoading, isError: itemsError } = usePLUData(activeVersion?.id)
+  const { data: storeRenamed = [], isLoading: renamedLoading } = useRenamedItems()
+  const { data: layoutSettings } = useLayoutSettings()
   const resetName = useResetProductName()
+  const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
 
-  const renamedItems = useMemo(
-    () => masterItems.filter((m) => m.is_manually_renamed === true),
-    [masterItems],
-  )
+  // Produkte, die in der aktuellen Version vorkommen UND marktspezifisch umbenannt sind
+  const renamedItems = useMemo(() => {
+    const renamedPlus = new Set(storeRenamed.map((r) => r.plu))
+    const byPlu = new Map(storeRenamed.map((r) => [r.plu, r]))
+    return masterItems
+      .filter((m) => renamedPlus.has(m.plu))
+      .map((m) => {
+        const r = byPlu.get(m.plu)!
+        return { ...m, display_name: r.display_name }
+      })
+  }, [masterItems, storeRenamed])
 
   const handleResetConfirm = async () => {
     if (!resetConfirmItem) return
@@ -47,6 +59,19 @@ export function RenamedProductsPage() {
     } catch {
       // Toast im Hook
     }
+  }
+
+  if (itemsError) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+            <p className="font-medium">Fehler beim Laden der Daten</p>
+            <p className="text-sm mt-1">Bitte lade die Seite neu oder versuche es später erneut.</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -71,7 +96,7 @@ export function RenamedProductsPage() {
           </Button>
         </div>
 
-        {itemsLoading && (
+        {(itemsLoading || renamedLoading) && (
           <Card>
             <CardContent className="p-6 space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -85,7 +110,7 @@ export function RenamedProductsPage() {
           </Card>
         )}
 
-        {!itemsLoading && renamedItems.length === 0 && (
+        {!itemsLoading && !renamedLoading && renamedItems.length === 0 && (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <Pencil className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -98,7 +123,7 @@ export function RenamedProductsPage() {
           </Card>
         )}
 
-        {!itemsLoading && renamedItems.length > 0 && (
+        {!itemsLoading && !renamedLoading && renamedItems.length > 0 && (
           <Card>
             <CardContent className="p-0">
               <table className="w-full">
@@ -154,6 +179,8 @@ export function RenamedProductsPage() {
           open={showRenameDialog}
           onOpenChange={setShowRenameDialog}
           searchableItems={masterItems}
+          displayMode={displayMode}
+          renamedOverrides={storeRenamed.map((r) => ({ plu: r.plu, display_name: r.display_name }))}
         />
 
         <AlertDialog open={!!resetConfirmItem} onOpenChange={(open) => !open && setResetConfirmItem(null)}>

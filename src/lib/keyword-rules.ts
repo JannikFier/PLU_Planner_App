@@ -108,6 +108,7 @@ export function applyAllRulesToItems(
   const updates: { id: string; display_name: string }[] = []
 
   for (const item of items) {
+    if (item.is_manually_renamed) continue
     // Ausgangspunkt: system_name (Original aus Excel)
     let currentName = item.system_name
 

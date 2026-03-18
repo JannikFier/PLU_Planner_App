@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryRest } from '@/lib/supabase'
 import type { Block, BlockRule, Database } from '@/types/database'
 
 const onMutationError = (error: unknown) => {
@@ -17,13 +17,11 @@ export function useBlocks() {
     queryKey: ['blocks'],
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('blocks')
-        .select('*')
-        .order('order_index', { ascending: true })
-
-      if (error) throw error
-      return (data ?? []) as Block[]
+      const data = await queryRest<Block[]>('blocks', {
+        select: '*',
+        order: 'order_index.asc',
+      })
+      return data ?? []
     },
   })
 }
@@ -32,14 +30,13 @@ export function useBlocks() {
 export function useBlockRules() {
   return useQuery<BlockRule[]>({
     queryKey: ['block-rules'],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('block_rules')
-        .select('*')
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-      return (data ?? []) as BlockRule[]
+      const data = await queryRest<BlockRule[]>('block_rules', {
+        select: '*',
+        order: 'created_at.asc',
+      })
+      return data ?? []
     },
   })
 }
@@ -112,17 +109,15 @@ export function useReorderBlocks() {
 
   return useMutation({
     mutationFn: async (blocks: { id: string; order_index: number }[]) => {
-      // Sequentiell updaten (Supabase hat kein Batch-Update)
-      for (const block of blocks) {
-        const { error } = await supabase
-          .from('blocks')
-          .update(
-          ({ order_index: block.order_index } as Database['public']['Tables']['blocks']['Update']) as never
+      await Promise.all(
+        blocks.map((block) =>
+          supabase
+            .from('blocks')
+            .update(({ order_index: block.order_index } as Database['public']['Tables']['blocks']['Update']) as never)
+            .eq('id', block.id)
+            .then(({ error }) => { if (error) throw error })
         )
-          .eq('id', block.id)
-
-        if (error) throw error
-      }
+      )
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blocks'], refetchType: 'all' })

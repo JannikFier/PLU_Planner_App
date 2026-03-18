@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { Navigate } from 'react-router-dom'
+import { useState, useMemo, useEffect } from 'react'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { toast } from 'sonner'
  * Passwort-Feld hat ein Auge-Icon zum Ein-/Ausblenden.
  */
 export function LoginPage() {
+  const location = useLocation()
   const {
     user,
     isLoading,
@@ -26,6 +27,7 @@ export function LoginPage() {
     loginWithEmail,
     loginWithPersonalnummer,
     requestPasswordReset,
+    clearError,
   } = useAuth()
 
   const { storeName, storeLogo, companyLogo, isAdminDomain, error: storeError } = useCurrentStore()
@@ -40,18 +42,22 @@ export function LoginPage() {
   const [localError, setLocalError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Veraltete Fehlermeldungen beim Betreten der Login-Seite loeschen
+  useEffect(() => {
+    clearError()
+  }, [clearError])
+
   // Automatische Erkennung: Email (enthält @) oder Personalnummer (Hooks vor allen Returns)
   const isEmail = useMemo(() => identifier.includes('@'), [identifier])
 
-  // Wenn eingeloggt: weiterleiten
+  // Wenn eingeloggt: weiterleiten (zur ursprünglich angefragten Route oder Dashboard) (zur ursprünglich angefragten Route oder Dashboard)
   if (user && !isLoading) {
     if (mustChangePassword) {
       return <Navigate to="/change-password" replace />
     }
-    if (isSuperAdmin) return <Navigate to="/super-admin" replace />
-    if (isAdmin) return <Navigate to="/admin" replace />
-    if (isViewer) return <Navigate to="/viewer" replace />
-    return <Navigate to="/user" replace />
+    const dashboardPath = isSuperAdmin ? '/super-admin' : isAdmin ? '/admin' : isViewer ? '/viewer' : '/user'
+    const from = (location.state as { from?: { pathname?: string } })?.from?.pathname || dashboardPath
+    return <Navigate to={from} replace />
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -114,7 +120,7 @@ export function LoginPage() {
           <p className="mt-2 text-muted-foreground">
             Melde dich an, um auf deine PLU-Listen zuzugreifen
           </p>
-          {storeError && (
+          {storeError && !user && (
             <p className="mt-2 text-sm text-destructive">{storeError}</p>
           )}
         </div>
@@ -205,6 +211,7 @@ export function LoginPage() {
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                       onClick={() => setShowPassword(!showPassword)}
                       tabIndex={-1}
+                      aria-label={showPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
                     >
                       {showPassword ? (
                         <EyeOff className="h-4 w-4" />

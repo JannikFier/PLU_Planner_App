@@ -245,22 +245,22 @@ function PreviewRowByRowTable({ tableRows, fonts }: { tableRows: TableRow[]; fon
     <table className="w-full">
       <thead>
         <tr className="border-b border-border">
-          <th className="w-[50px] px-1.5 py-1 text-left font-semibold text-muted-foreground uppercase" style={{ fontSize: fonts.column }}>
+          <th className="w-[50px] px-1.5 text-left font-semibold text-muted-foreground uppercase" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             PLU
           </th>
-          <th className="px-1.5 py-1 text-left font-semibold text-muted-foreground uppercase" style={{ fontSize: fonts.column }}>
+          <th className="px-1.5 text-left font-semibold text-muted-foreground uppercase" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             Artikel
           </th>
-          <th className="w-[50px] px-1.5 py-1 text-left font-medium text-muted-foreground uppercase border-l border-border" style={{ fontSize: fonts.column }}>
+          <th className="w-[50px] px-1.5 text-left font-medium text-muted-foreground uppercase border-l border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             Preis
           </th>
-          <th className="w-[50px] px-1.5 py-1 text-left font-semibold text-muted-foreground uppercase border-l border-border" style={{ fontSize: fonts.column }}>
+          <th className="w-[50px] px-1.5 text-left font-semibold text-muted-foreground uppercase border-l border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             PLU
           </th>
-          <th className="px-1.5 py-1 text-left font-semibold text-muted-foreground uppercase" style={{ fontSize: fonts.column }}>
+          <th className="px-1.5 text-left font-semibold text-muted-foreground uppercase" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             Artikel
           </th>
-          <th className="w-[50px] px-1.5 py-1 text-left font-medium text-muted-foreground uppercase border-l border-border" style={{ fontSize: fonts.column }}>
+          <th className="w-[50px] px-1.5 text-left font-medium text-muted-foreground uppercase border-l border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
             Preis
           </th>
         </tr>
@@ -270,7 +270,7 @@ function PreviewRowByRowTable({ tableRows, fonts }: { tableRows: TableRow[]; fon
           if (row.type === 'fullHeader') {
             return (
               <tr key={`h-${i}`} className="border-b border-border">
-                <td colSpan={6} className="px-1.5 py-1 text-center font-bold text-muted-foreground tracking-wider uppercase bg-muted/50" style={{ fontSize: fonts.column }}>
+                <td colSpan={6} className="px-1.5 text-center font-bold text-muted-foreground tracking-wider uppercase bg-muted/50" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
                   {row.label}
                 </td>
               </tr>
@@ -280,37 +280,37 @@ function PreviewRowByRowTable({ tableRows, fonts }: { tableRows: TableRow[]; fon
             <tr key={`p-${i}`} className="border-b border-border last:border-b-0">
               {row.left ? (
                 <>
-                  <td className="px-1.5 py-0.5" style={{ fontSize: fonts.product }}>
+                  <td className="px-1.5" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
                     <StatusBadge plu={row.left.plu} status={row.left.status} oldPlu={row.left.old_plu} className="px-1 py-0" style={{ fontSize: fonts.product }} />
                   </td>
-                  <td className="px-1.5 py-0.5 truncate" style={{ fontSize: fonts.product }} title={getDisplayNameForItem(row.left.display_name, row.left.system_name, (row.left as unknown as DisplayItem).is_custom)}>
+                  <td className="px-1.5 truncate" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }} title={getDisplayNameForItem(row.left.display_name, row.left.system_name, (row.left as unknown as DisplayItem).is_custom)}>
                     {getDisplayNameForItem(row.left.display_name, row.left.system_name, (row.left as unknown as DisplayItem).is_custom)}
                   </td>
-                  <td className="px-1.5 py-0.5 border-l border-border" style={{ fontSize: fonts.product }}>
+                  <td className="px-1.5 border-l border-border" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
                     {(row.left as unknown as DisplayItem).preis != null ? (
-                      <PreisBadge value={(row.left as unknown as DisplayItem).preis!} style={{ fontSize: Math.max(8, fonts.product - 1) + 'px' }} />
+                      <PreisBadge value={(row.left as unknown as DisplayItem).preis as number} style={{ fontSize: Math.max(8, fonts.product - 1) + 'px' }} />
                     ) : null}
                   </td>
                 </>
               ) : (
-                <><td className="px-1.5 py-0.5" /><td className="px-1.5 py-0.5" /><td className="px-1.5 py-0.5" /></>
+                <><td className="px-1.5" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }} /><td className="px-1.5" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }} /><td className="px-1.5" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }} /></>
               )}
               {row.right ? (
                 <>
-                  <td className="px-1.5 py-0.5 border-l border-border" style={{ fontSize: fonts.product }}>
+                  <td className="px-1.5 border-l border-border" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
                     <StatusBadge plu={row.right.plu} status={row.right.status} oldPlu={row.right.old_plu} className="px-1 py-0" style={{ fontSize: fonts.product }} />
                   </td>
-                  <td className="px-1.5 py-0.5 truncate" style={{ fontSize: fonts.product }} title={getDisplayNameForItem(row.right.display_name, row.right.system_name, (row.right as unknown as DisplayItem).is_custom)}>
+                  <td className="px-1.5 truncate" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }} title={getDisplayNameForItem(row.right.display_name, row.right.system_name, (row.right as unknown as DisplayItem).is_custom)}>
                     {getDisplayNameForItem(row.right.display_name, row.right.system_name, (row.right as unknown as DisplayItem).is_custom)}
                   </td>
-                  <td className="px-1.5 py-0.5 border-l border-border" style={{ fontSize: fonts.product }}>
+                  <td className="px-1.5 border-l border-border" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
                     {(row.right as unknown as DisplayItem).preis != null ? (
-                      <PreisBadge value={(row.right as unknown as DisplayItem).preis!} style={{ fontSize: Math.max(8, fonts.product - 1) + 'px' }} />
+                      <PreisBadge value={(row.right as unknown as DisplayItem).preis as number} style={{ fontSize: Math.max(8, fonts.product - 1) + 'px' }} />
                     ) : null}
                   </td>
                 </>
               ) : (
-                <><td className="px-1.5 py-0.5 border-l border-border" /><td className="px-1.5 py-0.5" /><td className="px-1.5 py-0.5" /></>
+                <><td className="px-1.5 border-l border-border" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }} /><td className="px-1.5" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }} /><td className="px-1.5" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }} /></>
               )}
             </tr>
           )
@@ -326,13 +326,13 @@ function PreviewColumn({ rows, fonts }: { rows: FlatRow[]; fonts: FontSizes }) {
       <table className="w-full">
         <thead>
           <tr className="border-b border-border">
-            <th className="w-[50px] px-1.5 py-1 text-left font-semibold text-muted-foreground uppercase" style={{ fontSize: fonts.column }}>
+            <th className="w-[50px] px-1.5 text-left font-semibold text-muted-foreground uppercase" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
               PLU
             </th>
-            <th className="px-1.5 py-1 text-left font-semibold text-muted-foreground uppercase" style={{ fontSize: fonts.column }}>
+            <th className="px-1.5 text-left font-semibold text-muted-foreground uppercase" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
               Artikel
             </th>
-            <th className="w-[50px] px-1.5 py-1 text-left font-medium text-muted-foreground uppercase border-l border-border" style={{ fontSize: fonts.column }}>
+            <th className="w-[50px] px-1.5 text-left font-medium text-muted-foreground uppercase border-l border-border" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
               Preis
             </th>
           </tr>
@@ -342,24 +342,25 @@ function PreviewColumn({ rows, fonts }: { rows: FlatRow[]; fonts: FontSizes }) {
             if (row.type === 'header') {
               return (
                 <tr key={`h-${i}`} className="border-b border-border">
-                  <td colSpan={3} className="px-1.5 py-1 text-center font-bold text-muted-foreground tracking-wider uppercase bg-muted/50" style={{ fontSize: fonts.column }}>
+                  <td colSpan={3} className="px-1.5 text-center font-bold text-muted-foreground tracking-wider uppercase bg-muted/50" style={{ fontSize: fonts.column, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
                     {row.label}
                   </td>
                 </tr>
               )
             }
-            const item = row.item!
+            const item = row.item
+            if (!item) return null
             return (
               <tr key={item.id} className="border-b border-border last:border-b-0">
-                <td className="px-1.5 py-0.5" style={{ fontSize: fonts.product }}>
+                <td className="px-1.5" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
                   <StatusBadge plu={item.plu} status={item.status} oldPlu={item.old_plu} className="px-1 py-0" style={{ fontSize: fonts.product }} />
                 </td>
-                <td className="px-1.5 py-0.5 truncate" style={{ fontSize: fonts.product }} title={getDisplayNameForItem(item.display_name, item.system_name, (item as unknown as DisplayItem).is_custom)}>
+                <td className="px-1.5 truncate" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }} title={getDisplayNameForItem(item.display_name, item.system_name, (item as unknown as DisplayItem).is_custom)}>
                   {getDisplayNameForItem(item.display_name, item.system_name, (item as unknown as DisplayItem).is_custom)}
                 </td>
-                <td className="px-1.5 py-0.5 border-l border-border" style={{ fontSize: fonts.product }}>
+                <td className="px-1.5 border-l border-border" style={{ fontSize: fonts.product, paddingTop: '0.25em', paddingBottom: '0.25em' }}>
                   {(item as unknown as DisplayItem).preis != null ? (
-                    <PreisBadge value={(item as unknown as DisplayItem).preis!} style={{ fontSize: Math.max(8, fonts.product - 1) + 'px' }} />
+                    <PreisBadge value={(item as unknown as DisplayItem).preis as number} style={{ fontSize: Math.max(8, fonts.product - 1) + 'px' }} />
                   ) : null}
                 </td>
               </tr>

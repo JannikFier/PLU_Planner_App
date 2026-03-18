@@ -1,0 +1,31 @@
+---
+description: E2E-Tests – Wann anpassen, wie strukturieren
+alwaysApply: true
+---
+
+# E2E-Tests
+
+## Zwei Stufen
+
+- **Standard** (`npm run test:e2e`): Nur @smoke – Login, Redirects. Schnell, ohne .env.e2e. Für jeden Commit.
+- **Vollständig** (`npm run test:e2e:full`): Alle Tests inkl. @extended. Braucht .env.e2e. Vor Publish ausführen.
+
+## Bei neuen Features
+
+- **Größere Features** (neue Seite, neuer Flow, neue Rolle): E2E-Test hinzufügen oder erweitern.
+- **Kleine Änderungen** (Text, Styling, Bugfix): Kein neuer Test nötig.
+- **Regel:** Wenn ein User-Flow neu ist oder sich wesentlich ändert → Test anpassen.
+
+## Struktur
+
+- Eine Datei pro Rolle/Domain: `user-journey.spec.ts`, `admin-journey.spec.ts`, etc.
+- Nicht zu viele Tests pro Datei. Wenn >15 Tests: in zwei Dateien aufteilen (z.B. `user-journey-core.spec.ts` + `user-journey-extended.spec.ts`).
+- Neue Tests mit @extended taggen (im describe-Namen).
+
+## Vor Publish
+
+```bash
+npm run test:e2e:full
+```
+
+Alle Tests müssen grün sein. Siehe docs/TESTING.md.

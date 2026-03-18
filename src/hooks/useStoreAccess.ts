@@ -3,16 +3,30 @@ import { invokeEdgeFunction, queryRest, mutateRest } from '@/lib/supabase'
 import { toast } from 'sonner'
 import type { UserStoreAccess, Profile } from '@/types/database'
 
+/** Fehlermeldungen von user_store_access in verstaendliche Texte uebersetzen */
+function translateStoreAccessError(msg: string): string {
+  const lower = msg.toLowerCase()
+  if (lower.includes('gleichen firma') || lower.includes('same company')) {
+    return 'Benutzer kann nur Märkten der gleichen Firma zugewiesen werden.'
+  }
+  if (lower.includes('duplicate key') || lower.includes('unique constraint') || lower.includes('already exists')) {
+    return 'Dieser Benutzer ist diesem Markt bereits zugewiesen.'
+  }
+  return msg
+}
+
 export function useStoreAccessByStore(storeId: string | undefined) {
   return useQuery({
     queryKey: ['store-access', storeId],
     queryFn: async () => {
+      if (!storeId) throw new Error('Kein Markt angegeben.')
       return queryRest<UserStoreAccess[]>('user_store_access', {
         select: '*',
-        store_id: `eq.${storeId!}`,
+        store_id: `eq.${storeId}`,
       })
     },
     enabled: !!storeId,
+    staleTime: 5 * 60 * 1000,
   })
 }
 
@@ -21,9 +35,10 @@ export function useStoreUserProfiles(storeId: string | undefined) {
   return useQuery({
     queryKey: ['store-user-profiles', storeId],
     queryFn: async () => {
+      if (!storeId) throw new Error('Kein Markt angegeben.')
       const rows = await queryRest<{ user_id: string; is_home_store: boolean }[]>(
         'user_store_access',
-        { select: 'user_id,is_home_store', store_id: `eq.${storeId!}` },
+        { select: 'user_id,is_home_store', store_id: `eq.${storeId}` },
       )
       if (!rows.length) return []
 
@@ -39,6 +54,7 @@ export function useStoreUserProfiles(storeId: string | undefined) {
         .map(p => ({ ...p, isHomeStore: homeMap.get(p.id) ?? false }))
     },
     enabled: !!storeId,
+    staleTime: 5 * 60 * 1000,
   })
 }
 
@@ -46,12 +62,14 @@ export function useStoreAccessByUser(userId: string | undefined) {
   return useQuery({
     queryKey: ['store-access', 'user', userId],
     queryFn: async () => {
+      if (!userId) throw new Error('Kein Benutzer angegeben.')
       return queryRest<UserStoreAccess[]>('user_store_access', {
         select: '*',
-        user_id: `eq.${userId!}`,
+        user_id: `eq.${userId}`,
       })
     },
     enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
   })
 }
 
@@ -93,7 +111,7 @@ export function useAddUserToStore() {
       queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
       toast.success('Benutzer wurde dem Markt zugewiesen.')
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(translateStoreAccessError(e.message)),
   })
 }
 
@@ -114,6 +132,6 @@ export function useRemoveUserFromStore() {
       queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
       toast.success('Benutzer wurde vom Markt entfernt.')
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(translateStoreAccessError(e.message)),
   })
 }

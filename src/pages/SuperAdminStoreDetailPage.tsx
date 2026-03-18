@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, invokeEdgeFunction } from '@/lib/supabase'
@@ -7,7 +7,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { BereichsauswahlCard } from '@/components/layout/BereichsauswahlCard'
 import { DashboardGroupCard, type DashboardGroupCardItem } from '@/components/layout/DashboardCard'
 import { useStoreById, useUpdateStore, useDeleteStore } from '@/hooks/useStores'
-import { useStoreListVisibility, useUpdateStoreListVisibility } from '@/hooks/useStoreListVisibility'
+import { useStoreListVisibility, useUpdateStoreListVisibility, useUserListVisibilityForUser, useUpdateUserListVisibility } from '@/hooks/useStoreListVisibility'
 import { useStoreUserProfiles, useAddUserToStore, useRemoveUserFromStore } from '@/hooks/useStoreAccess'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,6 +24,7 @@ import {
   AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Separator } from '@/components/ui/separator'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -44,41 +45,45 @@ type Section = 'overview' | 'listen' | 'listen-obst' | 'listen-backshop' | 'benu
 
 function buildObstItems(backTo: string): DashboardGroupCardItem[] {
   const s = { backTo }
+  const q = `?backTo=${encodeURIComponent(backTo)}`
   return [
-    { title: 'Masterliste Obst/Gemüse', description: 'PLU-Liste anzeigen und bearbeiten', icon: ClipboardList, to: '/super-admin/masterlist', state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { title: 'Eigene Produkte', description: 'Hinzufügen, bearbeiten, ausblenden', icon: Plus, to: '/super-admin/custom-products', state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { title: 'Ausgeblendete', description: 'Einsehen und wieder einblenden', icon: EyeOff, to: '/super-admin/hidden-products', state: s, color: 'text-gray-600', bg: 'bg-gray-100' },
-    { title: 'Werbung', description: 'Angebote verwalten', icon: Megaphone, to: '/super-admin/offer-products', state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { title: 'Umbenannte', description: 'Anzeigenamen anpassen', icon: Pencil, to: '/super-admin/renamed-products', state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { title: 'Masterliste Obst/Gemüse', description: 'PLU-Liste anzeigen und bearbeiten', icon: ClipboardList, to: `/super-admin/masterlist${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { title: 'Eigene Produkte', description: 'Hinzufügen, bearbeiten, ausblenden', icon: Plus, to: `/super-admin/custom-products${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { title: 'Ausgeblendete', description: 'Einsehen und wieder einblenden', icon: EyeOff, to: `/super-admin/hidden-products${q}`, state: s, color: 'text-gray-600', bg: 'bg-gray-100' },
+    { title: 'Werbung', description: 'Angebote verwalten', icon: Megaphone, to: `/super-admin/offer-products${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { title: 'Umbenannte', description: 'Anzeigenamen anpassen', icon: Pencil, to: `/super-admin/renamed-products${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
   ]
 }
 
 function buildObstConfigItems(backTo: string): DashboardGroupCardItem[] {
   const s = { backTo }
+  const q = `?backTo=${encodeURIComponent(backTo)}`
   return [
-    { title: 'Layout', description: 'Sortierung, Anzeige, Schriftgrößen', icon: Palette, to: '/super-admin/layout', state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
-    { title: 'Inhalt & Regeln', description: 'Bezeichnungsregeln und Warengruppen', icon: FileText, to: '/super-admin/rules', state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { title: 'Block-Sortierung', description: 'Reihenfolge der Blöcke anpassen', icon: ListOrdered, to: '/super-admin/block-sort', state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
+    { title: 'Layout', description: 'Sortierung, Anzeige, Schriftgrößen', icon: Palette, to: `/super-admin/layout${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
+    { title: 'Inhalt & Regeln', description: 'Bezeichnungsregeln und Warengruppen', icon: FileText, to: `/super-admin/rules${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { title: 'Block-Sortierung', description: 'Reihenfolge der Blöcke anpassen', icon: ListOrdered, to: `/super-admin/block-sort${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
   ]
 }
 
 function buildBackshopItems(backTo: string): DashboardGroupCardItem[] {
   const s = { backTo }
+  const q = `?backTo=${encodeURIComponent(backTo)}`
   return [
-    { title: 'Backshop-Liste', description: 'Liste mit Bild, PLU und Name', icon: ClipboardList, to: '/super-admin/backshop-list', state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
-    { title: 'Eigene Produkte (Backshop)', description: 'Eigene Backshop-Produkte anlegen', icon: Plus, to: '/super-admin/backshop-custom-products', state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
-    { title: 'Ausgeblendete (Backshop)', description: 'Ausgeblendete einblenden', icon: EyeOff, to: '/super-admin/backshop-hidden-products', state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
-    { title: 'Werbung (Backshop)', description: 'Angebote verwalten', icon: Megaphone, to: '/super-admin/backshop-offer-products', state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
-    { title: 'Umbenannte (Backshop)', description: 'Anzeigenamen anpassen', icon: Pencil, to: '/super-admin/backshop-renamed-products', state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
+    { title: 'Backshop-Liste', description: 'Liste mit Bild, PLU und Name', icon: ClipboardList, to: `/super-admin/backshop-list${q}`, state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
+    { title: 'Eigene Produkte (Backshop)', description: 'Eigene Backshop-Produkte anlegen', icon: Plus, to: `/super-admin/backshop-custom-products${q}`, state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
+    { title: 'Ausgeblendete (Backshop)', description: 'Ausgeblendete einblenden', icon: EyeOff, to: `/super-admin/backshop-hidden-products${q}`, state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
+    { title: 'Werbung (Backshop)', description: 'Angebote verwalten', icon: Megaphone, to: `/super-admin/backshop-offer-products${q}`, state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
+    { title: 'Umbenannte (Backshop)', description: 'Anzeigenamen anpassen', icon: Pencil, to: `/super-admin/backshop-renamed-products${q}`, state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
   ]
 }
 
 function buildBackshopConfigItems(backTo: string): DashboardGroupCardItem[] {
   const s = { backTo }
+  const q = `?backTo=${encodeURIComponent(backTo)}`
   return [
-    { title: 'Layout (Backshop)', description: 'Sortierung und Schriftgrößen', icon: Palette, to: '/super-admin/backshop-layout', state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
-    { title: 'Inhalt & Regeln (Backshop)', description: 'Bezeichnungsregeln und Warengruppen', icon: FileText, to: '/super-admin/backshop-rules', state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { title: 'Block-Sortierung (Backshop)', description: 'Reihenfolge der Blöcke', icon: ListOrdered, to: '/super-admin/backshop-block-sort', state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
+    { title: 'Layout (Backshop)', description: 'Sortierung und Schriftgrößen', icon: Palette, to: `/super-admin/backshop-layout${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
+    { title: 'Inhalt & Regeln (Backshop)', description: 'Bezeichnungsregeln und Warengruppen', icon: FileText, to: `/super-admin/backshop-rules${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { title: 'Block-Sortierung (Backshop)', description: 'Reihenfolge der Blöcke', icon: ListOrdered, to: `/super-admin/backshop-block-sort${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
   ]
 }
 
@@ -96,7 +101,7 @@ export function SuperAdminStoreDetailPage() {
     else setSearchParams({ view: s }, { replace: true })
   }
 
-  const { data: store, isLoading } = useStoreById(storeId)
+  const { data: store, isLoading, isError } = useStoreById(storeId)
   const { data: visibility } = useStoreListVisibility(storeId)
   const updateStore = useUpdateStore()
   const deleteStore = useDeleteStore()
@@ -112,14 +117,36 @@ export function SuperAdminStoreDetailPage() {
   const addUserToStore = useAddUserToStore()
   const removeUserFromStore = useRemoveUserFromStore()
 
-  // Alle Profile laden (für "Benutzer hinzufügen" Dialog)
-  const { data: allProfiles } = useQuery({
-    queryKey: ['all-profiles'],
+  // Firmeninterne Profile laden (für "Benutzer hinzufügen" Dialog)
+  const { data: companyProfiles } = useQuery({
+    queryKey: ['company-profiles', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('profiles').select('*').order('display_name')
-      if (error) throw error
-      return data as Profile[]
+      if (!companyId) throw new Error('Keine Firma angegeben.')
+      const { data: companyStores, error: storesErr } = await supabase
+        .from('stores' as never)
+        .select('id')
+        .eq('company_id', companyId)
+      if (storesErr) throw storesErr
+      const storeIds = (companyStores as unknown as { id: string }[]).map(s => s.id)
+      if (storeIds.length === 0) return []
+
+      const { data: access, error: accessErr } = await supabase
+        .from('user_store_access' as never)
+        .select('user_id')
+        .in('store_id', storeIds)
+      if (accessErr) throw accessErr
+      const userIds = [...new Set((access as unknown as { user_id: string }[]).map(a => a.user_id))]
+      if (userIds.length === 0) return []
+
+      const { data: profiles, error: profilesErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', userIds)
+        .order('display_name')
+      if (profilesErr) throw profilesErr
+      return profiles as Profile[]
     },
+    enabled: !!companyId,
   })
 
   // Settings-Dialoge
@@ -137,6 +164,7 @@ export function SuperAdminStoreDetailPage() {
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [showDeleteUserConfirm, setShowDeleteUserConfirm] = useState(false)
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null)
+  const [detailUser, setDetailUser] = useState<(Profile & { isHomeStore: boolean }) | null>(null)
   const [generatedPassword, setGeneratedPassword] = useState('')
   const [copied, setCopied] = useState(false)
 
@@ -154,6 +182,7 @@ export function SuperAdminStoreDetailPage() {
   // Benutzer erstellen (Edge Function)
   const createUserMutation = useMutation({
     mutationFn: async () => {
+      if (!store) throw new Error('Kein Markt ausgewählt.')
       const pw = generateOneTimePassword()
       await invokeEdgeFunction('create-user', {
         email: newEmail.trim() || undefined,
@@ -161,7 +190,7 @@ export function SuperAdminStoreDetailPage() {
         personalnummer: newPersonalnummer.trim() || undefined,
         displayName: newDisplayName,
         role: isSuperAdmin ? newRole : 'user',
-        home_store_id: storeId,
+        home_store_id: store.id,
         additional_store_ids: [],
       })
       return { oneTimePassword: pw }
@@ -170,7 +199,7 @@ export function SuperAdminStoreDetailPage() {
       setGeneratedPassword(result.oneTimePassword)
       setShowCreateUser(false)
       setShowPasswordDialog(true)
-      queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
+      queryClient.invalidateQueries({ queryKey: ['company-profiles', companyId] })
       queryClient.invalidateQueries({ queryKey: ['store-user-profiles'] })
       setNewDisplayName(''); setNewEmail(''); setNewPersonalnummer(''); setNewRole('user')
       toast.success('Benutzer angelegt und diesem Markt zugewiesen!')
@@ -202,7 +231,7 @@ export function SuperAdminStoreDetailPage() {
     onSuccess: () => {
       setShowDeleteUserConfirm(false)
       setSelectedUser(null)
-      queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
+      queryClient.invalidateQueries({ queryKey: ['company-profiles', companyId] })
       queryClient.invalidateQueries({ queryKey: ['store-user-profiles'] })
       queryClient.invalidateQueries({ queryKey: ['store-access'] })
       toast.success('Benutzer wurde endgültig gelöscht.')
@@ -217,7 +246,7 @@ export function SuperAdminStoreDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['store-user-profiles'] })
-      queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
+      queryClient.invalidateQueries({ queryKey: ['company-profiles', companyId] })
       toast.success('Rolle wurde geändert.')
     },
     onError: (e: Error) => toast.error(e.message),
@@ -235,18 +264,42 @@ export function SuperAdminStoreDetailPage() {
     } catch { toast.error('Kopieren fehlgeschlagen.') }
   }
 
-  // Benutzer die noch NICHT diesem Markt zugewiesen sind
+  // Firmeninterne Benutzer die noch NICHT diesem Markt zugewiesen sind
   const assignedUserIds = new Set(storeUsers?.map(u => u.id) ?? [])
-  const availableUsers = allProfiles?.filter(
+  const availableUsers = companyProfiles?.filter(
     p => p.role !== 'super_admin' && !assignedUserIds.has(p.id),
   ) ?? []
 
-  if (isLoading || !store) {
+  if (isLoading) {
     return (
       <DashboardLayout>
         <div className="space-y-4">
           <Skeleton className="h-10 w-64" />
           <Skeleton className="h-32 w-full" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (isError) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+            <p className="font-medium">Fehler beim Laden der Daten</p>
+            <p className="text-sm mt-1">Bitte lade die Seite neu oder versuche es später erneut.</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (!store) {
+    return (
+      <DashboardLayout>
+        <div className="p-6 text-center">
+          <p className="text-muted-foreground">Eintrag nicht gefunden.</p>
+          <Button variant="outline" onClick={() => navigate(-1)} className="mt-4">Zurück</Button>
         </div>
       </DashboardLayout>
     )
@@ -391,66 +444,25 @@ export function SuperAdminStoreDetailPage() {
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead className="hidden sm:table-cell">Personalnr.</TableHead>
-                        <TableHead className="hidden md:table-cell">E-Mail</TableHead>
                         <TableHead>Rolle</TableHead>
-                        <TableHead className="hidden sm:table-cell">Heimat</TableHead>
-                        <TableHead className="text-right">Aktionen</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {storeUsers.map(u => (
-                        <TableRow key={u.id}>
-                          <TableCell className="font-medium">{u.display_name || '–'}</TableCell>
-                          <TableCell className="font-mono hidden sm:table-cell">{formatProfileDisplayPersonalnummer(u.personalnummer)}</TableCell>
-                          <TableCell className="text-muted-foreground hidden md:table-cell">{formatProfileDisplayEmail(u.email)}</TableCell>
-                          <TableCell>
-                            {isSuperAdmin && u.id !== currentUser?.id ? (
-                              <Select
-                                value={u.role}
-                                onValueChange={(val) => updateRoleMutation.mutate({ userId: u.id, newRole: val })}
-                              >
-                                <SelectTrigger className="h-8 w-[120px]">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="admin">Admin</SelectItem>
-                                  <SelectItem value="user">Personal</SelectItem>
-                                  <SelectItem value="viewer">Viewer</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Badge variant={u.role === 'admin' ? 'secondary' : 'outline'}>
-                                {roleBadgeLabel(u.role)}
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="hidden sm:table-cell">
-                            {u.isHomeStore && (
-                              <Badge variant="default" className="gap-1">
-                                <Home className="h-3 w-3" /> Heimatmarkt
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex flex-wrap justify-end gap-1">
-                              <Button variant="outline" size="sm" className="gap-1"
-                                onClick={() => { setSelectedUser(u); setShowResetConfirm(true) }}
-                              >
-                                <KeyRound className="h-3 w-3" /><span className="hidden sm:inline"> Passwort</span>
-                              </Button>
-                              <Button variant="outline" size="sm" className="gap-1"
-                                disabled={u.id === currentUser?.id}
-                                onClick={() => { setSelectedUser(u); setShowRemoveConfirm(true) }}
-                              >
-                                <UserMinus className="h-3 w-3" /><span className="hidden sm:inline"> Entfernen</span>
-                              </Button>
-                              <Button variant="outline" size="sm" className="gap-1 text-destructive hover:text-destructive"
-                                disabled={u.id === currentUser?.id}
-                                onClick={() => { setSelectedUser(u); setShowDeleteUserConfirm(true) }}
-                              >
-                                <Trash2 className="h-3 w-3" /><span className="hidden sm:inline"> Löschen</span>
-                              </Button>
+                        <TableRow key={u.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setDetailUser(u)}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {u.display_name || '–'}
+                              {u.isHomeStore && (
+                                <Home className="h-3 w-3 text-muted-foreground" />
+                              )}
                             </div>
+                          </TableCell>
+                          <TableCell className="font-mono hidden sm:table-cell">{formatProfileDisplayPersonalnummer(u.personalnummer)}</TableCell>
+                          <TableCell>
+                            <Badge variant={u.role === 'admin' ? 'secondary' : 'outline'}>
+                              {roleBadgeLabel(u.role)}
+                            </Badge>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -462,6 +474,21 @@ export function SuperAdminStoreDetailPage() {
             </Card>
           </div>
         )}
+
+        {/* === USER-DETAIL-DIALOG === */}
+        <UserDetailDialog
+          user={detailUser}
+          open={!!detailUser}
+          onOpenChange={(open) => { if (!open) setDetailUser(null) }}
+          storeId={store.id}
+          isSuperAdmin={isSuperAdmin}
+          isSelf={detailUser?.id === currentUser?.id}
+          roleMutationPending={updateRoleMutation.isPending}
+          onResetPassword={(u) => { setSelectedUser(u); setShowResetConfirm(true) }}
+          onRemove={(u) => { setSelectedUser(u); setShowRemoveConfirm(true) }}
+          onDelete={(u) => { setSelectedUser(u); setShowDeleteUserConfirm(true) }}
+          onRoleChange={(userId, role) => updateRoleMutation.mutate({ userId, newRole: role })}
+        />
 
         {/* === EINSTELLUNGEN === */}
         {view === 'einstellungen' && (
@@ -480,9 +507,11 @@ export function SuperAdminStoreDetailPage() {
                     <p className="text-sm font-medium">Markt {store.is_active ? 'aktiv' : 'pausiert'}</p>
                     <p className="text-xs text-muted-foreground">Pausierte Märkte sind für Benutzer nicht sichtbar</p>
                   </div>
-                  <Switch checked={store.is_active}
+                  <Switch
+                    checked={store.is_active}
+                    disabled={updateStore.isPending}
                     onCheckedChange={async (checked) => {
-                      await updateStore.mutateAsync({ id: storeId!, isActive: checked })
+                      await updateStore.mutateAsync({ id: store.id, isActive: checked })
                     }}
                   />
                 </div>
@@ -503,9 +532,11 @@ export function SuperAdminStoreDetailPage() {
                     <p className="text-sm font-medium">Obst & Gemüse</p>
                     <p className="text-xs text-muted-foreground">PLU-Liste Obst & Gemüse für diesen Markt anzeigen</p>
                   </div>
-                  <Switch checked={obstVisible}
+                  <Switch
+                    checked={obstVisible}
+                    disabled={updateVisibility.isPending}
                     onCheckedChange={async (checked) => {
-                      await updateVisibility.mutateAsync({ storeId: storeId!, listType: 'obst_gemuese', isVisible: checked })
+                      await updateVisibility.mutateAsync({ storeId: store.id, listType: 'obst_gemuese', isVisible: checked })
                     }}
                   />
                 </div>
@@ -514,9 +545,11 @@ export function SuperAdminStoreDetailPage() {
                     <p className="text-sm font-medium">Backshop</p>
                     <p className="text-xs text-muted-foreground">Backshop-Liste für diesen Markt anzeigen</p>
                   </div>
-                  <Switch checked={backshopVisible}
+                  <Switch
+                    checked={backshopVisible}
+                    disabled={updateVisibility.isPending}
                     onCheckedChange={async (checked) => {
-                      await updateVisibility.mutateAsync({ storeId: storeId!, listType: 'backshop', isVisible: checked })
+                      await updateVisibility.mutateAsync({ storeId: store.id, listType: 'backshop', isVisible: checked })
                     }}
                   />
                 </div>
@@ -575,7 +608,7 @@ export function SuperAdminStoreDetailPage() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowEditName(false)}>Abbrechen</Button>
               <Button onClick={async () => {
-                await updateStore.mutateAsync({ id: storeId!, name: editValue.trim() })
+                await updateStore.mutateAsync({ id: store.id, name: editValue.trim() })
                 setShowEditName(false)
               }}>Speichern</Button>
             </DialogFooter>
@@ -598,7 +631,7 @@ export function SuperAdminStoreDetailPage() {
               <Button onClick={async () => {
                 const err = validateSubdomain(editValue)
                 if (err) { toast.error(err); return }
-                await updateStore.mutateAsync({ id: storeId!, subdomain: editValue.trim() })
+                await updateStore.mutateAsync({ id: store.id, subdomain: editValue.trim() })
                 setShowEditSubdomain(false)
               }}>Speichern</Button>
             </DialogFooter>
@@ -621,7 +654,7 @@ export function SuperAdminStoreDetailPage() {
               <Button variant="destructive"
                 disabled={deleteConfirm !== store.name || deleteStore.isPending}
                 onClick={async () => {
-                  await deleteStore.mutateAsync(storeId!)
+                  await deleteStore.mutateAsync(store.id)
                   navigate(`/super-admin/companies/${companyId}`)
                 }}
               >
@@ -654,7 +687,7 @@ export function SuperAdminStoreDetailPage() {
                     <Button size="sm" variant="outline" className="gap-1"
                       disabled={addUserToStore.isPending}
                       onClick={async () => {
-                        await addUserToStore.mutateAsync({ userId: u.id, storeId: storeId! })
+                        await addUserToStore.mutateAsync({ userId: u.id, storeId: store.id })
                         setShowAddUser(false)
                       }}
                     >
@@ -696,7 +729,7 @@ export function SuperAdminStoreDetailPage() {
               {isSuperAdmin && (
                 <div className="space-y-2">
                   <Label>Rolle</Label>
-                  <Select value={newRole} onValueChange={v => setNewRole(v as 'user' | 'admin' | 'viewer')}>
+                  <Select value={newRole} onValueChange={v => setNewRole(v as 'user' | 'admin' | 'viewer')} disabled={createUserMutation.isPending}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="user">User (Personal)</SelectItem>
@@ -787,7 +820,7 @@ export function SuperAdminStoreDetailPage() {
                 disabled={!selectedUser || removeUserFromStore.isPending}
                 onClick={async () => {
                   if (!selectedUser) return
-                  await removeUserFromStore.mutateAsync({ userId: selectedUser.id, storeId: storeId! })
+                  await removeUserFromStore.mutateAsync({ userId: selectedUser.id, storeId: store.id })
                   setShowRemoveConfirm(false)
                   setSelectedUser(null)
                 }}
@@ -827,5 +860,182 @@ export function SuperAdminStoreDetailPage() {
         </AlertDialog>
       </div>
     </DashboardLayout>
+  )
+}
+
+/* ═══════════════════════════════════════════════════ */
+/* ══ User-Detail-Dialog (zentriertes Popup)        ══ */
+/* ═══════════════════════════════════════════════════ */
+
+type StoreUser = Profile & { isHomeStore: boolean }
+
+interface UserDetailDialogProps {
+  user: StoreUser | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  storeId: string
+  isSuperAdmin: boolean
+  isSelf: boolean
+  roleMutationPending?: boolean
+  onResetPassword: (u: StoreUser) => void
+  onRemove: (u: StoreUser) => void
+  onDelete: (u: StoreUser) => void
+  onRoleChange: (userId: string, newRole: string) => void
+}
+
+function UserDetailDialog({
+  user, open, onOpenChange, storeId, isSuperAdmin, isSelf, roleMutationPending,
+  onResetPassword, onRemove, onDelete, onRoleChange,
+}: UserDetailDialogProps) {
+  const { data: visibilityRows } = useUserListVisibilityForUser(user?.id, storeId)
+  const updateVisibility = useUpdateUserListVisibility()
+
+  const [obstLocal, setObstLocal] = useState(true)
+  const [backshopLocal, setBackshopLocal] = useState(true)
+  const lastSyncedKeyRef = useRef<string | null>(null)
+
+  const syncKey = user?.id && storeId ? `${user.id}-${storeId}` : ''
+  useEffect(() => {
+    if (!open) {
+      lastSyncedKeyRef.current = null
+      return
+    }
+    if (!syncKey || visibilityRows === undefined) return
+    if (lastSyncedKeyRef.current === syncKey) return
+    lastSyncedKeyRef.current = syncKey
+    const obst = visibilityRows?.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
+    const backshop = visibilityRows?.find(v => v.list_type === 'backshop')?.is_visible ?? true
+    setObstLocal(obst)
+    setBackshopLocal(backshop)
+  }, [open, syncKey, visibilityRows])
+
+  if (!user) return null
+
+  const setVisibility = async (listType: string, isVisible: boolean) => {
+    if (listType === 'obst_gemuese') setObstLocal(isVisible)
+    else setBackshopLocal(isVisible)
+    await updateVisibility.mutateAsync({ userId: user.id, storeId, listType, isVisible })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        {/* Header mit Avatar-Kreis */}
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
+              {(user.display_name ?? user.personalnummer ?? '?').charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <DialogTitle className="text-base">{user.display_name || user.personalnummer || '–'}</DialogTitle>
+              <DialogDescription className="text-xs">
+                {formatProfileDisplayEmail(user.email) !== '–' ? formatProfileDisplayEmail(user.email) : `Nr. ${formatProfileDisplayPersonalnummer(user.personalnummer)}`}
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-5 pt-2">
+          {/* ── Profil-Infos als kompakte Kacheln ── */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Personalnr.</p>
+              <p className="text-sm font-mono font-medium mt-0.5">{formatProfileDisplayPersonalnummer(user.personalnummer)}</p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Heimatmarkt</p>
+              <p className="text-sm font-medium mt-0.5">{user.isHomeStore ? 'Ja' : 'Nein'}</p>
+            </div>
+          </div>
+
+          {/* ── Rolle ── */}
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Rolle</Label>
+            {isSuperAdmin && !isSelf ? (
+              <Select value={user.role} onValueChange={(val) => onRoleChange(user.id, val)} disabled={roleMutationPending}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="user">Personal</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <div>
+                <Badge variant={user.role === 'admin' ? 'secondary' : 'outline'} className="text-sm">
+                  {roleBadgeLabel(user.role)}
+                </Badge>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* ── Sichtbare Bereiche ── */}
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sichtbare Bereiche</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">Welche Listen sieht dieser Benutzer?</p>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center gap-2">
+                  <Apple className="h-4 w-4 text-emerald-600" />
+                  <span className="text-sm font-medium">Obst & Gemüse</span>
+                </div>
+                <Switch
+                  checked={obstLocal}
+                  disabled={updateVisibility.isPending}
+                  onCheckedChange={(checked) => setVisibility('obst_gemuese', checked)}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center gap-2">
+                  <Croissant className="h-4 w-4 text-amber-700" />
+                  <span className="text-sm font-medium">Backshop</span>
+                </div>
+                <Switch
+                  checked={backshopLocal}
+                  disabled={updateVisibility.isPending}
+                  onCheckedChange={(checked) => setVisibility('backshop', checked)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* ── Aktionen ── */}
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Aktionen</Label>
+            <Button variant="outline" size="sm" className="w-full justify-start gap-2" onClick={() => { onOpenChange(false); onResetPassword(user) }}>
+              <KeyRound className="h-4 w-4" />
+              Passwort zurücksetzen
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="flex-1 gap-2"
+                disabled={isSelf}
+                onClick={() => { onOpenChange(false); onRemove(user) }}
+              >
+                <UserMinus className="h-4 w-4" />
+                Entfernen
+              </Button>
+              <Button variant="outline" size="sm" className="flex-1 gap-2 text-destructive hover:text-destructive"
+                disabled={isSelf}
+                onClick={() => { onOpenChange(false); onDelete(user) }}
+              >
+                <Trash2 className="h-4 w-4" />
+                Löschen
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground text-center">
+              Entfernen = nur von diesem Markt. Löschen = Account komplett weg.
+            </p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

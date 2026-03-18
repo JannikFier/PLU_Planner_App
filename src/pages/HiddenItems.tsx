@@ -88,7 +88,7 @@ export function HiddenItems() {
   const hiddenExcelFileInputRef = useRef<HTMLInputElement>(null)
 
   // Daten laden
-  const { data: hiddenItems = [], isLoading: hiddenLoading } = useHiddenItems()
+  const { data: hiddenItems = [], isLoading: hiddenLoading, isError: hiddenError } = useHiddenItems()
   const { data: activeVersion } = useActiveVersion()
   const { data: masterItems = [] } = usePLUData(activeVersion?.id)
   const { data: customProducts = [], isLoading: customProductsLoading } = useCustomProducts()
@@ -108,22 +108,25 @@ export function HiddenItems() {
 
   // Suchbare Items: Master + Custom, noch nicht ausgeblendet
   const hiddenPLUSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
+  const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
   const searchableItems = useMemo(() => {
-    const master: Array<{ id: string; plu: string; display_name: string; system_name?: string }> = masterItems
+    const master = masterItems
       .filter((m) => !hiddenPLUSet.has(m.plu))
       .map((m) => ({
         id: m.id,
         plu: m.plu,
         display_name: m.display_name ?? m.system_name,
         system_name: m.system_name,
+        item_type: m.item_type as 'PIECE' | 'WEIGHT',
       }))
-    const custom: Array<{ id: string; plu: string; display_name: string; system_name?: string }> = customProducts
+    const custom = customProducts
       .filter((c) => !hiddenPLUSet.has(c.plu))
       .map((c) => ({
         id: c.id,
         plu: c.plu,
         display_name: c.name,
         system_name: c.name,
+        item_type: c.item_type as 'PIECE' | 'WEIGHT',
       }))
     return [...master, ...custom]
   }, [masterItems, customProducts, hiddenPLUSet])
@@ -362,6 +365,19 @@ export function HiddenItems() {
     }
     return { willAdd, willSkip, skipIndices }
   }, [excelParseResult, existingPLUs])
+
+  if (hiddenError) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+            <p className="font-medium">Fehler beim Laden der Daten</p>
+            <p className="text-sm mt-1">Bitte lade die Seite neu oder versuche es später erneut.</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   return (
     <DashboardLayout>
@@ -696,6 +712,7 @@ export function HiddenItems() {
           open={showHideProductsDialog}
           onOpenChange={setShowHideProductsDialog}
           searchableItems={searchableItems}
+          displayMode={displayMode}
         />
 
         <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>

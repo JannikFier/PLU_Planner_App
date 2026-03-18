@@ -10,6 +10,7 @@ import type { UnmatchedProduct } from '@/lib/backshop-excel-images'
 import { compareBackshopWithCurrentVersion } from '@/lib/comparison-logic'
 import { publishBackshopVersion } from '@/lib/publish-backshop-version'
 import { useAuth } from '@/hooks/useAuth'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { supabase } from '@/lib/supabase'
 import type { BackshopParseResult, ParsedBackshopRow } from '@/types/plu'
 import type { BackshopCompareItem } from '@/types/plu'
@@ -37,6 +38,7 @@ function masterToCompareItem(row: BackshopMasterPLUItem): BackshopCompareItem {
 
 export function useBackshopUpload() {
   const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
   const queryClient = useQueryClient()
 
   const [step, setStep] = useState<BackshopUploadStep>(1)
@@ -250,11 +252,13 @@ export function useBackshopUpload() {
     const itemsToPublish = itemsWithBlockIds ?? comparison.allItems
     setIsProcessing(true)
     try {
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       const result = await publishBackshopVersion({
         kwNummer: kw,
         jahr,
         items: itemsToPublish,
         createdBy: user.id,
+        storeId: currentStoreId,
         replaceExistingVersion,
       })
       setPublishResult({ itemCount: result.itemCount })

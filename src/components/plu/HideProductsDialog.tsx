@@ -2,6 +2,7 @@
 // Suchleiste (PLU/Name), Liste mit Scroll zu Treffern, Multi-Auswahl, Batch-Ausblenden
 
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
   Dialog,
   DialogContent,
@@ -14,40 +15,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Search, EyeOff } from 'lucide-react'
 import { useHideProductsBatch } from '@/hooks/useHiddenItems'
-import { filterItemsBySearch, getDisplayPlu } from '@/lib/plu-helpers'
+import { filterItemsBySearch, getDisplayPlu, groupItemsForDialog, itemMatchesSearch } from '@/lib/plu-helpers'
 import { cn } from '@/lib/utils'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 
-/** Ä→A, Ö→O, Ü→U für Gruppierung */
-function normalizeLetterForGrouping(char: string): string {
-  const upper = char.toUpperCase()
-  if (upper === 'Ä') return 'A'
-  if (upper === 'Ö') return 'O'
-  if (upper === 'Ü') return 'U'
-  return upper
-}
-
-/** Gruppiert nach Anfangsbuchstabe (wie Master-PLU-Liste) */
-function groupByLetter(items: SearchableItem[]): { letter: string; items: SearchableItem[] }[] {
-  const grouped = new Map<string, SearchableItem[]>()
-  for (const item of items) {
-    const name = item.display_name ?? item.system_name ?? ''
-    const firstChar = name.charAt(0)
-    const letter = normalizeLetterForGrouping(firstChar) || '?'
-    const existing = grouped.get(letter)
-    if (existing) existing.push(item)
-    else grouped.set(letter, [item])
-  }
-  return Array.from(grouped.entries())
-    .sort(([a], [b]) => a.localeCompare(b, 'de'))
-    .map(([letter, items]) => ({ letter, items }))
-}
-
-/** Baut Reihen: Header pro Gruppe, dann Items paarweise (links/rechts) wie Master-PLU-Liste */
 type TableRow = { type: 'header'; label: string } | { type: 'row'; left?: SearchableItem; right?: SearchableItem }
-function buildTableRows(groups: { letter: string; items: SearchableItem[] }[]): TableRow[] {
+function buildTableRows(groups: { label: string; items: SearchableItem[] }[]): TableRow[] {
   const rows: TableRow[] = []
   for (const group of groups) {
-    rows.push({ type: 'header', label: `— ${group.letter} —` })
+    rows.push({ type: 'header', label: group.label })
     const items = group.items
     for (let i = 0; i < items.length; i += 2) {
       rows.push({ type: 'row', left: items[i], right: items[i + 1] })
@@ -55,13 +32,13 @@ function buildTableRows(groups: { letter: string; items: SearchableItem[] }[]): 
   }
   return rows
 }
-import { Checkbox } from '@/components/ui/checkbox'
 
 interface SearchableItem {
   id: string
   plu: string
   display_name: string
   system_name?: string
+  item_type?: 'PIECE' | 'WEIGHT' | string | null
 }
 
 interface HideProductsDialogProps {
@@ -69,37 +46,33 @@ interface HideProductsDialogProps {
   onOpenChange: (open: boolean) => void
   /** Produkte die noch ausgeblendet werden können (Master + Custom, nicht bereits ausgeblendet) */
   searchableItems: SearchableItem[]
+  /** Anzeige-Modus: SEPARATED = nach Stück/Gewicht getrennt, MIXED = nur alphabetisch */
+  displayMode?: 'MIXED' | 'SEPARATED'
 }
 
 export function HideProductsDialog({
   open,
   onOpenChange,
   searchableItems,
+  displayMode = 'MIXED',
 }: HideProductsDialogProps) {
   const [searchText, setSearchText] = useState('')
+  const deferredSearch = useDebouncedValue(searchText, 200)
   const [selectedPLUs, setSelectedPLUs] = useState<Set<string>>(new Set())
   const hideBatch = useHideProductsBatch()
   const listRef = useRef<HTMLTableSectionElement | null>(null)
 
   // Leere Suche = alle Items; sonst gefiltert
   const filteredItems = useMemo(() => {
-    const q = searchText.trim().toLowerCase()
+    const q = deferredSearch.trim().toLowerCase()
     if (!q) return searchableItems
-    return filterItemsBySearch(searchableItems, searchText)
-  }, [searchableItems, searchText])
+    return filterItemsBySearch(searchableItems, deferredSearch)
+  }, [searchableItems, deferredSearch])
 
-  // Gruppierung und Reihen wie Master-PLU-Liste (alphabetisch, zwei Spalten)
-  const groups = useMemo(() => groupByLetter(filteredItems), [filteredItems])
+  const groups = useMemo(() => groupItemsForDialog(filteredItems, displayMode), [filteredItems, displayMode])
   const tableRows = useMemo(() => buildTableRows(groups), [groups])
 
-  const searchLower = searchText.trim().toLowerCase()
-  const isMatch = (item: SearchableItem) => {
-    if (!searchLower) return false
-    const pluMatch = item.plu.toLowerCase().includes(searchLower)
-    const name = (item.display_name ?? item.system_name ?? '').toLowerCase()
-    const sys = (item.system_name ?? '').toLowerCase()
-    return pluMatch || name.includes(searchLower) || sys.includes(searchLower)
-  }
+  const searchLower = deferredSearch.trim().toLowerCase()
 
   // Nach Suchen-Änderung: Zum ersten Treffer scrollen
   useEffect(() => {
@@ -191,6 +164,7 @@ export function HideProductsDialog({
                   <thead className="sticky top-0 bg-background z-10">
                     <tr className="border-b-2 border-border">
                       <th className="px-1 py-1.5 w-[36px]">
+                        <Label htmlFor="select-all" className="sr-only">Alle auswählen</Label>
                         <Checkbox
                           id="select-all"
                           checked={selectedPLUs.size === filteredItems.length && filteredItems.length > 0}
@@ -226,8 +200,8 @@ export function HideProductsDialog({
                           </tr>
                         )
                       }
-                      const leftH = row.left ? isMatch(row.left) : false
-                      const rightH = row.right ? isMatch(row.right) : false
+                      const leftH = row.left ? itemMatchesSearch(row.left, deferredSearch) : false
+                      const rightH = row.right ? itemMatchesSearch(row.right, deferredSearch) : false
                       const leftSel = row.left ? selectedPLUs.has(row.left.plu) : false
                       const rightSel = row.right ? selectedPLUs.has(row.right.plu) : false
                       const hasMatch = (row.left && leftH) || (row.right && rightH)
@@ -238,21 +212,21 @@ export function HideProductsDialog({
                             {row.left ? (
                               <Checkbox
                                 checked={leftSel}
-                                onCheckedChange={() => toggleSelect(row.left!.plu)}
+                                onCheckedChange={() => { const p = row.left?.plu; if (p) toggleSelect(p) }}
                                 onClick={(e) => e.stopPropagation()}
                               />
                             ) : null}
                           </td>
                           <td
                             className={cn('px-2 py-1 text-sm font-mono', row.left && 'cursor-pointer hover:bg-muted/30', leftH && 'bg-primary/10')}
-                            onClick={row.left ? () => toggleSelect(row.left!.plu) : undefined}
+                            onClick={row.left ? () => { const p = row.left?.plu; if (p) toggleSelect(p) } : undefined}
                           >
                             {row.left ? getDisplayPlu(row.left.plu) : ''}
                           </td>
                           <td
                             className={cn('px-2 py-1 text-sm break-words min-w-0 border-l border-border', row.left && 'cursor-pointer hover:bg-muted/30', leftH && 'bg-primary/10')}
                             title={row.left?.display_name}
-                            onClick={row.left ? () => toggleSelect(row.left!.plu) : undefined}
+                            onClick={row.left ? () => { const p = row.left?.plu; if (p) toggleSelect(p) } : undefined}
                           >
                             {row.left?.display_name ?? ''}
                           </td>
@@ -261,21 +235,21 @@ export function HideProductsDialog({
                             {row.right ? (
                               <Checkbox
                                 checked={rightSel}
-                                onCheckedChange={() => toggleSelect(row.right!.plu)}
+                                onCheckedChange={() => { const p = row.right?.plu; if (p) toggleSelect(p) }}
                                 onClick={(e) => e.stopPropagation()}
                               />
                             ) : null}
                           </td>
                           <td
                             className={cn('px-2 py-1 text-sm font-mono', row.right && 'cursor-pointer hover:bg-muted/30', rightH && 'bg-primary/10')}
-                            onClick={row.right ? () => toggleSelect(row.right!.plu) : undefined}
+                            onClick={row.right ? () => { const p = row.right?.plu; if (p) toggleSelect(p) } : undefined}
                           >
                             {row.right ? getDisplayPlu(row.right.plu) : ''}
                           </td>
                           <td
                             className={cn('px-2 py-1 text-sm break-words min-w-0 border-l border-border', row.right && 'cursor-pointer hover:bg-muted/30', rightH && 'bg-primary/10')}
                             title={row.right?.display_name}
-                            onClick={row.right ? () => toggleSelect(row.right!.plu) : undefined}
+                            onClick={row.right ? () => { const p = row.right?.plu; if (p) toggleSelect(p) } : undefined}
                           >
                             {row.right?.display_name ?? ''}
                           </td>

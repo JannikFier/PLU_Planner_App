@@ -14,12 +14,25 @@
 | Phase 7 | Deployment (Vercel) | Geplant |
 | Backshop Phase 3 (A6) | Backshop-Liste + Upload (Routen, Dashboard-Karten, Tabelle Bild/PLU/Name, 3-Schritt-Upload) | Fertig |
 | Backshop Layout/Regeln/Cron | Layout (Backshop), Inhalt & Regeln (Backshop), Block-Sort, Cron-Jobs für Backshop-KW-Wechsel | Fertig |
+| Kassen | Kassen-Login, PLU-Listen nur lesen, marktspezifischer Link für iPad | Spezifikation in [FEATURE_KASSEN_SPEC.md](FEATURE_KASSEN_SPEC.md) |
+
+## Kassen (geplant)
+
+Kassen sind ein eigener Benutzertyp für Mitarbeiter an der Kasse. Sie bekommen ein Tablet und können damit nur die PLU-Listen (Obst/Gemüse + Backshop) ansehen – strikt lesend, ohne Bearbeitungsfunktionen. Der Markt wird über den Link (Subdomain) bestimmt. Vollständige Spezifikation: [FEATURE_KASSEN_SPEC.md](FEATURE_KASSEN_SPEC.md).
 
 ## Backshop-Liste (Phase 3)
 
 Zweite PLU-Liste **Backshop** neben Obst/Gemüse: eigene Versionen, Master-Items (mit Bild), keine Stück/Gewicht-Typen. **Routen:** `/user/backshop-list`, `/viewer/backshop-list`, `/admin/backshop-list`, `/super-admin/backshop-list`, `/super-admin/backshop-upload`. **Dashboard:** In User-, Viewer-, Admin- und Super-Admin-Dashboard je zwei Karten: „PLU-Liste Obst/Gemüse“ und „PLU-Liste Backshop“. Super-Admin zusätzlich „Backshop Upload“. **Backshop-Liste-Seite:** Tabelle mit Spalten Bild, PLU, Name; KW-Auswahl; Titel „PLU-Liste Backshop“. **Backshop-Upload:** 3 Schritte (Dateien + Ziel-KW, Vergleich mit Bild-Erhalt, Einspielen); mehrere Excel werden zusammengeführt (PLU-Deduplizierung). Obst/Gemüse-Flows unverändert. **Backshop-Excel-Parser:** Spalten-Erkennung (PLU 5-stellig mit Normalisierung, Name, Abbildung/Bild), Namens-Bereinigung (bis erstes Komma); Details und Fehlerbehebung in [BACKSHOP_EXCEL_PARSER.md](BACKSHOP_EXCEL_PARSER.md).
 
 **Backshop Layout & Regeln:** Super-Admin kann unter Konfiguration „Layout (Backshop)“ und „Inhalt & Regeln (Backshop)“ getrennt von Obst/Gemüse verwalten. Layout: **Anzeige** nur „Alle zusammen (alphabetisch)“ oder „Nach Warengruppen (alphabetisch)“; Flussrichtung (zeilen-/spaltenweise), Schriftgrößen, Markierungsdauer, Features (ohne separaten Warengruppen-Toggle – Warengruppen werden durch Anzeige „Nach Warengruppen“ freigeschaltet). Bei „Nach Warengruppen“ optional **„Jede Warengruppe auf eigener Seite“** für das PDF. Regeln: Bezeichnungsregeln (Schlagwort-Manager) und Warengruppen (Blöcke anlegen/zuweisen); bei Anzeige nach Warengruppen steht „Liste interaktiv bearbeiten“ für Drag-&-Drop-Sortierung zur Verfügung. **Drag-Overlay** in „Liste interaktiv bearbeiten“ und im Warengruppen-Panel folgt der Maus (snapCenterToCursor). **Rechte Spalte Warengruppen:** Ohne Gruppenauswahl werden nur unzugeordnete Produkte angezeigt; bei Klick auf eine Warengruppe nur deren Produkte (Falschzuordnungen korrigierbar per Zuweisen oder Drag auf andere Gruppe); optional „Zuordnung aufheben“. **Zuordnung nach Schlagwort:** Karte „Zuordnung nach Schlagwort“ auf der Regeln-Seite: Regeln „Schlagwort → Warengruppe“ (NAME_CONTAINS) anlegen/löschen, Button „Regeln jetzt anwenden“ (Standard: nur unzugeordnete zuordnen). **Nach Upload:** Hinweis auf fehlende Warengruppen-Zuordnung und Button „Warengruppen zuordnen“; auf der Regeln-Seite erscheint eine Info-Box mit der Anzahl unzugeordneter Artikel. **Backshop-Cron:** Drei pg_cron-Jobs (KW-Switch Samstag 23:59 UTC, Auto-Delete alte Versionen, Notification-Cleanup) nur für Backshop-Tabellen.
+
+## Per-User Bereichs-Sichtbarkeit
+
+Admin und Super-Admin können in der Benutzerverwaltung pro User einstellen, welche Bereiche (Obst/Gemüse, Backshop) sichtbar sind. Button "Bereiche" in der User-Tabelle öffnet einen Dialog mit Checkboxen. Tabelle: `user_list_visibility` (Migration 038). Default: Beide sichtbar (kein Eintrag = sichtbar). Die Dashboards (UserDashboard, AdminDashboard) zeigen nur die freigeschalteten Bereiche.
+
+## S/W-taugliche PDF-Markierungen
+
+Die PDF-Statusmarkierungen sind auch in Schwarz-Weiss erkennbar: Neues Produkt = gestrichelter Rahmen, PLU geändert = fetter Rahmen. Zusätzlich zur Farbmarkierung (gelb/rot).
 
 ## Kern-Konzept
 
@@ -107,8 +120,9 @@ Alle Rollen arbeiten an EINER gemeinsamen Liste. Änderungen gelten für alle.
   - **Dialog „Produkte umbenennen“:** Einfache Suchleiste (PLU/Name) wie beim Dialog „Produkte ausblenden“ – filtert die Liste, Treffer werden hervorgehoben, optional Scroll zum ersten Treffer. Kein „X von Y“, keine Pfeil-Buttons. Pro Zeile ein Stift; Klick öffnet den Dialog „Produkt umbenennen“ (Neuer Name, optional Zurücksetzen). Nach Speichern bleibt der Dialog offen, die Listen werden aktualisiert.
   - Setzt `is_manually_renamed = true`; nur `display_name` wird geändert, `system_name` bleibt für Excel-Abgleich unverändert.
   - Layout-Engine überspringt dann Bezeichnungsregeln für dieses Item.
-  - **Zurücksetzen:** Auf der Seite Umbenannte Produkte pro Zeile „Zurücksetzen“ (mit Bestätigung) → `display_name = system_name`, `is_manually_renamed = false`.
-  - **Backshop: Umbenennungen global** (wie eigene Produkte, ausgeblendete): In `backshop_renamed_items` gespeichert, bleiben erhalten auch wenn eine KW-Version gelöscht wird. Orphan-Renames (PLU existiert nirgends mehr) werden täglich automatisch entfernt.
+  - **Zurücksetzen:** Auf der Seite Umbenannte Produkte pro Zeile „Zurücksetzen“ (mit Bestätigung) → Eintrag in `renamed_items` bzw. `backshop_renamed_items` wird gelöscht.
+  - **Obst/Gemüse: Umbenennungen pro Markt** – In `renamed_items` gespeichert (store_id), gelten nur für den aktuell gewählten Markt.
+  - **Backshop: Umbenennungen pro Markt** – In `backshop_renamed_items` gespeichert (store_id), gelten nur für den aktuell gewählten Markt. Orphan-Renames (PLU existiert nirgends mehr) werden täglich automatisch entfernt.
 - **Suche in der Masterliste:** Die Find-in-Page-Suchleiste in der Masterliste ist aktuell **deaktiviert**. Zum Suchen in der PLU-Tabelle kann die Browser-Suche (z. B. Strg+F / Cmd+F) genutzt werden. Im Dialog „Produkte umbenennen“ gibt es weiterhin die Filter-Suche (PLU/Name) wie bei „Produkte ausblenden“, ohne Pfeile.
 
 ## Feature: Warengruppen (Blöcke)
@@ -150,7 +164,7 @@ Der Super-Admin kann einstellen. Die Layout-Seite zeigt eine **Live-Vorschau** m
 | Sortierung | Alphabetisch (A-Z) oder nach Warengruppen | Radio-Cards |
 | Anzeige-Modus | Gemischt (Stück+Gewicht) oder Getrennt | Radio-Cards |
 | Flussrichtung | Zeilenweise (→↓) oder Spaltenweise (↓→) | Radio-Cards |
-| Schriftgrößen | Header, Spalte, Produkt (in px) | Number-Inputs |
+| Schriftgrößen | Header, Spalte, Produkt (in px) – steuern Schriftgröße, Zellen-/Zeilenhöhe und Mindestabstände proportional | Number-Inputs |
 | Markierungs-Dauer | Rot: 1-4 KWs, Gelb: 1-4 KWs | Selects |
 | Features Ein/Aus | Eigene Produkte, Ausblenden, Blöcke, Regeln | Switches |
 
@@ -169,7 +183,7 @@ Der Super-Admin kann einstellen. Die Layout-Seite zeigt eine **Live-Vorschau** m
 - Footer: KW, Datum, Seitenzahl
 - Basiert auf der globalen Liste (nach Layout-Engine: eigene Produkte drin, ausgeblendete entfernt)
 - Unterstützt MIXED/SEPARATED und ROW_BY_ROW/COLUMN_FIRST
-- Schriftgrößen aus Layout-Einstellungen (font_header_px, font_column_px, font_product_px) werden ins PDF übernommen
+- Schriftgrößen aus Layout-Einstellungen (font_header_px, font_column_px, font_product_px) werden ins PDF übernommen; sie steuern Schriftgröße, Zeilen-/Bannerhöhen und Mindestabstände proportional (Formel: Höhe = Schrift + 2×Padding)
 - Tabellen-Design: Header „PLU“ und „Artikel“ ohne vertikale Linien; Mitte eine Mittellinie (keine weißen Kästen); Strich vor Preis nur wenn Produkt einen Preis hat
 - Zebra-Striping (grau-weiß) bleibt erhalten
 - ExportPDFDialog zeigt Vorschau-Infos vor dem Download

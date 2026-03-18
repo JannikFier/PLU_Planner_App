@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryRest } from '@/lib/supabase'
 import { applyAllRulesToItems } from '@/lib/keyword-rules'
 import type {
   BackshopBezeichnungsregel,
@@ -24,13 +24,11 @@ export function useBackshopBezeichnungsregeln() {
     queryKey: ['backshop-bezeichnungsregeln'],
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('backshop_bezeichnungsregeln')
-        .select('*')
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-      return (data ?? []) as BackshopBezeichnungsregel[]
+      const data = await queryRest<BackshopBezeichnungsregel[]>('backshop_bezeichnungsregeln', {
+        select: '*',
+        order: 'created_at.asc',
+      })
+      return data ?? []
     },
   })
 }

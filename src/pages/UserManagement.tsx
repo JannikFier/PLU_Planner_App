@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, invokeEdgeFunction } from '@/lib/supabase'
+import { createUserSchema, createUserResponseSchema, validateEdgeFunctionResponse } from '@/lib/validation'
 import { useAuth } from '@/hooks/useAuth'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
@@ -43,27 +44,31 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { UserPlus, KeyRound, Loader2, Copy, Check, Users, Trash2, Building2 } from 'lucide-react'
+import { UserPlus, KeyRound, Loader2, Copy, Check, Users, Trash2, Building2, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Profile } from '@/types/database'
 import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer, roleBadgeLabel, generateOneTimePassword } from '@/lib/profile-helpers'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useAllStores } from '@/hooks/useStores'
 import { useStoreAccessByUser, useAddUserToStore, useRemoveUserFromStore } from '@/hooks/useStoreAccess'
+import { useUserListVisibilityForUser, useUpdateUserListVisibility } from '@/hooks/useStoreListVisibility'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 
 /**
  * Benutzerverwaltung – für Admin und Super-Admin.
- * - Super-Admin: Kann User + Admins anlegen
- * - Admin: Kann nur User anlegen
+ * - Super-Admin: Kann User, Admin und Viewer anlegen; Rollen ändern; Märkte zuweisen
+ * - Admin: Kann User, Admin und Viewer anlegen; Rollen ändern (außer sich selbst); Märkte zuweisen
  * Beide können Passwörter zurücksetzen (Einmalpasswort).
  */
 export function UserManagement() {
   const { isSuperAdmin, isAdmin, user: currentUser } = useAuth()
+  const { currentStoreId, storeName } = useCurrentStore()
   const currentUserId = currentUser?.id ?? null
   const queryClient = useQueryClient()
 
   // User-Liste laden
-  const { data: users, isLoading } = useQuery({
+  const { data: users, isLoading, isError } = useQuery({
     queryKey: ['all-profiles'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -80,10 +85,11 @@ export function UserManagement() {
   const { data: homeStoreId } = useQuery({
     queryKey: ['home-store-id', currentUserId],
     queryFn: async () => {
+      if (!currentUserId) throw new Error('Nicht eingeloggt.')
       const { data, error } = await supabase
         .from('user_store_access' as never)
         .select('store_id')
-        .eq('user_id', currentUserId!)
+        .eq('user_id', currentUserId)
         .eq('is_home_store', true)
         .single()
 
@@ -111,7 +117,9 @@ export function UserManagement() {
     enabled: isSuperAdmin,
   })
 
-  const defaultStoreId = (isSuperAdmin ? firstStoreId : homeStoreId) ?? undefined
+  // Neuer User wird dem aktuell ausgewaehlten Markt zugewiesen (nicht Heimatmarkt/erster Store)
+  const effectiveStoreId = currentStoreId ?? (isSuperAdmin ? firstStoreId : homeStoreId)
+  const defaultStoreId = effectiveStoreId ?? undefined
 
   // Super-Admin wird nie angezeigt (verwaltet global, gehoert keinem Markt)
   const filteredUsers = users?.filter(u => u.role !== 'super_admin')
@@ -134,6 +142,22 @@ export function UserManagement() {
   const removeUserFromStore = useRemoveUserFromStore()
   const userAssignedStoreIds = new Set(userStoreAccess?.map(a => a.store_id) ?? [])
 
+  // Firmen: Ziel-User oder (bei leer) aktuelle Firma (Admin/Super-Admin)
+  const userCompanyIds = new Set(
+    allStores?.filter(s => userAssignedStoreIds.has(s.id)).map(s => s.company_id) ?? [],
+  )
+  const targetCompanyIds = userCompanyIds.size > 0
+    ? userCompanyIds
+    : new Set(allStores?.map(s => s.company_id) ?? [])
+  const companyFilteredStores = (allStores ?? []).filter(s => targetCompanyIds.has(s.company_id))
+
+  // Bereiche-Dialog State
+  const [visibilityDialogUser, setVisibilityDialogUser] = useState<Profile | null>(null)
+  const { data: userVisibility } = useUserListVisibilityForUser(visibilityDialogUser?.id, defaultStoreId)
+  const updateUserVisibility = useUpdateUserListVisibility()
+  const userObstVisible = userVisibility?.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
+  const userBackshopVisible = userVisibility?.find(v => v.list_type === 'backshop')?.is_visible ?? true
+
   // Formular States für neuen User
   const [newDisplayName, setNewDisplayName] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -148,16 +172,29 @@ export function UserManagement() {
       }
 
       const oneTimePassword = generateOneTimePassword()
-      const roleToCreate = isSuperAdmin ? newRole : 'user'
-      const data = await invokeEdgeFunction<{ user?: unknown }>('create-user', {
-        email: newEmail.trim() || undefined,
+      const roleToCreate = newRole
+
+      const validated = createUserSchema.safeParse({
+        email: newEmail.trim(),
         password: oneTimePassword,
+        display_name: newDisplayName.trim(),
         personalnummer: newPersonalnummer.trim() || undefined,
-        displayName: newDisplayName,
+        role: roleToCreate,
+      })
+      if (!validated.success) {
+        throw new Error(validated.error.issues[0]?.message ?? 'Ungültige Eingabe')
+      }
+
+      const raw = await invokeEdgeFunction('create-user', {
+        email: validated.data.email || undefined,
+        password: oneTimePassword,
+        personalnummer: validated.data.personalnummer || undefined,
+        displayName: validated.data.display_name,
         role: roleToCreate,
         home_store_id: defaultStoreId,
         additional_store_ids: [],
       })
+      const data = validateEdgeFunctionResponse(raw, createUserResponseSchema, 'create-user')
 
       return { oneTimePassword, user: data?.user }
     },
@@ -248,7 +285,7 @@ export function UserManagement() {
   }
 
 
-  // Rolle ändern (nur Super-Admin)
+  // Rolle ändern (nur Super-Admin und Admin; nicht für sich selbst)
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, newRole }: { userId: string; newRole: 'user' | 'admin' | 'viewer' }) => {
       await invokeEdgeFunction('update-user-role', { userId, newRole })
@@ -262,6 +299,19 @@ export function UserManagement() {
     },
   })
 
+  if (isError) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+            <p className="font-medium">Fehler beim Laden der Daten</p>
+            <p className="text-sm mt-1">Bitte lade die Seite neu oder versuche es später erneut.</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -270,8 +320,8 @@ export function UserManagement() {
             <h2 className="text-2xl font-bold tracking-tight">Benutzerverwaltung</h2>
             <p className="text-muted-foreground">
               {isSuperAdmin
-                ? 'Admins und Personal anlegen, Passwörter zurücksetzen.'
-                : 'Personal anlegen und Passwörter zurücksetzen.'}
+                ? 'Admins und Personal anlegen, Rollen und Passwörter verwalten.'
+                : 'Personal anlegen, Rollen und Passwörter verwalten.'}
             </p>
           </div>
 
@@ -327,8 +377,8 @@ export function UserManagement() {
                   </p>
                 </div>
 
-                {/* Nur Super-Admin kann Rolle wählen */}
-                {isSuperAdmin && (
+                {/* Admin und Super-Admin können Rolle wählen */}
+                {(isSuperAdmin || isAdmin) && (
                   <div className="space-y-2">
                     <Label>Rolle</Label>
                     <Select
@@ -346,6 +396,15 @@ export function UserManagement() {
                     </Select>
                   </div>
                 )}
+                {!defaultStoreId ? (
+                  <p className="text-sm text-amber-600">
+                    Kein Standard-Markt verfügbar. Bitte warte, bis die Märkte geladen sind, oder weise dir zuerst einen Heimatmarkt zu.
+                  </p>
+                ) : storeName && (
+                  <p className="text-sm text-muted-foreground">
+                    Der Benutzer wird dem Markt <strong>{storeName}</strong> zugewiesen.
+                  </p>
+                )}
               </div>
 
               <DialogFooter>
@@ -357,7 +416,7 @@ export function UserManagement() {
                 </Button>
                 <Button
                   onClick={() => createUserMutation.mutate()}
-                  disabled={!(newPersonalnummer.trim() || newEmail.trim()) || createUserMutation.isPending}
+                  disabled={!(newPersonalnummer.trim() || newEmail.trim()) || !defaultStoreId || createUserMutation.isPending}
                 >
                   {createUserMutation.isPending ? (
                     <>
@@ -519,7 +578,7 @@ export function UserManagement() {
                         {formatProfileDisplayEmail(user.email)}
                       </TableCell>
                       <TableCell>
-                        {(isSuperAdmin || isAdmin) && user.role !== 'super_admin' ? (
+                        {(isSuperAdmin || isAdmin) && user.role !== 'super_admin' && user.id !== currentUserId ? (
                           <Select
                             value={user.role}
                             onValueChange={(v) => updateRoleMutation.mutate({ userId: user.id, newRole: v as 'user' | 'admin' | 'viewer' })}
@@ -542,11 +601,20 @@ export function UserManagement() {
                       </TableCell>
                       <TableCell>
                         {user.role !== 'super_admin' && (
-                          <Button variant="outline" size="sm" className="gap-1"
-                            onClick={() => setStoreDialogUser(user)}
-                          >
-                            <Building2 className="h-3 w-3" /> Märkte
-                          </Button>
+                          <div className="flex flex-wrap gap-1">
+                            <Button variant="outline" size="sm" className="gap-1"
+                              onClick={() => setStoreDialogUser(user)}
+                            >
+                              <Building2 className="h-3 w-3" /> Märkte
+                            </Button>
+                            {user.id !== currentUserId && (
+                              <Button variant="outline" size="sm" className="gap-1"
+                                onClick={() => setVisibilityDialogUser(user)}
+                              >
+                                <Eye className="h-3 w-3" /> Bereiche
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -616,7 +684,7 @@ export function UserManagement() {
               </DialogDescription>
             </DialogHeader>
             <div className="max-h-[320px] overflow-y-auto space-y-3 py-2">
-              {allStores?.map(store => {
+              {companyFilteredStores.map(store => {
                 const assigned = userAssignedStoreIds.has(store.id)
                 const isPending = addUserToStore.isPending || removeUserFromStore.isPending
                 return (
@@ -643,12 +711,71 @@ export function UserManagement() {
                   </label>
                 )
               })}
-              {(!allStores || allStores.length === 0) && (
-                <p className="text-sm text-muted-foreground text-center py-4">Keine Märkte vorhanden.</p>
+              {companyFilteredStores.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  {targetCompanyIds.size === 0
+                    ? 'Kein Markt verfügbar. Bitte wende dich an den Administrator.'
+                    : 'Keine weiteren Märkte in dieser Firma vorhanden.'}
+                </p>
               )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setStoreDialogUser(null)}>Schließen</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Bereichs-Sichtbarkeit Dialog */}
+        <Dialog open={!!visibilityDialogUser} onOpenChange={(open) => { if (!open) setVisibilityDialogUser(null) }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Bereiche für {visibilityDialogUser?.display_name || visibilityDialogUser?.personalnummer}</DialogTitle>
+              <DialogDescription>
+                Welche Listen soll dieser Benutzer sehen? Änderungen werden sofort gespeichert.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div className="flex items-center justify-between rounded-lg border px-3 py-3">
+                <div>
+                  <p className="text-sm font-medium">Obst und Gemüse</p>
+                  <p className="text-xs text-muted-foreground">PLU-Liste Obst/Gemüse anzeigen</p>
+                </div>
+                <Switch
+                  checked={userObstVisible}
+                  disabled={updateUserVisibility.isPending || !defaultStoreId}
+                  onCheckedChange={async (checked) => {
+                    if (!visibilityDialogUser || !defaultStoreId) return
+                    await updateUserVisibility.mutateAsync({
+                      userId: visibilityDialogUser.id,
+                      storeId: defaultStoreId,
+                      listType: 'obst_gemuese',
+                      isVisible: checked,
+                    })
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border px-3 py-3">
+                <div>
+                  <p className="text-sm font-medium">Backshop</p>
+                  <p className="text-xs text-muted-foreground">Backshop-Liste anzeigen</p>
+                </div>
+                <Switch
+                  checked={userBackshopVisible}
+                  disabled={updateUserVisibility.isPending || !defaultStoreId}
+                  onCheckedChange={async (checked) => {
+                    if (!visibilityDialogUser || !defaultStoreId) return
+                    await updateUserVisibility.mutateAsync({
+                      userId: visibilityDialogUser.id,
+                      storeId: defaultStoreId,
+                      listType: 'backshop',
+                      isVisible: checked,
+                    })
+                  }}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setVisibilityDialogUser(null)}>Schließen</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

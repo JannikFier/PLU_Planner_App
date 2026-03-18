@@ -1,7 +1,7 @@
 // Hook: Backshop-Layout-Einstellungen laden + aktualisieren (Singleton)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryRest } from '@/lib/supabase'
 import type { BackshopLayoutSettings } from '@/types/database'
 import type { Database } from '@/types/database'
 
@@ -38,15 +38,13 @@ export function useBackshopLayoutSettings() {
     queryKey: ['backshop-layout-settings'],
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('backshop_layout_settings')
-        .select('*')
-        .limit(1)
-        .maybeSingle()
-
-      if (error) throw error
-      if (!data) return DEFAULT_BACKSHOP_LAYOUT
-      return data as BackshopLayoutSettings
+      const data = await queryRest<BackshopLayoutSettings[]>('backshop_layout_settings', {
+        select: '*',
+        limit: '1',
+      })
+      const arr = Array.isArray(data) ? data : []
+      if (arr.length === 0) return DEFAULT_BACKSHOP_LAYOUT
+      return arr[0] as BackshopLayoutSettings
     },
   })
 }

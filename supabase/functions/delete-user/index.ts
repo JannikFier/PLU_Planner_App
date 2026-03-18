@@ -90,7 +90,15 @@ serve(async (req) => {
       )
     }
 
-    // Admin und Super-Admin dürfen alle außer Super-Admin löschen (User, Admin, Viewer)
+    // Admin darf nur User und Viewer löschen, nicht andere Admins
+    if (targetProfile.role === 'admin' && callerProfile.role !== 'super_admin') {
+      return new Response(
+        JSON.stringify({ error: 'Nur Super-Admins können Admins löschen.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Super-Admin darf alle außer Super-Admin löschen; Admin nur User und Viewer
 
     // 1. Verknuepfte Daten explizit loeschen (user_store_access, profiles)
     //    CASCADE koennte nicht feuern wenn Auth nur soft-deleted.
@@ -112,8 +120,9 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err ?? 'Unbekannter Fehler')
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: msg }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

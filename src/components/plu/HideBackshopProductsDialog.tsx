@@ -1,6 +1,7 @@
 // Backshop: Dialog zum Ausblenden von Produkten (Suche, Auswahl, einzeln ausblenden)
 
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
   Dialog,
   DialogContent,
@@ -72,20 +73,21 @@ export function HideBackshopProductsDialog({
   searchableItems,
 }: HideBackshopProductsDialogProps) {
   const [searchText, setSearchText] = useState('')
+  const deferredSearch = useDebouncedValue(searchText, 200)
   const [selectedPLUs, setSelectedPLUs] = useState<Set<string>>(new Set())
   const hideProduct = useBackshopHideProduct()
   const listRef = useRef<HTMLTableSectionElement | null>(null)
 
   const filteredItems = useMemo(() => {
-    const q = searchText.trim().toLowerCase()
+    const q = deferredSearch.trim().toLowerCase()
     if (!q) return searchableItems
-    return filterItemsBySearch(searchableItems, searchText)
-  }, [searchableItems, searchText])
+    return filterItemsBySearch(searchableItems, deferredSearch)
+  }, [searchableItems, deferredSearch])
 
   const groups = useMemo(() => groupByLetter(filteredItems), [filteredItems])
   const tableRows = useMemo(() => buildTableRows(groups), [groups])
 
-  const searchLower = searchText.trim().toLowerCase()
+  const searchLower = deferredSearch.trim().toLowerCase()
   const isMatch = (item: SearchableItem) => {
     if (!searchLower) return false
     const pluMatch = item.plu.toLowerCase().includes(searchLower)
@@ -215,7 +217,7 @@ export function HideBackshopProductsDialog({
                             {row.left && (
                               <Checkbox
                                 checked={selectedPLUs.has(row.left.plu)}
-                                onCheckedChange={() => toggleSelect(row.left!.plu)}
+                                onCheckedChange={() => { const p = row.left?.plu; if (p) toggleSelect(p) }}
                               />
                             )}
                           </td>
@@ -229,7 +231,7 @@ export function HideBackshopProductsDialog({
                             {row.right && (
                               <Checkbox
                                 checked={selectedPLUs.has(row.right.plu)}
-                                onCheckedChange={() => toggleSelect(row.right!.plu)}
+                                onCheckedChange={() => { const p = row.right?.plu; if (p) toggleSelect(p) }}
                               />
                             )}
                           </td>
