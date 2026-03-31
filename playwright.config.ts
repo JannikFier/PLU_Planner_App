@@ -17,7 +17,7 @@ if (existsSync(envPath)) {
 /**
  * Playwright-Konfiguration für E2E-Tests.
  * - Standard (npm run test:e2e): Nur @smoke – schnell, ohne .env.e2e
- * - Vollständig (npm run test:e2e:full): Alle Tests – vor Publish, braucht .env.e2e
+ * - Vollständig (npm run test:e2e:full): Alle Tests inkl. mobile-layout (Handy + Tablet) – vor Publish, braucht .env.e2e
  */
 export default defineConfig({
   testDir: './e2e',
@@ -44,6 +44,20 @@ export default defineConfig({
     timeout: 10_000,
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      testIgnore: /mobile-layout\.spec\.ts/,
+    },
+    {
+      name: 'mobile-chromium',
+      use: { ...devices['iPhone 13'] },
+      testMatch: /mobile-layout\.spec\.ts/,
+    },
+    {
+      name: 'tablet-chromium',
+      use: { ...devices['iPad Pro 11'] },
+      testMatch: /mobile-layout\.spec\.ts/,
+    },
   ],
 })

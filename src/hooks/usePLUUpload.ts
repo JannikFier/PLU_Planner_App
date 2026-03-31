@@ -240,7 +240,7 @@ export function usePLUUpload() {
     } finally {
       setIsProcessing(false)
     }
-  }, [user, targetKW, targetJahr, pieceComparison, weightComparison, conflicts, replaceExistingVersion, queryClient])
+  }, [user, targetKW, targetJahr, pieceComparison, weightComparison, conflicts, replaceExistingVersion, queryClient, currentStoreId])
 
   const setConflictResolution = useCallback((index: number, resolution: ConflictItem['resolution']) => {
     setConflicts((prev) => {

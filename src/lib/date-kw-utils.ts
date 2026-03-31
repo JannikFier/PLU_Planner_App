@@ -1,9 +1,21 @@
 // Kalenderwochen- und Jahr-Helfer für Upload und Versionen
 
-import { getWeek, getISOWeekYear } from 'date-fns'
+import {
+  addWeeks,
+  compareAsc,
+  differenceInCalendarWeeks,
+  getISOWeek,
+  getISOWeekYear,
+  setISOWeek,
+  setISOWeekYear,
+  startOfISOWeek,
+} from 'date-fns'
 
 /** Anzahl KWs vor/nach aktueller KW in der Upload-Auswahl */
 const KW_RANGE = 3
+
+/** Anzahl Kalenderwochen (±) für die Zentral-Werbungs-KW-Auswahl (5 Einträge: −2 … +2) */
+const CAMPAIGN_KW_RANGE_WEEKS = 2
 
 /** Anzahl Jahre vor/nach aktuellem Jahr in der Upload-Auswahl */
 const YEAR_RANGE = 1
@@ -36,17 +48,98 @@ export function clampKWToUploadRange(kw: number): number {
   return Math.max(min, Math.min(max, kw))
 }
 
-/** Aktuelle ISO-Kalenderwoche (1–53) */
+/** Aktuelle ISO-8601-Kalenderwoche (1–53), wie in Deutschland üblich. */
 export function getCurrentKW(): number {
-  return getWeek(new Date(), { firstWeekContainsDate: 4 })
+  return getISOWeek(new Date())
 }
 
-/** ISO-Kalenderwoche und -Jahr zu einem Datum (gleiche Logik wie getCurrentKW für Konsistenz). */
+/**
+ * ISO-8601-Kalenderwoche und ISO-Kalenderjahr zu einem Datum.
+ * date-fns `getWeek(..., { firstWeekContainsDate: 4 })` weicht in Randfällen von `getISOWeek` ab;
+ * für eine einheitliche KW nutzen wir durchgängig getISOWeek/getISOWeekYear.
+ */
 export function getKWAndYearFromDate(date: Date): { kw: number; year: number } {
   return {
-    kw: getWeek(date, { firstWeekContainsDate: 4 }),
+    kw: getISOWeek(date),
     year: getISOWeekYear(date),
   }
+}
+
+/** Kurzformat „KW 12 · 2026“ für Toolbars und Dialoge. */
+export function formatKwDotYear(kw: number, year: number): string {
+  return `KW ${kw} · ${year}`
+}
+
+/**
+ * Backshop-Masterliste: eine Zeile für „aktive Liste“ von Einspiel-KW bis heute.
+ * - Dieselbe KW wie heute: `KW 10 · 2026`
+ * - Spätere Wochen gleiches Jahr: `KW 10 – KW 14 · 2026`
+ * - Jahreswechsel: `KW 52 · 2026 – KW 2 · 2027`
+ */
+export function formatBackshopActiveListToolbarRange(
+  uploadKw: number,
+  uploadYear: number,
+  todayKw: number,
+  todayYear: number,
+): string {
+  const uploadMonday = startOfISOWeek(setISOWeek(setISOWeekYear(new Date(), uploadYear), uploadKw))
+  const todayMonday = startOfISOWeek(setISOWeek(setISOWeekYear(new Date(), todayYear), todayKw))
+  if (compareAsc(todayMonday, uploadMonday) < 0) {
+    return formatKwDotYear(uploadKw, uploadYear)
+  }
+  if (uploadKw === todayKw && uploadYear === todayYear) {
+    return formatKwDotYear(uploadKw, uploadYear)
+  }
+  if (uploadYear === todayYear) {
+    return `KW ${uploadKw} – KW ${todayKw} · ${todayYear}`
+  }
+  return `${formatKwDotYear(uploadKw, uploadYear)} – ${formatKwDotYear(todayKw, todayYear)}`
+}
+
+/**
+ * Kalenderwochen-Abstand (ISO-8601) von der Start-KW bis zur End-KW (inkl.).
+ * Basis: Montag der jeweiligen ISO-Woche; für „Neu“-Dauer mit markYellowKwCount nutzen.
+ */
+export function weeksBetweenIsoWeeks(
+  endKw: number,
+  endYear: number,
+  startKw: number,
+  startYear: number,
+): number {
+  const end = startOfISOWeek(setISOWeek(setISOWeekYear(new Date(), endYear), endKw))
+  const start = startOfISOWeek(setISOWeek(setISOWeekYear(new Date(), startYear), startKw))
+  return Math.max(0, differenceInCalendarWeeks(end, start, { weekStartsOn: 1 }))
+}
+
+/**
+ * Fünf ISO-KW-Optionen: heute ±2 Kalenderwochen (eindeutig nach Jahr+KW).
+ * Für Dropdowns „Zentrale Werbung“ (kein freies Zahleneingabe-Feld).
+ */
+export function getCampaignWeekSelectOptions(from: Date = new Date()): { kw: number; year: number; label: string }[] {
+  const seen = new Set<string>()
+  const out: { kw: number; year: number; label: string }[] = []
+  for (let d = -CAMPAIGN_KW_RANGE_WEEKS; d <= CAMPAIGN_KW_RANGE_WEEKS; d++) {
+    const { kw, year } = getKWAndYearFromDate(addWeeks(from, d))
+    const key = `${year}-${kw}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ kw, year, label: `KW ${kw} · ${year}` })
+  }
+  return out
+}
+
+/** Standard-Ziel-KW für neue Werbung: nächste ISO-KW (typisch: Vorbereitung für die kommende Woche). */
+export function getDefaultCampaignTargetWeek(): { kw: number; year: number } {
+  return getKWAndYearFromDate(addWeeks(new Date(), 1))
+}
+
+/**
+ * Kurzlabel für die **aktuelle ISO-Kalenderwoche** (Werbung, Angebote, „heute“).
+ * Unabhängig davon, in welcher KW die PLU-Liste zuletzt eingespielt wurde.
+ */
+export function getCalendarKwLabel(date: Date = new Date()): string {
+  const { kw, year } = getKWAndYearFromDate(date)
+  return formatKwDotYear(kw, year)
 }
 
 /**

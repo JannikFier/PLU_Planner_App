@@ -1,7 +1,8 @@
 // PLUTable: Zwei-Spalten-Tabelle mit Buchstaben-/Block-Headern, Flussrichtung und Trennlinien
 // Unterstützt Auswahl-Modus (Checkboxen), optional Find-in-Page (Suche mit Pfeilen + Markierung)
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useCallback, forwardRef, useImperativeHandle, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
   PLU_TABLE_HEADER_CLASS,
@@ -13,19 +14,46 @@ import {
   groupItemsByBlock,
   splitLetterGroupsIntoColumns,
   getDisplayNameForItem,
+  getDisplayPreisForItem,
   itemMatchesSearch,
 } from '@/lib/plu-helpers'
 import { cn } from '@/lib/utils'
 import { useFindInPage } from '@/hooks/useFindInPage'
-import { Search } from 'lucide-react'
+import { Megaphone, Search, Tag } from 'lucide-react'
 import { FindInPageBar } from '@/components/plu/FindInPageBar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { PreisBadge } from './PreisBadge'
 import { StatusBadge } from './StatusBadge'
+import { HighlightedSearchText } from './HighlightedSearchText'
 import type { Block } from '@/types/database'
 import type { DisplayItem } from '@/types/plu'
 import type { LetterGroup, BlockGroup } from '@/lib/plu-helpers'
+
+function itemHasDisplayPreis(item: DisplayItem | undefined): boolean {
+  if (!item) return false
+  return getDisplayPreisForItem(item) != null
+}
+
+function OfferKindBadge({ item }: { item: DisplayItem }) {
+  if (!item.is_offer) return null
+  const central = item.offer_source_kind === 'central'
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 shrink-0"
+      title={central ? 'Zentrale Werbung' : 'Eigene Werbung'}
+    >
+      {central ? (
+        <Megaphone className="h-3.5 w-3.5 text-red-800 shrink-0" aria-hidden />
+      ) : (
+        <Tag className="h-3.5 w-3.5 text-red-800 shrink-0" aria-hidden />
+      )}
+      <Badge variant="secondary" className="text-xs font-normal bg-red-100 text-red-800 border-0">
+        Angebot
+      </Badge>
+    </span>
+  )
+}
 
 /** Schriftgrößen aus den Layout-Einstellungen */
 export interface FontSizes {
@@ -68,8 +96,19 @@ interface PLUTableProps {
   onToggleSelect?: (plu: string) => void
   /** Suchleiste mit Find-in-Page (Pfeile, Markierung, Springen) oberhalb der Tabelle */
   showFindInPage?: boolean
+  /**
+   * Wenn true: kein „In Liste suchen“-Button in der Tabelle – Öffnen z. B. per Toolbar-Lupe (ref.openFindInPage).
+   * Die Suchleiste erscheint fixiert oben rechts (unter dem App-Header).
+   */
+  findInPageExternalTrigger?: boolean
   /** Obst/Gemüse (Standard) oder Backshop (Bild-Spalte, eine Liste) */
   listType?: 'obst' | 'backshop'
+}
+
+/** Imperative API für externe Toolbar (Lupen-Button) */
+export interface PLUTableHandle {
+  openFindInPage: () => void
+  closeFindInPage: () => void
 }
 
 /** Einzelne Zeile in der flachen Liste (Item oder Header) */
@@ -139,6 +178,7 @@ function PLUColumn({
   onToggleSelect,
   findInPageRowOffset,
   findInPageHighlightRowIndex,
+  findInPageQuery,
   listType = 'obst',
 }: {
   rows: FlatRow[]
@@ -148,11 +188,13 @@ function PLUColumn({
   onToggleSelect?: (plu: string) => void
   findInPageRowOffset?: number
   findInPageHighlightRowIndex?: number | null
+  /** Nur für aktuelle Trefferzeile: Teilstring-Markierung in PLU/Name */
+  findInPageQuery?: string
   listType?: 'obst' | 'backshop'
 }) {
   const hasAnyPrice = useMemo(
-    () => listType === 'backshop' ? false : rows.some((r) => r.type === 'item' && r.item?.preis != null),
-    [rows, listType],
+    () => rows.some((r) => r.type === 'item' && itemHasDisplayPreis(r.item)),
+    [rows],
   )
   const showImageColumn = listType === 'backshop'
 
@@ -226,7 +268,11 @@ function PLUColumn({
             if (!item) return null
             const isSelected = selectedPLUs?.has(item.plu) ?? false
             const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
-            const isHighlight = findInPageHighlightRowIndex !== undefined && rowIndex === findInPageHighlightRowIndex
+            const isActiveFindRow =
+              findInPageHighlightRowIndex != null &&
+              rowIndex !== undefined &&
+              rowIndex === findInPageHighlightRowIndex
+            const hq = isActiveFindRow ? findInPageQuery : undefined
 
             return (
               <tr
@@ -236,7 +282,6 @@ function PLUColumn({
                   'border-b border-border last:border-b-0',
                   selectionMode && 'cursor-pointer hover:bg-muted/30',
                   isSelected && 'bg-primary/5',
-                  isHighlight && 'bg-primary/10',
                 )}
                 onClick={selectionMode ? () => onToggleSelect?.(item.plu) : undefined}
               >
@@ -262,6 +307,7 @@ function PLUColumn({
                     status={item.status}
                     oldPlu={item.old_plu}
                     style={{ fontSize: fonts.product + 'px' }}
+                    highlightQuery={hq}
                   />
                 </td>
                 <td
@@ -270,19 +316,25 @@ function PLUColumn({
                   title={getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
                 >
                   <span className="inline-flex items-center gap-1.5 flex-wrap">
-                    {getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
-                    {item.is_offer && (
-                      <Badge variant="secondary" className="text-xs font-normal bg-red-100 text-red-800 border-0 shrink-0">
-                        Angebot
-                      </Badge>
+                    {hq?.trim() ? (
+                      <HighlightedSearchText
+                        text={getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
+                        query={hq}
+                      />
+                    ) : (
+                      getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)
                     )}
+                    <OfferKindBadge item={item} />
                   </span>
                 </td>
                 {hasAnyPrice && (
                   <td className="w-[90px] min-w-[90px] px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}>
-                    {item.preis != null ? (
-                      <PreisBadge value={item.preis} style={{ fontSize: fonts.product + 'px' }} />
-                    ) : null}
+                    {(() => {
+                      const p = getDisplayPreisForItem(item)
+                      return p != null ? (
+                        <PreisBadge value={p} style={{ fontSize: fonts.product + 'px' }} />
+                      ) : null
+                    })()}
                   </td>
                 )}
               </tr>
@@ -303,6 +355,7 @@ function RowByRowTable({
   onToggleSelect,
   findInPageRowOffset,
   findInPageHighlightRowIndex,
+  findInPageQuery,
   listType = 'obst',
 }: {
   tableRows: TableRow[]
@@ -312,16 +365,18 @@ function RowByRowTable({
   onToggleSelect?: (plu: string) => void
   findInPageRowOffset?: number
   findInPageHighlightRowIndex?: number | null
+  findInPageQuery?: string
   listType?: 'obst' | 'backshop'
 }) {
   const showImageColumn = listType === 'backshop'
   const hasAnyPrice = useMemo(
     () =>
-      !showImageColumn &&
       tableRows.some(
-        (r) => r.type === 'itemPair' && (r.left?.preis != null || r.right?.preis != null),
+        (r) =>
+          r.type === 'itemPair' &&
+          (itemHasDisplayPreis(r.left) || itemHasDisplayPreis(r.right)),
       ),
-    [tableRows, showImageColumn],
+    [tableRows],
   )
   const totalCols = (selectionMode ? 2 : 0) + (showImageColumn ? 2 : 0) + 4 + (hasAnyPrice ? 2 : 0)
 
@@ -367,7 +422,11 @@ function RowByRowTable({
           const leftSelected = row.left ? (selectedPLUs?.has(row.left.plu) ?? false) : false
           const rightSelected = row.right ? (selectedPLUs?.has(row.right.plu) ?? false) : false
           const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
-          const isHighlight = findInPageHighlightRowIndex !== undefined && rowIndex === findInPageHighlightRowIndex
+          const isActiveFindRow =
+            findInPageHighlightRowIndex != null &&
+            rowIndex !== undefined &&
+            rowIndex === findInPageHighlightRowIndex
+          const hq = isActiveFindRow ? findInPageQuery : undefined
 
           const imageCell = (item: DisplayItem) => (
             <td className="px-1 py-1 align-middle border-l border-r border-border">
@@ -376,21 +435,33 @@ function RowByRowTable({
           )
 
           return (
-            <tr key={`pair-${i}`} className={cn('border-b border-border last:border-b-0', isHighlight && 'bg-primary/10')} {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}>
+            <tr key={`pair-${i}`} className="border-b border-border last:border-b-0" {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}>
               {row.left ? (
                 <>
                   {selectionMode && <td className="px-1 py-1 text-center"><input type="checkbox" checked={leftSelected} onChange={() => { const p = row.left?.plu; if (p) onToggleSelect?.(p) }} className="h-4 w-4 rounded border-border" /></td>}
                   {showImageColumn && imageCell(row.left)}
-                  <td className="px-2" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}><StatusBadge plu={row.left.plu} status={row.left.status} oldPlu={row.left.old_plu} style={{ fontSize: fonts.product + 'px' }} /></td>
+                  <td className="px-2" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}><StatusBadge plu={row.left.plu} status={row.left.status} oldPlu={row.left.old_plu} style={{ fontSize: fonts.product + 'px' }} highlightQuery={hq} /></td>
                   <td className="px-2 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }} title={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}>
                     <span className="inline-flex items-center gap-1.5 flex-wrap">
-                      {getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}
-                      {row.left.is_offer && (
-                        <Badge variant="secondary" className="text-xs font-normal bg-red-100 text-red-800 border-0 shrink-0">Angebot</Badge>
+                      {hq?.trim() ? (
+                        <HighlightedSearchText
+                          text={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}
+                          query={hq}
+                        />
+                      ) : (
+                        getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)
                       )}
+                      <OfferKindBadge item={row.left} />
                     </span>
                   </td>
-                  {hasAnyPrice && <td className="w-[90px] min-w-[90px] px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}>{row.left.preis != null ? <PreisBadge value={row.left.preis} style={{ fontSize: fonts.product + 'px' }} /> : null}</td>}
+                  {hasAnyPrice && (
+                    <td className="w-[90px] min-w-[90px] px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}>
+                      {(() => {
+                        const p = getDisplayPreisForItem(row.left)
+                        return p != null ? <PreisBadge value={p} style={{ fontSize: fonts.product + 'px' }} /> : null
+                      })()}
+                    </td>
+                  )}
                 </>
               ) : (
                 <>
@@ -404,16 +475,28 @@ function RowByRowTable({
                 <>
                   {selectionMode && <td className="px-1 py-1 text-center border-l-2 border-border"><input type="checkbox" checked={rightSelected} onChange={() => { const p = row.right?.plu; if (p) onToggleSelect?.(p) }} className="h-4 w-4 rounded border-border" /></td>}
                   {showImageColumn && imageCell(row.right)}
-                  <td className={cn('px-2', !selectionMode && !showImageColumn && 'border-l-2 border-border')} style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}><StatusBadge plu={row.right.plu} status={row.right.status} oldPlu={row.right.old_plu} style={{ fontSize: fonts.product + 'px' }} /></td>
+                  <td className={cn('px-2', !selectionMode && !showImageColumn && 'border-l-2 border-border')} style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}><StatusBadge plu={row.right.plu} status={row.right.status} oldPlu={row.right.old_plu} style={{ fontSize: fonts.product + 'px' }} highlightQuery={hq} /></td>
                   <td className="px-2 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }} title={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}>
                     <span className="inline-flex items-center gap-1.5 flex-wrap">
-                      {getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}
-                      {row.right.is_offer && (
-                        <Badge variant="secondary" className="text-xs font-normal bg-red-100 text-red-800 border-0 shrink-0">Angebot</Badge>
+                      {hq?.trim() ? (
+                        <HighlightedSearchText
+                          text={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}
+                          query={hq}
+                        />
+                      ) : (
+                        getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)
                       )}
+                      <OfferKindBadge item={row.right} />
                     </span>
                   </td>
-                  {hasAnyPrice && <td className="w-[90px] min-w-[90px] px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}>{row.right.preis != null ? <PreisBadge value={row.right.preis} style={{ fontSize: fonts.product + 'px' }} /> : null}</td>}
+                  {hasAnyPrice && (
+                    <td className="w-[90px] min-w-[90px] px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}>
+                      {(() => {
+                        const p = getDisplayPreisForItem(row.right)
+                        return p != null ? <PreisBadge value={p} style={{ fontSize: fonts.product + 'px' }} /> : null
+                      })()}
+                    </td>
+                  )}
                 </>
               ) : (
                 <>
@@ -448,22 +531,41 @@ function isRowMatch(row: SearchableRow, searchText: string): boolean {
   return false
 }
 
+/** Find-in-Page-Leiste: gleicher horizontaler Rahmen wie DashboardLayout (max-w-7xl + Padding) */
+function FindInPageFixedPortal({ children }: { children: ReactNode }) {
+  if (typeof document === 'undefined') return null
+  return createPortal(
+    <div className="fixed top-16 left-0 right-0 z-[45] pointer-events-none">
+      <div className="mx-auto max-w-7xl px-4 pt-2 sm:px-6 pointer-events-auto">
+        <div className="max-w-[min(100%,420px)] rounded-lg border border-border bg-background p-3 shadow-lg">
+          {children}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 /**
  * PLU-Tabelle im Zwei-Spalten-Layout.
  */
-export function PLUTable({
-  items,
-  displayMode,
-  sortMode = 'ALPHABETICAL',
-  flowDirection = 'COLUMN_FIRST',
-  blocks = [],
-  fontSizes,
-  selectionMode = false,
-  selectedPLUs,
-  onToggleSelect,
-  showFindInPage = false,
-  listType = 'obst',
-}: PLUTableProps) {
+export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTable(
+  {
+    items,
+    displayMode,
+    sortMode = 'ALPHABETICAL',
+    flowDirection = 'COLUMN_FIRST',
+    blocks = [],
+    fontSizes,
+    selectionMode = false,
+    selectedPLUs,
+    onToggleSelect,
+    showFindInPage = false,
+    findInPageExternalTrigger = false,
+    listType = 'obst',
+  },
+  ref,
+) {
   const fonts = fontSizes ?? DEFAULT_FONT_SIZES
   /** Backshop: immer eine Liste (Bild | PLU | Name), kein Stück/Gewicht-Split */
   const effectiveDisplayMode = listType === 'backshop' ? 'MIXED' : displayMode
@@ -524,6 +626,43 @@ export function PLUTable({
     if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [showFindInPage, currentIndex, totalMatches, matchIndices])
 
+  const closeFindInPage = useCallback(() => {
+    setSearchOpen(false)
+    setSearchText('')
+  }, [])
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      openFindInPage: () => setSearchOpen(true),
+      closeFindInPage,
+    }),
+    [closeFindInPage],
+  )
+
+  useEffect(() => {
+    if (!findInPageExternalTrigger || !showSearchBar) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeFindInPage()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [findInPageExternalTrigger, showSearchBar, closeFindInPage])
+
+  const findInPageBarEl =
+    showFindInPage && showSearchBar ? (
+      <FindInPageBar
+        searchText={searchText}
+        onSearchTextChange={setSearchText}
+        currentIndex={currentIndex}
+        totalMatches={totalMatches}
+        onPrev={goPrev}
+        onNext={goNext}
+        placeholder="PLU oder Name suchen…"
+        onClose={closeFindInPage}
+      />
+    ) : null
+
   if (items.length === 0) {
     return (
       <div className="flex items-center justify-center py-12 text-muted-foreground">
@@ -539,7 +678,10 @@ export function PLUTable({
 
     return (
       <div className="space-y-8">
-        {showFindInPage && !showSearchBar && (
+        {findInPageExternalTrigger && showFindInPage && showSearchBar && (
+          <FindInPageFixedPortal>{findInPageBarEl}</FindInPageFixedPortal>
+        )}
+        {showFindInPage && !showSearchBar && !findInPageExternalTrigger && (
           <div className="rounded-t-lg border border-border bg-muted/30 px-4 py-2">
             <Button
               type="button"
@@ -554,21 +696,9 @@ export function PLUTable({
             </Button>
           </div>
         )}
-        {showSearchBar && (
+        {showSearchBar && !findInPageExternalTrigger && (
           <div className="sticky top-0 z-10 rounded-t-lg border border-border border-b bg-background px-4 py-2">
-            <FindInPageBar
-              searchText={searchText}
-              onSearchTextChange={setSearchText}
-              currentIndex={currentIndex}
-              totalMatches={totalMatches}
-              onPrev={goPrev}
-              onNext={goNext}
-              placeholder="PLU oder Name suchen…"
-              onClose={() => {
-                setSearchOpen(false)
-                setSearchText('')
-              }}
-            />
+            {findInPageBarEl}
           </div>
         )}
         {pieceItems.length > 0 && (
@@ -590,6 +720,7 @@ export function PLUTable({
               onToggleSelect={onToggleSelect}
               findInPageHighlightRowIndex={showFindInPage ? findInPageHighlightRowIndex : undefined}
               findInPageRowOffset={showFindInPage ? sectionOffsets[0] : undefined}
+              findInPageQuery={showFindInPage ? deferredSearch : undefined}
               listType={listType}
             />
           </div>
@@ -613,6 +744,7 @@ export function PLUTable({
               onToggleSelect={onToggleSelect}
               findInPageHighlightRowIndex={showFindInPage ? findInPageHighlightRowIndex : undefined}
               findInPageRowOffset={showFindInPage ? sectionOffsets[1] : undefined}
+              findInPageQuery={showFindInPage ? deferredSearch : undefined}
               listType={listType}
             />
           </div>
@@ -624,13 +756,16 @@ export function PLUTable({
   // MIXED: Alles zusammen mit großem Banner (Backshop: „PLU-Liste Backshop“)
   return (
     <div>
+      {findInPageExternalTrigger && showFindInPage && showSearchBar && (
+        <FindInPageFixedPortal>{findInPageBarEl}</FindInPageFixedPortal>
+      )}
       <div
         className={PLU_TABLE_HEADER_CLASS}
         style={{ fontSize: fonts.header + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}
       >
         {listType === 'backshop' ? 'PLU-Liste Backshop' : 'PLU-Liste'}
       </div>
-      {showFindInPage && !showSearchBar && (
+      {showFindInPage && !showSearchBar && !findInPageExternalTrigger && (
         <div className="border-x border-t border-border bg-muted/30 px-4 py-2">
           <Button
             type="button"
@@ -645,21 +780,9 @@ export function PLUTable({
           </Button>
         </div>
       )}
-      {showSearchBar && (
+      {showSearchBar && !findInPageExternalTrigger && (
         <div className="sticky top-0 z-10 border-x border-t border-b border-border bg-background px-4 py-2">
-          <FindInPageBar
-            searchText={searchText}
-            onSearchTextChange={setSearchText}
-            currentIndex={currentIndex}
-            totalMatches={totalMatches}
-            onPrev={goPrev}
-            onNext={goNext}
-            placeholder="PLU oder Name suchen…"
-            onClose={() => {
-              setSearchOpen(false)
-              setSearchText('')
-            }}
-          />
+          {findInPageBarEl}
         </div>
       )}
       <TwoColumnLayout
@@ -673,11 +796,14 @@ export function PLUTable({
         onToggleSelect={onToggleSelect}
         findInPageHighlightRowIndex={showFindInPage ? findInPageHighlightRowIndex : undefined}
         findInPageRowOffset={showFindInPage ? sectionOffsets[0] : undefined}
+        findInPageQuery={showFindInPage ? deferredSearch : undefined}
         listType={listType}
       />
     </div>
   )
-}
+})
+
+PLUTable.displayName = 'PLUTable'
 
 /** Zwei-Spalten-Layout mit Header-Gruppen */
 function TwoColumnLayout({
@@ -691,6 +817,7 @@ function TwoColumnLayout({
   onToggleSelect,
   findInPageHighlightRowIndex,
   findInPageRowOffset,
+  findInPageQuery,
   listType = 'obst',
 }: {
   items: DisplayItem[]
@@ -703,6 +830,7 @@ function TwoColumnLayout({
   onToggleSelect?: (plu: string) => void
   findInPageHighlightRowIndex?: number | null
   findInPageRowOffset?: number
+  findInPageQuery?: string
   listType?: 'obst' | 'backshop'
 }) {
   const groups = useMemo(() => {
@@ -747,6 +875,7 @@ function TwoColumnLayout({
             onToggleSelect={onToggleSelect}
             findInPageRowOffset={findInPageRowOffset}
             findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+            findInPageQuery={findInPageQuery}
             listType={listType}
           />
         </div>
@@ -759,6 +888,7 @@ function TwoColumnLayout({
             onToggleSelect={onToggleSelect}
             findInPageRowOffset={findInPageRowOffset}
             findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+            findInPageQuery={findInPageQuery}
             listType={listType}
           />
         </div>
@@ -778,6 +908,7 @@ function TwoColumnLayout({
           onToggleSelect={onToggleSelect}
           findInPageRowOffset={findInPageRowOffset}
           findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+          findInPageQuery={findInPageQuery}
           listType={listType}
         />
         <PLUColumn
@@ -788,6 +919,7 @@ function TwoColumnLayout({
           onToggleSelect={onToggleSelect}
           findInPageRowOffset={findInPageRowOffset !== undefined ? findInPageRowOffset + leftRowCount : undefined}
           findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+          findInPageQuery={findInPageQuery}
           listType={listType}
         />
       </div>
@@ -800,6 +932,7 @@ function TwoColumnLayout({
           onToggleSelect={onToggleSelect}
           findInPageRowOffset={findInPageRowOffset}
           findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+          findInPageQuery={findInPageQuery}
           listType={listType}
         />
       </div>

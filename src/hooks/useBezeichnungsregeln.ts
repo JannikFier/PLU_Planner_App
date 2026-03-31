@@ -3,8 +3,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase, queryRest } from '@/lib/supabase'
-import { applyAllRulesToItems } from '@/lib/keyword-rules'
-import type { Bezeichnungsregel, Database, MasterPLUItem } from '@/types/database'
+import { applyAllRulesWithRenamedMerge } from '@/lib/keyword-rules'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
+import type { Bezeichnungsregel, Database, MasterPLUItem, RenamedItem } from '@/types/database'
 
 type RegelInsert = {
   keyword: string
@@ -14,14 +15,19 @@ type RegelInsert = {
   created_by?: string | null
 }
 
-/** Lädt alle Bezeichnungsregeln */
+/** Lädt Bezeichnungsregeln für den aktuellen Markt */
 export function useBezeichnungsregeln() {
+  const { currentStoreId } = useCurrentStore()
+
   return useQuery<Bezeichnungsregel[]>({
-    queryKey: ['bezeichnungsregeln'],
+    queryKey: ['bezeichnungsregeln', currentStoreId],
     staleTime: 5 * 60_000,
+    enabled: !!currentStoreId,
     queryFn: async () => {
+      if (!currentStoreId) return []
       const data = await queryRest<Bezeichnungsregel[]>('bezeichnungsregeln', {
         select: '*',
+        store_id: `eq.${currentStoreId}`,
         order: 'created_at.asc',
       })
       return data ?? []
@@ -32,17 +38,19 @@ export function useBezeichnungsregeln() {
 /** Neue Bezeichnungsregel erstellen */
 export function useCreateBezeichnungsregel() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (regel: RegelInsert) => {
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       const { error } = await supabase
         .from('bezeichnungsregeln')
-        .insert((regel as Database['public']['Tables']['bezeichnungsregeln']['Insert']) as never)
+        .insert(({ ...regel, store_id: currentStoreId } as Database['public']['Tables']['bezeichnungsregeln']['Insert']) as never)
 
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bezeichnungsregeln'] })
+      queryClient.invalidateQueries({ queryKey: ['bezeichnungsregeln', currentStoreId] })
     },
     onError: (error) => {
       toast.error('Fehler: ' + (error instanceof Error ? error.message : String(error)))
@@ -53,6 +61,7 @@ export function useCreateBezeichnungsregel() {
 /** Bezeichnungsregel aktualisieren (z.B. aktivieren/deaktivieren, Keyword/Position ändern) */
 export function useUpdateBezeichnungsregel() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async ({
@@ -72,7 +81,7 @@ export function useUpdateBezeichnungsregel() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bezeichnungsregeln'] })
+      queryClient.invalidateQueries({ queryKey: ['bezeichnungsregeln', currentStoreId] })
     },
     onError: (error) => {
       toast.error('Fehler: ' + (error instanceof Error ? error.message : String(error)))
@@ -83,6 +92,7 @@ export function useUpdateBezeichnungsregel() {
 /** Bezeichnungsregel löschen */
 export function useDeleteBezeichnungsregel() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -94,7 +104,7 @@ export function useDeleteBezeichnungsregel() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bezeichnungsregeln'] })
+      queryClient.invalidateQueries({ queryKey: ['bezeichnungsregeln', currentStoreId] })
     },
     onError: (error) => {
       toast.error('Fehler: ' + (error instanceof Error ? error.message : String(error)))
@@ -111,9 +121,14 @@ const PARALLEL_UPDATE_CHUNK = 10
 
 export function useApplyAllRules() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async () => {
+      if (!currentStoreId) {
+        throw new Error('Kein Markt ausgewählt.')
+      }
+
       // Aktive Version aus Cache oder einmalig laden
       let activeVersion = queryClient.getQueryData<unknown>(['version', 'active'])
       if (!activeVersion) {
@@ -140,30 +155,45 @@ export function useApplyAllRules() {
         allItems = (items ?? []) as MasterPLUItem[]
       }
 
-      // Regeln aus Cache oder einmalig laden
-      let activeRegeln = queryClient.getQueryData<Bezeichnungsregel[]>(['bezeichnungsregeln'])
+      // Regeln aus Cache oder einmalig laden (pro Markt)
+      let activeRegeln = queryClient.getQueryData<Bezeichnungsregel[]>(['bezeichnungsregeln', currentStoreId])
       if (!activeRegeln) {
         const { data: regeln, error: regelnError } = await supabase
           .from('bezeichnungsregeln')
           .select('*')
+          .eq('store_id', currentStoreId)
           .eq('is_active', true)
         if (regelnError) throw regelnError
         activeRegeln = (regeln ?? []) as Bezeichnungsregel[]
       }
 
-      const updates = applyAllRulesToItems(allItems, activeRegeln)
-      if (updates.length === 0) return { updatedCount: 0 }
+      let renamedRows = queryClient.getQueryData<RenamedItem[]>(['renamed-items', currentStoreId])
+      if (!renamedRows) {
+        const { data, error: renamedError } = await supabase
+          .from('renamed_items')
+          .select('*')
+          .eq('store_id', currentStoreId)
+        if (renamedError) throw renamedError
+        renamedRows = (data ?? []) as RenamedItem[]
+      }
 
-      // Parallele Updates in Chunks (statt sequentiell)
-      for (let i = 0; i < updates.length; i += PARALLEL_UPDATE_CHUNK) {
-        const chunk = updates.slice(i, i + PARALLEL_UPDATE_CHUNK)
+      const { masterUpdates, renamedUpdates } = applyAllRulesWithRenamedMerge(
+        allItems,
+        renamedRows,
+        activeRegeln,
+      )
+      const total = masterUpdates.length + renamedUpdates.length
+      if (total === 0) return { updatedCount: 0 }
+
+      for (let i = 0; i < masterUpdates.length; i += PARALLEL_UPDATE_CHUNK) {
+        const chunk = masterUpdates.slice(i, i + PARALLEL_UPDATE_CHUNK)
         await Promise.all(
           chunk.map((update) =>
             supabase
               .from('master_plu_items')
               .update(
-              ({ display_name: update.display_name } as Database['public']['Tables']['master_plu_items']['Update']) as never
-            )
+                ({ display_name: update.display_name } as Database['public']['Tables']['master_plu_items']['Update']) as never,
+              )
               .eq('id', update.id)
               .then(({ error }) => {
                 if (error) throw error
@@ -172,10 +202,30 @@ export function useApplyAllRules() {
         )
       }
 
-      return { updatedCount: updates.length }
+      for (let i = 0; i < renamedUpdates.length; i += PARALLEL_UPDATE_CHUNK) {
+        const chunk = renamedUpdates.slice(i, i + PARALLEL_UPDATE_CHUNK)
+        await Promise.all(
+          chunk.map((u) =>
+            supabase
+              .from('renamed_items')
+              .update({
+                display_name: u.display_name,
+                is_manually_renamed: u.is_manually_renamed,
+              } as Database['public']['Tables']['renamed_items']['Update'] as never)
+              .eq('plu', u.plu)
+              .eq('store_id', u.store_id)
+              .then(({ error }) => {
+                if (error) throw error
+              }),
+          ),
+        )
+      }
+
+      return { updatedCount: total }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plu-items'] })
+      queryClient.invalidateQueries({ queryKey: ['renamed-items', currentStoreId] })
     },
     onError: (error) => {
       toast.error('Fehler: ' + (error instanceof Error ? error.message : String(error)))

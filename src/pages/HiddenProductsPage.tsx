@@ -2,6 +2,7 @@
 // Liste, Einblenden, Bearbeiten (bei eigenen), "Produkte ausblenden" oben rechts
 
 import { useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,14 +10,30 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EyeOff, Undo2, Pencil } from 'lucide-react'
 import { useHiddenItems, useUnhideProduct } from '@/hooks/useHiddenItems'
+import { useOfferItems } from '@/hooks/useOfferItems'
+import {
+  useObstOfferCampaignWithLines,
+  useObstOfferStoreDisabled,
+} from '@/hooks/useCentralOfferCampaigns'
+import { useObstOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalPrices'
+import { useBezeichnungsregeln } from '@/hooks/useBezeichnungsregeln'
+import { useRenamedItems } from '@/hooks/useRenamedItems'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
 import { useCustomProducts } from '@/hooks/useCustomProducts'
 import { useBlocks } from '@/hooks/useBlocks'
 import { useAuth } from '@/hooks/useAuth'
+import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
+import { canManageMarketHiddenItems } from '@/lib/permissions'
 import { supabase } from '@/lib/supabase'
 import { getDisplayPlu } from '@/lib/plu-helpers'
+import { buildDisplayList } from '@/lib/layout-engine'
+import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
+import { useStoreObstBlockOrder, useStoreObstNameBlockOverrides } from '@/hooks/useStoreObstBlockLayout'
+import { buildOfferDisplayMap } from '@/lib/offer-display'
+import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
+import { orderByPluDisplayOrder } from '@/lib/list-order'
 import { useQuery } from '@tanstack/react-query'
 import { HideProductsDialog } from '@/components/plu/HideProductsDialog'
 import { EditCustomProductDialog } from '@/components/plu/EditCustomProductDialog'
@@ -35,7 +52,10 @@ interface HiddenProductInfo {
 }
 
 export function HiddenProductsPage() {
+  const { pathname } = useLocation()
   const { user } = useAuth()
+  const effectiveRole = useEffectiveRouteRole()
+  const canManageHidden = canManageMarketHiddenItems(effectiveRole, pathname)
   const currentUserId = user?.id ?? null
 
   const [showHideDialog, setShowHideDialog] = useState(false)
@@ -47,7 +67,91 @@ export function HiddenProductsPage() {
   const { data: customProducts = [] } = useCustomProducts()
   const { data: blocks = [] } = useBlocks()
   const { data: layoutSettings } = useLayoutSettings()
+  const { data: regeln = [] } = useBezeichnungsregeln()
+  const { data: storeObstBlockOrder = [] } = useStoreObstBlockOrder()
+  const { data: storeObstNameOverrides = [] } = useStoreObstNameBlockOverrides()
+  const nameBlockOverrides = useMemo(
+    () => buildNameBlockOverrideMap(storeObstNameOverrides),
+    [storeObstNameOverrides],
+  )
+  const hideDialogListLayout = useMemo(
+    () => ({
+      sortMode: (layoutSettings?.sort_mode ?? 'ALPHABETICAL') as 'ALPHABETICAL' | 'BY_BLOCK',
+      blocks,
+      storeBlockOrder: storeObstBlockOrder,
+      nameBlockOverrides,
+    }),
+    [layoutSettings?.sort_mode, blocks, storeObstBlockOrder, nameBlockOverrides],
+  )
+  const { data: renamedItems = [] } = useRenamedItems()
+  const { data: offerItems = [] } = useOfferItems()
+  const { data: obstCampaign } = useObstOfferCampaignWithLines()
+  const { data: obstStoreDisabled = new Set() } = useObstOfferStoreDisabled()
+  const { overrideMap: obstLocalOverrides } = useObstOfferLocalPriceOverrides(obstCampaign ?? undefined)
   const unhideProduct = useUnhideProduct()
+
+  const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
+  const offerDisplayByPlu = useMemo(
+    () =>
+      buildOfferDisplayMap(
+        currentKw,
+        currentJahr,
+        obstCampaign ?? null,
+        obstStoreDisabled,
+        offerItems,
+        obstLocalOverrides,
+      ),
+    [currentKw, currentJahr, obstCampaign, obstStoreDisabled, offerItems, obstLocalOverrides],
+  )
+
+  const canonicalListOrderPlu = useMemo(() => {
+    const activeRegeln = regeln
+      .filter((r) => r.is_active)
+      .map((r) => ({
+        keyword: r.keyword,
+        position: r.position,
+        case_sensitive: r.case_sensitive,
+      }))
+    const version = activeVersion
+    const now = new Date()
+    const { items } = buildDisplayList({
+      masterItems,
+      customProducts,
+      hiddenPLUs: new Set(),
+      offerDisplayByPlu,
+      renamedItems: renamedItems.map((r) => ({
+        plu: r.plu,
+        display_name: r.display_name,
+        is_manually_renamed: r.is_manually_renamed,
+      })),
+      bezeichnungsregeln: activeRegeln,
+      blocks,
+      sortMode: layoutSettings?.sort_mode ?? 'ALPHABETICAL',
+      displayMode: layoutSettings?.display_mode ?? 'MIXED',
+      markRedKwCount: layoutSettings?.mark_red_kw_count ?? 0,
+      markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
+      versionKwNummer: version?.kw_nummer ?? 0,
+      versionJahr: version?.jahr ?? now.getFullYear(),
+      currentKwNummer: currentKw,
+      currentJahr,
+      nameBlockOverrides,
+      storeBlockOrder: storeObstBlockOrder,
+    })
+    return items.map((i) => i.plu)
+  }, [
+    masterItems,
+    customProducts,
+    offerDisplayByPlu,
+    renamedItems,
+    regeln,
+    blocks,
+    layoutSettings,
+    activeVersion,
+    currentKw,
+    currentJahr,
+    nameBlockOverrides,
+    storeObstBlockOrder,
+  ])
 
   const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
   const hiddenPLUSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
@@ -60,6 +164,7 @@ export function HiddenProductsPage() {
         display_name: m.display_name ?? m.system_name,
         system_name: m.system_name,
         item_type: m.item_type as 'PIECE' | 'WEIGHT',
+        block_id: m.block_id,
       }))
     const custom = customProducts
       .filter((c) => !hiddenPLUSet.has(c.plu))
@@ -69,6 +174,7 @@ export function HiddenProductsPage() {
         display_name: c.name,
         system_name: c.name,
         item_type: c.item_type as 'PIECE' | 'WEIGHT',
+        block_id: c.block_id,
       }))
     return [...master, ...custom]
   }, [masterItems, customProducts, hiddenPLUSet])
@@ -140,6 +246,11 @@ export function HiddenProductsPage() {
     })
   }, [hiddenItems, masterItems, customProducts, profileMap])
 
+  const sortedHiddenProductInfos = useMemo(
+    () => orderByPluDisplayOrder(hiddenProductInfos, (x) => x.plu, canonicalListOrderPlu),
+    [hiddenProductInfos, canonicalListOrderPlu],
+  )
+
   if (hiddenError) {
     return (
       <DashboardLayout>
@@ -169,10 +280,12 @@ export function HiddenProductsPage() {
             </div>
           </div>
 
-          <Button variant="outline" size="sm" onClick={() => setShowHideDialog(true)}>
-            <EyeOff className="h-4 w-4 mr-2" />
-            Produkte ausblenden
-          </Button>
+          {canManageHidden && (
+            <Button variant="outline" size="sm" onClick={() => setShowHideDialog(true)}>
+              <EyeOff className="h-4 w-4 mr-2" />
+              Produkte ausblenden
+            </Button>
+          )}
         </div>
 
         {hiddenLoading && (
@@ -201,7 +314,7 @@ export function HiddenProductsPage() {
           </Card>
         )}
 
-        {!hiddenLoading && hiddenProductInfos.length > 0 && (
+        {!hiddenLoading && sortedHiddenProductInfos.length > 0 && (
           <Card>
             <CardContent className="p-0">
               <table className="w-full">
@@ -215,7 +328,7 @@ export function HiddenProductsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {hiddenProductInfos.map((info) => (
+                  {sortedHiddenProductInfos.map((info) => (
                     <tr key={info.plu} className="border-b border-border last:border-b-0 hover:bg-muted/30">
                       <td className="px-4 py-3 font-mono text-sm">{getDisplayPlu(info.plu)}</td>
                       <td className="px-4 py-3 text-sm">
@@ -252,15 +365,19 @@ export function HiddenProductsPage() {
                               Bearbeiten
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => unhideProduct.mutate(info.plu)}
-                            disabled={unhideProduct.isPending}
-                          >
-                            <Undo2 className="h-4 w-4 mr-1" />
-                            Einblenden
-                          </Button>
+                          {canManageHidden ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => unhideProduct.mutate(info.plu)}
+                              disabled={unhideProduct.isPending}
+                            >
+                              <Undo2 className="h-4 w-4 mr-1" />
+                              Einblenden
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -271,12 +388,15 @@ export function HiddenProductsPage() {
           </Card>
         )}
 
-        <HideProductsDialog
-          open={showHideDialog}
-          onOpenChange={setShowHideDialog}
-          searchableItems={searchableItems}
-          displayMode={displayMode}
-        />
+        {canManageHidden && (
+          <HideProductsDialog
+            open={showHideDialog}
+            onOpenChange={setShowHideDialog}
+            searchableItems={searchableItems}
+            displayMode={displayMode}
+            listLayout={hideDialogListLayout}
+          />
+        )}
 
         {editingProduct && (
           <EditCustomProductDialog

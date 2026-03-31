@@ -1,11 +1,12 @@
 // Wiederverwendbare Radio-Card (shadcn-konform)
 
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 export interface RadioCardProps {
   selected: boolean
   onClick: () => void
-  title: string
+  title: ReactNode
   description: string
 }
 

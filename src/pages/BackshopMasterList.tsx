@@ -1,16 +1,16 @@
 // BackshopMasterList – Backshop-PLU-Tabelle (Bild | PLU | Name)
 
-import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
+import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ListFilter, RefreshCw, AlertCircle, FileDown, Plus, EyeOff, Pencil, Megaphone } from 'lucide-react'
+import { ListFilter, RefreshCw, AlertCircle, FileDown, Plus, EyeOff, Pencil, Megaphone, Search } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { KWSelector } from '@/components/plu/KWSelector'
-import { PLUTable } from '@/components/plu/PLUTable'
+import { PLUTable, type PLUTableHandle } from '@/components/plu/PLUTable'
 import { PLUFooter } from '@/components/plu/PLUFooter'
 const ExportBackshopPDFDialog = lazy(() =>
   import('@/components/plu/ExportBackshopPDFDialog').then((m) => ({ default: m.ExportBackshopPDFDialog })),
@@ -26,9 +26,19 @@ import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
 import { useBackshopBezeichnungsregeln } from '@/hooks/useBackshopBezeichnungsregeln'
 import { useBackshopRenamedItems } from '@/hooks/useBackshopRenamedItems'
 import { buildBackshopDisplayList } from '@/lib/layout-engine'
+import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
+import {
+  useStoreBackshopBlockOrder,
+  useStoreBackshopNameBlockOverrides,
+} from '@/hooks/useStoreBackshopBlockLayout'
 import type { PLUStats } from '@/lib/plu-helpers'
-import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
-import { getActiveOfferPLUs } from '@/lib/offer-utils'
+import { formatBackshopActiveListToolbarRange, getKWAndYearFromDate } from '@/lib/date-kw-utils'
+import { buildOfferDisplayMap } from '@/lib/offer-display'
+import {
+  useBackshopOfferCampaignWithLines,
+  useBackshopOfferStoreDisabled,
+} from '@/hooks/useCentralOfferCampaigns'
+import { useBackshopOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalPrices'
 
 /**
  * Backshop-Masterliste: Tabelle mit Bild, PLU, Name.
@@ -52,6 +62,17 @@ export function BackshopMasterList() {
   const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>(undefined)
   const effectiveVersionId = selectedVersionId ?? activeVersion?.id
 
+  /** Bei neuem aktivem Upload: wieder die aktive Liste zeigen (nicht in alter KW-Version hängen bleiben). */
+  const prevActiveVersionIdRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    const id = activeVersion?.id
+    if (!id) return
+    if (prevActiveVersionIdRef.current !== undefined && prevActiveVersionIdRef.current !== id) {
+      setSelectedVersionId(undefined)
+    }
+    prevActiveVersionIdRef.current = id
+  }, [activeVersion?.id])
+
   const [showPdfDialog, setShowPdfDialog] = useState(false)
   const [pdfDialogVersionId, setPdfDialogVersionId] = useState<string | undefined>(undefined)
 
@@ -71,17 +92,37 @@ export function BackshopMasterList() {
   const { data: hiddenItems = [] } = useBackshopHiddenItems()
   const { data: renamedItems = [] } = useBackshopRenamedItems()
   const { data: offerItems = [] } = useBackshopOfferItems()
+  const { data: backshopCampaign } = useBackshopOfferCampaignWithLines()
+  const { data: backshopDisabled = new Set() } = useBackshopOfferStoreDisabled()
+  const { overrideMap: backshopLocalPriceOverrides } = useBackshopOfferLocalPriceOverrides(
+    backshopCampaign ?? undefined,
+  )
   const { data: blocks = [] } = useBackshopBlocks()
   const { data: bezeichnungsregeln = [] } = useBackshopBezeichnungsregeln()
+  const { data: storeBackshopBlockOrder = [] } = useStoreBackshopBlockOrder()
+  const { data: storeBackshopNameOverrides = [] } = useStoreBackshopNameBlockOverrides()
+  const nameBlockOverrides = useMemo(
+    () => buildNameBlockOverrideMap(storeBackshopNameOverrides),
+    [storeBackshopNameOverrides],
+  )
 
   const hiddenPLUs = useMemo(
     () => new Set(hiddenItems.map((h) => h.plu)),
     [hiddenItems],
   )
   const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
-  const offerPLUs = useMemo(
-    () => getActiveOfferPLUs(offerItems, currentKw, currentJahr),
-    [offerItems, currentKw, currentJahr],
+  const markYellowKwCount = layoutSettings?.mark_yellow_kw_count ?? 4
+  const offerDisplayByPlu = useMemo(
+    () =>
+      buildOfferDisplayMap(
+        currentKw,
+        currentJahr,
+        backshopCampaign ?? null,
+        backshopDisabled,
+        offerItems,
+        backshopLocalPriceOverrides,
+      ),
+    [currentKw, currentJahr, backshopCampaign, backshopDisabled, offerItems, backshopLocalPriceOverrides],
   )
 
   const sortMode = layoutSettings?.sort_mode ?? 'ALPHABETICAL'
@@ -96,12 +137,24 @@ export function BackshopMasterList() {
     const result = buildBackshopDisplayList({
       masterItems: rawItems,
       hiddenPLUs,
-      offerPLUs,
+      offerDisplayByPlu,
       sortMode,
       blocks,
-      customProducts,
+      customProducts: customProducts.map((c) => ({
+        id: c.id,
+        plu: c.plu,
+        name: c.name,
+        image_url: c.image_url,
+        block_id: c.block_id,
+        created_at: c.created_at,
+      })),
       bezeichnungsregeln,
       renamedItems,
+      markYellowKwCount,
+      currentKwNummer: currentKw,
+      currentJahr,
+      nameBlockOverrides,
+      storeBlockOrder: storeBackshopBlockOrder,
     })
     const pluStats: PLUStats = {
       total: result.stats.total,
@@ -112,7 +165,7 @@ export function BackshopMasterList() {
       customCount: result.stats.customCount,
     }
     return { displayItems: result.items, stats: pluStats }
-  }, [rawItems, hiddenPLUs, offerPLUs, sortMode, blocks, customProducts, bezeichnungsregeln, renamedItems])
+  }, [rawItems, hiddenPLUs, offerDisplayByPlu, sortMode, blocks, customProducts, bezeichnungsregeln, renamedItems, markYellowKwCount, currentKw, currentJahr, nameBlockOverrides, storeBackshopBlockOrder])
 
   const currentVersion = useMemo(
     () => versions.find((v) => v.id === effectiveVersionId) ?? activeVersion,
@@ -129,13 +182,26 @@ export function BackshopMasterList() {
     return buildBackshopDisplayList({
       masterItems: pdfRawItems,
       hiddenPLUs,
+      offerDisplayByPlu,
       sortMode,
       blocks,
-      customProducts,
+      customProducts: customProducts.map((c) => ({
+        id: c.id,
+        plu: c.plu,
+        name: c.name,
+        image_url: c.image_url,
+        block_id: c.block_id,
+        created_at: c.created_at,
+      })),
       bezeichnungsregeln,
       renamedItems,
+      markYellowKwCount,
+      currentKwNummer: currentKw,
+      currentJahr,
+      nameBlockOverrides,
+      storeBlockOrder: storeBackshopBlockOrder,
     })
-  }, [showPdfDialog, pdfDialogVersionId, pdfRawItems, hiddenPLUs, sortMode, blocks, customProducts, bezeichnungsregeln, renamedItems])
+  }, [showPdfDialog, pdfDialogVersionId, pdfRawItems, hiddenPLUs, offerDisplayByPlu, sortMode, blocks, customProducts, bezeichnungsregeln, renamedItems, markYellowKwCount, currentKw, currentJahr, nameBlockOverrides, storeBackshopBlockOrder])
 
   const pdfStats: PLUStats = useMemo(
     () => ({
@@ -153,6 +219,8 @@ export function BackshopMasterList() {
     setPdfDialogVersionId(effectiveVersionId ?? undefined)
     setShowPdfDialog(true)
   }
+
+  const pluTableRef = useRef<PLUTableHandle>(null)
 
   // Tab wurde sichtbar: Browser throttelt Hintergrund-Tabs – Re-Render erzwingen
   const [, setVisibilityTick] = useState(0)
@@ -195,9 +263,30 @@ export function BackshopMasterList() {
         {/* === Toolbar (wie MasterList: Infos links, Aktionen rechts) === */}
         {currentVersion && !isLoading && !hasNoVersion && (
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <ListFilter className="h-4 w-4" />
-              <span>{currentVersion.kw_label}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="shrink-0"
+              onClick={() => pluTableRef.current?.openFindInPage()}
+              aria-label="In Liste suchen"
+              title="In Liste suchen (PLU oder Name)"
+            >
+              <Search className="h-4 w-4" />
+            </Button>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+              <ListFilter className="h-4 w-4 shrink-0" />
+              <span
+                className="text-foreground font-medium"
+                title="Zeitraum der aktuellen Backshop-Liste: Einspiel-KW bis heute (ISO-8601). Nach neuem Upload beginnt die Anzeige wieder mit einer einzelnen KW."
+              >
+                {formatBackshopActiveListToolbarRange(
+                  currentVersion.kw_nummer,
+                  currentVersion.jahr,
+                  currentKw,
+                  currentJahr,
+                )}
+              </span>
               {currentVersion.status === 'active' && (
                 <Badge variant="default" className="text-xs">Aktiv</Badge>
               )}
@@ -344,6 +433,7 @@ export function BackshopMasterList() {
         {!isLoading && !itemsError && !hasNoVersion && (displayItems.length > 0 || rawItems.length > 0) && (
           <>
             <PLUTable
+              ref={pluTableRef}
               items={displayItems}
               displayMode="MIXED"
               sortMode={sortMode}
@@ -351,6 +441,8 @@ export function BackshopMasterList() {
               blocks={blocks}
               fontSizes={fontSizes}
               listType="backshop"
+              showFindInPage
+              findInPageExternalTrigger
             />
             <PLUFooter stats={stats} />
           </>
@@ -371,7 +463,6 @@ export function BackshopMasterList() {
             selectedVersionId={pdfDialogVersionId}
             onVersionChange={setPdfDialogVersionId}
             fontSizes={fontSizes}
-            pageBreakPerBlock={layoutSettings?.page_break_per_block ?? false}
           />
           </Suspense>
         )}

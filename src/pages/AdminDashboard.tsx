@@ -1,20 +1,21 @@
-import { useMemo } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { useAuth } from '@/hooks/useAuth'
+import { useUserPreview } from '@/contexts/UserPreviewContext'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
-import { DashboardCard } from '@/components/layout/DashboardCard'
+import { BereichsauswahlCard } from '@/components/layout/BereichsauswahlCard'
 import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
 import { useUserListVisibility } from '@/hooks/useStoreListVisibility'
-import { ClipboardList, Users } from 'lucide-react'
+import { Apple, Croissant, Users } from 'lucide-react'
 
 /**
- * Admin Dashboard – Startseite für Admins (z.B. Abteilungsleiter).
- * Zeigt nur die Bereiche, die für den Admin freigeschaltet sind.
+ * Admin-Dashboard – drei Einstiege wie Super-Admin Markt-Übersicht: Obst, Backshop, Benutzer.
+ * Detailnavigation unter /admin/obst und /admin/backshop.
  */
 export function AdminDashboard() {
   const navigate = useNavigate()
   const { isSuperAdmin } = useAuth()
+  const { isUserPreviewActive, preview } = useUserPreview()
   const { currentStoreId } = useCurrentStore()
   usePrefetchForNavigation()
 
@@ -22,52 +23,7 @@ export function AdminDashboard() {
   const obstVisible = visibility?.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
   const backshopVisible = visibility?.find(v => v.list_type === 'backshop')?.is_visible ?? true
 
-  const cards = useMemo(() => {
-    const result: {
-      title: string
-      description: string
-      icon: typeof ClipboardList
-      onClick: () => void
-      color: string
-      bg: string
-    }[] = []
-
-    if (obstVisible) {
-      result.push({
-        title: 'PLU-Liste Obst/Gemüse',
-        description: 'Aktuelle PLU-Liste anzeigen und exportieren',
-        icon: ClipboardList,
-        onClick: () => navigate('/admin/masterlist'),
-        color: 'text-primary',
-        bg: 'bg-primary/10',
-      })
-    }
-
-    if (backshopVisible) {
-      result.push({
-        title: 'PLU-Liste Backshop',
-        description: 'Backshop-Liste mit Bild, PLU und Name',
-        icon: ClipboardList,
-        onClick: () => navigate('/admin/backshop-list'),
-        color: 'text-slate-600',
-        bg: 'bg-slate-100',
-      })
-    }
-
-    result.push({
-      title: 'Benutzerverwaltung',
-      description: 'Personal anlegen und Passwörter zurücksetzen',
-      icon: Users,
-      onClick: () => navigate('/admin/users'),
-      color: 'text-sky-600',
-      bg: 'bg-sky-50',
-    })
-
-    return result
-  }, [navigate, obstVisible, backshopVisible])
-
-  // Super-Admin gehoert auf /super-admin (Schutz-Redirect bei falschem Routing)
-  if (isSuperAdmin) {
+  if (isSuperAdmin && !(isUserPreviewActive && preview?.simulatedRole === 'admin')) {
     return <Navigate to="/super-admin" replace />
   }
 
@@ -93,27 +49,47 @@ export function AdminDashboard() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Administration</h2>
           <p className="text-muted-foreground">
-            PLU-Liste ansehen, Personal verwalten und Passwörter zurücksetzen.
+            Wähle einen Bereich – Listen und Konfiguration findest du unter Obst/Gemüse und Backshop.
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {cards.map((card) => (
-            <DashboardCard
-              key={card.title}
-              title={card.title}
-              description={card.description}
-              icon={card.icon}
-              onClick={card.onClick}
-              color={card.color}
-              bg={card.bg}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {obstVisible && (
+            <BereichsauswahlCard
+              title="Obst und Gemüse"
+              description="PLU-Liste und Konfiguration für diesen Markt"
+              icon={Apple}
+              onClick={() => navigate('/admin/obst')}
+              variant="obst"
             />
-          ))}
+          )}
+          {backshopVisible && (
+            <BereichsauswahlCard
+              title="Backshop"
+              description="Backshop-Liste und Konfiguration für diesen Markt"
+              icon={Croissant}
+              onClick={() => navigate('/admin/backshop')}
+              variant="backshop"
+            />
+          )}
+          <BereichsauswahlCard
+            title="Benutzer"
+            description="Personal anlegen und Passwörter zurücksetzen"
+            icon={Users}
+            onClick={() => navigate('/admin/users')}
+            variant="benutzer"
+          />
         </div>
+
+        {!obstVisible && !backshopVisible && (
+          <p className="text-sm text-muted-foreground text-center">
+            Keine Listen freigeschaltet. Bitte den Super-Admin unter Einstellungen prüfen.
+          </p>
+        )}
       </div>
     </DashboardLayout>
   )

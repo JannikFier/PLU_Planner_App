@@ -1,5 +1,6 @@
 // FindInPageBar: Such-Input + „X von Y“ + Vorheriger/Nächster (Chrome-artige Find-in-Page)
 
+import { useEffect, useRef } from 'react'
 import { Search, ChevronUp, ChevronDown, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -32,9 +33,22 @@ export function FindInPageBar({
   className,
   onClose,
 }: FindInPageBarProps) {
+  const inputWrapRef = useRef<HTMLDivElement>(null)
+
+  // Nach Öffnen (Toolbar-Lupe / „In Liste suchen“) sofort tippbar; doppeltes rAF für Portal/Fokus-Reihenfolge
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = inputWrapRef.current?.querySelector<HTMLInputElement>('input[type="search"], input')
+        el?.focus({ preventScroll: true })
+      })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [])
+
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
-      <div className="relative max-w-[260px] min-w-[180px]">
+      <div ref={inputWrapRef} className="relative max-w-[260px] min-w-[180px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
           type="search"

@@ -6,8 +6,10 @@ import {
   useRef,
   useMemo,
   useEffect,
+  useLayoutEffect,
   type ReactNode,
 } from 'react'
+import { flushSync } from 'react-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { setTestModeFlag } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -55,28 +57,42 @@ export function TestModeProvider({ children }: { children: ReactNode }) {
       data: structuredClone(query.state.data),
     }))
 
-    originalInvalidate.current = queryClient.invalidateQueries.bind(queryClient)
-    originalRefetch.current = queryClient.refetchQueries.bind(queryClient)
-    queryClient.invalidateQueries = () => Promise.resolve()
-    queryClient.refetchQueries = (() => Promise.resolve()) as typeof queryClient.refetchQueries
-
     setTestModeFlag(true)
-    setIsTestMode(true)
+    flushSync(() => {
+      setIsTestMode(true)
+    })
     toast.info('Testmodus aktiviert – Änderungen werden nicht gespeichert.')
     if (!isBroadcasting.current) {
       channelRef.current?.postMessage({ type: 'TESTMODE_ON' })
     }
   }, [queryClient])
 
+  // invalidate/refetch patchen: TanStack QueryClient bietet keinen eingebauten „keine Invalidation“-Modus;
+  // kurzzeitiges Ersetzen der Methoden verhindert Server-Refetches im Testmodus (Layout-Effect, nicht im Render).
+  useLayoutEffect(() => {
+    if (!isTestMode) return
+
+    originalInvalidate.current = queryClient.invalidateQueries.bind(queryClient)
+    originalRefetch.current = queryClient.refetchQueries.bind(queryClient)
+    // TanStack QueryClient: kein eingebauter Modus „Invalidation aus“; nur fuer Testmodus.
+    // eslint-disable-next-line react-hooks/immutability -- kurzzeitiger Methoden-Tausch (siehe Kommentar oben)
+    queryClient.invalidateQueries = () => Promise.resolve()
+    queryClient.refetchQueries = (() => Promise.resolve()) as typeof queryClient.refetchQueries
+
+    return () => {
+      if (originalInvalidate.current) {
+        queryClient.invalidateQueries = originalInvalidate.current
+      }
+      if (originalRefetch.current) {
+        queryClient.refetchQueries = originalRefetch.current
+      }
+      originalInvalidate.current = null
+      originalRefetch.current = null
+    }
+  }, [isTestMode, queryClient])
+
   const disableTestMode = useCallback(() => {
     setTestModeFlag(false)
-
-    if (originalInvalidate.current) {
-      queryClient.invalidateQueries = originalInvalidate.current
-    }
-    if (originalRefetch.current) {
-      queryClient.refetchQueries = originalRefetch.current
-    }
 
     if (cacheSnapshot.current) {
       for (const { queryKey, data } of cacheSnapshot.current) {
@@ -85,12 +101,14 @@ export function TestModeProvider({ children }: { children: ReactNode }) {
     }
 
     cacheSnapshot.current = null
-    originalInvalidate.current = null
-    originalRefetch.current = null
-    setIsTestMode(false)
-    setShowExitConfirm(false)
+    flushSync(() => {
+      setIsTestMode(false)
+      setShowExitConfirm(false)
+    })
 
-    queryClient.invalidateQueries()
+    queueMicrotask(() => {
+      queryClient.invalidateQueries()
+    })
     toast.success('Testmodus beendet – echte Daten wiederhergestellt.')
     if (!isBroadcasting.current) {
       channelRef.current?.postMessage({ type: 'TESTMODE_OFF' })
@@ -137,6 +155,6 @@ export function TestModeProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export function useTestMode() {
+export function useTestMode() { // eslint-disable-line react-refresh/only-export-components
   return useContext(TestModeContext)
 }

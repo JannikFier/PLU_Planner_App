@@ -8,13 +8,15 @@ alwaysApply: true
 ## Zwei Stufen
 
 - **Standard** (`npm run test:e2e`): Nur @smoke – Login, Redirects. Schnell, ohne .env.e2e. Für jeden Commit.
-- **Vollständig** (`npm run test:e2e:full`): Alle Tests inkl. @extended. Braucht .env.e2e. Vor Publish ausführen.
+- **Vollständig** (`npm run test:e2e:full`): Alle Tests inkl. @extended (Desktop-Chromium + `mobile-layout.spec.ts` auf **mobile-chromium** und **tablet-chromium**). Braucht .env.e2e. Vor Publish ausführen.
+- **Optional nur Mobile-Layout:** `npm run test:e2e:mobile` – Projekte `mobile-chromium` (iPhone 13) und `tablet-chromium` (iPad Pro 11), gleiche Scrollbreiten-Checks.
 
 ## Bei neuen Features
 
 - **Größere Features** (neue Seite, neuer Flow, neue Rolle): E2E-Test hinzufügen oder erweitern.
 - **Kleine Änderungen** (Text, Styling, Bugfix): Kein neuer Test nötig.
 - **Regel:** Wenn ein User-Flow neu ist oder sich wesentlich ändert → Test anpassen.
+- **Neue `/user/`-Seite mit breiter Tabelle/Liste:** `e2e/mobile-layout.spec.ts` um einen Fall mit derselben Scrollbreiten-Prüfung ergänzen (Handy + iPad-Projekte laufen automatisch mit).
 
 ## Struktur
 

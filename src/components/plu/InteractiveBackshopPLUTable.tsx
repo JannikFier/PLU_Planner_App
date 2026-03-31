@@ -20,13 +20,21 @@ import { PLU_TABLE_HEADER_CLASS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
 import { StatusBadge } from './StatusBadge'
+import { BackshopThumbnail } from './BackshopThumbnail'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
+import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
 import {
-  useBackshopBlocks,
-  useReorderBackshopBlocks,
-  useAssignBackshopProducts,
-} from '@/hooks/useBackshopBlocks'
+  useStoreBackshopBlockOrder,
+  useStoreBackshopNameBlockOverrides,
+  useReorderStoreBackshopBlocks,
+  useAssignBackshopProductBlockOverride,
+} from '@/hooks/useStoreBackshopBlockLayout'
+import {
+  buildNameBlockOverrideMap,
+  effectiveBlockIdForStoreOverride,
+  sortBlocksWithStoreOrder,
+} from '@/lib/block-override-utils'
 import { getDisplayPlu, getDisplayNameForItem, groupItemsByBlock } from '@/lib/plu-helpers'
 import type { BackshopBlock, BackshopMasterPLUItem } from '@/types/database'
 import type { BlockGroup } from '@/lib/plu-helpers'
@@ -45,12 +53,22 @@ export function InteractiveBackshopPLUTable() {
   const { data: activeVersion } = useActiveBackshopVersion()
   const { data: items = [] } = useBackshopPLUData(activeVersion?.id)
   const { data: blocks = [] } = useBackshopBlocks()
-  const reorderMutation = useReorderBackshopBlocks()
-  const assignMutation = useAssignBackshopProducts()
+  const { data: storeBlockOrder = [] } = useStoreBackshopBlockOrder()
+  const { data: storeNameOverrides = [] } = useStoreBackshopNameBlockOverrides()
+  const nameBlockOverrideMap = useMemo(
+    () => buildNameBlockOverrideMap(storeNameOverrides),
+    [storeNameOverrides],
+  )
+  const reorderStoreMutation = useReorderStoreBackshopBlocks()
+  const assignOverrideMutation = useAssignBackshopProductBlockOverride()
 
   const sortedBlocks = useMemo(
-    () => [...(blocks as unknown as { id: string; name: string; order_index: number }[])].sort((a, b) => a.order_index - b.order_index),
-    [blocks],
+    () =>
+      sortBlocksWithStoreOrder(
+        blocks as unknown as { id: string; name: string; order_index: number }[],
+        storeBlockOrder,
+      ),
+    [blocks, storeBlockOrder],
   )
 
   const itemsWithType: BackshopItemForGroup[] = useMemo(
@@ -59,11 +77,22 @@ export function InteractiveBackshopPLUTable() {
   )
 
   const groups = useMemo(
-    () => groupItemsByBlock<BackshopItemForGroup>(itemsWithType, sortedBlocks as import('@/types/database').Block[]),
-    [itemsWithType, sortedBlocks],
+    () =>
+      groupItemsByBlock<BackshopItemForGroup>(itemsWithType, sortedBlocks as import('@/types/database').Block[], {
+        resolveBlockId: (item) =>
+          effectiveBlockIdForStoreOverride(item.system_name, item.block_id, nameBlockOverrideMap),
+        sortedBlocks: sortedBlocks as import('@/types/database').Block[],
+      }),
+    [itemsWithType, sortedBlocks, nameBlockOverrideMap],
   )
 
-  const unassignedItems = useMemo(() => items.filter((i) => i.block_id == null), [items])
+  const unassignedItems = useMemo(
+    () =>
+      items.filter(
+        (i) => effectiveBlockIdForStoreOverride(i.system_name, i.block_id, nameBlockOverrideMap) == null,
+      ),
+    [items, nameBlockOverrideMap],
+  )
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const [dragType, setDragType] = useState<'block' | 'item' | null>(null)
@@ -109,7 +138,7 @@ export function InteractiveBackshopPLUTable() {
       const [moved] = reordered.splice(oldIndex, 1)
       reordered.splice(newIndex, 0, moved)
       try {
-        await reorderMutation.mutateAsync(reordered.map((b, i) => ({ id: b.id, order_index: i })))
+        await reorderStoreMutation.mutateAsync(reordered.map((b) => b.id))
         toast.success('Warengruppe verschoben')
       } catch {
         toast.error('Fehler beim Verschieben')
@@ -121,8 +150,14 @@ export function InteractiveBackshopPLUTable() {
       const itemId = activeId.replace('drag-item-', '')
       const targetBlockId = overId.replace('drop-block-', '')
       const blockId = targetBlockId === 'unassigned' ? null : targetBlockId
+      const item = items.find((i) => i.id === itemId)
+      if (!item) return
       try {
-        await assignMutation.mutateAsync({ itemIds: [itemId], blockId })
+        await assignOverrideMutation.mutateAsync({
+          systemName: item.system_name,
+          masterBlockId: item.block_id,
+          targetBlockId: blockId,
+        })
         toast.success('Produkt verschoben')
       } catch {
         toast.error('Fehler beim Verschieben')
@@ -137,14 +172,20 @@ export function InteractiveBackshopPLUTable() {
       const targetBlockId = findBlockIdForItem(targetItemId, groups)
       const sourceBlockId = findBlockIdForItem(itemId, groups)
       if (targetBlockId === sourceBlockId) return
+      const item = items.find((i) => i.id === itemId)
+      if (!item) return
       try {
-        await assignMutation.mutateAsync({ itemIds: [itemId], blockId: targetBlockId })
+        await assignOverrideMutation.mutateAsync({
+          systemName: item.system_name,
+          masterBlockId: item.block_id,
+          targetBlockId: targetBlockId,
+        })
         toast.success('Produkt verschoben')
       } catch {
         toast.error('Fehler beim Verschieben')
       }
     }
-  }, [dragType, sortedBlocks, groups, reorderMutation, assignMutation])
+  }, [dragType, sortedBlocks, groups, reorderStoreMutation, assignOverrideMutation, items])
 
   if (items.length === 0) {
     return (
@@ -174,9 +215,9 @@ export function InteractiveBackshopPLUTable() {
         {dragType === 'item' && dragData?.item && (
           <div className="flex items-center gap-2 px-3 py-1.5 bg-background border border-border rounded shadow-lg text-sm">
             <GripVertical className="h-3 w-3 text-muted-foreground" />
-            {dragData.item.image_url && (
-              <img src={dragData.item.image_url} alt="" className="h-8 w-8 object-cover rounded" />
-            )}
+            {dragData.item.image_url ? (
+              <BackshopThumbnail src={dragData.item.image_url} size="sm" />
+            ) : null}
             <span className="font-mono text-xs">{getDisplayPlu(dragData.item.plu)}</span>
             <span>{getDisplayNameForItem(dragData.item.display_name, dragData.item.system_name, false)}</span>
           </div>
@@ -350,11 +391,7 @@ function BackshopDraggableProductChip({ item }: { item: BackshopMasterPLUItem })
       >
         <GripVertical className="h-3 w-3" />
       </button>
-      {item.image_url ? (
-        <img src={item.image_url} alt="" className="h-8 w-8 object-cover rounded shrink-0" />
-      ) : (
-        <span className="h-8 w-8 flex items-center justify-center rounded bg-muted text-[10px] text-muted-foreground shrink-0">–</span>
-      )}
+      <BackshopThumbnail src={item.image_url} size="sm" />
       <span className="font-mono text-muted-foreground shrink-0">{getDisplayPlu(item.plu)}</span>
       <span className="truncate min-w-0">{getDisplayNameForItem(item.display_name, item.system_name, false)}</span>
     </div>
@@ -378,11 +415,7 @@ function BackshopProductRow({ item }: { item: BackshopMasterPLUItem }) {
         </button>
       </td>
       <td className="px-1 py-1 align-top">
-        {item.image_url ? (
-          <img src={item.image_url} alt="" className="h-10 w-10 object-cover rounded" />
-        ) : (
-          <span className="text-muted-foreground text-xs">–</span>
-        )}
+        <BackshopThumbnail src={item.image_url} size="md" />
       </td>
       <td className="px-2 py-1 align-top">
         <StatusBadge plu={item.plu} status={item.status} oldPlu={item.old_plu} />

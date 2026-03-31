@@ -1,0 +1,49 @@
+// Quadratische Backshop-Bildvorschau: volles Bild sichtbar (object-contain), konsistent mit PLU-Tabelle
+
+import { useState } from 'react'
+import { cn } from '@/lib/utils'
+
+export type BackshopThumbnailSize = 'sm' | 'md' | 'lg' | 'xl'
+
+const SIZE_CLASS: Record<BackshopThumbnailSize, string> = {
+  sm: 'h-8 w-8',
+  md: 'h-10 w-10',
+  lg: 'h-12 w-12',
+  xl: 'h-20 w-20',
+}
+
+export interface BackshopThumbnailProps {
+  src: string | null | undefined
+  /** Standard: md (40×40), wie Listen „Umbenannt / Ausgeblendet“ */
+  size?: BackshopThumbnailSize
+  className?: string
+}
+
+/**
+ * Quadratischer Rahmen; Bild wird vollständig angezeigt, nicht beschnitten (object-contain).
+ */
+export function BackshopThumbnail({ src, size = 'md', className }: BackshopThumbnailProps) {
+  const [loadFailed, setLoadFailed] = useState(false)
+  const showImg = Boolean(src) && !loadFailed
+
+  return (
+    <div
+      className={cn(
+        'shrink-0 rounded-md flex items-center justify-center overflow-hidden',
+        SIZE_CLASS[size],
+        showImg ? 'border border-border bg-muted' : 'border border-dashed border-border bg-muted/50',
+        className,
+      )}
+      aria-hidden={!showImg}
+    >
+      {showImg ? (
+        <img
+          src={src!}
+          alt=""
+          className="h-full w-full object-contain p-0.5 [image-rendering:crisp-edges]"
+          onError={() => setLoadFailed(true)}
+        />
+      ) : null}
+    </div>
+  )
+}

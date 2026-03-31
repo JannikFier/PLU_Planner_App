@@ -196,7 +196,7 @@ export async function invokeEdgeFunction<T = Record<string, unknown>>(
 export async function queryRest<T = unknown[]>(
   table: string,
   params: Record<string, string> = {},
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; /** Wenn Tabelle fehlt (Migration noch nicht ausgefuehrt): leeres Ergebnis statt Fehler */ onMissingRelation?: 'empty' },
 ): Promise<T> {
   const doRequest = async () => {
     const jwt = getAccessTokenFromStorage()
@@ -227,6 +227,16 @@ export async function queryRest<T = unknown[]>(
   if (!resp.ok) {
     let msg = `REST Fehler: ${resp.status}`
     try { msg = JSON.parse(text)?.message || msg } catch { /* ignore */ }
+    if (resp.status === 404 && options?.onMissingRelation === 'empty') {
+      try {
+        const j = JSON.parse(text) as { code?: string }
+        if (j.code === 'PGRST205') {
+          return [] as T
+        }
+      } catch {
+        /* weiter mit Fehler */
+      }
+    }
     throw new Error(msg)
   }
 

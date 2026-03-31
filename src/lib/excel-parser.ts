@@ -11,6 +11,8 @@ import type {
   CustomProductParseResult,
   ParsedOfferItemRow,
   OfferItemsParseResult,
+  ParsedExitWerbungRow,
+  ExitWerbungParseResult,
 } from '@/types/plu'
 
 /** Erkennt den Item-Typ aus dem Dateinamen */
@@ -284,6 +286,96 @@ export async function parseOfferItemsExcel(file: File): Promise<OfferItemsParseR
         weeks = n
       }
       rows.push({ plu, name, weeks })
+    }
+
+    return {
+      rows,
+      fileName: file.name,
+      totalRows: rawRows.length,
+      skippedRows,
+    }
+  } catch (err) {
+    throw new Error(`Excel-Parsing fehlgeschlagen: ${formatError(err)}`)
+  }
+}
+
+function parseGermanCellNumber(cell: unknown): number | null {
+  if (cell == null || cell === '') return null
+  const s = String(cell).trim().replace(/\s/g, '').replace(',', '.')
+  const n = parseFloat(s)
+  return Number.isFinite(n) ? n : null
+}
+
+function normalizeHeaderCell(c: unknown): string {
+  return String(c ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+}
+
+/**
+ * Exit-/Wochenwerbung-Excel: erkennt Spalten per Header (Art. Nr., Artikel, Inhalt, Akt. UVP).
+ */
+export async function parseExitWerbungExcel(file: File): Promise<ExitWerbungParseResult> {
+  try {
+    const rawRows = await loadExcelSheetAsRows(file)
+    let headerRow = -1
+    let colArt = -1
+    let colArtikel = -1
+    let colInhalt = -1
+    let colAktUvp = -1
+
+    for (let i = 0; i < Math.min(rawRows.length, 40); i++) {
+      const row = rawRows[i]
+      if (!row?.length) continue
+      const cells = row.map(normalizeHeaderCell)
+      const a0 = cells[0] ?? ''
+      if (a0.includes('art') && (a0.includes('nr') || a0.includes('nr.'))) {
+        headerRow = i
+        for (let j = 0; j < row.length; j++) {
+          const h = cells[j] ?? ''
+          if (h.includes('art') && (h.includes('nr') || h.includes('nr.'))) colArt = j
+          else if (h === 'artikel' || h.startsWith('artikel')) colArtikel = j
+          else if (h.includes('inhalt')) colInhalt = j
+          else if (h.includes('akt') && h.includes('uvp')) colAktUvp = j
+        }
+        break
+      }
+    }
+
+    if (headerRow < 0 || colArt < 0 || colAktUvp < 0) {
+      throw new Error(
+        'Header nicht gefunden: Erwartet werden Spalten „Art. Nr.“ und „Akt. UVP“ (oder ähnlich).',
+      )
+    }
+    if (colArtikel < 0) colArtikel = 1
+
+    const rows: ParsedExitWerbungRow[] = []
+    let skippedRows = 0
+    for (let i = headerRow + 1; i < rawRows.length; i++) {
+      const rawRow = rawRows[i]
+      if (!rawRow || rawRow.length === 0) continue
+      const artNr = rawRow[colArt] != null ? String(rawRow[colArt]).trim() : ''
+      if (!artNr) {
+        skippedRows++
+        continue
+      }
+      const artikel =
+        colArtikel >= 0 && rawRow[colArtikel] != null ? String(rawRow[colArtikel]).trim() : ''
+      const inhalt =
+        colInhalt >= 0 && rawRow[colInhalt] != null ? String(rawRow[colInhalt]).trim() : ''
+      const aktUvp = parseGermanCellNumber(rawRow[colAktUvp])
+      if (aktUvp == null || aktUvp < 0) {
+        skippedRows++
+        continue
+      }
+      rows.push({
+        artNr,
+        artikel,
+        inhalt,
+        aktUvp,
+        rowIndex: i + 1,
+      })
     }
 
     return {

@@ -38,7 +38,12 @@ import { usePLUData } from '@/hooks/usePLUData'
 import { useCustomProducts, useAddCustomProductsBatch, useDeleteCustomProduct } from '@/hooks/useCustomProducts'
 import { useBlocks } from '@/hooks/useBlocks'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
+import { useStoreObstBlockOrder, useStoreObstNameBlockOverrides } from '@/hooks/useStoreObstBlockLayout'
+import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
 import { useAuth } from '@/hooks/useAuth'
+import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
+import { canManageMarketHiddenItems } from '@/lib/permissions'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { EXCEL_READ_ERROR_FALLBACK, formatError } from '@/lib/error-messages'
 import { formatPreisEur, generatePriceOnlyPlu, getDisplayPlu, parseBlockNameToItemType } from '@/lib/plu-helpers'
@@ -47,6 +52,7 @@ import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { CustomProductDialog } from '@/components/plu/CustomProductDialog'
+import { ObstCustomProductsList } from '@/components/plu/ObstCustomProductsList'
 import { ExcelPreviewBox } from '@/components/plu/ExcelPreviewBox'
 import { HideProductsDialog } from '@/components/plu/HideProductsDialog'
 import type { Profile, CustomProduct } from '@/types/database'
@@ -69,8 +75,10 @@ interface HiddenProductInfo {
  */
 export function HiddenItems() {
   const { user, isSuperAdmin } = useAuth()
+  const effectiveRole = useEffectiveRouteRole()
   const navigate = useNavigate()
   const location = useLocation()
+  const canManageHidden = canManageMarketHiddenItems(effectiveRole, location.pathname)
   // Prefix aus aktueller URL, damit Super-Admin in User-Ansicht dort bleibt
   const pathPrefix =
     location.pathname.startsWith('/super-admin') ? '/super-admin'
@@ -94,11 +102,28 @@ export function HiddenItems() {
   const { data: customProducts = [], isLoading: customProductsLoading } = useCustomProducts()
   const { data: blocks = [] } = useBlocks()
   const { data: layoutSettings } = useLayoutSettings()
+  const { currentStoreId } = useCurrentStore()
+  const { data: storeObstBlockOrder = [] } = useStoreObstBlockOrder()
+  const { data: storeObstNameOverrides = [] } = useStoreObstNameBlockOverrides()
+  const hideDialogListLayout = useMemo(() => {
+    if (!currentStoreId) return undefined
+    return {
+      sortMode: (layoutSettings?.sort_mode ?? 'ALPHABETICAL') as 'ALPHABETICAL' | 'BY_BLOCK',
+      blocks,
+      storeBlockOrder: storeObstBlockOrder,
+      nameBlockOverrides: buildNameBlockOverrideMap(storeObstNameOverrides),
+    }
+  }, [currentStoreId, layoutSettings?.sort_mode, blocks, storeObstBlockOrder, storeObstNameOverrides])
   const addBatch = useAddCustomProductsBatch()
   const deleteProduct = useDeleteCustomProduct()
   const hideProduct = useHideProduct()
   const sortMode = layoutSettings?.sort_mode ?? 'ALPHABETICAL'
   const sortedBlocks = useMemo(() => [...blocks].sort((a, b) => a.order_index - b.order_index), [blocks])
+
+  const hasAnyPriceCustom = useMemo(
+    () => customProducts.some((c) => c.preis != null),
+    [customProducts],
+  )
 
   // Alle PLUs (Master + Custom) für Duplikat-Prüfung im Dialog
   const existingPLUs = useMemo(
@@ -118,6 +143,7 @@ export function HiddenItems() {
         display_name: m.display_name ?? m.system_name,
         system_name: m.system_name,
         item_type: m.item_type as 'PIECE' | 'WEIGHT',
+        block_id: m.block_id,
       }))
     const custom = customProducts
       .filter((c) => !hiddenPLUSet.has(c.plu))
@@ -127,6 +153,7 @@ export function HiddenItems() {
         display_name: c.name,
         system_name: c.name,
         item_type: c.item_type as 'PIECE' | 'WEIGHT',
+        block_id: c.block_id,
       }))
     return [...master, ...custom]
   }, [masterItems, customProducts, hiddenPLUSet])
@@ -396,7 +423,7 @@ export function HiddenItems() {
             </div>
           </div>
 
-          {hiddenItems.length > 0 && (
+          {canManageHidden && hiddenItems.length > 0 && (
             <Button
               variant="outline"
               size="sm"
@@ -464,82 +491,21 @@ export function HiddenItems() {
             )}
 
             {!customProductsLoading && customProducts.length > 0 && (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
-                      PLU
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Name
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[100px]">
-                      Typ
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
-                      Preis
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[120px]">
-                      Warengruppe
-                    </th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[140px]">
-                      Aktionen
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customProducts.map((cp) => (
-                    <tr
-                      key={cp.id}
-                      className="border-b border-border last:border-b-0 hover:bg-muted/30"
-                    >
-                      <td className="px-4 py-3 font-mono text-sm">{getDisplayPlu(cp.plu)}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span className="flex items-center gap-2">
-                          {cp.name}
-                          {currentUserId && cp.created_by === currentUserId && (
-                            <Badge variant="secondary" className="text-xs shrink-0">
-                              Von mir erstellt
-                            </Badge>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {cp.item_type === 'PIECE' ? 'Stück' : 'Gewicht'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {cp.preis != null ? formatPreisEur(cp.preis) : '–'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {blocks.find((b) => b.id === cp.block_id)?.name ?? '–'}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => hideProduct.mutate(cp.plu)}
-                            disabled={hideProduct.isPending}
-                          >
-                            <EyeOff className="h-3 w-3 mr-1" />
-                            Ausblenden
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => setProductToDelete(cp)}
-                            disabled={deleteProduct.isPending}
-                          >
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Löschen
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <ObstCustomProductsList
+                products={customProducts}
+                blocks={blocks}
+                context="hidden-items"
+                currentUserId={currentUserId}
+                sortMode={sortMode}
+                hasAnyPrice={hasAnyPriceCustom}
+                isHidden={() => false}
+                onDelete={(cp) => setProductToDelete(cp)}
+                onHide={(plu) => hideProduct.mutate(plu)}
+                hidePending={hideProduct.isPending}
+                unhidePending={false}
+                deletePending={deleteProduct.isPending}
+                allowHideUnhide={canManageHidden}
+              />
             )}
           </CardContent>
         </Card>
@@ -549,16 +515,16 @@ export function HiddenItems() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h3 className="text-lg font-semibold">Ausgeblendete Produkte</h3>
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowHideProductsDialog(true)}
-              >
-                <EyeOff className="h-4 w-4 mr-2" />
-                Produkte ausblenden
-              </Button>
-              {isSuperAdmin && (
+              {canManageHidden && (
                 <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowHideProductsDialog(true)}
+                  >
+                    <EyeOff className="h-4 w-4 mr-2" />
+                    Produkte ausblenden
+                  </Button>
                   <input
                     ref={hiddenExcelFileInputRef}
                     type="file"
@@ -663,15 +629,19 @@ export function HiddenItems() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => unhideProduct.mutate(info.plu)}
-                          disabled={unhideProduct.isPending}
-                        >
-                          <Undo2 className="h-4 w-4 mr-1" />
-                          Einblenden
-                        </Button>
+                        {canManageHidden ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => unhideProduct.mutate(info.plu)}
+                            disabled={unhideProduct.isPending}
+                          >
+                            <Undo2 className="h-4 w-4 mr-1" />
+                            Einblenden
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -708,12 +678,15 @@ export function HiddenItems() {
           blocks={blocks}
         />
 
-        <HideProductsDialog
-          open={showHideProductsDialog}
-          onOpenChange={setShowHideProductsDialog}
-          searchableItems={searchableItems}
-          displayMode={displayMode}
-        />
+        {canManageHidden && (
+          <HideProductsDialog
+            open={showHideProductsDialog}
+            onOpenChange={setShowHideProductsDialog}
+            searchableItems={searchableItems}
+            displayMode={displayMode}
+            listLayout={hideDialogListLayout}
+          />
+        )}
 
         <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
           <AlertDialogContent>

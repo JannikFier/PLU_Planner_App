@@ -9,7 +9,14 @@ import { useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
-import { runMasterListPrefetch, runAdminPrefetch, runStorePrefetch, runBackshopPrefetch, runBackshopStorePrefetch } from '@/hooks/usePrefetchForNavigation'
+import {
+  runMasterListPrefetch,
+  runAdminPrefetch,
+  runStorePrefetch,
+  runBackshopPrefetch,
+  runBackshopStorePrefetch,
+  runSuperAdminCompaniesPrefetch,
+} from '@/hooks/usePrefetchForNavigation'
 import { supabase } from '@/lib/supabase'
 import type { Store } from '@/types/database'
 
@@ -29,6 +36,9 @@ export function AuthPrefetch() {
       runBackshopPrefetch(queryClient)
       if (profile?.role === 'admin' || profile?.role === 'super_admin') {
         runAdminPrefetch(queryClient)
+      }
+      if (profile?.role === 'super_admin') {
+        runSuperAdminCompaniesPrefetch(queryClient)
       }
     })()
     return () => { cancelled = true }
@@ -64,7 +74,10 @@ export function AuthPrefetch() {
   useEffect(() => {
     if (authLoading || !user || mustChangePassword || !profile?.role) return
     const role = profile.role
-    if (role === 'super_admin') void import('@/pages/SuperAdminDashboard')
+    if (role === 'super_admin') {
+      void import('@/pages/SuperAdminDashboard')
+      void import('@/pages/SuperAdminCompaniesPage')
+    }
     else if (role === 'admin') void import('@/pages/AdminDashboard')
     else if (role === 'viewer') void import('@/pages/ViewerDashboard')
     else void import('@/pages/UserDashboard')

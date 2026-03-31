@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import { StoreProvider } from '@/contexts/StoreContext'
+import { UserPreviewProvider } from '@/contexts/UserPreviewContext'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { initErrorReporting, captureError } from '@/lib/error-reporting'
 import './index.css'
@@ -18,7 +19,9 @@ window.onerror = (message, source, lineno, colno, error) => {
 createRoot(document.getElementById('root')!).render(
   <AuthProvider>
     <StoreProvider>
-      <App />
+      <UserPreviewProvider>
+        <App />
+      </UserPreviewProvider>
     </StoreProvider>
   </AuthProvider>,
 )

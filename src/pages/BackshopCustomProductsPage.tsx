@@ -1,19 +1,22 @@
 // Backshop: Eigene Produkte (Bild Pflicht), Ausblenden, Bearbeiten, Löschen
 
 import { useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, Eye, EyeOff, Trash2, Pencil } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useBackshopCustomProducts, useDeleteBackshopCustomProduct } from '@/hooks/useBackshopCustomProducts'
 import { useBackshopHiddenItems, useBackshopHideProduct, useBackshopUnhideProduct } from '@/hooks/useBackshopHiddenItems'
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
 import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useAuth } from '@/hooks/useAuth'
+import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
+import { canManageMarketHiddenItems } from '@/lib/permissions'
 import { getDisplayPlu } from '@/lib/plu-helpers'
+import { BackshopCustomProductsList } from '@/components/plu/BackshopCustomProductsList'
 import { BackshopCustomProductDialog } from '@/components/plu/BackshopCustomProductDialog'
 import { EditBackshopCustomProductDialog } from '@/components/plu/EditBackshopCustomProductDialog'
 import type { BackshopCustomProduct } from '@/types/database'
@@ -27,10 +30,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-
 export function BackshopCustomProductsPage() {
+  const { pathname } = useLocation()
   const { user } = useAuth()
+  const effectiveRole = useEffectiveRouteRole()
+  const canHideUnhide = canManageMarketHiddenItems(effectiveRole, pathname)
 
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [editingProduct, setEditingProduct] = useState<BackshopCustomProduct | null>(null)
@@ -104,90 +108,20 @@ export function BackshopCustomProductsPage() {
             )}
 
             {!isLoading && customProducts.length > 0 && (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">Bild</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">PLU</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Name</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[120px]">Warengruppe</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[180px]">Aktionen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customProducts.map((cp) => {
-                    const isHidden = hiddenItems.some((h) => h.plu === cp.plu)
-                    return (
-                      <tr key={cp.id} className="border-b border-border last:border-b-0 hover:bg-muted/30">
-                        <td className="px-4 py-3">
-                          {cp.image_url ? (
-                            <img
-                              src={cp.image_url}
-                              alt=""
-                              className="h-12 w-12 object-contain rounded border border-border"
-                            />
-                          ) : (
-                            <span className="inline-block h-12 w-12 rounded border border-border bg-muted/50 text-muted-foreground text-xs flex items-center justify-center">–</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 font-mono text-sm">{getDisplayPlu(cp.plu)}</td>
-                        <td className="px-4 py-3 text-sm">
-                          <span className="flex items-center gap-2">
-                            {cp.name}
-                            {user && cp.created_by === user.id && (
-                              <Badge variant="secondary" className="text-xs shrink-0">Von mir</Badge>
-                            )}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {blocks.find((b) => b.id === cp.block_id)?.name ?? '–'}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-1">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={() => setEditingProduct(cp)} aria-label="Bearbeiten">
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Name und Bild bearbeiten</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => (isHidden ? unhideProduct.mutate(cp.plu) : hideProduct.mutate(cp.plu))}
-                                  disabled={hideProduct.isPending || unhideProduct.isPending}
-                                  aria-label={isHidden ? 'Einblenden' : 'Ausblenden'}
-                                >
-                                  {isHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {isHidden ? 'Einblenden' : 'Ausblenden'}
-                              </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setProductToDelete(cp)}
-                                  aria-label="Löschen"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Produkt löschen</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <BackshopCustomProductsList
+                products={customProducts}
+                blocks={blocks}
+                currentUserId={user?.id ?? null}
+                isHidden={(plu) => hiddenItems.some((h) => h.plu === plu)}
+                onEdit={(cp) => setEditingProduct(cp)}
+                onDelete={(cp) => setProductToDelete(cp)}
+                onHide={(plu) => hideProduct.mutate(plu)}
+                onUnhide={(plu) => unhideProduct.mutate(plu)}
+                hidePending={hideProduct.isPending}
+                unhidePending={unhideProduct.isPending}
+                deletePending={deleteProduct.isPending}
+                allowHideUnhide={canHideUnhide}
+              />
             )}
           </CardContent>
         </Card>

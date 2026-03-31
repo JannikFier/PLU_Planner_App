@@ -23,26 +23,27 @@ test.describe('Admin-Journey @extended', () => {
   })
 
   test('Dashboard zeigt Admin-Bereiche', async ({ page }) => {
-    // .first() vermeidet Strict-Mode-Fehler: "PLU-Liste" in Obst- und Backshop-Karte
-    await expect(page.getByText('PLU-Liste').first()).toBeVisible()
-    await expect(page.getByText('Backshop').first()).toBeVisible()
-    await expect(page.getByText('Benutzerverwaltung').first()).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Obst und Gemüse' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Backshop' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Benutzer' })).toBeVisible()
   })
 
   test('Benutzerverwaltung öffnen', async ({ page }) => {
-    await page.getByText('Benutzerverwaltung').first().click()
+    await page.getByRole('heading', { name: 'Benutzer' }).click()
     await expect(page).toHaveURL(/\/admin\/users/)
     await expect(page.getByRole('heading', { name: 'Benutzerverwaltung' })).toBeVisible({ timeout: 10_000 })
   })
 
   test('Benutzerverwaltung: Neuer-Benutzer-Button sichtbar', async ({ page }) => {
-    await page.getByText('Benutzerverwaltung').first().click()
+    await page.getByRole('heading', { name: 'Benutzer' }).click()
     await expect(page).toHaveURL(/\/admin\/users/)
     await expect(page.getByRole('button', { name: 'Neuer Benutzer' })).toBeVisible({ timeout: 10_000 })
   })
 
   test('Admin-Masterliste: Seite lädt', async ({ page }) => {
-    await page.getByText('PLU-Liste Obst/Gemüse').first().click()
+    await page.getByRole('heading', { name: 'Obst und Gemüse' }).click()
+    await expect(page).toHaveURL(/\/admin\/obst/)
+    await page.getByRole('heading', { name: 'PLU-Liste' }).click()
     await expect(page).toHaveURL(/\/admin\/masterlist/)
     await page.waitForLoadState('networkidle')
     await expect(page.getByRole('heading', { name: 'PLU-Masterliste' })).toBeVisible({ timeout: 15_000 })

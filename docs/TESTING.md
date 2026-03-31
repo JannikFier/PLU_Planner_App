@@ -27,6 +27,7 @@ npm run test:run
 
 - Neue **Funktion** in einem bestehenden Modul → neue `describe`/`it`-Blöcke in der zugehörigen `*.test.ts`.
 - Neues **Modul** in `src/lib` mit reiner Logik → neue Datei `modulname.test.ts` im gleichen Ordner anlegen.
+- **E2E Mobile-Layout:** Neue oder stark geänderte **User-Seiten mit breiten Tabellen/Listen** (`/user/...`) → [e2e/mobile-layout.spec.ts](../e2e/mobile-layout.spec.ts) um einen Test mit derselben **Scrollbreiten-Assertion** ergänzen (Login bleibt `E2E_USER_*`), damit Handy- und iPad-Viewport weiterhin ohne horizontales Scrollen geprüft werden.
 
 ## Getestete Module (Stand)
 
@@ -34,7 +35,8 @@ npm run test:run
 |-------|--------|
 | `plu-helpers` | formatKWLabel, formatPreisEur, parseBlockNameToItemType, isPriceOnlyPlu, getDisplayPlu, filterItemsBySearch, groupItemsByLetter, splitIntoColumns |
 | `date-kw-utils` | getKWAndYearFromDate, getNextFreeKW, versionExistsForKW, clampKWToUploadRange |
-| `keyword-rules` | normalizeKeywordInName, isAlreadyCorrect, nameContainsKeyword |
+| `keyword-rules` | normalizeKeywordInName, isAlreadyCorrect, nameContainsKeyword (inkl. Satzzeichen nach Schlagwort) |
+| `block-override-utils` | Normalisierung Artikelname, effektive Warengruppe, Sortierung mit Markt-Block-Reihenfolge |
 | `comparison-logic` | compareWithCurrentVersion (UNCHANGED, CONFLICT, PLU_CHANGED_RED, NEW_PRODUCT_YELLOW, erster Upload), resolveConflicts |
 | `utils` | generateUUID, cn |
 
@@ -44,6 +46,7 @@ User-Journeys (Login, Navigation, Rollen-Redirects) werden mit **Playwright** in
 
 - **Smoke:** Login-Seite lädt, Root und geschützte Routen leiten zu `/login` um.
 - **Journey-Tests:** Pro Rolle (Viewer, User, Admin, Super-Admin) Login und Hauptseiten; fehlende Berechtigung führt zu Redirect.
+- **Mobile-Layout (`@mobile`):** Zwei Playwright-Projekte in [playwright.config.ts](../playwright.config.ts): **`mobile-chromium`** (Viewport iPhone 13) und **`tablet-chromium`** (Viewport iPad Pro 11). Datei [e2e/mobile-layout.spec.ts](../e2e/mobile-layout.spec.ts) loggt sich mit `E2E_USER_*` ein und prüft auf **allen** wichtigen Personal-Routen, dass **weder `html`/`body` noch das `main`** des Dashboard-Layouts horizontal breiter als der Viewport sind (`scrollWidth - clientWidth ≤ 1` je Element). Abgedeckt u. a.: Dashboard, **PLU-Masterliste**, **Backshop-Liste**, **Eigene Produkte** (Obst + Backshop), **Eigene & Ausgeblendete**, **Ausgeblendete Produkte**, **Werbung**, **Umbenannt** (Obst + Backshop). Läuft bei `npm run test:e2e:full` mit; isoliert: `npm run test:e2e:mobile`. **Hinweis:** Konto muss Rolle **User (Personal)** sein (Login landet unter `/user/`).
 
 ### Abgedeckte Flows (Stand)
 
@@ -64,7 +67,8 @@ User-Journeys (Login, Navigation, Rollen-Redirects) werden mit **Playwright** in
 | Befehl | Was läuft | Wann |
 |--------|-----------|------|
 | `npm run test:e2e` | Nur **@smoke** (Login, Redirects) | Schnell, vor jedem Commit, ohne .env.e2e |
-| `npm run test:e2e:full` | **Alle** Tests (inkl. Journeys mit Login) | Vor Publish, braucht .env.e2e |
+| `npm run test:e2e:full` | **Alle** Tests: Desktop-Chromium (ohne `mobile-layout.spec.ts`) + **mobile-chromium** + **tablet-chromium** (jeweils `mobile-layout.spec.ts`) | Vor Publish, braucht .env.e2e |
+| `npm run test:e2e:mobile` | Nur **mobile-chromium** und **tablet-chromium** (`mobile-layout.spec.ts`) | Schneller Check Handy- + Tablet-Layout mit User-Credentials |
 
 **Vor dem Publish:** `npm run test:e2e:full` ausführen – alle Tests müssen grün sein.
 
@@ -77,11 +81,29 @@ npm run test:e2e
 # Vollständig (vor Publish, braucht .env.e2e):
 npm run test:e2e:full
 
+# Nur Mobile-Layout-Tests (Handy + iPad-Viewport):
+npm run test:e2e:mobile
+
 # Mit UI (empfohlen zum Debuggen):
 npm run test:e2e:ui
 ```
 
 Playwright startet den Dev-Server automatisch, sofern noch keiner auf Port 5173 läuft (`reuseExistingServer: true`).
+
+### Playwright: „Executable doesn't exist“ / falscher Ordner `mac-x64` vs. `mac-arm64`
+
+**Symptom:** Fehler wie `browserType.launch: Executable doesn't exist at …/chrome-headless-shell-mac-arm64/…`, obwohl `npx playwright install` gelaufen ist.
+
+**Ursache:** Die installierten Browser liegen im Cache unter **`chrome-headless-shell-mac-x64`**, der Testlauf erwartet aber **`mac-arm64`** (Apple Silicon). Das passiert, wenn Install und Laufzeit **unterschiedliche Plattform-Erkennung** hatten oder ein alter Cache nur die x64-ZIPs enthält.
+
+**Behebung:**
+
+1. Einmalig vollständig neu installieren: `npx playwright install` (oder nur `npx playwright install chromium`).
+2. Wenn es weiter fehlt: Playwright-Browser-Cache löschen und mit **expliziter** Apple-Silicon-Plattform neu laden, z. B.  
+   `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=mac15-arm64 npx playwright install chromium --force`  
+   (`mac15-arm64` an die macOS-Hauptversion anpassen, falls nötig; auf aktuellen Macs mit M-Chip passt das meist.)
+
+**Hinweis:** Ohne Override meldet Playwright bei Override ggf. „not officially supported“ – die ARM-Builds sind trotzdem die richtigen für M1/M2/M3.
 
 ### Test-Accounts (optional)
 

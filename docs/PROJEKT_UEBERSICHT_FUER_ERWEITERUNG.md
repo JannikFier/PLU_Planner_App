@@ -1,45 +1,62 @@
-# Projekt-Übersicht für Erweiterung (z. B. Eventplanungs-App)
+# Projekt-Index für KI & Erweiterungen
 
-Diese Datei bündelt alles Wichtige über das bestehende Projekt, damit ein **externer Planer** oder ein **anderer KI-Assistent** darauf aufbauend ein neues Modul (z. B. eine Eventplanungs-App) planen und nahtlos in dieselbe Codebasis und Infrastruktur integrieren kann.
+> **Suchst du eine „Index-Datei“ oder einen Einstieg für eine externe KI?** Dieses Dokument ist der **empfohlene Startpunkt**: Es fasst Zweck, Architektur, Konventionen und nächste Schritte zusammen. Details stehen in den verlinkten Dateien unter `docs/` und in `.cursor/rules/`.
+
+Die folgenden Abschnitte helfen **externen Planern, Entwicklern und KI-Assistenten**, die Codebasis zu verstehen und **neue Module** (eigene Domänen, Routen, Tabellen) konsistent anzubinden – ohne die bestehenden Regeln zu brechen.
 
 ---
 
 ## 1. Einleitung und Zweck des Dokuments
 
-**Für wen:** Externe Kollegen, KI-Assistenten oder Planer, die das Projekt nicht im Detail kennen und ein **neues Feature oder eine neue App** (z. B. Eventplanung) darauf aufsetzen sollen.
+**Für wen:** Personen oder Tools ohne tiefen Vorkenntnis-Stand, die Features planen, Code lesen oder implementieren sollen.
 
-**Ziel:** Die Eventplanungs-App (oder ein anderes neues Modul) soll auf **demselben System** gebaut werden – gleiche Codebasis, gleiche Auth, gleiche Rollen, ein gemeinsames Deployment. So kann die Integration später über gemeinsame Schnittstellen (Login, Navigation, Rollen) nahtlos erfolgen, ohne zwei getrennte Systeme zu betreiben.
+**Ziel:** Neue Funktionen auf **derselben Plattform** bauen: eine React-App, ein Supabase-Projekt, gemeinsame Auth und Rollen, ein Deployment. Integration über dieselben Muster (TanStack Query, RLS, Routing, `src/lib` + `src/hooks`).
+
+**Beispiele für „neue Module“:** Eine zusätzliche Domäne neben Obst/Gemüse und Backshop (historisch im Dokument oft **Eventplanung** als Beispiel genannt), oder die geplante **Kassen**-Rolle (Spezifikation separat).
+
+**Sicherheit:** Überblick zum aktuellen Stand der App: [SECURITY_REVIEW.md](SECURITY_REVIEW.md). Laufende Checklisten, einfach erklärtes Hintergrundwissen und Entscheidungsnotizen: [SECURITY_LIVING.md](SECURITY_LIVING.md). Tiefenreview älterer RLS-/Multi-Tenancy-Migrationen: [RLS_SECURITY_REVIEW_021_035.md](RLS_SECURITY_REVIEW_021_035.md).
 
 ---
 
 ## 2. Was ist dieses Projekt?
 
-**PLU Planner** ist eine Web-App zur Verwaltung wöchentlicher **Preis-Look-Up (PLU) Listen** für Obst/Gemüse und Backshop im Einzelhandel. Zentrale liefert Excel-Dateien; ein Super-Admin lädt sie hoch, das System vergleicht automatisch mit der Vorwoche (neu/geändert/unverändert), und alle Nutzer sehen personalisierte Listen (eigene Produkte, ausgeblendete, Umbenennungen, PDF-Export). Es gibt vier Rollen (Super-Admin, Admin, User, Viewer) und ein durchgängiges Konzept aus Auth, TanStack Query, Supabase und klaren Ordner-/Code-Konventionen.
+**PLU Planner** ist eine Web-App für wöchentliche **Preis-Look-Up (PLU) Listen** im Einzelhandel (Obst/Gemüse und **Backshop**). Die Zentrale liefert Excel-Dateien; ein Super-Admin lädt sie hoch, das System vergleicht mit der Vorwoche (neu / geändert / unverändert), Nutzer sehen personalisierte Listen (eigene Produkte, Ausblenden, Umbenennungen, Layout/Regeln, PDF-Export).
 
-**Für die Erweiterung** ist entscheidend: Dieselbe **Architektur und Konventionen** (State, Hooks, Lib, Seiten, Routing, Reload-Verhalten) sollen für die Eventplanung wiederverwendet werden, damit die neue Funktionalität sich wie ein natürlicher Teil der App verhält.
+**Rollen:** Vier Stufen – `super_admin`, `admin`, `user`, `viewer`. Matrix und Flows: [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md).
+
+**Multi-Tenancy (Märkte):** Pro **Subdomain** (z. B. `markt.example.de`) wird der **aktuelle Markt** (`store_id`) über den **StoreContext** geladen; Daten in Hooks werden typischerweise mit `.eq('store_id', currentStoreId)` gefiltert und QueryKeys enthalten die Store-ID für Cache-Isolation. Sonderfall **Admin-Domain** (`admin.…`) für Super-Admin-Modus. Details: [ARCHITECTURE.md](ARCHITECTURE.md) (Abschnitt Multi-Tenancy).
+
+**Zweite Produkt-Domäne:** **Backshop** – eigene Versionen, Upload, Layout, Regeln, Storage für Bilder; eigenes Routen- und Hook-Präfix (`backshop-*`). Gute **Blaupause** für eine weitere große Domäne.
+
+**Geplant (Spezifikation):** **Kassen** – eigener Nutzertyp, PLU-Ansicht ohne Stammdaten-Edit, Meldungen aus der Kasse; siehe [FEATURE_KASSEN_SPEC.md](FEATURE_KASSEN_SPEC.md) und Kurzüberblick in [FEATURES.md](FEATURES.md).
+
+**Responsive UI:** Fokus der App ist **Desktop**; ausgewählte Verwaltungsseiten (z. B. **Eigene Produkte** Obst/Backshop) haben unterhalb des Tailwind-Breakpoints **`md`** eine eigene, schmale Listenansicht, damit auf dem Handy keine horizontale Seiten-Scrollleiste nötig ist. Komponenten: `ObstCustomProductsList`, `BackshopCustomProductsList` in `src/components/plu/`.
 
 ---
 
-## 3. Tech-Stack (verbindlich, nicht abweichen)
+## 3. Tech-Stack (verbindlich laut Projektregeln)
 
 | Bereich | Technologie |
 |--------|-------------|
-| **Frontend** | React 18, Vite, TypeScript (strict) |
-| **UI** | Tailwind CSS v4, shadcn/ui (alle UI-Komponenten) |
-| **State** | TanStack Query v5 für alle Server-Daten; **kein** Redux/Zustand/Jotai; einziger globaler Context: Auth (`AuthProvider`) |
-| **Routing** | React Router v6 |
+| **Frontend** | React (aktuell v19), Vite, TypeScript (strict) |
+| **UI** | Tailwind CSS v4, shadcn/ui |
+| **State (Server)** | TanStack Query v5; **kein** Redux / Zustand / Jotai für Server-Daten |
+| **Globale React-Contexts** | **Auth** (Session, Profil) und **Store** (aktueller Markt/Tenant). **Kein** weiterer globaler Context für fachliche Listen oder Server-Daten. |
+| **Routing** | React Router (aktuell v7, `react-router-dom`) |
 | **Backend** | Supabase (PostgreSQL, Auth, Storage, Edge Functions) |
-| **Weitere** | Zod (Validierung), jsPDF (PDF), xlsx/ExcelJS (Excel), sonner (Toasts), lucide-react (Icons), date-fns |
+| **Weitere** | Zod (Validierung), jsPDF (PDF), **exceljs** (Excel lesen/schreiben), sonner (Toasts), lucide-react (Icons), date-fns |
 
-Referenzen: [README.md](../README.md), [ARCHITECTURE.md](ARCHITECTURE.md).
+Referenzen: [README.md](../README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [.cursor/rules/project-general.mdc](../.cursor/rules/project-general.mdc).
 
 ---
 
 ## 4. Architektur-Überblick
 
-- **System:** Frontend wird auf **Vercel** gehostet und spricht ausschließlich mit **Supabase** (PostgreSQL, Auth, Storage, Edge Functions). Es gibt **keinen eigenen Backend-Server**.
-- **Datenfluss:** Server State ausschließlich über **TanStack Query** (useQuery/useMutation). Nach einer Mutation: `invalidateQueries` für betroffene Keys → automatischer Refetch. **Kein** `useEffect` zum Laden von Server-Daten.
-- **Auth:** Ein zentraler **AuthProvider** ([src/contexts/AuthContext.tsx](../src/contexts/AuthContext.tsx)) hält User, Session und Profil; Profil/Session werden in sessionStorage gecacht, damit Reloads schnell wirken. Supabase Client wird **nur** über [src/lib/supabase.ts](../src/lib/supabase.ts) importiert und ist mit dem typisierten `Database` aus [src/types/database.ts](../src/types/database.ts) versehen.
+- **System:** Frontend auf **Vercel**, Anbindung nur an **Supabase** (kein eigener App-Server).
+- **Datenfluss:** Server State über **TanStack Query** (`useQuery` / `useMutation`). Nach Schreiboperationen: `invalidateQueries` für betroffene Keys. **Kein** `useEffect`, nur um Server-Daten zu laden.
+- **Auth:** **AuthContext** reagiert als einzige Stelle auf Supabase-Auth-Events (`onAuthStateChange`); Profil/Session werden für schnelle Reloads in **sessionStorage** gecacht (Details: [.cursor/rules/auth-architecture.mdc](../.cursor/rules/auth-architecture.mdc)).
+- **Supabase-Client:** Nur aus [src/lib/supabase.ts](../src/lib/supabase.ts); Typen in [src/types/database.ts](../src/types/database.ts).
+- **Provider-Reihenfolge** in [src/main.tsx](../src/main.tsx): `AuthProvider` → `StoreProvider` → `App`.
 
 ```mermaid
 flowchart LR
@@ -65,24 +82,25 @@ flowchart LR
 
 | Ordner/Datei | Zweck |
 |--------------|--------|
-| **src/lib/** | Business-Logik, Helper, Konstanten, Supabase-Client. **Keine** UI. |
-| **src/hooks/** | Pro Datendomäne ein Custom Hook (TanStack Query Wrapper); z. B. useAuth. |
-| **src/components/** | Wiederverwendbare UI: `ui/` = shadcn; `layout/` = Shell, Header, ProtectedRoute; domänenspezifisch z. B. `plu/`, später z. B. `events/`. |
-| **src/pages/** | Seiten = eine pro Route; **nur** Orchestrierung, **keine** Business-Logik. |
-| **src/types/** | TypeScript-Interfaces/Types (inkl. von Supabase generierte DB-Typen). |
-| **Path-Alias** | `@/` zeigt auf `src/`. |
-| **Sprache** | UI-Texte und Code-Kommentare auf **Deutsch**; Variablen- und Funktionsnamen auf **Englisch**. |
+| **src/lib/** | Business-Logik, Helper, Konstanten. **Keine** UI. |
+| **src/hooks/** | Pro Datendomäne Custom Hooks (TanStack Query); z. B. `useAuth`, `useBackshop*`. |
+| **src/components/** | Wiederverwendbare UI: `ui/` = shadcn; `layout/` = Shell, Header, ProtectedRoute; domänenspezifisch z. B. `plu/`. |
+| **src/pages/** | Eine Seite pro Route; **nur** Orchestrierung, **keine** Business-Logik. |
+| **src/contexts/** | **AuthContext**, **StoreContext** (keine weiteren fachlichen Global-Contexts). |
+| **src/types/** | TypeScript-Typen inkl. DB-Typen. |
+| **Path-Alias** | `@/` → `src/`. |
+| **Sprache** | UI-Texte und Code-Kommentare **Deutsch**; Bezeichner **Englisch**. |
 
-Referenzen: [.cursor/rules/project-general.mdc](../.cursor/rules/project-general.mdc), [.cursor/rules/code-quality.mdc](../.cursor/rules/code-quality.mdc).
+Referenzen: [.cursor/rules/code-quality.mdc](../.cursor/rules/code-quality.mdc).
 
 ---
 
 ## 6. State Management und Datenmuster
 
-- **Regel:** Kein globaler React Context für fachliche Daten; **Ausnahme:** Auth (AuthProvider).
-- **Muster:** Neue Domäne = neuer Hook in `src/hooks/` (useQuery/useMutation), Lesen/Schreiben über Supabase; bei Schreiben: `invalidateQueries` für die betroffenen QueryKeys. QueryKeys sind konsistent aufgebaut, z. B. `['plu-items', versionId]`, `['custom-products']`, `['backshop-versions']` – für Events z. B. `['events']`, `['events', eventId]`.
-- **Query-Persistenz:** Nur ausgewählte QueryKeys werden in **sessionStorage** persistiert. Die Allowlist steht in [src/lib/query-persist-allowlist.ts](../src/lib/query-persist-allowlist.ts). Neue Listen/Queries, die nach Reload sofort sichtbar sein sollen → Key-Präfix in `PERSIST_QUERY_KEY_PREFIXES` eintragen.
-- **Prefetch:** Zentrale Prefetch-Logik in [src/hooks/usePrefetchForNavigation.ts](../src/hooks/usePrefetchForNavigation.ts). Bei neuen Hauptrouten/Dashboards Prefetch dort ergänzen und in [AuthPrefetch](../src/components/AuthPrefetch.tsx) oder auf dem zugehörigen Dashboard auslösen.
+- **Regel:** Fachliche Server-Daten nur über TanStack Query in Hooks, nicht in einem eigenen React Context.
+- **Muster:** Neue Domäne → Hook(s) in `src/hooks/`, konsistente QueryKeys (z. B. `['plu-items', versionId, storeId]`, `['backshop-versions', storeId]`).
+- **Query-Persistenz:** Nur Allowlist in [src/lib/query-persist-allowlist.ts](../src/lib/query-persist-allowlist.ts). Neue Listen, die nach Reload sofort da sein sollen → Präfix in `PERSIST_QUERY_KEY_PREFIXES`.
+- **Prefetch:** [src/hooks/usePrefetchForNavigation.ts](../src/hooks/usePrefetchForNavigation.ts) und [src/components/AuthPrefetch.tsx](../src/components/AuthPrefetch.tsx).
 
 Ausführlich: [RELOAD_UND_LAADEVERHALTEN.md](RELOAD_UND_LAADEVERHALTEN.md), [.cursor/rules/reload-performance.mdc](../.cursor/rules/reload-performance.mdc).
 
@@ -90,35 +108,28 @@ Ausführlich: [RELOAD_UND_LAADEVERHALTEN.md](RELOAD_UND_LAADEVERHALTEN.md), [.cu
 
 ## 7. Auth und Rollen
 
-- **Vier Rollen:** `super_admin`, `admin`, `user`, `viewer`. Details und Rechte-Matrix: [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md).
-- **Login:** E-Mail **oder** 7-stellige Personalnummer; Einmalpasswort-Flow (`must_change_password`), Passwort-Änderung unter `/change-password`.
-- **Routen nach Rolle:** `/user/*`, `/viewer/*`, `/admin/*`, `/super-admin/*`; geschützt über **ProtectedRoute** mit optional `requireAdmin` (Admin + Super-Admin).
-- **RLS:** Datenbank-Rechte über PostgreSQL Row Level Security; Hilfsfunktionen `is_admin()`, `is_super_admin()` in der DB.
-- **Profil:** Tabelle `profiles` (id, email, personalnummer, display_name, role, must_change_password, …); Auth-State und Profil kommen aus dem AuthContext.
+- **Login:** E-Mail **oder** 7-stellige Personalnummer; Einmalpasswort (`must_change_password`), Route `/change-password`.
+- **Routen:** `/user/*`, `/viewer/*`, `/admin/*`, `/super-admin/*`; geschützt mit **ProtectedRoute** (`requireAdmin`, `requireSuperAdmin` wo nötig).
+- **RLS:** Rechte in PostgreSQL; Hilfsfunktionen `is_admin()`, `is_super_admin()`.
+- **Profil:** Tabelle `profiles`; App liest Rolle und Flags aus dem AuthContext.
 
-**Für Eventplanung:** Die gleichen `profiles` und Rollen können genutzt werden; falls nötig, sollte klar dokumentiert werden, ob neue Rollen oder zusätzliche Claims erforderlich sind.
-
-**Vorlage in der App:** Die App enthält bereits eine zweite Domäne **Backshop** (eigene PLU-Liste mit Versionen, Upload, Layout, Regeln, getrennte Tabellen). Das Muster – eigene Hooks (`useBackshop*`), eigene Seiten (`BackshopMasterList`, `BackshopUploadPage`, …), eigene Routen (`/user/backshop-list`, `/super-admin/backshop-upload`, …), eigene QueryKeys (`backshop-*`) – ist eine gute Vorlage für ein drittes Modul (Eventplanung).
+**Vorlage zweite Domäne:** Backshop-Hooks, -Seiten und -Routen (siehe Abschnitt 2).
 
 ---
 
 ## 8. Routing und Lazy Loading
 
-- **Startseite:** Route `/` wird von [HomeRedirect](../src/components/HomeRedirect.tsx) behandelt: nicht eingeloggt → `/login`; eingeloggt je nach Rolle → `/super-admin`, `/admin`, `/viewer` oder `/user` (jeweils Dashboard).
-- **Routen:** Zentral in [src/App.tsx](../src/App.tsx). Öffentlich: `/login`; geschützt: `ProtectedRoute` mit optional `requireAdmin` bzw. `requireSuperAdmin`. Bei fehlender Berechtigung: Redirect zum passenden Dashboard (z. B. Viewer auf Admin-Route → `/viewer`).
-- **ProtectedRoute** ([src/components/layout/ProtectedRoute.tsx](../src/components/layout/ProtectedRoute.tsx)): Nicht eingeloggt → `/login`; `must_change_password` → `/change-password`; Admin-Route ohne Admin-Rolle → `/user`; Super-Admin-Route ohne Super-Admin → `/admin` oder `/user`.
-- **Lazy Loading:** Seiten werden per `lazy(() => import('@/pages/...'))` geladen; einheitlicher **PageLoadingFallback** (Header + Spinner).
-- **Dashboard-Chunk:** Nach Auth wird der passende Dashboard-Chunk vorab geladen (AuthPrefetch), damit nach Reload beim ersten Aufruf kein spürbarer Chunk-Download entsteht.
-
-**Für neue Eventplanungs-Seiten:** Gleiches Muster – lazy Import, Route unter passendem Präfix (z. B. `/user/events/...`, `/admin/events/...`).
+- **Start:** [HomeRedirect](../src/components/HomeRedirect.tsx) – nicht eingeloggt → `/login`; sonst Dashboard je nach Rolle.
+- **Routen:** [src/App.tsx](../src/App.tsx); öffentlich u. a. `/login`; geschützt mit `ProtectedRoute`.
+- **Lazy Loading:** Seiten per `lazy(() => import('@/pages/...'))` mit gemeinsamem Lade-Fallback.
+- **Dashboard-Chunks:** Vorladen über **AuthPrefetch** nach erfolgreicher Auth.
 
 ---
 
 ## 9. Datenbank (Supabase/PostgreSQL)
 
-- **Schema:** Migrations unter `supabase/migrations/` (nummeriert: 001_, 002_, …). Der aktuelle Stand ergibt sich aus der Reihenfolge der ausgeführten Migrations.
-- **Wichtige Konzepte:** RLS für alle Tabellen; DB-Helfer wie `get_active_version()`, `lookup_email_by_personalnummer`; Trigger z. B. für automatisches Anlegen eines Profils bei neuem Auth-User.
-- **Für Erweiterung:** Neue Domäne = neue Tabellen + neue Migration; RLS an `profiles.role` bzw. `is_admin()`/`is_super_admin()` anbinden. Bestehende PLU-Tabellen müssen **nicht** geändert werden (außer gewollt).
+- **Schema:** `supabase/migrations/` (nummerierte SQL-Dateien).
+- **Neue Domäne:** Neue Tabellen + Migration + **RLS** für alle Operationen; bestehende PLU-/Backshop-Tabellen nur bei bewusstem Bedarf anfassen.
 
 Referenz: [DATABASE.md](DATABASE.md).
 
@@ -126,159 +137,153 @@ Referenz: [DATABASE.md](DATABASE.md).
 
 ## 10. Design und UI
 
-- **Design System:** Primärfarben über shadcn CSS Variables; Hintergrund `bg-background`; Karten `bg-card`, `shadow-sm`, `rounded-lg`. Dark Mode ist nicht vorgeschrieben.
-- **Tabellen/Layout:** Konsistente Abstände (p-4, gap-4); Dialoge mit sinnvollen max-w (max-w-lg, max-w-xl, …); lange Texte mit `break-words` oder ScrollArea statt hartem `truncate`.
-- **Komponenten:** Ausschließlich shadcn/ui als Basis; keine weiteren ad-hoc UI-Bibliotheken.
-
-Referenz: [.cursor/rules/design-system.mdc](../.cursor/rules/design-system.mdc).
+- **Design System:** shadcn-Variablen, PLU-Statusfarben fest (`.cursor/rules/design-system.mdc`).
+- **Komponenten:** shadcn/ui als Basis; keine zusätzlichen UI-Frameworks.
 
 ---
 
 ## 11. Code-Qualität und Fehlerbehandlung
 
-- **DRY:** Vor neuer Logik prüfen, ob in `src/lib/` oder `src/hooks/` bereits etwas Ähnliches existiert; bei Wiederholung auslagern.
-- **Fehler:** try/catch bei async; Fehler mit `toast.error()`, Erfolg mit `toast.success()`; bei Supabase: `if (error) throw error`.
-- **Build:** Nach Änderungen muss `npm run build` durchlaufen; neue Features in `docs/` dokumentieren.
+- **DRY:** Zuerst in `src/lib/` und `src/hooks/` suchen, dann erst neu bauen.
+- **Fehler:** try/catch bei async; `toast.error` / `toast.success`; Supabase: `if (error) throw error`.
+- **Build:** Nach Änderungen `npm run build` ohne Fehler; Features in `docs/` pflegen.
 
-**Tests:** Unit-Tests mit **Vitest** (z. B. `src/lib/*.test.ts`), E2E mit **Playwright** (`tests/` bzw. Projekt-Root). Befehle: `npm run test` / `npm run test:run`, `npm run test:e2e`. Details: [TESTING.md](TESTING.md).
+**Tests:** Vitest (`npm run test` / `npm run test:run`), Playwright E2E:
+
+| Befehl | Bedeutung |
+|--------|-----------|
+| `npm run test:e2e` | Nur `@smoke` – schnell, für Alltag/CI |
+| `npm run test:e2e:full` | Alle Tests; oft mit `.env.e2e` – vor Release |
+
+Details: [TESTING.md](TESTING.md), [TEST_UND_RELEASE.md](TEST_UND_RELEASE.md), [.cursor/rules/e2e-tests.mdc](../.cursor/rules/e2e-tests.mdc).
 
 ---
 
-## 12. Wie man die App um ein neues Modul (z. B. Eventplanung) erweitert
+## 12. Checkliste: neues Modul / neue Domäne
 
-**Checkliste:**
+1. Typen in `src/types/` (oder Erweiterung `database.ts` + Migration).
+2. Migration + RLS in Supabase.
+3. Logik in `src/lib/`.
+4. Hooks in `src/hooks/` mit stabilen QueryKeys (Store-ID einbeziehen, wenn marktabhängig).
+5. Bei Bedarf: Persist-Allowlist, Prefetch, AuthPrefetch/Dashboard.
+6. Komponenten unter sinnvollem Ordner (z. B. `src/components/meinmodul/`).
+7. Seiten in `src/pages/` (dünn).
+8. Routen in `src/App.tsx` + Lazy Import + passende `ProtectedRoute`-Flags.
+9. Dokumentation: `FEATURES.md` / domänenspezifische Specs.
 
-1. **Types:** Neue oder erweiterte Typen in `src/types/`.
-2. **Datenbank:** Neue Tabellen, Migration, RLS.
-3. **src/lib/:** Reine Logik/Helper für die neue Domäne.
-4. **src/hooks/:** Ein Hook pro Domäne (Query/Mutation), QueryKeys konsistent (z. B. `['events', ...]`).
-5. **Persist-Allowlist:** Neue Query-Key-Präfixe in [src/lib/query-persist-allowlist.ts](../src/lib/query-persist-allowlist.ts), falls Listen nach Reload sofort sichtbar sein sollen.
-6. **Prefetch:** In [src/hooks/usePrefetchForNavigation.ts](../src/hooks/usePrefetchForNavigation.ts) (oder eigenes Prefetch-Modul) ergänzen und in AuthPrefetch/Dashboard aufrufen.
-7. **src/components/:** Wiederverwendbare UI (z. B. Unterordner `events/`).
-8. **src/pages/:** Neue Seiten nur orchestrierend.
-9. **Routen** in [src/App.tsx](../src/App.tsx) unter passendem Präfix; `ProtectedRoute`/`requireAdmin` je nach gewünschter Rolle.
-10. **Lazy Imports** für neue Seiten; optional Dashboard-Chunk-Vorladung für ein Event-Dashboard.
-
-**Schnittstellen für spätere Verbindung:** Gemeinsame Auth (gleicher AuthProvider, gleiche `profiles`), gleiche Rollen, ein gemeinsames Deployment (eine Vercel-App, eine Supabase-Instanz). Eventplanungs-Features können unter eigenen Routen (z. B. `/user/events`, `/admin/events`) leben und dieselbe Header/Navigation nutzen.
+**Schnittstellen:** Gleiche Auth, gleiche Rollen (oder erweiterte Rollen nur nach DB-/Spec-Änderung), ein Deployment.
 
 ---
 
 ## 13. Deployment und Umgebung
 
-- **Hosting:** Vercel; SPA-Routing (alle Pfade → index.html) über `vercel.json`.
-- **Umgebung:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (lokal in `.env.local`, auf Vercel in den Projekt-Settings).
-- **Lokal starten:** `npm install`, dann `npm run dev` (Dev-Server z. B. http://localhost:5173). Vorher Supabase-Projekt anlegen und Migrations ausführen (siehe [README.md](../README.md)).
-- **Edge Functions:** Werden über Supabase CLI deployt (create-user, reset-password, delete-user, update-user-role); Aufruf im Frontend per `supabase.functions.invoke('create-user', { body: { … } })`. Für Eventplanung können bei Bedarf eigene Edge Functions ergänzt werden.
-- **Supabase Storage:** Wird bereits für Backshop-Produktbilder genutzt (Bucket, RLS-Policies). Falls Events Anhänge oder Bilder brauchen, gleiches Muster (eigener Bucket, Policies, Helper in `src/lib/`).
+- **Hosting:** Vercel; SPA-Fallback über `vercel.json`.
+- **Env:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (lokal z. B. `.env.local`).
+- **Edge Functions** (Stand Repo): `create-user`, `reset-password`, `delete-user`, `update-user-role`, `update-user-store-access` – Deploy über Supabase CLI, Aufruf z. B. `supabase.functions.invoke(...)`.
+- **Storage:** u. a. Backshop-Bilder; neue Buckets analog mit RLS planen.
 
 ---
 
 ## 14. Bestehende Dokumentation (Referenzen)
 
-Zum Vertiefen:
-
 | Dokument | Inhalt |
 |----------|--------|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Datenfluss, Hooks, Lib-Module, Seiten, State Management |
-| [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md) | Rollen, Login-Flows, RLS, Passwort-Management |
-| [DATABASE.md](DATABASE.md) | Schema, Tabellen, RLS, SQL-Funktionen, Migrations |
-| [FEATURES.md](FEATURES.md) | Features und Business-Regeln (PLU/Backshop) |
-| [RELOAD_UND_LAADEVERHALTEN.md](RELOAD_UND_LAADEVERHALTEN.md) | Reload/Performance, Auth-Cache, Prefetch, Persist-Allowlist |
-| [TESTING.md](TESTING.md) | Unit-Tests (Vitest), E2E (Playwright) |
-| [.cursor/rules/](../.cursor/rules/) | Code-Qualität, Design, Reload-Performance, Projekt-Allgemein |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Datenfluss, Multi-Tenancy, Hooks, Module |
+| [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md) | Rollen, Login, RLS, Passwort |
+| [DATABASE.md](DATABASE.md) | Tabellen, Funktionen, Migrations |
+| [FEATURES.md](FEATURES.md) | Implementierungsstand, Business-Regeln |
+| [FEATURE_KASSEN_SPEC.md](FEATURE_KASSEN_SPEC.md) | Geplantes Kassen-Feature (für spätere Umsetzung) |
+| [RELOAD_UND_LAADEVERHALTEN.md](RELOAD_UND_LAADEVERHALTEN.md) | Performance, Cache, Prefetch |
+| [TESTING.md](TESTING.md) / [TEST_UND_RELEASE.md](TEST_UND_RELEASE.md) | Tests und Release-Checklisten |
+| [.cursor/rules/](../.cursor/rules/) | Auth, Code-Qualität, Design, E2E, Safe Changes |
+
+**Externe Master-Spec (falls vorhanden):** Der Projektinhaber pflegt teils eine gesammelte Spezifikation außerhalb des Repos (z. B. `MASTER_SPEC_PLU_PLANNER.md`); der **in-Repo-Stand** für Schema und Features ist maßgeblich über `docs/` + `supabase/migrations/`.
 
 ---
 
-## 15. Eventplanung: Anforderungen an die Integration
+## 15. Beispiel „neues Modul“: Anforderungen an die Integration
 
-Damit die Eventplanungs-Funktion **nahtlos** in die bestehende App passt, muss Folgendes gelten:
+Gilt analog für jede größere Erweiterung (Events, Kassen nach Spec, weitere Listen, …):
 
 | Anforderung | Bedeutung |
 |-------------|-----------|
-| **Gleicher Auth** | Kein eigener Login. Nutzer melden sich wie bisher an; `useAuth()` und `profile` liefern Rolle und User-Infos auch für Event-Seiten. |
-| **Gleiche Rollen** | Es werden dieselben vier Rollen genutzt. Wer darf was bei Events entscheiden (z. B. nur Admin/Super-Admin Events anlegen) muss definiert werden, aber keine neuen Rollen-Typen in der DB. |
-| **Kein neuer globaler State** | Kein eigener React Context für Event-Daten. Alles über TanStack Query (eigene Hooks mit QueryKeys `events`, `events-detail` o. ä.). |
-| **Gleiches Routing-Muster** | Event-Routen unter `/user/events`, `/admin/events`, `/super-admin/events` (oder `/viewer/events`); jede Route mit `ProtectedRoute` bzw. `requireAdmin` wie bei PLU/Backshop. |
-| **Gleiche UI-Basis** | shadcn/ui + Tailwind; neue Seiten in `DashboardLayout`; gleiche Abstände, Karten, Buttons wie im Rest der App. |
-| **Eine Codebase, ein Deploy** | Kein separates Repo für Events. Neue Dateien in `src/pages/`, `src/hooks/`, `src/components/events/`, `src/lib/`; neue Migration in `supabase/migrations/`. |
-| **Header/Navigation** | App-Header bleibt einer; Event-Links (z. B. „Events“) in die bestehende Navigation (z. B. im Dashboard oder im Header) integrieren. |
+| **Gleicher Auth-Flow** | Kein zweiter Login; `useAuth()` / Profil für Berechtigungen. |
+| **Rollen klären** | Wer darf lesen/schreiben? Entweder bestehende vier Rollen oder dokumentierte Erweiterung (DB + RLS). |
+| **Kein fachlicher Global-Context** | Daten über TanStack Query in Hooks. |
+| **Routing** | Routen unter passendem Präfix pro Rolle; `ProtectedRoute` wie bei bestehenden Seiten. |
+| **UI-Konsistenz** | shadcn + Tailwind, `DashboardLayout` wo passend. |
+| **Eine Codebasis** | Neue Dateien unter `src/…`; Migrationen unter `supabase/migrations/`. |
 
-**Routen-Matrix (Beispiel für Eventplanung):**
+**Illustration Routen (fiktiv, z. B. Event-Modul):**
 
-| Rolle        | Dashboard-Route   | Beispiel Event-Routen                          |
-|-------------|-------------------|-------------------------------------------------|
-| viewer      | `/viewer`         | `/viewer/events` (nur Lesen, falls gewünscht)   |
-| user        | `/user`           | `/user/events`, `/user/events/:id`              |
-| admin       | `/admin`          | `/admin/events`, `/admin/events/:id`            |
-| super_admin | `/super-admin`    | `/super-admin/events`, `/super-admin/events/...` |
+| Rolle | Beispiel-Routen |
+|-------|------------------|
+| viewer | `/viewer/events` (nur Lesen, falls vorgesehen) |
+| user | `/user/events`, `/user/events/:id` |
+| admin | `/admin/events`, … |
+| super_admin | `/super-admin/events`, … |
+
+Für **Kassen** konkrete URLs und Datenmodell aus [FEATURE_KASSEN_SPEC.md](FEATURE_KASSEN_SPEC.md) übernehmen, sobald umgesetzt wird.
 
 ---
 
 ## 16. Konkrete Muster und Referenz-Dateien
 
-Für den Anschluss der Eventplanung können folgende Dateien als **Vorlage** dienen:
+| Bedarf | Referenz im Repo |
+|--------|-------------------|
+| Hook: Query + Mutation + `invalidateQueries` | [src/hooks/useCustomProducts.ts](../src/hooks/useCustomProducts.ts) |
+| Seite: Dashboard mit Karten | [src/pages/UserDashboard.tsx](../src/pages/UserDashboard.tsx) |
+| Seite: komplexe Liste | [src/pages/MasterList.tsx](../src/pages/MasterList.tsx), [src/pages/BackshopMasterList.tsx](../src/pages/BackshopMasterList.tsx) |
+| Zweite Domäne end-to-end | Backshop: `useBackshop*`, `BackshopMasterList`, Routen `…/backshop-…` |
 
-| Was braucht man | Referenz im Projekt |
-|-----------------|---------------------|
-| **Hook: Liste laden + Mutation + Invalidierung** | [src/hooks/useCustomProducts.ts](../src/hooks/useCustomProducts.ts) – useQuery mit `queryKey: ['custom-products']`, useMutation mit `onSuccess` → `invalidateQueries` + `toast.success`. |
-| **Hook: CRUD mit Auth (user.id)** | Ebenfalls useCustomProducts: `useAuth()`, `user.id` für `created_by`; Insert über `supabase.from('...').insert().select().single()`. |
-| **Seite: Dashboard mit Karten** | [src/pages/UserDashboard.tsx](../src/pages/UserDashboard.tsx) – `DashboardLayout`, `useNavigate`, Karten mit `onClick` → `navigate('/user/...')`. So kann z. B. eine Karte „Events“ ergänzt werden. |
-| **Seite: Liste mit Daten aus Hook** | [src/pages/MasterList.tsx](../src/pages/MasterList.tsx) oder [src/pages/BackshopMasterList.tsx](../src/pages/BackshopMasterList.tsx) – viele useXxx-Hooks, Aufruf von `buildDisplayList` bzw. Darstellung; Seite orchestriert nur, keine DB-Logik in der Seite. |
-| **Ganze zweite Domäne (Backshop)** | Backshop: eigene Versionen, Upload, Layout, Regeln. Hooks: `useBackshopVersions`, `useBackshopPLUData`, …; Seiten: `BackshopMasterList`, `BackshopUploadPage`, …; Routen: `/user/backshop-list`, `/super-admin/backshop-upload`, ….
-
-**Typisches Hook-Muster (verkürzt):**
+**Kurzes Hook-Muster:**
 
 ```ts
 // Lesen
-useQuery({ queryKey: ['events'], queryFn: async () => { const { data, error } = await supabase.from('events').select('*'); if (error) throw error; return data; } })
+useQuery({
+  queryKey: ['my-entity', storeId],
+  queryFn: async () => {
+    const { data, error } = await supabase.from('my_entity').select('*').eq('store_id', storeId);
+    if (error) throw error;
+    return data;
+  },
+});
 // Schreiben
-useMutation({ mutationFn: async (payload) => { ... supabase.from('events').insert(payload) ... }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['events'] }); toast.success('...'); } })
+useMutation({
+  mutationFn: async (payload) => { /* insert/update */ },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['my-entity', storeId] });
+    toast.success('Gespeichert');
+  },
+});
 ```
 
-**Typisches Seiten-Muster:** Seite nutzt `DashboardLayout`, ruft `useAuth()` und domänenspezifische Hooks (`useEvents()`, …), rendert shadcn-Komponenten und ggf. eigene `components/events/...`. Keine direkten `supabase.from()`-Aufrufe in der Seite.
+Seiten: keine direkten `supabase.from()`-Aufrufe – Logik in Hooks/`lib`.
 
 ---
 
-## 17. Do's und Don'ts / Häufige Fallstricke
+## 17. Do's und Don'ts
 
-**Do's:**
+**Do:** TanStack Query; nach Mutationen invalidieren; RLS für neue Tabellen; Routen in `App.tsx`; Supabase nur aus `src/lib/supabase.ts`; Store-ID in Keys/Filtern bei Markt-Daten.
 
-- Immer **TanStack Query** für Server-Daten (useQuery/useMutation); nach Mutation `invalidateQueries` + ggf. `toast.success`/`toast.error`.
-- **Neue Tabellen** → eigene Migration (nummeriert), inkl. **RLS-Policies** für alle neuen Tabellen.
-- **Neue Routen** in [src/App.tsx](../src/App.tsx) eintragen (lazy Import + Route mit ProtectedRoute).
-- **Dashboard-Karten** oder Nav-Links für Events auf allen relevanten Dashboards (User, Admin, Super-Admin) ergänzen.
-- Listen, die nach Reload sofort da sein sollen → **Persist-Allowlist** in [src/lib/query-persist-allowlist.ts](../src/lib/query-persist-allowlist.ts) ergänzen.
-- **Supabase Client** nur aus [src/lib/supabase.ts](../src/lib/supabase.ts) importieren; **Typen** aus [src/types/database.ts](../src/types/database.ts) nutzen/erweitern.
+**Don't:** Server-Daten per `useEffect` laden; Redux/Zustand für Server-State; zusätzliche UI-Bibliotheken; zweiter Auth-Listener neben AuthContext.
 
-**Don'ts:**
-
-- **Kein** `useEffect` zum Laden von Server-Daten; immer useQuery.
-- **Kein** neuer globaler React Context für fachliche Daten (nur Auth ist erlaubt).
-- **Keine** Redux/Zustand/Jotai für Server-State.
-- **Keine** neuen UI-Bibliotheken; nur shadcn/ui + Tailwind.
-
-**Häufige Fallstricke:**
-
-| Fallstrick | Folge | Abhilfe |
-|------------|--------|---------|
-| Route vergessen in App.tsx | Event-Seite ist nicht erreichbar. | Jede neue Seite in App.tsx als lazy Route unter dem richtigen Präfix eintragen. |
-| RLS auf neuen Tabellen vergessen | Unbefugte können lesen/schreiben. | In der Migration für jede neue Tabelle SELECT/INSERT/UPDATE/DELETE Policies definieren (z. B. über `auth.uid()` oder `is_admin()`). |
-| Persist-Allowlist nicht ergänzt | Nach Reload fehlen Event-Listen kurz oder länger. | Key-Präfix `events` (o. ä.) in `PERSIST_QUERY_KEY_PREFIXES` aufnehmen. |
-| useEffect für Daten | Race Conditions, doppelte Requests, schwer wartbar. | Stattdessen useQuery verwenden. |
-| Eigener Context für Event-State | Widerspricht Architektur; später schwer integrierbar. | Alles in Hooks mit TanStack Query halten. |
+**Fallstricke:** Route vergessen; RLS vergessen; Persist-Allowlist bei „sofort nach Reload sichtbar“ vergessen; Markt-Isolation bei Multi-Tenancy vergessen.
 
 ---
 
-## 18. Kurz-Glossar (für das Lesen der Codebase)
+## 18. Kurz-Glossar
 
 | Begriff | Bedeutung |
 |---------|-----------|
-| **PLU** | Preis-Look-Up – Artikelnummer (z. B. 5-stellig) für die PLU-Listen (Obst/Gemüse, Backshop). |
-| **KW** | Kalenderwoche. Viele PLU-Features sind pro KW (Version, Upload, Wechsel am Samstag). |
-| **RLS** | Row Level Security – PostgreSQL-Feature; Zugriff auf Zeilen nur nach Policy (z. B. nur eigene oder nur für Admins). |
-| **AuthProvider** | Einziger globaler React Context; hält user, session, profile, isAdmin, isSuperAdmin, isViewer, mustChangePassword. |
-| **Persist-Allowlist** | Liste von QueryKey-Präfixen; nur diese Queries werden im sessionStorage zwischen Reloads gespeichert. |
-| **ProtectedRoute** | Wrapper-Komponente; prüft Auth und Rolle, leitet sonst auf Login oder passendes Dashboard um. |
-| **DashboardLayout** | Layout-Wrapper für alle Dashboard-Seiten (Header, Hauptbereich); wird von jeder Dashboard-Seite genutzt. |
+| **PLU** | Preis-Look-Up / Artikelkennung in den Listen |
+| **KW** | Kalenderwoche (Versionen, Upload, Wechsel) |
+| **RLS** | Row Level Security in PostgreSQL |
+| **Store** | Markt/Filiale; `store_id` + Subdomain-Zuordnung |
+| **Persist-Allowlist** | QueryKey-Präfixe für sessionStorage-Persistenz |
+| **ProtectedRoute** | Auth- und Rollen-Guard |
+| **DashboardLayout** | Gemeinsames Layout für eingeloggte Bereiche |
 
-Mit dieser Übersicht (Abschnitte 1–18) und den Referenzen in Abschnitt 14 kann ein externer Planer oder KI-Assistent verstehen, was das Projekt ist, wie es aufgebaut ist und wie eine Eventplanungs-App darauf aufgesetzt und angebunden werden kann. Die Abschnitte **15–18** sind gezielt auf die Vorarbeit für die Eventplanung zugeschnitten.
+---
+
+*Zuletzt als Gesamtbild für KI & Erweiterungen überarbeitet: Architektur (Auth + Store, Multi-Tenancy), aktueller Stack, E2E-Befehle, Backshop als Vorlage, Kassen-Spec verlinkt.*

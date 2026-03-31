@@ -15,7 +15,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Search, EyeOff } from 'lucide-react'
 import { useHideProductsBatch } from '@/hooks/useHiddenItems'
-import { filterItemsBySearch, getDisplayPlu, groupItemsForDialog, itemMatchesSearch } from '@/lib/plu-helpers'
+import {
+  filterItemsBySearch,
+  getDisplayPlu,
+  groupItemsForDialog,
+  groupItemsForDialogAlignedWithList,
+  itemMatchesSearch,
+} from '@/lib/plu-helpers'
+import type { Block } from '@/types/database'
+import type { StoreBlockOrderRow } from '@/lib/block-override-utils'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
@@ -39,6 +47,7 @@ interface SearchableItem {
   display_name: string
   system_name?: string
   item_type?: 'PIECE' | 'WEIGHT' | string | null
+  block_id?: string | null
 }
 
 interface HideProductsDialogProps {
@@ -48,6 +57,13 @@ interface HideProductsDialogProps {
   searchableItems: SearchableItem[]
   /** Anzeige-Modus: SEPARATED = nach Stück/Gewicht getrennt, MIXED = nur alphabetisch */
   displayMode?: 'MIXED' | 'SEPARATED'
+  /** Optional: gleiche Gruppierung wie die Masterliste (Sortierung + Markt-Overrides) */
+  listLayout?: {
+    sortMode: 'ALPHABETICAL' | 'BY_BLOCK'
+    blocks: Block[]
+    storeBlockOrder: StoreBlockOrderRow[]
+    nameBlockOverrides: Map<string, string>
+  }
 }
 
 export function HideProductsDialog({
@@ -55,6 +71,7 @@ export function HideProductsDialog({
   onOpenChange,
   searchableItems,
   displayMode = 'MIXED',
+  listLayout,
 }: HideProductsDialogProps) {
   const [searchText, setSearchText] = useState('')
   const deferredSearch = useDebouncedValue(searchText, 200)
@@ -69,7 +86,19 @@ export function HideProductsDialog({
     return filterItemsBySearch(searchableItems, deferredSearch)
   }, [searchableItems, deferredSearch])
 
-  const groups = useMemo(() => groupItemsForDialog(filteredItems, displayMode), [filteredItems, displayMode])
+  const groups = useMemo(() => {
+    if (listLayout) {
+      return groupItemsForDialogAlignedWithList(
+        filteredItems,
+        displayMode,
+        listLayout.sortMode,
+        listLayout.blocks,
+        listLayout.storeBlockOrder,
+        listLayout.nameBlockOverrides,
+      )
+    }
+    return groupItemsForDialog(filteredItems, displayMode)
+  }, [filteredItems, displayMode, listLayout])
   const tableRows = useMemo(() => buildTableRows(groups), [groups])
 
   const searchLower = deferredSearch.trim().toLowerCase()

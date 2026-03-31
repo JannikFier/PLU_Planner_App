@@ -5,7 +5,7 @@ import { DashboardCard } from '@/components/layout/DashboardCard'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
 import { BackshopNotificationDialog } from '@/components/plu/BackshopNotificationDialog'
-import { Upload, Package, Bell, ListTree } from 'lucide-react'
+import { Upload, Package, Bell, ListTree, Megaphone } from 'lucide-react'
 import { toast } from 'sonner'
 
 /**
@@ -64,6 +64,14 @@ export function SuperAdminBackshopBereichPage() {
             onClick={() => navigate('/super-admin/backshop-warengruppen')}
             color="text-violet-600"
             bg="bg-violet-50"
+          />
+          <DashboardCard
+            title="Zentrale Werbung (Exit)"
+            description="Wochenwerbung-Excel für alle Märkte, aktuelle KW"
+            icon={Megaphone}
+            onClick={() => navigate('/super-admin/central-werbung/backshop')}
+            color="text-slate-700"
+            bg="bg-slate-100"
           />
         </div>
       </div>

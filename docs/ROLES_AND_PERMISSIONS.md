@@ -13,6 +13,9 @@ Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
 | Eigene Produkte hinzufuegen (pro Markt) | ✅ | ✅ | ✅ | ❌ |
 | Produkte ausblenden (pro Markt) | ✅ | ✅ | ✅ | ❌ |
 | Produkte wieder einblenden (pro Markt) | ✅ | ✅ | ✅ | ❌ |
+| **Manuelle Werbung** (Angebot + Preis, Laufzeit) | ✅ | ✅ | ✅ | ❌ |
+| **Megafon aus** (zentrale Werbung pro Markt ausblenden) | ✅ | ✅ | ✅ | ❌ |
+| **Zentrale Werbung** (Exit-Excel, Kampagne pro KW) | ✅ | ❌ | ❌ | ❌ |
 | Benachrichtigungen (Glocke) | ✅ | ✅ | ✅ | ❌ |
 | **Custom Product umbenennen** | ✅ (alle) | Nur eigene | Nur eigene | ❌ |
 | **Master Product umbenennen** | ✅ | ✅ | ✅ | ❌ |
@@ -22,9 +25,10 @@ Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
 | **User/Admin/Viewer loeschen** | ✅ | ✅ | ❌ | ❌ |
 | **Rollen aendern (hoch-/runterstufen)** | ✅ | ✅ (nicht sich selbst) | ❌ | ❌ |
 | **Excel Upload / KW-Vergleich** | ✅ | ❌ | ❌ | ❌ |
-| **Layout konfigurieren** | ✅ | ❌ | ❌ | ❌ |
-| **Bezeichnungsregeln verwalten** | ✅ | ❌ | ❌ | ❌ |
-| **Warengruppen/Bloecke verwalten** | ✅ | ❌ | ❌ | ❌ |
+| **Layout konfigurieren** (marktspezifisch) | ✅ | ✅ (eigener Markt) | ❌ | ❌ |
+| **Bezeichnungsregeln verwalten** (marktspezifisch) | ✅ | ✅ (eigener Markt) | ❌ | ❌ |
+| **Warengruppen/Bloecke verwalten** (global: Namen, Upload-Referenz) | ✅ | ❌ | ❌ | ❌ |
+| **Warengruppen sortieren / PLU-Zuordnung** (nur Markt, Overrides) | ✅ | ✅ (eigener Markt) | ❌ | ❌ |
 | **KW-Versionen verwalten** | ✅ | ❌ | ❌ | ❌ |
 | **Firmen/Maerkte anlegen** | ✅ | ❌ | ❌ | ❌ |
 | **Firmen/Maerkte pausieren/loeschen** | ✅ | ❌ | ❌ | ❌ |
@@ -47,7 +51,7 @@ Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
 - Hat vollen Zugriff auf alle Funktionen
 - Darf Rollen tauschen (User/Admin/Viewer hoch- oder runterstufen), außer sich selbst
 - Kann Admins, User und Viewer erstellen; sieht alle in der Benutzerverwaltung
-- Verwaltet Upload, Layout, Regeln, Versionen
+- Verwaltet Upload, **globale** Blöcke/Versionen, marktspezifisches Layout/Regeln für jeden Markt, **zentrale Werbung** (Obst/Backshop getrennt, `/super-admin/central-werbung/...`)
 - Es gibt nur einen Super-Admin
 
 **Admin (Abteilungsleiter)** – `role: 'admin'`
@@ -57,6 +61,7 @@ Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
 - Kann Märkte zuweisen (nur Märkte, auf die der Admin selbst Zugriff hat)
 - Darf sich nicht selbst Bereiche wegnehmen
 - PLU-Rechte wie User inkl. Master-Produkte umbenennen
+- **Markt-Einstellungen:** Layout, Bezeichnungsregeln und Warengruppen-Sortierung (DnD) für den **aktuell gewählten Markt** unter `/admin/layout`, `/admin/rules`, `/admin/block-sort` (Backshop: `/admin/backshop-*`)
 - Loggt sich mit **E-Mail-Adresse** ein
 
 **User (Personal)** – `role: 'user'`
@@ -162,14 +167,14 @@ Die Datenbank-Sicherheit wird durch PostgreSQL RLS Policies gewährleistet:
 
 - `is_admin()` → gibt `true` für `super_admin` UND `admin`
 - `is_super_admin()` → gibt `true` nur für `super_admin`
-- Upload/Layout/Versionen/Blöcke/Regeln → nur `is_super_admin()`
+- Upload/Versionen/**globale** `blocks`-Definition (CRUD) → nur `is_super_admin()`; **marktspezifisches** `layout_settings`, `bezeichnungsregeln`, `store_*_block_order`, `store_*_name_block_override` → Super-Admin oder Admin mit `store_id = get_current_store_id()` (Migration 052)
 - User-Verwaltung (Profile lesen) → `is_admin()`
 - **profiles UPDATE:** User können nur das eigene Profil ändern; die Spalte `role` darf dabei nicht geändert werden (Migration 008 – verhindert Rollen-Eskalation).
 - `custom_products` → alle lesen/einfügen; Ersteller oder Super-Admin updaten/löschen
-- `hidden_items` → alle lesen/einfügen/löschen (jeder kann ein-/ausblenden)
+- `hidden_items` / `backshop_hidden_items` → Lesen für zugewiesene Märkte (Super-Admin liest alle); **Schreiben** nur wenn `store_id = profiles.current_store_id` (Migration 028/031/049). **Super-Admin** hat in der App **keine** Buttons zum Aus-/Einblenden (`canManageMarketHiddenItems`); die Marktrollen (user/admin) verwalten die Liste.
 - `version_notifications` → eigene lesen/updaten; Super-Admin einfügen
 - `master_plu_items` (Umbenennen): Alle Rollen außer Viewer über RPC `rename_master_plu_item` / `reset_master_plu_item_display_name` (Prüfung: `is_not_viewer()`, Migration 037)
 - `user_list_visibility`: User liest eigene Einträge; Admin/Super-Admin liest/schreibt alle im eigenen Markt (Migration 038)
 - **stores / companies (anon):** Anonymes Lesen nur für Subdomain-Branding auf der Login-Seite (Migration 048). Anon darf aktive Stores mit Subdomain und deren Firmen lesen – Name, Logo für Markt-Branding.
 
-Die **Seite Umbenannte Produkte** und der Dialog **„Produkte umbenennen“** sind für User, Admin und Super-Admin erreichbar. Der **Umbenennen-Button** in der Masterliste wird für alle Rollen außer Viewer angezeigt (auch unter `/admin/masterlist`). Die **Vergleichslogik** beim Excel-Upload verwendet weiterhin den ursprünglichen Namen (`system_name`), nicht den Anzeigenamen (`display_name`). **Excel** (neue Produkte per Excel, Excel ausblenden) ist nur für Super-Admin sichtbar.
+Die **Seite Umbenannte Produkte** und der Dialog **„Produkte umbenennen“** sind für User, Admin und Super-Admin erreichbar. Der **Umbenennen-Button** in der Masterliste wird für alle Rollen außer Viewer angezeigt (auch unter `/admin/masterlist`). Die **Vergleichslogik** beim Excel-Upload verwendet weiterhin den ursprünglichen Namen (`system_name`), nicht den Anzeigenamen (`display_name`). **Excel** für eigene Produkte (Eigene Produkte-Seite) ist nur für Super-Admin sichtbar; **Excel zum Ausblenden** von PLUs und die übrigen Ausblend-Aktionen sind für **user/admin** am Markt vorgesehen, nicht für Super-Admin (siehe oben).

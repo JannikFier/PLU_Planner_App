@@ -1,6 +1,7 @@
 // PLU-spezifische Types für Business-Logik
 
 import type { MasterPLUItem, Block, CustomProduct } from './database'
+import type { OfferDisplayInfo } from '@/lib/offer-display'
 
 /** Status eines PLU-Eintrags */
 export type PLUStatus = 'UNCHANGED' | 'NEW_PRODUCT_YELLOW' | 'PLU_CHANGED_RED'
@@ -28,6 +29,12 @@ export interface DisplayItem {
   image_url?: string | null
   /** In der Werbung/Angebot (aktuell aktiv) */
   is_offer?: boolean
+  /** Aktions-VK (zentral oder manuell); Anzeige in Preis-Spalte wenn gesetzt */
+  offer_promo_price?: number | null
+  /** Woher kommt die Werbung (Megafon vs. eigenes Angebot) */
+  offer_source_kind?: 'central' | 'manual'
+  /** Nur bei zentraler Werbung: Original-Kampagnenpreis (wenn eigener VK abweicht) */
+  offer_central_reference_price?: number | null
 }
 
 /** Geparste Zeile aus einer Excel-Datei */
@@ -76,6 +83,22 @@ export interface ParsedOfferItemRow {
 /** Ergebnis des Excel-Parsers für Werbung/Angebot */
 export interface OfferItemsParseResult {
   rows: ParsedOfferItemRow[]
+  fileName: string
+  totalRows: number
+  skippedRows: number
+}
+
+/** Zeile aus Exit-/Wochenwerbung-Excel (Zentrale) */
+export interface ParsedExitWerbungRow {
+  artNr: string
+  artikel: string
+  inhalt: string
+  aktUvp: number | null
+  rowIndex: number
+}
+
+export interface ExitWerbungParseResult {
+  rows: ParsedExitWerbungRow[]
   fileName: string
   totalRows: number
   skippedRows: number
@@ -217,6 +240,8 @@ export interface LayoutEngineInput {
   hiddenPLUs: Set<string>
   /** PLUs die aktuell als Angebot/Werbung gelten (für is_offer auf DisplayItem) */
   offerPLUs?: Set<string>
+  /** Rich: Preis + Quelle; hat Vorrang vor offerPLUs */
+  offerDisplayByPlu?: Map<string, OfferDisplayInfo>
   /** Marktspezifische Umbenennungen (überschreiben display_name, is_manually_renamed aus Master) */
   renamedItems?: { plu: string; display_name: string; is_manually_renamed: boolean }[]
   bezeichnungsregeln: { keyword: string; position: 'PREFIX' | 'SUFFIX'; case_sensitive: boolean }[]
@@ -231,6 +256,10 @@ export interface LayoutEngineInput {
   /** Aktuelle Kalenderwoche/Jahr (heute) – für „wie lange als neu anzeigen“ */
   currentKwNummer: number
   currentJahr: number
+  /** Markt: normalisierter system_name → block_id (optional) */
+  nameBlockOverrides?: Map<string, string>
+  /** Markt: optionale Reihenfolge der Warengruppen; leer = globale order_index */
+  storeBlockOrder?: { block_id: string; order_index: number }[]
 }
 
 /** Output der Layout-Engine */

@@ -5,7 +5,7 @@ import { DashboardCard } from '@/components/layout/DashboardCard'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
 import { NotificationDialog } from '@/components/plu/NotificationDialog'
-import { Upload, Package, Bell } from 'lucide-react'
+import { Upload, Package, Bell, Megaphone } from 'lucide-react'
 import { toast } from 'sonner'
 
 /**
@@ -56,6 +56,14 @@ export function SuperAdminObstBereichPage() {
             onClick={() => navigate('/super-admin/versions')}
             color="text-orange-600"
             bg="bg-orange-50"
+          />
+          <DashboardCard
+            title="Zentrale Werbung (Exit)"
+            description="Wochenwerbung-Excel für alle Märkte, aktuelle KW"
+            icon={Megaphone}
+            onClick={() => navigate('/super-admin/central-werbung/obst')}
+            color="text-emerald-700"
+            bg="bg-emerald-50"
           />
         </div>
       </div>

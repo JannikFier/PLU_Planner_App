@@ -28,6 +28,7 @@ import { uploadBackshopImage } from '@/lib/backshop-storage'
 import { toast } from 'sonner'
 import { X, ArrowLeftRight, Camera } from 'lucide-react'
 import type { BackshopBlock } from '@/types/database'
+import { BackshopThumbnail } from '@/components/plu/BackshopThumbnail'
 import { useBackshopBlockRules } from '@/hooks/useBackshopBlocks'
 
 interface BackshopCustomProductDialogProps {
@@ -276,11 +277,7 @@ export function BackshopCustomProductDialog({
               {imagePreview ? (
                 <>
                   <div className="relative shrink-0">
-                    <img
-                      src={imagePreview}
-                      alt="Vorschau"
-                      className="h-20 w-20 object-cover rounded-lg border border-border bg-muted/30"
-                    />
+                    <BackshopThumbnail src={imagePreview} size="xl" className="rounded-lg" />
                     <button
                       type="button"
                       onClick={clearImage}

@@ -27,12 +27,19 @@ import { PreisBadge } from './PreisBadge'
 import { StatusBadge } from './StatusBadge'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
-import {
-  useBlocks,
-  useReorderBlocks,
-  useAssignProducts,
-} from '@/hooks/useBlocks'
+import { useBlocks } from '@/hooks/useBlocks'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
+import {
+  useStoreObstBlockOrder,
+  useStoreObstNameBlockOverrides,
+  useReorderStoreObstBlocks,
+  useAssignObstProductBlockOverride,
+} from '@/hooks/useStoreObstBlockLayout'
+import {
+  buildNameBlockOverrideMap,
+  effectiveBlockIdForStoreOverride,
+  sortBlocksWithStoreOrder,
+} from '@/lib/block-override-utils'
 import { getDisplayPlu, getDisplayNameForItem, groupItemsByBlock } from '@/lib/plu-helpers'
 import type { MasterPLUItem, Block } from '@/types/database'
 import type { DisplayItem } from '@/types/plu'
@@ -54,21 +61,30 @@ export function InteractivePLUTable() {
   const { data: items = [] } = usePLUData(activeVersion?.id)
   const { data: blocks = [] } = useBlocks()
   const { data: layoutSettings } = useLayoutSettings()
-  const reorderMutation = useReorderBlocks()
-  const assignMutation = useAssignProducts()
+  const { data: storeBlockOrder = [] } = useStoreObstBlockOrder()
+  const { data: storeNameOverrides = [] } = useStoreObstNameBlockOverrides()
+  const nameBlockOverrideMap = useMemo(
+    () => buildNameBlockOverrideMap(storeNameOverrides),
+    [storeNameOverrides],
+  )
+  const reorderStoreMutation = useReorderStoreObstBlocks()
+  const assignOverrideMutation = useAssignObstProductBlockOverride()
 
   const displayMode = layoutSettings?.display_mode ?? 'MIXED'
 
-  // Sortierte Blöcke
   const sortedBlocks = useMemo(
-    () => [...blocks].sort((a, b) => a.order_index - b.order_index),
-    [blocks],
+    () => sortBlocksWithStoreOrder(blocks, storeBlockOrder),
+    [blocks, storeBlockOrder],
   )
 
-  // Gruppen bauen (explizit MasterPLUItem als generischen Typ)
   const groups = useMemo(
-    () => groupItemsByBlock<MasterPLUItem>(items, sortedBlocks),
-    [items, sortedBlocks],
+    () =>
+      groupItemsByBlock<MasterPLUItem>(items, sortedBlocks, {
+        resolveBlockId: (item) =>
+          effectiveBlockIdForStoreOverride(item.system_name, item.block_id, nameBlockOverrideMap),
+        sortedBlocks,
+      }),
+    [items, sortedBlocks, nameBlockOverrideMap],
   )
 
   // DnD
@@ -125,9 +141,7 @@ export function InteractivePLUTable() {
       reordered.splice(newIndex, 0, moved)
 
       try {
-        await reorderMutation.mutateAsync(
-          reordered.map((b, i) => ({ id: b.id, order_index: i })),
-        )
+        await reorderStoreMutation.mutateAsync(reordered.map((b) => b.id))
         toast.success('Warengruppe verschoben')
       } catch {
         toast.error('Fehler beim Verschieben')
@@ -140,9 +154,15 @@ export function InteractivePLUTable() {
       const itemId = activeId.replace('drag-item-', '')
       const targetBlockId = overId.replace('drop-block-', '')
       const blockId = targetBlockId === 'unassigned' ? null : targetBlockId
+      const item = items.find((i) => i.id === itemId)
+      if (!item) return
 
       try {
-        await assignMutation.mutateAsync({ itemIds: [itemId], blockId })
+        await assignOverrideMutation.mutateAsync({
+          systemName: item.system_name,
+          masterBlockId: item.block_id,
+          targetBlockId: blockId,
+        })
         toast.success('Produkt verschoben')
       } catch {
         toast.error('Fehler beim Verschieben')
@@ -160,14 +180,21 @@ export function InteractivePLUTable() {
       const sourceBlockId = findBlockIdForItem(itemId, groups)
       if (targetBlockId === sourceBlockId) return // Gleicher Block
 
+      const item = items.find((i) => i.id === itemId)
+      if (!item) return
+
       try {
-        await assignMutation.mutateAsync({ itemIds: [itemId], blockId: targetBlockId })
+        await assignOverrideMutation.mutateAsync({
+          systemName: item.system_name,
+          masterBlockId: item.block_id,
+          targetBlockId: targetBlockId,
+        })
         toast.success('Produkt verschoben')
       } catch {
         toast.error('Fehler beim Verschieben')
       }
     }
-  }, [dragType, sortedBlocks, groups, reorderMutation, assignMutation])
+  }, [dragType, sortedBlocks, groups, reorderStoreMutation, assignOverrideMutation, items])
 
   if (items.length === 0) {
     return (

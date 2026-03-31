@@ -3,6 +3,7 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
 import { getDisplayPlu, getStatusColorClass } from '@/lib/plu-helpers'
+import { HighlightedSearchText } from '@/components/plu/HighlightedSearchText'
 import type { PLUStatus } from '@/types/plu'
 
 interface StatusBadgeProps {
@@ -16,6 +17,8 @@ interface StatusBadgeProps {
   className?: string
   /** Inline-Styles (z.B. für dynamische Schriftgrößen) */
   style?: React.CSSProperties
+  /** Find-in-Page: Suchstring → nur Treffer im PLU-Text markieren (nicht die ganze Zelle) */
+  highlightQuery?: string
 }
 
 /**
@@ -24,9 +27,17 @@ interface StatusBadgeProps {
  * - Rot: PLU geändert (zeigt alte PLU als Tooltip)
  * - Kein Hintergrund: Unverändert
  */
-export const StatusBadge = React.memo(function StatusBadge({ plu, status, oldPlu, className, style }: StatusBadgeProps) {
+export const StatusBadge = React.memo(function StatusBadge({
+  plu,
+  status,
+  oldPlu,
+  className,
+  style,
+  highlightQuery,
+}: StatusBadgeProps) {
   const colorClass = getStatusColorClass(status)
   const hasOldPlu = status === 'PLU_CHANGED_RED' && oldPlu
+  const displayPlu = getDisplayPlu(plu)
 
   return (
     <span
@@ -38,7 +49,15 @@ export const StatusBadge = React.memo(function StatusBadge({ plu, status, oldPlu
       style={style}
       title={hasOldPlu ? `Vorher: ${oldPlu}` : undefined}
     >
-      {getDisplayPlu(plu)}
+      {highlightQuery?.trim() ? (
+        <HighlightedSearchText
+          text={displayPlu}
+          query={highlightQuery}
+          markClassName="bg-foreground/25 dark:bg-foreground/20"
+        />
+      ) : (
+        displayPlu
+      )}
     </span>
   )
 })

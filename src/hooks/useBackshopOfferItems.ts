@@ -5,6 +5,7 @@ import { supabase, queryRest, isTestModeActive } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { toast } from 'sonner'
+import { formatError } from '@/lib/error-messages'
 import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import type { BackshopOfferItem, Database } from '@/types/database'
 
@@ -34,11 +35,22 @@ export function useBackshopAddOfferItem() {
   const { currentStoreId } = useCurrentStore()
 
   return useMutation({
-    mutationFn: async ({ plu, durationWeeks }: { plu: string; durationWeeks: number }) => {
+    mutationFn: async ({
+      plu,
+      durationWeeks,
+      promoPrice,
+    }: {
+      plu: string
+      durationWeeks: number
+      promoPrice: number
+    }) => {
       if (!user) throw new Error('Nicht eingeloggt')
       if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       const { kw, year } = getKWAndYearFromDate(new Date())
       const weeks = Math.max(1, Math.min(4, durationWeeks))
+      if (promoPrice <= 0 || Number.isNaN(promoPrice)) {
+        throw new Error('Bitte einen gültigen Aktionspreis größer 0 eingeben.')
+      }
 
       if (isTestModeActive()) {
         queryClient.setQueryData<BackshopOfferItem[]>(
@@ -54,6 +66,8 @@ export function useBackshopAddOfferItem() {
               created_by: user.id,
               store_id: currentStoreId,
               created_at: new Date().toISOString(),
+              promo_price: promoPrice,
+              offer_source: 'manual',
             } as BackshopOfferItem]
           },
         )
@@ -67,10 +81,12 @@ export function useBackshopAddOfferItem() {
         duration_weeks: weeks,
         created_by: user.id,
         store_id: currentStoreId,
+        promo_price: promoPrice,
+        offer_source: 'manual',
       }
 
       const { error } = await supabase.from('backshop_offer_items').upsert(row as never, {
-        onConflict: 'plu',
+        onConflict: 'plu,store_id',
         ignoreDuplicates: false,
       })
 
@@ -83,7 +99,7 @@ export function useBackshopAddOfferItem() {
       toast.success('Produkt zur Werbung hinzugefügt')
     },
     onError: (err) => {
-      toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
+      toast.error(`Fehler: ${formatError(err)}`)
     },
   })
 }
@@ -121,7 +137,7 @@ export function useBackshopUpdateOfferItem() {
       toast.success('Laufzeit aktualisiert')
     },
     onError: (err) => {
-      toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
+      toast.error(`Fehler: ${formatError(err)}`)
     },
   })
 }
@@ -154,7 +170,7 @@ export function useBackshopRemoveOfferItem() {
     },
     onError: (err, _plu, ctx) => {
       if (ctx?.prev != null) queryClient.setQueryData(['backshop-offer-items', currentStoreId], ctx.prev)
-      toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
+      toast.error(`Fehler: ${formatError(err)}`)
     },
     onSuccess: () => {
       toast.success('Aus Werbung entfernt')
@@ -172,7 +188,7 @@ export function useBackshopAddOfferItemsBatch() {
   const { currentStoreId } = useCurrentStore()
 
   return useMutation({
-    mutationFn: async (rows: { plu: string; durationWeeks: number }[]) => {
+    mutationFn: async (rows: { plu: string; durationWeeks: number; promoPrice?: number | null }[]) => {
       if (!user) throw new Error('Nicht eingeloggt')
       if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       const { kw, year } = getKWAndYearFromDate(new Date())
@@ -189,18 +205,22 @@ export function useBackshopAddOfferItemsBatch() {
           created_by: user.id,
           store_id: currentStoreId,
           created_at: new Date().toISOString(),
+          promo_price: r.promoPrice ?? null,
+          offer_source: 'manual',
         } as BackshopOfferItem))
         queryClient.setQueryData<BackshopOfferItem[]>(['backshop-offer-items', currentStoreId], [...existing, ...newItems])
         return { added: newItems.length, skipped: rows.length - newItems.length }
       }
 
-      const allRows = rows.map(({ plu, durationWeeks }) => ({
+      const allRows = rows.map(({ plu, durationWeeks, promoPrice }) => ({
         plu,
         start_kw: kw,
         start_jahr: year,
         duration_weeks: Math.max(1, Math.min(4, durationWeeks)),
         created_by: user.id,
         store_id: currentStoreId,
+        promo_price: promoPrice ?? null,
+        offer_source: 'manual' as const,
       } as Database['public']['Tables']['backshop_offer_items']['Insert']))
 
       const { error } = await supabase.from('backshop_offer_items').upsert(allRows as never[], {
@@ -222,7 +242,7 @@ export function useBackshopAddOfferItemsBatch() {
       }
     },
     onError: (err) => {
-      toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
+      toast.error(`Fehler: ${formatError(err)}`)
     },
   })
 }

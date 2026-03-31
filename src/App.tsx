@@ -8,6 +8,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { Loader2 } from 'lucide-react'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AuthPrefetch } from '@/components/AuthPrefetch'
+import { StoreChangeQuerySync } from '@/components/StoreChangeQuerySync'
 import { HomeRedirect } from '@/components/HomeRedirect'
 import { TestModeProvider } from '@/contexts/TestModeContext'
 import { TestModeBanner } from '@/components/layout/TestModeBanner'
@@ -16,6 +17,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react'
 
 // Layout (nicht lazy – wird überall gebraucht)
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
+import { RedirectRolePrefixed } from '@/components/RedirectRolePrefixed'
 import { isAbortError } from '@/lib/error-utils'
 import { shouldPersistQuery } from '@/lib/query-persist-allowlist'
 
@@ -24,11 +26,22 @@ const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default:
 const ChangePasswordPage = lazy(() => import('@/pages/ChangePasswordPage').then((m) => ({ default: m.ChangePasswordPage })))
 const UserDashboard = lazy(() => import('@/pages/UserDashboard').then((m) => ({ default: m.UserDashboard })))
 const AdminDashboard = lazy(() => import('@/pages/AdminDashboard').then((m) => ({ default: m.AdminDashboard })))
+const AdminObstHubPage = lazy(() => import('@/pages/AdminObstHubPage').then((m) => ({ default: m.AdminObstHubPage })))
+const AdminObstKonfigurationPage = lazy(() =>
+  import('@/pages/AdminObstKonfigurationPage').then((m) => ({ default: m.AdminObstKonfigurationPage })),
+)
+const AdminBackshopHubPage = lazy(() => import('@/pages/AdminBackshopHubPage').then((m) => ({ default: m.AdminBackshopHubPage })))
+const AdminBackshopKonfigurationPage = lazy(() =>
+  import('@/pages/AdminBackshopKonfigurationPage').then((m) => ({ default: m.AdminBackshopKonfigurationPage })),
+)
 const SuperAdminDashboard = lazy(() => import('@/pages/SuperAdminDashboard').then((m) => ({ default: m.SuperAdminDashboard })))
 const SuperAdminCompaniesPage = lazy(() => import('@/pages/SuperAdminCompaniesPage').then((m) => ({ default: m.SuperAdminCompaniesPage })))
 const SuperAdminCompanyDetailPage = lazy(() => import('@/pages/SuperAdminCompanyDetailPage').then((m) => ({ default: m.SuperAdminCompanyDetailPage })))
 const SuperAdminStoreDetailPage = lazy(() => import('@/pages/SuperAdminStoreDetailPage').then((m) => ({ default: m.SuperAdminStoreDetailPage })))
 const SuperAdminUploadPage = lazy(() => import('@/pages/SuperAdminUploadPage').then((m) => ({ default: m.SuperAdminUploadPage })))
+const CentralCampaignUploadPage = lazy(() =>
+  import('@/pages/CentralCampaignUploadPage').then((m) => ({ default: m.CentralCampaignUploadPage })),
+)
 const SuperAdminObstBereichPage = lazy(() => import('@/pages/SuperAdminObstBereichPage').then((m) => ({ default: m.SuperAdminObstBereichPage })))
 const SuperAdminBackshopBereichPage = lazy(() => import('@/pages/SuperAdminBackshopBereichPage').then((m) => ({ default: m.SuperAdminBackshopBereichPage })))
 const MasterList = lazy(() => import('@/pages/MasterList').then((m) => ({ default: m.MasterList })))
@@ -127,6 +140,7 @@ function App() {
       <TooltipProvider>
         <BrowserRouter>
           <AuthPrefetch />
+          <StoreChangeQuerySync />
           <ErrorBoundary>
           <OfflineBanner />
           <TestModeBanner />
@@ -141,6 +155,56 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ChangePasswordPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Ohne Rollen-Prefix (z. B. Lesezeichen) → /user/… oder /admin/… */}
+            <Route
+              path="/offer-products"
+              element={
+                <ProtectedRoute>
+                  <RedirectRolePrefixed segment="offer-products" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hidden-products"
+              element={
+                <ProtectedRoute>
+                  <RedirectRolePrefixed segment="hidden-products" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/backshop-offer-products"
+              element={
+                <ProtectedRoute>
+                  <RedirectRolePrefixed segment="backshop-offer-products" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/backshop-hidden-products"
+              element={
+                <ProtectedRoute>
+                  <RedirectRolePrefixed segment="backshop-hidden-products" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/renamed-products"
+              element={
+                <ProtectedRoute>
+                  <RedirectRolePrefixed segment="renamed-products" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/backshop-renamed-products"
+              element={
+                <ProtectedRoute>
+                  <RedirectRolePrefixed segment="backshop-renamed-products" />
                 </ProtectedRoute>
               }
             />
@@ -279,6 +343,38 @@ function App() {
               }
             />
             <Route
+              path="/admin/obst/konfiguration"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminObstKonfigurationPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/obst"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminObstHubPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/backshop/konfiguration"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminBackshopKonfigurationPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/backshop"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminBackshopHubPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/masterlist"
               element={
                 <ProtectedRoute requireAdmin>
@@ -371,6 +467,54 @@ function App() {
               element={
                 <ProtectedRoute requireAdmin>
                   <UserManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/layout"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <LayoutSettingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/rules"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <RulesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/block-sort"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <BlockSortPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/backshop-layout"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <BackshopLayoutSettingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/backshop-rules"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <BackshopRulesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/backshop-block-sort"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <BackshopBlockSortPage />
                 </ProtectedRoute>
               }
             />
@@ -489,6 +633,14 @@ function App() {
               }
             />
             <Route
+              path="/super-admin/central-werbung/obst"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <CentralCampaignUploadPage listType="obst" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/super-admin/backshop-list"
               element={
                 <ProtectedRoute requireSuperAdmin>
@@ -541,6 +693,14 @@ function App() {
               element={
                 <ProtectedRoute requireSuperAdmin>
                   <BackshopUploadPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/central-werbung/backshop"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <CentralCampaignUploadPage listType="backshop" />
                 </ProtectedRoute>
               }
             />

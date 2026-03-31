@@ -2,6 +2,8 @@
 // Liste, Aus Werbung entfernen, Produkte zur Werbung hinzufügen, Per Excel (Super-Admin)
 
 import { useMemo, useState, useRef, useCallback } from 'react'
+import { buildBackshopDisplayList } from '@/lib/layout-engine'
+import { buildOfferDisplayMap } from '@/lib/offer-display'
 import { useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
@@ -9,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Megaphone, Undo2, FileSpreadsheet } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import {
   Select,
   SelectContent,
@@ -27,12 +30,25 @@ import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
 import { useBackshopCustomProducts } from '@/hooks/useBackshopCustomProducts'
 import { useBackshopHiddenItems } from '@/hooks/useBackshopHiddenItems'
+import { useBackshopLayoutSettings } from '@/hooks/useBackshopLayoutSettings'
+import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
+import { useBackshopRenamedItems } from '@/hooks/useBackshopRenamedItems'
+import { useBackshopBezeichnungsregeln } from '@/hooks/useBackshopBezeichnungsregeln'
+import { useBackshopOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalPrices'
+import { useAuth } from '@/hooks/useAuth'
 import { EXCEL_READ_ERROR_FALLBACK, formatError } from '@/lib/error-messages'
-import { getDisplayPlu } from '@/lib/plu-helpers'
+import { formatPreisEur, getDisplayPlu } from '@/lib/plu-helpers'
 import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import { getActiveOfferPLUs } from '@/lib/offer-utils'
+import { orderByPluDisplayOrder } from '@/lib/list-order'
+import {
+  useBackshopOfferCampaignWithLines,
+  useBackshopOfferStoreDisabled,
+  useToggleBackshopOfferDisabled,
+} from '@/hooks/useCentralOfferCampaigns'
 import { parseOfferItemsExcel } from '@/lib/excel-parser'
 import { AddToOfferDialog } from '@/components/plu/AddToOfferDialog'
+import { CentralOfferLocalPriceDialog } from '@/components/plu/CentralOfferLocalPriceDialog'
 import { toast } from 'sonner'
 import type { BackshopOfferItem } from '@/types/database'
 import type { OfferItemsParseResult } from '@/types/plu'
@@ -45,17 +61,36 @@ interface OfferProductInfo {
 
 export function BackshopOfferProductsPage() {
   const location = useLocation()
+  const { isViewer } = useAuth()
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [localPriceTarget, setLocalPriceTarget] = useState<{
+    plu: string
+    name: string
+    centralPrice: number
+    initialLocalPrice: number | null
+    kw: number
+    jahr: number
+  } | null>(null)
   // Per Excel nur in Super-Admin-URL; in User-/Admin-Ansicht nur manuell hinzufügen
   const showExcelUpload = location.pathname.startsWith('/super-admin/')
   const [excelResult, setExcelResult] = useState<OfferItemsParseResult | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data: offerItems = [], isLoading: offerLoading } = useBackshopOfferItems()
+  const { data: backshopCampaign } = useBackshopOfferCampaignWithLines()
+  const { data: backshopStoreDisabled = new Set() } = useBackshopOfferStoreDisabled()
+  const toggleCentralBackshop = useToggleBackshopOfferDisabled()
   const { data: activeVersion } = useActiveBackshopVersion()
   const { data: masterItems = [] } = useBackshopPLUData(activeVersion?.id)
   const { data: customProducts = [] } = useBackshopCustomProducts()
   const { data: hiddenItems = [] } = useBackshopHiddenItems()
+  const { data: layoutSettings } = useBackshopLayoutSettings()
+  const { data: blocks = [] } = useBackshopBlocks()
+  const { data: renamedItems = [] } = useBackshopRenamedItems()
+  const { data: regeln = [] } = useBackshopBezeichnungsregeln()
+  const { overrideMap: backshopLocalOverrides } = useBackshopOfferLocalPriceOverrides(
+    backshopCampaign ?? undefined,
+  )
   const addOffer = useBackshopAddOfferItem()
   const removeOffer = useBackshopRemoveOfferItem()
   const addBatch = useBackshopAddOfferItemsBatch()
@@ -68,25 +103,67 @@ export function BackshopOfferProductsPage() {
   )
 
   const hiddenPLUSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
+
+  const offerDisplayByPlu = useMemo(
+    () =>
+      buildOfferDisplayMap(
+        currentKw,
+        currentJahr,
+        backshopCampaign ?? null,
+        backshopStoreDisabled,
+        offerItems,
+        backshopLocalOverrides,
+      ),
+    [currentKw, currentJahr, backshopCampaign, backshopStoreDisabled, offerItems, backshopLocalOverrides],
+  )
+
   const searchableItems = useMemo(() => {
-    const master = masterItems
-      .filter((m) => !hiddenPLUSet.has(m.plu))
-      .map((m) => ({
-        id: m.id,
-        plu: m.plu,
-        display_name: m.display_name ?? m.system_name,
-        system_name: m.system_name,
-      }))
-    const custom = customProducts
-      .filter((c) => !hiddenPLUSet.has(c.plu))
-      .map((c) => ({
+    const activeRegeln = regeln.filter((r) => r.is_active)
+    const markYellow = layoutSettings?.mark_yellow_kw_count ?? 4
+    const sortMode = layoutSettings?.sort_mode ?? 'ALPHABETICAL'
+    const { items } = buildBackshopDisplayList({
+      masterItems,
+      hiddenPLUs: hiddenPLUSet,
+      offerDisplayByPlu,
+      sortMode,
+      blocks,
+      customProducts: customProducts.map((c) => ({
         id: c.id,
         plu: c.plu,
-        display_name: c.name,
-        system_name: c.name,
-      }))
-    return [...master, ...custom]
-  }, [masterItems, customProducts, hiddenPLUSet])
+        name: c.name,
+        image_url: c.image_url,
+        block_id: c.block_id,
+        created_at: c.created_at,
+      })),
+      bezeichnungsregeln: activeRegeln,
+      renamedItems,
+      markYellowKwCount: markYellow,
+      currentKwNummer: currentKw,
+      currentJahr,
+    })
+    return items.map((i) => ({
+      id: i.id,
+      plu: i.plu,
+      display_name: i.display_name,
+      system_name: i.system_name,
+    }))
+  }, [
+    masterItems,
+    customProducts,
+    hiddenPLUSet,
+    offerDisplayByPlu,
+    regeln,
+    blocks,
+    layoutSettings,
+    renamedItems,
+    currentKw,
+    currentJahr,
+  ])
+
+  const centralPluSet = useMemo(
+    () => new Set((backshopCampaign?.lines ?? []).map((l) => l.plu)),
+    [backshopCampaign],
+  )
 
   const offerProductInfos: OfferProductInfo[] = useMemo(() => {
     return offerItems.map((item) => {
@@ -99,10 +176,22 @@ export function BackshopOfferProductsPage() {
     })
   }, [offerItems, masterItems, customProducts, activeOfferPLUs])
 
+  const listOrderPlu = useMemo(() => searchableItems.map((i) => i.plu), [searchableItems])
+
+  const sortedCampaignLines = useMemo(
+    () => orderByPluDisplayOrder([...(backshopCampaign?.lines ?? [])], (l) => l.plu, listOrderPlu),
+    [backshopCampaign?.lines, listOrderPlu],
+  )
+
+  const sortedOfferProductInfos = useMemo(
+    () => orderByPluDisplayOrder(offerProductInfos, (x) => x.item.plu, listOrderPlu),
+    [offerProductInfos, listOrderPlu],
+  )
+
   const handleAddFromDialog = useCallback(
-    (plu: string, durationWeeks: number) => {
+    (plu: string, durationWeeks: number, promoPrice: number) => {
       addOffer.mutate(
-        { plu, durationWeeks },
+        { plu, durationWeeks, promoPrice },
         { onSuccess: () => {} },
       )
     },
@@ -233,7 +322,7 @@ export function BackshopOfferProductsPage() {
           </Card>
         )}
 
-        {!offerLoading && offerItems.length === 0 && (
+        {!offerLoading && (backshopCampaign?.lines.length ?? 0) === 0 && offerItems.length === 0 && (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <Megaphone className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -245,24 +334,136 @@ export function BackshopOfferProductsPage() {
           </Card>
         )}
 
+        {!offerLoading && (backshopCampaign?.lines.length ?? 0) > 0 && (
+          <Card>
+            <CardContent className="p-0">
+              <div className="px-4 py-3 border-b border-border bg-muted/40">
+                <h3 className="text-sm font-semibold">Zentrale Werbung (KW {currentKw}/{currentJahr})</h3>
+                <p className="text-xs text-muted-foreground">Megafon: Angebot für diesen Markt ein/aus.</p>
+              </div>
+              {/* min-w-0 + overflow-x-auto: schmale Viewports (E2E mobile) – kein horizontales Scrollen am document */}
+              <div className="min-w-0 overflow-x-auto">
+                <table className="w-full">
+                <thead>
+                  <tr className="border-b-2 border-border">
+                    <th className="px-4 py-3 w-12" aria-label="Megafon" />
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[90px]">PLU</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-0">Artikel</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-0">Preis</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedCampaignLines.map((line) => {
+                    const masterItem = masterItems.find((m) => m.plu === line.plu)
+                    const name =
+                      masterItem?.display_name ?? masterItem?.system_name
+                      ?? customProducts.find((c) => c.plu === line.plu)?.name
+                      ?? `PLU ${getDisplayPlu(line.plu)}`
+                    const hiddenForStore = backshopStoreDisabled.has(line.plu)
+                    const central = Number(line.promo_price)
+                    const localOverride = backshopLocalOverrides.get(line.plu)
+                    const effective = localOverride ?? central
+                    const camp = backshopCampaign!
+                    return (
+                      <tr
+                        key={line.plu}
+                        className={cn(
+                          'border-b border-border last:border-b-0 hover:bg-muted/30',
+                          hiddenForStore && 'opacity-50 line-through',
+                        )}
+                      >
+                        <td className="px-4 py-3">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9"
+                            title={hiddenForStore ? 'Werbung für diesen Markt aktivieren' : 'Werbung für diesen Markt ausblenden'}
+                            onClick={() =>
+                              toggleCentralBackshop.mutate({ plu: line.plu, disabled: !hiddenForStore })
+                            }
+                            disabled={toggleCentralBackshop.isPending}
+                          >
+                            <Megaphone className={cn('h-4 w-4', hiddenForStore && 'opacity-40')} />
+                          </Button>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-sm">{getDisplayPlu(line.plu)}</td>
+                        <td className="px-4 py-3 text-sm">{name}</td>
+                        <td className="px-4 py-3 text-sm align-top">
+                          {!isViewer ? (
+                            <button
+                              type="button"
+                              className={cn(
+                                'w-full max-w-[240px] rounded-md border border-transparent px-2 py-2 text-left transition-colors',
+                                'hover:bg-muted/60 hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                              )}
+                              title="Eigener Verkaufspreis – Klicken zum Bearbeiten"
+                              onClick={() =>
+                                setLocalPriceTarget({
+                                  plu: line.plu,
+                                  name,
+                                  centralPrice: central,
+                                  initialLocalPrice: localOverride ?? null,
+                                  kw: camp.kw_nummer,
+                                  jahr: camp.jahr,
+                                })
+                              }
+                            >
+                              <p className="text-xs text-muted-foreground">
+                                Zentral vorgegeben:{' '}
+                                <span className="tabular-nums font-medium text-foreground">{formatPreisEur(central)}</span>
+                              </p>
+                              <p className="tabular-nums font-semibold mt-1">
+                                Deine Anzeige: {formatPreisEur(effective)}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground mt-1">Tippen zum Ändern</p>
+                            </button>
+                          ) : (
+                            <div className="space-y-1 max-w-[200px]">
+                              <p className="text-xs text-muted-foreground">
+                                Zentral vorgegeben:{' '}
+                                <span className="tabular-nums font-medium text-foreground">{formatPreisEur(central)}</span>
+                              </p>
+                              <p className="tabular-nums font-semibold">Anzeige: {formatPreisEur(effective)}</p>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {!offerLoading && offerProductInfos.length > 0 && (
           <Card>
             <CardContent className="p-0">
-              <table className="w-full">
+              <div className="px-4 py-3 border-b border-border bg-muted/40">
+                <h3 className="text-sm font-semibold">Eigene Werbung</h3>
+              </div>
+              <div className="min-w-0 overflow-x-auto">
+                <table className="w-full">
                 <thead>
                   <tr className="border-b-2 border-border">
                     <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">PLU</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Artikel</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[100px]">Aktionspreis</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[130px]">Laufzeit</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[90px]">Status</th>
                     <th className="px-4 py-3 text-right w-[160px]" />
                   </tr>
                 </thead>
                 <tbody>
-                  {offerProductInfos.map(({ item, name, isActive }) => (
+                  {sortedOfferProductInfos.map(({ item, name, isActive }) => (
                     <tr key={item.id} className="border-b border-border last:border-b-0 hover:bg-muted/30">
                       <td className="px-4 py-3 font-mono text-sm">{getDisplayPlu(item.plu)}</td>
                       <td className="px-4 py-3 text-sm">{name}</td>
+                      <td className="px-4 py-3 text-sm tabular-nums">
+                        {item.promo_price != null ? formatPreisEur(Number(item.promo_price)) : '–'}
+                      </td>
                       <td className="px-4 py-3">
                         <Select
                           value={String(item.duration_weeks)}
@@ -302,6 +503,7 @@ export function BackshopOfferProductsPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -312,7 +514,22 @@ export function BackshopOfferProductsPage() {
           searchableItems={searchableItems}
           onAdd={handleAddFromDialog}
           isAdding={addOffer.isPending}
+          blockedPlus={centralPluSet}
         />
+
+        {localPriceTarget && (
+          <CentralOfferLocalPriceDialog
+            open
+            onOpenChange={(o) => !o && setLocalPriceTarget(null)}
+            domain="backshop"
+            plu={localPriceTarget.plu}
+            productName={localPriceTarget.name}
+            centralPrice={localPriceTarget.centralPrice}
+            initialLocalPrice={localPriceTarget.initialLocalPrice}
+            kw_nummer={localPriceTarget.kw}
+            jahr={localPriceTarget.jahr}
+          />
+        )}
       </div>
     </DashboardLayout>
   )

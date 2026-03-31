@@ -12,7 +12,7 @@ interface BackshopLayoutPreviewProps {
   fontHeaderPx?: number
   fontColumnPx?: number
   fontProductPx?: number
-  /** Bei „Nach Warengruppen“: Vorschau als getrennte Seiten (jede Warengruppe = eine Seite mit Titel „[Gruppe] Liste“) */
+  /** Bei „Nach Warengruppen“: Vorschau als getrennte Seiten (nur Darstellung; PDF umbricht platzsparend nach Höhe) */
   pageBreakPerBlock?: boolean
 }
 

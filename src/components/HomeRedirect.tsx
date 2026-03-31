@@ -5,10 +5,13 @@
 
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { useUserPreview } from '@/contexts/UserPreviewContext'
+import { getHomeDashboardPath } from '@/lib/effective-route-prefix'
 import { LoadingSkeleton } from '@/components/layout/ProtectedRoute'
 
 export function HomeRedirect() {
-  const { user, profile, isLoading, isSuperAdmin, isAdmin, isViewer } = useAuth()
+  const { user, profile, isLoading } = useAuth()
+  const { preview } = useUserPreview()
 
   if (isLoading) {
     return <LoadingSkeleton />
@@ -23,8 +26,6 @@ export function HomeRedirect() {
     return <LoadingSkeleton />
   }
 
-  if (isSuperAdmin) return <Navigate to="/super-admin" replace />
-  if (isAdmin) return <Navigate to="/admin" replace />
-  if (isViewer) return <Navigate to="/viewer" replace />
-  return <Navigate to="/user" replace />
+  const home = getHomeDashboardPath(profile?.role, preview)
+  return <Navigate to={home} replace />
 }

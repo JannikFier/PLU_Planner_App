@@ -305,6 +305,7 @@ export interface Database {
       layout_settings: {
         Row: {
           id: string
+          store_id: string
           sort_mode: 'ALPHABETICAL' | 'BY_BLOCK'
           display_mode: 'MIXED' | 'SEPARATED'
           flow_direction: 'ROW_BY_ROW' | 'COLUMN_FIRST'
@@ -324,6 +325,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          store_id: string
           sort_mode?: 'ALPHABETICAL' | 'BY_BLOCK'
           display_mode?: 'MIXED' | 'SEPARATED'
           flow_direction?: 'ROW_BY_ROW' | 'COLUMN_FIRST'
@@ -359,6 +361,7 @@ export interface Database {
       bezeichnungsregeln: {
         Row: {
           id: string
+          store_id: string
           keyword: string
           position: 'PREFIX' | 'SUFFIX'
           case_sensitive: boolean
@@ -368,6 +371,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          store_id: string
           keyword: string
           position: 'PREFIX' | 'SUFFIX'
           case_sensitive?: boolean
@@ -465,6 +469,8 @@ export interface Database {
           created_by: string
           created_at: string
           store_id?: string
+          promo_price: number | null
+          offer_source: 'manual'
         }
         Insert: {
           id?: string
@@ -474,12 +480,100 @@ export interface Database {
           duration_weeks: number
           created_by: string
           store_id?: string
+          promo_price?: number | null
+          offer_source?: 'manual'
         }
         Update: {
           plu?: string
           start_kw?: number
           start_jahr?: number
           duration_weeks?: number
+          promo_price?: number | null
+          offer_source?: 'manual'
+        }
+      }
+      obst_offer_campaigns: {
+        Row: {
+          id: string
+          kw_nummer: number
+          jahr: number
+          source_file_name: string | null
+          created_at: string
+          created_by: string
+        }
+        Insert: {
+          id?: string
+          kw_nummer: number
+          jahr: number
+          source_file_name?: string | null
+          created_at?: string
+          created_by: string
+        }
+        Update: {
+          kw_nummer?: number
+          jahr?: number
+          source_file_name?: string | null
+        }
+      }
+      obst_offer_campaign_lines: {
+        Row: {
+          id: string
+          campaign_id: string
+          plu: string
+          promo_price: number
+          sort_index: number
+          source_art_nr: string | null
+        }
+        Insert: {
+          id?: string
+          campaign_id: string
+          plu: string
+          promo_price: number
+          sort_index?: number
+          source_art_nr?: string | null
+        }
+        Update: {
+          plu?: string
+          promo_price?: number
+          sort_index?: number
+          source_art_nr?: string | null
+        }
+      }
+      obst_offer_store_disabled: {
+        Row: {
+          store_id: string
+          plu: string
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          store_id: string
+          plu: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: Record<string, never>
+      }
+      obst_offer_store_local_prices: {
+        Row: {
+          store_id: string
+          plu: string
+          kw_nummer: number
+          jahr: number
+          local_promo_price: number
+          updated_at: string
+        }
+        Insert: {
+          store_id: string
+          plu: string
+          kw_nummer: number
+          jahr: number
+          local_promo_price: number
+          updated_at?: string
+        }
+        Update: {
+          local_promo_price?: number
+          updated_at?: string
         }
       }
       renamed_items: {
@@ -742,6 +836,8 @@ export interface Database {
           created_by: string
           created_at: string
           store_id?: string
+          promo_price: number | null
+          offer_source: 'manual'
         }
         Insert: {
           id?: string
@@ -751,12 +847,100 @@ export interface Database {
           duration_weeks: number
           created_by: string
           store_id?: string
+          promo_price?: number | null
+          offer_source?: 'manual'
         }
         Update: {
           plu?: string
           start_kw?: number
           start_jahr?: number
           duration_weeks?: number
+          promo_price?: number | null
+          offer_source?: 'manual'
+        }
+      }
+      backshop_offer_campaigns: {
+        Row: {
+          id: string
+          kw_nummer: number
+          jahr: number
+          source_file_name: string | null
+          created_at: string
+          created_by: string
+        }
+        Insert: {
+          id?: string
+          kw_nummer: number
+          jahr: number
+          source_file_name?: string | null
+          created_at?: string
+          created_by: string
+        }
+        Update: {
+          kw_nummer?: number
+          jahr?: number
+          source_file_name?: string | null
+        }
+      }
+      backshop_offer_campaign_lines: {
+        Row: {
+          id: string
+          campaign_id: string
+          plu: string
+          promo_price: number
+          sort_index: number
+          source_art_nr: string | null
+        }
+        Insert: {
+          id?: string
+          campaign_id: string
+          plu: string
+          promo_price: number
+          sort_index?: number
+          source_art_nr?: string | null
+        }
+        Update: {
+          plu?: string
+          promo_price?: number
+          sort_index?: number
+          source_art_nr?: string | null
+        }
+      }
+      backshop_offer_store_disabled: {
+        Row: {
+          store_id: string
+          plu: string
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          store_id: string
+          plu: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: Record<string, never>
+      }
+      backshop_offer_store_local_prices: {
+        Row: {
+          store_id: string
+          plu: string
+          kw_nummer: number
+          jahr: number
+          local_promo_price: number
+          updated_at: string
+        }
+        Insert: {
+          store_id: string
+          plu: string
+          kw_nummer: number
+          jahr: number
+          local_promo_price: number
+          updated_at?: string
+        }
+        Update: {
+          local_promo_price?: number
+          updated_at?: string
         }
       }
       backshop_version_notifications: {
@@ -786,6 +970,7 @@ export interface Database {
       backshop_layout_settings: {
         Row: {
           id: string
+          store_id: string
           sort_mode: 'ALPHABETICAL' | 'BY_BLOCK'
           display_mode: 'MIXED' | 'SEPARATED'
           flow_direction: 'ROW_BY_ROW' | 'COLUMN_FIRST'
@@ -806,6 +991,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          store_id: string
           sort_mode?: 'ALPHABETICAL' | 'BY_BLOCK'
           display_mode?: 'MIXED' | 'SEPARATED'
           flow_direction?: 'ROW_BY_ROW' | 'COLUMN_FIRST'
@@ -843,6 +1029,7 @@ export interface Database {
       backshop_bezeichnungsregeln: {
         Row: {
           id: string
+          store_id: string
           keyword: string
           position: 'PREFIX' | 'SUFFIX'
           case_sensitive: boolean
@@ -852,6 +1039,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          store_id: string
           keyword: string
           position: 'PREFIX' | 'SUFFIX'
           case_sensitive?: boolean
@@ -863,6 +1051,78 @@ export interface Database {
           position?: 'PREFIX' | 'SUFFIX'
           case_sensitive?: boolean
           is_active?: boolean
+        }
+      }
+      store_obst_block_order: {
+        Row: {
+          store_id: string
+          block_id: string
+          order_index: number
+          updated_at: string
+        }
+        Insert: {
+          store_id: string
+          block_id: string
+          order_index?: number
+          updated_at?: string
+        }
+        Update: {
+          order_index?: number
+          updated_at?: string
+        }
+      }
+      store_backshop_block_order: {
+        Row: {
+          store_id: string
+          block_id: string
+          order_index: number
+          updated_at: string
+        }
+        Insert: {
+          store_id: string
+          block_id: string
+          order_index?: number
+          updated_at?: string
+        }
+        Update: {
+          order_index?: number
+          updated_at?: string
+        }
+      }
+      store_obst_name_block_override: {
+        Row: {
+          store_id: string
+          system_name_normalized: string
+          block_id: string
+          updated_at: string
+        }
+        Insert: {
+          store_id: string
+          system_name_normalized: string
+          block_id: string
+          updated_at?: string
+        }
+        Update: {
+          block_id?: string
+          updated_at?: string
+        }
+      }
+      store_backshop_name_block_override: {
+        Row: {
+          store_id: string
+          system_name_normalized: string
+          block_id: string
+          updated_at: string
+        }
+        Insert: {
+          store_id: string
+          system_name_normalized: string
+          block_id: string
+          updated_at?: string
+        }
+        Update: {
+          block_id?: string
+          updated_at?: string
         }
       }
     }
@@ -935,6 +1195,10 @@ export type CustomProduct = Database['public']['Tables']['custom_products']['Row
 export type HiddenItem = Database['public']['Tables']['hidden_items']['Row']
 export type RenamedItem = Database['public']['Tables']['renamed_items']['Row']
 export type OfferItem = Database['public']['Tables']['plu_offer_items']['Row']
+export type ObstOfferCampaign = Database['public']['Tables']['obst_offer_campaigns']['Row']
+export type ObstOfferCampaignLine = Database['public']['Tables']['obst_offer_campaign_lines']['Row']
+export type ObstOfferStoreDisabled = Database['public']['Tables']['obst_offer_store_disabled']['Row']
+export type ObstOfferStoreLocalPrice = Database['public']['Tables']['obst_offer_store_local_prices']['Row']
 export type VersionNotification = Database['public']['Tables']['version_notifications']['Row']
 
 // Backshop
@@ -945,7 +1209,15 @@ export type BackshopCustomProduct = Database['public']['Tables']['backshop_custo
 export type BackshopHiddenItem = Database['public']['Tables']['backshop_hidden_items']['Row']
 export type BackshopRenamedItem = Database['public']['Tables']['backshop_renamed_items']['Row']
 export type BackshopOfferItem = Database['public']['Tables']['backshop_offer_items']['Row']
+export type BackshopOfferCampaign = Database['public']['Tables']['backshop_offer_campaigns']['Row']
+export type BackshopOfferCampaignLine = Database['public']['Tables']['backshop_offer_campaign_lines']['Row']
+export type BackshopOfferStoreDisabled = Database['public']['Tables']['backshop_offer_store_disabled']['Row']
+export type BackshopOfferStoreLocalPrice = Database['public']['Tables']['backshop_offer_store_local_prices']['Row']
 export type BackshopVersionNotification = Database['public']['Tables']['backshop_version_notifications']['Row']
 export type BackshopLayoutSettings = Database['public']['Tables']['backshop_layout_settings']['Row']
 export type BackshopBlockRule = Database['public']['Tables']['backshop_block_rules']['Row']
 export type BackshopBezeichnungsregel = Database['public']['Tables']['backshop_bezeichnungsregeln']['Row']
+export type StoreObstBlockOrder = Database['public']['Tables']['store_obst_block_order']['Row']
+export type StoreBackshopBlockOrder = Database['public']['Tables']['store_backshop_block_order']['Row']
+export type StoreObstNameBlockOverride = Database['public']['Tables']['store_obst_name_block_override']['Row']
+export type StoreBackshopNameBlockOverride = Database['public']['Tables']['store_backshop_name_block_override']['Row']

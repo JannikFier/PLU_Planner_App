@@ -1,7 +1,8 @@
-// Hook: Backshop-Layout-Einstellungen laden + aktualisieren (Singleton)
+// Hook: Backshop-Layout-Einstellungen laden + aktualisieren (pro Markt)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, queryRest } from '@/lib/supabase'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import type { BackshopLayoutSettings } from '@/types/database'
 import type { Database } from '@/types/database'
 
@@ -10,6 +11,7 @@ type BackshopLayoutSettingsUpdate = Database['public']['Tables']['backshop_layou
 /** Standard-Werte falls keine Backshop-Layout-Einstellungen in der DB vorhanden */
 const DEFAULT_BACKSHOP_LAYOUT: BackshopLayoutSettings = {
   id: '',
+  store_id: '',
   sort_mode: 'ALPHABETICAL',
   display_mode: 'MIXED',
   flow_direction: 'ROW_BY_ROW',
@@ -30,20 +32,25 @@ const DEFAULT_BACKSHOP_LAYOUT: BackshopLayoutSettings = {
 }
 
 /**
- * Lädt die Backshop-Layout-Einstellungen (Singleton-Tabelle).
+ * Lädt die Backshop-Layout-Einstellungen fuer den aktuellen Markt.
  * Fallback: Default-Werte wenn keine Zeile gefunden wird.
  */
 export function useBackshopLayoutSettings() {
+  const { currentStoreId } = useCurrentStore()
+
   return useQuery<BackshopLayoutSettings>({
-    queryKey: ['backshop-layout-settings'],
+    queryKey: ['backshop-layout-settings', currentStoreId],
     staleTime: 5 * 60_000,
+    enabled: !!currentStoreId,
     queryFn: async () => {
+      if (!currentStoreId) return DEFAULT_BACKSHOP_LAYOUT
       const data = await queryRest<BackshopLayoutSettings[]>('backshop_layout_settings', {
         select: '*',
+        store_id: `eq.${currentStoreId}`,
         limit: '1',
       })
       const arr = Array.isArray(data) ? data : []
-      if (arr.length === 0) return DEFAULT_BACKSHOP_LAYOUT
+      if (arr.length === 0) return { ...DEFAULT_BACKSHOP_LAYOUT, store_id: currentStoreId }
       return arr[0] as BackshopLayoutSettings
     },
   })
@@ -55,10 +62,15 @@ export function useBackshopLayoutSettings() {
  */
 export function useUpdateBackshopLayoutSettings() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (updates: BackshopLayoutSettingsUpdate) => {
-      const cached = queryClient.getQueryData<BackshopLayoutSettings>(['backshop-layout-settings'])
+      if (!currentStoreId) {
+        throw new Error('Kein Markt ausgewählt.')
+      }
+
+      const cached = queryClient.getQueryData<BackshopLayoutSettings>(['backshop-layout-settings', currentStoreId])
       const settingsId = cached?.id
 
       if (!settingsId) {
@@ -70,6 +82,7 @@ export function useUpdateBackshopLayoutSettings() {
         .from('backshop_layout_settings')
         .update((updates as BackshopLayoutSettingsUpdate) as never)
         .eq('id', settingsId)
+        .eq('store_id', currentStoreId)
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Speichern hat zu lange gedauert. Bitte Seite neu laden und erneut versuchen.')), UPDATE_TIMEOUT_MS),
       )
@@ -77,7 +90,7 @@ export function useUpdateBackshopLayoutSettings() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-layout-settings'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-layout-settings', currentStoreId] })
     },
   })
 }

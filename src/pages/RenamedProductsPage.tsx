@@ -19,11 +19,26 @@ import {
 import { Pencil, Undo2 } from 'lucide-react'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
+import { useCustomProducts } from '@/hooks/useCustomProducts'
 import { useRenamedItems } from '@/hooks/useRenamedItems'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
+import { useBlocks } from '@/hooks/useBlocks'
+import { useBezeichnungsregeln } from '@/hooks/useBezeichnungsregeln'
+import { useOfferItems } from '@/hooks/useOfferItems'
+import {
+  useObstOfferCampaignWithLines,
+  useObstOfferStoreDisabled,
+} from '@/hooks/useCentralOfferCampaigns'
+import { useObstOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalPrices'
 import { useResetProductName } from '@/hooks/useCustomProducts'
 import { useAuth } from '@/hooks/useAuth'
 import { getDisplayPlu } from '@/lib/plu-helpers'
+import { buildDisplayList } from '@/lib/layout-engine'
+import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
+import { useStoreObstBlockOrder, useStoreObstNameBlockOverrides } from '@/hooks/useStoreObstBlockLayout'
+import { buildOfferDisplayMap } from '@/lib/offer-display'
+import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
+import { orderByPluDisplayOrder } from '@/lib/list-order'
 import { RenameProductsDialog } from '@/components/plu/RenameProductsDialog'
 import type { MasterPLUItem } from '@/types/database'
 
@@ -34,10 +49,95 @@ export function RenamedProductsPage() {
 
   const { data: activeVersion } = useActiveVersion()
   const { data: masterItems = [], isLoading: itemsLoading, isError: itemsError } = usePLUData(activeVersion?.id)
+  const { data: customProducts = [] } = useCustomProducts()
   const { data: storeRenamed = [], isLoading: renamedLoading } = useRenamedItems()
   const { data: layoutSettings } = useLayoutSettings()
+  const { data: blocks = [] } = useBlocks()
+  const { data: regeln = [] } = useBezeichnungsregeln()
+  const { data: storeObstBlockOrder = [] } = useStoreObstBlockOrder()
+  const { data: storeObstNameOverrides = [] } = useStoreObstNameBlockOverrides()
+  const nameBlockOverrides = useMemo(
+    () => buildNameBlockOverrideMap(storeObstNameOverrides),
+    [storeObstNameOverrides],
+  )
+  const renameDialogListLayout = useMemo(
+    () => ({
+      sortMode: (layoutSettings?.sort_mode ?? 'ALPHABETICAL') as 'ALPHABETICAL' | 'BY_BLOCK',
+      blocks,
+      storeBlockOrder: storeObstBlockOrder,
+      nameBlockOverrides,
+    }),
+    [layoutSettings?.sort_mode, blocks, storeObstBlockOrder, nameBlockOverrides],
+  )
+  const { data: offerItems = [] } = useOfferItems()
+  const { data: obstCampaign } = useObstOfferCampaignWithLines()
+  const { data: obstStoreDisabled = new Set() } = useObstOfferStoreDisabled()
+  const { overrideMap: obstLocalOverrides } = useObstOfferLocalPriceOverrides(obstCampaign ?? undefined)
   const resetName = useResetProductName()
   const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
+
+  const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
+  const offerDisplayByPlu = useMemo(
+    () =>
+      buildOfferDisplayMap(
+        currentKw,
+        currentJahr,
+        obstCampaign ?? null,
+        obstStoreDisabled,
+        offerItems,
+        obstLocalOverrides,
+      ),
+    [currentKw, currentJahr, obstCampaign, obstStoreDisabled, offerItems, obstLocalOverrides],
+  )
+
+  const canonicalListOrderPlu = useMemo(() => {
+    const activeRegeln = regeln
+      .filter((r) => r.is_active)
+      .map((r) => ({
+        keyword: r.keyword,
+        position: r.position,
+        case_sensitive: r.case_sensitive,
+      }))
+    const version = activeVersion
+    const now = new Date()
+    const { items } = buildDisplayList({
+      masterItems,
+      customProducts,
+      hiddenPLUs: new Set(),
+      offerDisplayByPlu,
+      renamedItems: storeRenamed.map((r) => ({
+        plu: r.plu,
+        display_name: r.display_name,
+        is_manually_renamed: r.is_manually_renamed,
+      })),
+      bezeichnungsregeln: activeRegeln,
+      blocks,
+      sortMode: layoutSettings?.sort_mode ?? 'ALPHABETICAL',
+      displayMode: layoutSettings?.display_mode ?? 'MIXED',
+      markRedKwCount: layoutSettings?.mark_red_kw_count ?? 0,
+      markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
+      versionKwNummer: version?.kw_nummer ?? 0,
+      versionJahr: version?.jahr ?? now.getFullYear(),
+      currentKwNummer: currentKw,
+      currentJahr,
+      nameBlockOverrides,
+      storeBlockOrder: storeObstBlockOrder,
+    })
+    return items.map((i) => i.plu)
+  }, [
+    masterItems,
+    customProducts,
+    offerDisplayByPlu,
+    storeRenamed,
+    regeln,
+    blocks,
+    layoutSettings,
+    activeVersion,
+    currentKw,
+    currentJahr,
+    nameBlockOverrides,
+    storeObstBlockOrder,
+  ])
 
   // Produkte, die in der aktuellen Version vorkommen UND marktspezifisch umbenannt sind
   const renamedItems = useMemo(() => {
@@ -50,6 +150,11 @@ export function RenamedProductsPage() {
         return { ...m, display_name: r.display_name }
       })
   }, [masterItems, storeRenamed])
+
+  const sortedRenamedItems = useMemo(
+    () => orderByPluDisplayOrder(renamedItems, (x) => x.plu, canonicalListOrderPlu),
+    [renamedItems, canonicalListOrderPlu],
+  )
 
   const handleResetConfirm = async () => {
     if (!resetConfirmItem) return
@@ -110,7 +215,7 @@ export function RenamedProductsPage() {
           </Card>
         )}
 
-        {!itemsLoading && !renamedLoading && renamedItems.length === 0 && (
+        {!itemsLoading && !renamedLoading && sortedRenamedItems.length === 0 && (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <Pencil className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -123,7 +228,7 @@ export function RenamedProductsPage() {
           </Card>
         )}
 
-        {!itemsLoading && !renamedLoading && renamedItems.length > 0 && (
+        {!itemsLoading && !renamedLoading && sortedRenamedItems.length > 0 && (
           <Card>
             <CardContent className="p-0">
               <table className="w-full">
@@ -142,7 +247,7 @@ export function RenamedProductsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {renamedItems.map((item) => (
+                  {sortedRenamedItems.map((item) => (
                     <tr
                       key={item.id}
                       className="border-b border-border last:border-b-0 hover:bg-muted/30"
@@ -181,6 +286,7 @@ export function RenamedProductsPage() {
           searchableItems={masterItems}
           displayMode={displayMode}
           renamedOverrides={storeRenamed.map((r) => ({ plu: r.plu, display_name: r.display_name }))}
+          listLayout={renameDialogListLayout}
         />
 
         <AlertDialog open={!!resetConfirmItem} onOpenChange={(open) => !open && setResetConfirmItem(null)}>

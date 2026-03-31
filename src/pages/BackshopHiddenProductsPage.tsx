@@ -1,6 +1,7 @@
 // Backshop: Ausgeblendete Produkte – Liste, Einblenden, „Produkte ausblenden“
 
 import { useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,13 +13,34 @@ import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
 import { useBackshopCustomProducts } from '@/hooks/useBackshopCustomProducts'
 import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
+import { useBackshopBezeichnungsregeln } from '@/hooks/useBackshopBezeichnungsregeln'
+import { useBackshopRenamedItems } from '@/hooks/useBackshopRenamedItems'
+import { useBackshopLayoutSettings } from '@/hooks/useBackshopLayoutSettings'
+import { useBackshopOfferItems } from '@/hooks/useBackshopOfferItems'
+import {
+  useBackshopOfferCampaignWithLines,
+  useBackshopOfferStoreDisabled,
+} from '@/hooks/useCentralOfferCampaigns'
+import { useBackshopOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalPrices'
 import { useAuth } from '@/hooks/useAuth'
+import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
+import { canManageMarketHiddenItems } from '@/lib/permissions'
 import { supabase } from '@/lib/supabase'
 import { getDisplayPlu } from '@/lib/plu-helpers'
+import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
+import {
+  useStoreBackshopBlockOrder,
+  useStoreBackshopNameBlockOverrides,
+} from '@/hooks/useStoreBackshopBlockLayout'
+import { buildBackshopDisplayList } from '@/lib/layout-engine'
+import { buildOfferDisplayMap } from '@/lib/offer-display'
+import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
+import { orderByPluDisplayOrder } from '@/lib/list-order'
 import { useQuery } from '@tanstack/react-query'
 import { HideBackshopProductsDialog } from '@/components/plu/HideBackshopProductsDialog'
+import { BackshopThumbnail } from '@/components/plu/BackshopThumbnail'
 import { EditBackshopCustomProductDialog } from '@/components/plu/EditBackshopCustomProductDialog'
-import type { BackshopCustomProduct } from '@/types/database'
+import type { BackshopCustomProduct, Block } from '@/types/database'
 import type { Profile } from '@/types/database'
 
 interface HiddenProductInfo {
@@ -29,10 +51,14 @@ interface HiddenProductInfo {
   hidden_by: string
   hiddenByName: string
   hiddenAt: string
+  thumbUrl: string | null
 }
 
 export function BackshopHiddenProductsPage() {
+  const { pathname } = useLocation()
   const { user } = useAuth()
+  const effectiveRole = useEffectiveRouteRole()
+  const canManageHidden = canManageMarketHiddenItems(effectiveRole, pathname)
 
   const [showHideDialog, setShowHideDialog] = useState(false)
   const [editingProduct, setEditingProduct] = useState<BackshopCustomProduct | null>(null)
@@ -42,19 +68,65 @@ export function BackshopHiddenProductsPage() {
   const { data: masterItems = [] } = useBackshopPLUData(activeVersion?.id)
   const { data: customProducts = [] } = useBackshopCustomProducts()
   const { data: blocks = [] } = useBackshopBlocks()
+  const { data: layoutSettings } = useBackshopLayoutSettings()
+  const { data: regeln = [] } = useBackshopBezeichnungsregeln()
+  const { data: renamedItems = [] } = useBackshopRenamedItems()
+  const { data: offerItems = [] } = useBackshopOfferItems()
+  const { data: backshopCampaign } = useBackshopOfferCampaignWithLines()
+  const { data: backshopStoreDisabled = new Set() } = useBackshopOfferStoreDisabled()
+  const { overrideMap: backshopLocalOverrides } = useBackshopOfferLocalPriceOverrides(
+    backshopCampaign ?? undefined,
+  )
   const unhideProduct = useBackshopUnhideProduct()
+  const { data: storeBackshopBlockOrder = [] } = useStoreBackshopBlockOrder()
+  const { data: storeBackshopNameOverrides = [] } = useStoreBackshopNameBlockOverrides()
+  const nameBlockOverrides = useMemo(
+    () => buildNameBlockOverrideMap(storeBackshopNameOverrides),
+    [storeBackshopNameOverrides],
+  )
+  const hideDialogListLayout = useMemo(
+    () => ({
+      sortMode: (layoutSettings?.sort_mode ?? 'ALPHABETICAL') as 'ALPHABETICAL' | 'BY_BLOCK',
+      blocks: blocks as Block[],
+      storeBlockOrder: storeBackshopBlockOrder,
+      nameBlockOverrides,
+    }),
+    [layoutSettings?.sort_mode, blocks, storeBackshopBlockOrder, nameBlockOverrides],
+  )
+  const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
+
+  const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
+  const offerDisplayByPlu = useMemo(
+    () =>
+      buildOfferDisplayMap(
+        currentKw,
+        currentJahr,
+        backshopCampaign ?? null,
+        backshopStoreDisabled,
+        offerItems,
+        backshopLocalOverrides,
+      ),
+    [currentKw, currentJahr, backshopCampaign, backshopStoreDisabled, offerItems, backshopLocalOverrides],
+  )
+
+  const renamedByPlu = useMemo(() => new Map(renamedItems.map((r) => [r.plu, r])), [renamedItems])
 
   const hiddenPLUSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
 
   const searchableItems = useMemo(() => {
     const master = masterItems
       .filter((m) => !hiddenPLUSet.has(m.plu))
-      .map((m) => ({
-        id: m.id,
-        plu: m.plu,
-        display_name: m.display_name ?? m.system_name,
-        system_name: m.system_name,
-      }))
+      .map((m) => {
+        const r = renamedByPlu.get(m.plu)
+        return {
+          id: m.id,
+          plu: m.plu,
+          display_name: r?.display_name ?? m.display_name ?? m.system_name,
+          system_name: m.system_name,
+          item_type: 'PIECE' as const,
+          block_id: m.block_id,
+        }
+      })
     const custom = customProducts
       .filter((c) => !hiddenPLUSet.has(c.plu))
       .map((c) => ({
@@ -62,9 +134,52 @@ export function BackshopHiddenProductsPage() {
         plu: c.plu,
         display_name: c.name,
         system_name: c.name,
+        item_type: 'PIECE' as const,
+        block_id: c.block_id,
       }))
     return [...master, ...custom]
-  }, [masterItems, customProducts, hiddenPLUSet])
+  }, [masterItems, customProducts, hiddenPLUSet, renamedByPlu])
+
+  const canonicalListOrderPlu = useMemo(() => {
+    const activeRegeln = regeln.filter((r) => r.is_active)
+    const markYellow = layoutSettings?.mark_yellow_kw_count ?? 4
+    const sortMode = layoutSettings?.sort_mode ?? 'ALPHABETICAL'
+    const { items } = buildBackshopDisplayList({
+      masterItems,
+      hiddenPLUs: new Set(),
+      offerDisplayByPlu,
+      sortMode,
+      blocks,
+      customProducts: customProducts.map((c) => ({
+        id: c.id,
+        plu: c.plu,
+        name: c.name,
+        image_url: c.image_url,
+        block_id: c.block_id,
+        created_at: c.created_at,
+      })),
+      bezeichnungsregeln: activeRegeln,
+      renamedItems,
+      markYellowKwCount: markYellow,
+      currentKwNummer: currentKw,
+      currentJahr,
+      nameBlockOverrides,
+      storeBlockOrder: storeBackshopBlockOrder,
+    })
+    return items.map((i) => i.plu)
+  }, [
+    masterItems,
+    customProducts,
+    offerDisplayByPlu,
+    regeln,
+    blocks,
+    layoutSettings,
+    renamedItems,
+    currentKw,
+    currentJahr,
+    nameBlockOverrides,
+    storeBackshopBlockOrder,
+  ])
 
   const hiddenByIds = useMemo(() => [...new Set(hiddenItems.map((h) => h.hidden_by))], [hiddenItems])
 
@@ -94,6 +209,8 @@ export function BackshopHiddenProductsPage() {
     return hiddenItems.map((hidden) => {
       const masterItem = masterItems.find((m) => m.plu === hidden.plu)
       if (masterItem) {
+        const r = renamedByPlu.get(hidden.plu)
+        const thumbUrl = (r?.image_url ?? masterItem.image_url) || null
         return {
           plu: hidden.plu,
           name: masterItem.display_name ?? masterItem.system_name,
@@ -102,6 +219,7 @@ export function BackshopHiddenProductsPage() {
           hidden_by: hidden.hidden_by,
           hiddenByName: profileMap.get(hidden.hidden_by) ?? 'Unbekannt',
           hiddenAt: hidden.created_at,
+          thumbUrl,
         }
       }
       const customItem = customProducts.find((c) => c.plu === hidden.plu)
@@ -114,6 +232,7 @@ export function BackshopHiddenProductsPage() {
           hidden_by: hidden.hidden_by,
           hiddenByName: profileMap.get(hidden.hidden_by) ?? 'Unbekannt',
           hiddenAt: hidden.created_at,
+          thumbUrl: customItem.image_url || null,
         }
       }
       return {
@@ -124,9 +243,15 @@ export function BackshopHiddenProductsPage() {
         hidden_by: hidden.hidden_by,
         hiddenByName: profileMap.get(hidden.hidden_by) ?? 'Unbekannt',
         hiddenAt: hidden.created_at,
+        thumbUrl: null,
       }
     })
-  }, [hiddenItems, masterItems, customProducts, profileMap])
+  }, [hiddenItems, masterItems, customProducts, profileMap, renamedByPlu])
+
+  const sortedHiddenProductInfos = useMemo(
+    () => orderByPluDisplayOrder(hiddenProductInfos, (x) => x.plu, canonicalListOrderPlu),
+    [hiddenProductInfos, canonicalListOrderPlu],
+  )
 
   return (
     <DashboardLayout>
@@ -144,10 +269,12 @@ export function BackshopHiddenProductsPage() {
             </div>
           </div>
 
-          <Button variant="outline" size="sm" onClick={() => setShowHideDialog(true)}>
-            <EyeOff className="h-4 w-4 mr-2" />
-            Produkte ausblenden
-          </Button>
+          {canManageHidden && (
+            <Button variant="outline" size="sm" onClick={() => setShowHideDialog(true)}>
+              <EyeOff className="h-4 w-4 mr-2" />
+              Produkte ausblenden
+            </Button>
+          )}
         </div>
 
         {hiddenLoading && (
@@ -176,12 +303,13 @@ export function BackshopHiddenProductsPage() {
           </Card>
         )}
 
-        {!hiddenLoading && hiddenProductInfos.length > 0 && (
+        {!hiddenLoading && sortedHiddenProductInfos.length > 0 && (
           <Card>
             <CardContent className="p-0">
               <table className="w-full">
                 <thead>
                   <tr className="border-b-2 border-border">
+                    <th className="px-4 py-3 w-14 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider" aria-label="Bild" />
                     <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">PLU</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Artikel</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[150px]">Ausgeblendet von</th>
@@ -189,8 +317,11 @@ export function BackshopHiddenProductsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {hiddenProductInfos.map((info) => (
+                  {sortedHiddenProductInfos.map((info) => (
                     <tr key={info.plu} className="border-b border-border last:border-b-0 hover:bg-muted/30">
+                      <td className="px-4 py-3 w-14 align-middle">
+                        <BackshopThumbnail src={info.thumbUrl} size="md" />
+                      </td>
                       <td className="px-4 py-3 font-mono text-sm">{getDisplayPlu(info.plu)}</td>
                       <td className="px-4 py-3 text-sm">
                         <span className="flex items-center gap-2">
@@ -223,15 +354,19 @@ export function BackshopHiddenProductsPage() {
                               Bearbeiten
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => unhideProduct.mutate(info.plu)}
-                            disabled={unhideProduct.isPending}
-                          >
-                            <Undo2 className="h-4 w-4 mr-1" />
-                            Einblenden
-                          </Button>
+                          {canManageHidden ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => unhideProduct.mutate(info.plu)}
+                              disabled={unhideProduct.isPending}
+                            >
+                              <Undo2 className="h-4 w-4 mr-1" />
+                              Einblenden
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -242,11 +377,15 @@ export function BackshopHiddenProductsPage() {
           </Card>
         )}
 
-        <HideBackshopProductsDialog
-          open={showHideDialog}
-          onOpenChange={setShowHideDialog}
-          searchableItems={searchableItems}
-        />
+        {canManageHidden && (
+          <HideBackshopProductsDialog
+            open={showHideDialog}
+            onOpenChange={setShowHideDialog}
+            searchableItems={searchableItems}
+            displayMode={displayMode}
+            listLayout={hideDialogListLayout}
+          />
+        )}
 
         {editingProduct && (
           <EditBackshopCustomProductDialog

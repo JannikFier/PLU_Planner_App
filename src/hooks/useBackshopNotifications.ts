@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { toast } from 'sonner'
-import type { Database, BackshopMasterPLUItem } from '@/types/database'
+import type { Database, BackshopMasterPLUItem, BackshopVersionNotification } from '@/types/database'
 
 /** Anzahl neuer + geänderter Produkte in der aktiven Backshop-Version (für Badge) */
 export function useBackshopActiveVersionChangeCount() {
@@ -24,6 +24,30 @@ export function useBackshopActiveVersionChangeCount() {
       })
     },
     enabled: !!activeVersion?.id,
+    staleTime: 30 * 1000,
+  })
+}
+
+/** Notification-Zeile für aktuellen User + Backshop-Version */
+export function useBackshopVersionNotification(versionId: string | undefined) {
+  const { user } = useAuth()
+  const { currentStoreId } = useCurrentStore()
+
+  return useQuery({
+    queryKey: ['backshop-version-notification', versionId, currentStoreId],
+    queryFn: async () => {
+      if (!user || !versionId || !currentStoreId) return null
+      const data = await queryRest<BackshopVersionNotification[]>('backshop_version_notifications', {
+        select: '*',
+        user_id: `eq.${user.id}`,
+        version_id: `eq.${versionId}`,
+        store_id: `eq.${currentStoreId}`,
+        limit: '1',
+      })
+      const arr = Array.isArray(data) ? data : []
+      return (arr[0] ?? null) as BackshopVersionNotification | null
+    },
+    enabled: !!user && !!versionId && !!currentStoreId,
     staleTime: 30 * 1000,
   })
 }

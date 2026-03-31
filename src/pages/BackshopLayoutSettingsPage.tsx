@@ -206,8 +206,12 @@ export function BackshopLayoutSettingsPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-medium text-sm">Jede Warengruppe auf eigener Seite</div>
-                    <div className="text-xs text-muted-foreground">Jede Warengruppe beginnt im PDF auf einer neuen Seite</div>
+                    <div className="font-medium text-sm">Vorschau: eine Seite pro Warengruppe</div>
+                    <div className="text-xs text-muted-foreground">
+                      In der Vorschau unten werden Warengruppen wie einzelne Seiten gezeigt. Im PDF wird platzsparend
+                      umgebrochen: eine neue Seite nur, wenn die nächste Warengruppe komplett nicht mehr in den unteren
+                      Rand passt – mehrere kurze Gruppen können auf einer Seite stehen.
+                    </div>
                   </div>
                   <Switch
                     checked={form.page_break_per_block}

@@ -1,6 +1,6 @@
 // LayoutSettingsPage: Layout-Konfiguration für Super-Admin (mit Live-Vorschau)
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -69,23 +69,25 @@ export function LayoutSettingsPage() {
       const hdr = settings.font_header_px ?? 24
       const col = settings.font_column_px ?? 16
       const prod = settings.font_product_px ?? 12
-      setForm({
-        sort_mode: settings.sort_mode ?? 'ALPHABETICAL',
-        display_mode: settings.display_mode ?? 'MIXED',
-        flow_direction: settings.flow_direction ?? 'ROW_BY_ROW',
-        font_header_px: hdr,
-        font_column_px: col,
-        font_product_px: prod,
-        mark_red_kw_count: [1, 2, 3, 4].includes(Number(settings.mark_red_kw_count)) ? settings.mark_red_kw_count : 2,
-        mark_yellow_kw_count: [1, 2, 3, 4].includes(Number(settings.mark_yellow_kw_count)) ? settings.mark_yellow_kw_count : 3,
-        features_custom_products: settings.features_custom_products ?? true,
-        features_hidden_items: settings.features_hidden_items ?? true,
-        features_blocks: settings.features_blocks ?? true,
-        features_keyword_rules: settings.features_keyword_rules ?? true,
+      queueMicrotask(() => {
+        setForm({
+          sort_mode: settings.sort_mode ?? 'ALPHABETICAL',
+          display_mode: settings.display_mode ?? 'MIXED',
+          flow_direction: settings.flow_direction ?? 'ROW_BY_ROW',
+          font_header_px: hdr,
+          font_column_px: col,
+          font_product_px: prod,
+          mark_red_kw_count: [1, 2, 3, 4].includes(Number(settings.mark_red_kw_count)) ? settings.mark_red_kw_count : 2,
+          mark_yellow_kw_count: [1, 2, 3, 4].includes(Number(settings.mark_yellow_kw_count)) ? settings.mark_yellow_kw_count : 3,
+          features_custom_products: settings.features_custom_products ?? true,
+          features_hidden_items: settings.features_hidden_items ?? true,
+          features_blocks: settings.features_blocks ?? true,
+          features_keyword_rules: settings.features_keyword_rules ?? true,
+        })
+        setHeaderText(String(hdr))
+        setColumnText(String(col))
+        setProductText(String(prod))
       })
-      setHeaderText(String(hdr))
-      setColumnText(String(col))
-      setProductText(String(prod))
       // Kleine Verzögerung damit der initiale setForm nicht gleich Auto-Save auslöst
       const timeoutId = setTimeout(() => {
         isInitialized.current = true
@@ -155,7 +157,9 @@ export function LayoutSettingsPage() {
 
   // Stabile Ref fuer die Mutation-Funktion (verhindert Effect-Re-Execution bei jedem Render)
   const mutateRef = useRef(updateMutation.mutate)
-  mutateRef.current = updateMutation.mutate
+  useLayoutEffect(() => {
+    mutateRef.current = updateMutation.mutate
+  }, [updateMutation.mutate])
 
   // Beim Unmount: ausstehende Speicherung sofort ausführen (sonst geht sie verloren)
   useEffect(

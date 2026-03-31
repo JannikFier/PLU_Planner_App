@@ -1,6 +1,6 @@
 // MasterList – Haupt-PLU-Tabelle mit Layout-Engine, Toolbar und globaler Liste
 
-import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
+import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -19,11 +19,12 @@ import {
   FileDown,
   Pencil,
   Megaphone,
+  Search,
 } from 'lucide-react'
 
 // PLU-Komponenten
 import { KWSelector } from '@/components/plu/KWSelector'
-import { PLUTable } from '@/components/plu/PLUTable'
+import { PLUTable, type PLUTableHandle } from '@/components/plu/PLUTable'
 import { PLUFooter } from '@/components/plu/PLUFooter'
 
 const ExportPDFDialog = lazy(() =>
@@ -43,9 +44,16 @@ import { useRenamedItems } from '@/hooks/useRenamedItems'
 import { useBezeichnungsregeln } from '@/hooks/useBezeichnungsregeln'
 // Layout-Engine + Helpers
 import { buildDisplayList } from '@/lib/layout-engine'
+import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
+import { useStoreObstBlockOrder, useStoreObstNameBlockOverrides } from '@/hooks/useStoreObstBlockLayout'
 import type { PLUStats } from '@/lib/plu-helpers'
-import { getCurrentKW, getKWAndYearFromDate } from '@/lib/date-kw-utils'
-import { getActiveOfferPLUs } from '@/lib/offer-utils'
+import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
+import { buildOfferDisplayMap } from '@/lib/offer-display'
+import {
+  useObstOfferCampaignWithLines,
+  useObstOfferStoreDisabled,
+} from '@/hooks/useCentralOfferCampaigns'
+import { useObstOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalPrices'
 import { ensureActiveVersion } from '@/lib/ensure-active-version'
 
 interface MasterListProps {
@@ -81,17 +89,45 @@ export function MasterList({ mode }: MasterListProps) {
   const { data: customProducts = [] } = useCustomProducts()
   const { data: hiddenItems = [] } = useHiddenItems()
   const { data: offerItems = [] } = useOfferItems()
+  const { data: obstCampaign } = useObstOfferCampaignWithLines()
+  const { data: obstDisabled = new Set() } = useObstOfferStoreDisabled()
+  const { overrideMap: obstLocalPriceOverrides } = useObstOfferLocalPriceOverrides(obstCampaign ?? undefined)
   const { data: renamedItems = [] } = useRenamedItems()
   const { data: regeln = [] } = useBezeichnungsregeln()
+  const { data: storeObstBlockOrder = [] } = useStoreObstBlockOrder()
+  const { data: storeObstNameOverrides = [] } = useStoreObstNameBlockOverrides()
+  const nameBlockOverrides = useMemo(
+    () => buildNameBlockOverrideMap(storeObstNameOverrides),
+    [storeObstNameOverrides],
+  )
 
   const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
-  const offerPLUs = useMemo(
-    () => getActiveOfferPLUs(offerItems, currentKw, currentJahr),
-    [offerItems, currentKw, currentJahr],
+  const offerDisplayByPlu = useMemo(
+    () =>
+      buildOfferDisplayMap(
+        currentKw,
+        currentJahr,
+        obstCampaign ?? null,
+        obstDisabled,
+        offerItems,
+        obstLocalPriceOverrides,
+      ),
+    [currentKw, currentJahr, obstCampaign, obstDisabled, offerItems, obstLocalPriceOverrides],
   )
 
   // Gewählte Version (standardmäßig die aktive)
   const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>(undefined)
+
+  /** Bei neuem aktivem Upload: wieder die aktive Liste zeigen (nicht in alter KW-Version hängen bleiben). */
+  const prevActiveVersionIdRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    const id = activeVersion?.id
+    if (!id) return
+    if (prevActiveVersionIdRef.current !== undefined && prevActiveVersionIdRef.current !== id) {
+      setSelectedVersionId(undefined)
+    }
+    prevActiveVersionIdRef.current = id
+  }, [activeVersion?.id])
 
   // Dialoge
   const [showPDFDialog, setShowPDFDialog] = useState(false)
@@ -144,7 +180,7 @@ export function MasterList({ mode }: MasterListProps) {
       masterItems: rawItems,
       customProducts,
       hiddenPLUs: new Set(hiddenItems.map((h) => h.plu)),
-      offerPLUs,
+      offerDisplayByPlu,
       renamedItems: renamedItems.map((r) => ({ plu: r.plu, display_name: r.display_name, is_manually_renamed: r.is_manually_renamed })),
       bezeichnungsregeln: activeRegeln,
       blocks,
@@ -154,8 +190,10 @@ export function MasterList({ mode }: MasterListProps) {
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
       versionKwNummer: version?.kw_nummer ?? 0,
       versionJahr: version?.jahr ?? now.getFullYear(),
-      currentKwNummer: getCurrentKW(),
-      currentJahr: now.getFullYear(),
+      currentKwNummer: currentKw,
+      currentJahr,
+      nameBlockOverrides,
+      storeBlockOrder: storeObstBlockOrder,
     })
 
     // Layout-Engine stats → PLUStats konvertieren
@@ -169,7 +207,7 @@ export function MasterList({ mode }: MasterListProps) {
     }
 
     return { displayItems: result.items, stats: pluStats }
-  }, [rawItems, customProducts, hiddenItems, offerPLUs, renamedItems, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion, selectedVersionId, versions])
+  }, [rawItems, customProducts, hiddenItems, offerDisplayByPlu, renamedItems, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion, selectedVersionId, versions, currentKw, currentJahr, nameBlockOverrides, storeObstBlockOrder])
 
   // Aktuelle Version finden (für Anzeige im Header)
   const currentVersion = useMemo(
@@ -194,7 +232,7 @@ export function MasterList({ mode }: MasterListProps) {
       masterItems: pdfRawItems,
       customProducts,
       hiddenPLUs: new Set(hiddenItems.map((h) => h.plu)),
-      offerPLUs,
+      offerDisplayByPlu,
       renamedItems: renamedItems.map((r) => ({ plu: r.plu, display_name: r.display_name, is_manually_renamed: r.is_manually_renamed })),
       bezeichnungsregeln: activeRegeln,
       blocks,
@@ -204,8 +242,10 @@ export function MasterList({ mode }: MasterListProps) {
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
       versionKwNummer: pdfVersion?.kw_nummer ?? activeVersion?.kw_nummer ?? 0,
       versionJahr: pdfVersion?.jahr ?? activeVersion?.jahr ?? now.getFullYear(),
-      currentKwNummer: getCurrentKW(),
-      currentJahr: now.getFullYear(),
+      currentKwNummer: currentKw,
+      currentJahr,
+      nameBlockOverrides,
+      storeBlockOrder: storeObstBlockOrder,
     })
     return {
       displayItems: result.items,
@@ -218,7 +258,7 @@ export function MasterList({ mode }: MasterListProps) {
         customCount: result.stats.customCount,
       } as PLUStats,
     }
-  }, [pdfRawItems, customProducts, hiddenItems, offerPLUs, renamedItems, regeln, blocks, layoutSettings, sortMode, displayMode, pdfVersion, activeVersion])
+  }, [pdfRawItems, customProducts, hiddenItems, offerDisplayByPlu, renamedItems, regeln, blocks, layoutSettings, sortMode, displayMode, pdfVersion, activeVersion, currentKw, currentJahr, nameBlockOverrides, storeObstBlockOrder])
 
   // Loading-State
   const isLoading = versionLoading || versionsLoading || itemsLoading
@@ -243,6 +283,8 @@ export function MasterList({ mode }: MasterListProps) {
 
   // Tab wurde sichtbar: Browser throttelt Hintergrund-Tabs – Re-Render erzwingen,
   // damit bereits geladene Daten sofort angezeigt werden (sonst erst nach Klick).
+  const pluTableRef = useRef<PLUTableHandle>(null)
+
   const [, setVisibilityTick] = useState(0)
   useEffect(() => {
     const handler = () => {
@@ -297,16 +339,29 @@ export function MasterList({ mode }: MasterListProps) {
         {/* === Toolbar === */}
         {currentVersion && !isLoading && (
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="shrink-0"
+              onClick={() => pluTableRef.current?.openFindInPage()}
+              aria-label="In Liste suchen"
+              title="In Liste suchen (PLU oder Name)"
+            >
+              <Search className="h-4 w-4" />
+            </Button>
             {/* Anzeige-Infos: links (Nach Typ getrennt, KW, Aktiv) */}
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <ListFilter className="h-4 w-4" />
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+              <ListFilter className="h-4 w-4 shrink-0" />
               <span>
                 {displayMode === 'MIXED'
                   ? 'Stück + Gewicht gemischt'
                   : 'Nach Typ getrennt'}
               </span>
               <span className="text-border">|</span>
-              <span>{currentVersion.kw_label}</span>
+              <span className="text-foreground font-medium" title="Stammdaten aus zuletzt eingespielter Liste (wechselt nur bei neuem Upload)">
+                Liste {currentVersion.kw_label}
+              </span>
               {currentVersion.status === 'active' && (
                 <Badge variant="default" className="text-xs">Aktiv</Badge>
               )}
@@ -457,12 +512,15 @@ export function MasterList({ mode }: MasterListProps) {
         {!isLoading && !itemsError && !hasNoVersion && (displayItems.length > 0 || rawItems.length > 0) && (
           <>
             <PLUTable
+              ref={pluTableRef}
               items={displayItems}
               displayMode={displayMode}
               sortMode={sortMode}
               flowDirection={flowDirection}
               blocks={blocks}
               fontSizes={fontSizes}
+              showFindInPage
+              findInPageExternalTrigger
             />
 
             {/* === Footer mit Statistiken === */}

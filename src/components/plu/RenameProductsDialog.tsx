@@ -13,7 +13,15 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pencil, Search } from 'lucide-react'
-import { filterItemsBySearch, getDisplayPlu, itemMatchesSearch, groupItemsForDialog } from '@/lib/plu-helpers'
+import {
+  filterItemsBySearch,
+  getDisplayPlu,
+  itemMatchesSearch,
+  groupItemsForDialog,
+  groupItemsForDialogAlignedWithList,
+} from '@/lib/plu-helpers'
+import type { Block } from '@/types/database'
+import type { StoreBlockOrderRow } from '@/lib/block-override-utils'
 import { RenameDialog } from '@/components/plu/RenameDialog'
 import { cn } from '@/lib/utils'
 import type { MasterPLUItem, BackshopMasterPLUItem } from '@/types/database'
@@ -25,6 +33,7 @@ interface SearchableItem {
   display_name: string
   system_name: string
   item_type?: 'PIECE' | 'WEIGHT' | string | null
+  block_id?: string | null
 }
 
 type TableRow = { type: 'header'; label: string } | { type: 'row'; left?: SearchableItem; right?: SearchableItem }
@@ -93,6 +102,13 @@ export interface RenameProductsDialogProps {
   renamedOverrides?: RenamedItemOverride[]
   /** Anzeige-Modus: SEPARATED = nach Stück/Gewicht getrennt, MIXED = nur alphabetisch */
   displayMode?: 'MIXED' | 'SEPARATED'
+  /** Optional: gleiche Gruppierung wie die Masterliste */
+  listLayout?: {
+    sortMode: 'ALPHABETICAL' | 'BY_BLOCK'
+    blocks: Block[]
+    storeBlockOrder: StoreBlockOrderRow[]
+    nameBlockOverrides: Map<string, string>
+  }
 }
 
 export function RenameProductsDialog({
@@ -102,6 +118,7 @@ export function RenameProductsDialog({
   listType = 'default',
   renamedOverrides = [],
   displayMode = 'MIXED',
+  listLayout,
 }: RenameProductsDialogProps) {
   const [searchText, setSearchText] = useState('')
   const deferredSearch = useDebouncedValue(searchText, 200)
@@ -125,6 +142,7 @@ export function RenameProductsDialog({
           display_name: display,
           system_name: base.system_name,
           item_type: 'item_type' in base ? base.item_type : undefined,
+          block_id: 'block_id' in base ? base.block_id : undefined,
         }
       }),
     [searchableItems, overrideByPlu],
@@ -135,7 +153,19 @@ export function RenameProductsDialog({
     [searchableAsList, deferredSearch],
   )
 
-  const groups = useMemo(() => groupItemsForDialog(filteredItems, displayMode), [filteredItems, displayMode])
+  const groups = useMemo(() => {
+    if (listLayout) {
+      return groupItemsForDialogAlignedWithList(
+        filteredItems,
+        displayMode,
+        listLayout.sortMode,
+        listLayout.blocks,
+        listLayout.storeBlockOrder,
+        listLayout.nameBlockOverrides,
+      )
+    }
+    return groupItemsForDialog(filteredItems, displayMode)
+  }, [filteredItems, displayMode, listLayout])
   const tableRows = useMemo(() => buildTableRows(groups), [groups])
 
   // Bei Suchänderung zum ersten Treffer scrollen (wie HideProductsDialog)
@@ -213,14 +243,12 @@ export function RenameProductsDialog({
                 </div>
               ) : (
                 <div className="overflow-auto flex-1 min-h-0">
-                  <table className="w-full table-fixed">
+                  <table className="w-full table-fixed border-collapse">
                     <colgroup>
                       <col className="w-[80px]" />
                       <col />
-                      <col className="w-[44px]" />
                       <col className="w-[80px]" />
                       <col />
-                      <col className="w-[44px]" />
                     </colgroup>
                     <thead className="sticky top-0 bg-background z-10">
                       <tr className="border-b-2 border-border">
@@ -230,14 +258,12 @@ export function RenameProductsDialog({
                         <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
                           Artikel
                         </th>
-                        <th className="px-1 py-1.5 w-[44px] border-l-2 border-border" />
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
+                        <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px] border-l-2 border-border">
                           PLU
                         </th>
                         <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
                           Artikel
                         </th>
-                        <th className="px-1 py-1.5 w-[44px] border-l-2 border-border" />
                       </tr>
                     </thead>
                     <tbody ref={listRef}>
@@ -246,7 +272,7 @@ export function RenameProductsDialog({
                           return (
                             <tr key={`h-${i}-${row.label}`} className="border-b border-border">
                               <td
-                                colSpan={6}
+                                colSpan={4}
                                 className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm"
                               >
                                 {row.label}
@@ -288,8 +314,7 @@ export function RenameProductsDialog({
                                 ''
                               )}
                             </td>
-                            <td className="border-l-2 border-border" />
-                            <td className="px-2 py-1 text-sm font-mono">
+                            <td className="px-2 py-1 text-sm font-mono border-l-2 border-border">
                               {row.right ? getDisplayPlu(row.right.plu) : ''}
                             </td>
                             <td className="px-2 py-1 text-sm border-l border-border">
@@ -313,7 +338,6 @@ export function RenameProductsDialog({
                                 ''
                               )}
                             </td>
-                            <td className="border-l-2 border-border" />
                           </tr>
                         )
                       })}

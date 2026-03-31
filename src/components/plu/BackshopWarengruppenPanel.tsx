@@ -51,18 +51,43 @@ import {
   useCreateBackshopBlock,
   useUpdateBackshopBlock,
   useDeleteBackshopBlock,
-  useAssignBackshopProducts,
 } from '@/hooks/useBackshopBlocks'
+import {
+  useStoreBackshopBlockOrder,
+  useStoreBackshopNameBlockOverrides,
+  useAssignBackshopProductBlockOverride,
+} from '@/hooks/useStoreBackshopBlockLayout'
+import {
+  buildNameBlockOverrideMap,
+  effectiveBlockIdForStoreOverride,
+  sortBlocksWithStoreOrder,
+} from '@/lib/block-override-utils'
 import type { BackshopMasterPLUItem } from '@/types/database'
 
 export function BackshopWarengruppenPanel() {
   const { data: activeVersion } = useActiveBackshopVersion()
   const { data: items = [] } = useBackshopPLUData(activeVersion?.id)
   const { data: blocks = [] } = useBackshopBlocks()
+  const { data: storeBlockOrder = [] } = useStoreBackshopBlockOrder()
+  const { data: storeNameOverrides = [] } = useStoreBackshopNameBlockOverrides()
+  const nameBlockOverrideMap = useMemo(
+    () => buildNameBlockOverrideMap(storeNameOverrides),
+    [storeNameOverrides],
+  )
+  const sortedBlocks = useMemo(
+    () => sortBlocksWithStoreOrder(blocks, storeBlockOrder),
+    [blocks, storeBlockOrder],
+  )
   const createBlock = useCreateBackshopBlock()
   const updateBlock = useUpdateBackshopBlock()
   const deleteBlock = useDeleteBackshopBlock()
-  const assignProducts = useAssignBackshopProducts()
+  const assignOverride = useAssignBackshopProductBlockOverride()
+
+  const effBlock = useCallback(
+    (item: BackshopMasterPLUItem) =>
+      effectiveBlockIdForStoreOverride(item.system_name, item.block_id, nameBlockOverrideMap),
+    [nameBlockOverrideMap],
+  )
 
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -78,20 +103,20 @@ export function BackshopWarengruppenPanel() {
   const blockItemCounts = useMemo(() => {
     const counts = new Map<string | null, number>()
     for (const item of items) {
-      const key = item.block_id
+      const key = effBlock(item)
       counts.set(key, (counts.get(key) ?? 0) + 1)
     }
     return counts
-  }, [items])
+  }, [items, effBlock])
 
   const selectedBlockItems = useMemo(
-    () => (selectedBlockId ? items.filter((i) => i.block_id === selectedBlockId) : []),
-    [items, selectedBlockId],
+    () => (selectedBlockId ? items.filter((i) => effBlock(i) === selectedBlockId) : []),
+    [items, selectedBlockId, effBlock],
   )
 
   const unassignedItems = useMemo(
-    () => items.filter((i) => i.block_id == null),
-    [items],
+    () => items.filter((i) => effBlock(i) == null),
+    [items, effBlock],
   )
 
   const filteredUnassignedItems = useMemo(() => {
@@ -114,10 +139,10 @@ export function BackshopWarengruppenPanel() {
         return
       }
       setSelectedBlockId(blockId)
-      const blockItems = items.filter((i) => i.block_id === blockId)
+      const blockItems = items.filter((i) => effBlock(i) === blockId)
       setCheckedIds(new Set(blockItems.map((i) => i.id)))
     },
-    [items, selectedBlockId],
+    [items, selectedBlockId, effBlock],
   )
 
   const toggleItem = useCallback((itemId: string) => {
@@ -132,10 +157,15 @@ export function BackshopWarengruppenPanel() {
   const handleAssign = async () => {
     if (!selectedBlockId || checkedIds.size === 0) return
     try {
-      await assignProducts.mutateAsync({
-        itemIds: Array.from(checkedIds),
-        blockId: selectedBlockId,
-      })
+      for (const id of checkedIds) {
+        const item = items.find((i) => i.id === id)
+        if (!item) continue
+        await assignOverride.mutateAsync({
+          systemName: item.system_name,
+          masterBlockId: item.block_id,
+          targetBlockId: selectedBlockId,
+        })
+      }
       toast.success(`${checkedIds.size} Produkte zugewiesen`)
     } catch {
       toast.error('Fehler beim Zuweisen')
@@ -145,10 +175,15 @@ export function BackshopWarengruppenPanel() {
   const handleUnassign = async () => {
     if (checkedIds.size === 0) return
     try {
-      await assignProducts.mutateAsync({
-        itemIds: Array.from(checkedIds),
-        blockId: null,
-      })
+      for (const id of checkedIds) {
+        const item = items.find((i) => i.id === id)
+        if (!item) continue
+        await assignOverride.mutateAsync({
+          systemName: item.system_name,
+          masterBlockId: item.block_id,
+          targetBlockId: null,
+        })
+      }
       toast.success(`Zuordnung bei ${checkedIds.size} Produkt(en) aufgehoben`)
       setCheckedIds(new Set())
     } catch {
@@ -219,13 +254,19 @@ export function BackshopWarengruppenPanel() {
     const targetBlockId = over.id as string
     const isBlock = blocks.some((b) => b.id === targetBlockId)
     if (!isBlock) return
+    const item = items.find((i) => i.id === itemId)
+    if (!item) return
     try {
-      await assignProducts.mutateAsync({ itemIds: [itemId], blockId: targetBlockId })
+      await assignOverride.mutateAsync({
+        systemName: item.system_name,
+        masterBlockId: item.block_id,
+        targetBlockId: targetBlockId,
+      })
       toast.success('Produkt zugewiesen')
     } catch {
       toast.error('Fehler beim Zuweisen')
     }
-  }, [blocks, assignProducts])
+  }, [blocks, items, assignOverride])
 
   return (
     <>
@@ -241,7 +282,7 @@ export function BackshopWarengruppenPanel() {
             <CardContent className="space-y-2">
               <ScrollArea className="h-[300px]">
                 <div className="space-y-1">
-                  {blocks.map((block) => (
+                  {sortedBlocks.map((block) => (
                     <DroppableBlock
                       key={block.id}
                       blockId={block.id}
@@ -312,7 +353,8 @@ export function BackshopWarengruppenPanel() {
                         selectedBlockItems.length > 0 ? (
                           selectedBlockItems.map((item) => {
                             const isChecked = checkedIds.has(item.id)
-                            const assignedBlock = item.block_id ? blocks.find((b) => b.id === item.block_id) : null
+                            const effId = effBlock(item)
+                            const assignedBlock = effId ? blocks.find((b) => b.id === effId) : null
                             const isOtherBlock = assignedBlock && assignedBlock.id !== selectedBlockId
                             return (
                               <DraggableBackshopProduct
@@ -350,7 +392,8 @@ export function BackshopWarengruppenPanel() {
                     <div className="space-y-0.5">
                       {filteredUnassignedItems.map((item) => {
                         const isChecked = checkedIds.has(item.id)
-                        const assignedBlock = item.block_id ? blocks.find((b) => b.id === item.block_id) : null
+                        const effId = effBlock(item)
+                        const assignedBlock = effId ? blocks.find((b) => b.id === effId) : null
                         const isOtherBlock = assignedBlock && assignedBlock.id !== selectedBlockId
                         return (
                           <DraggableBackshopProduct
@@ -377,10 +420,10 @@ export function BackshopWarengruppenPanel() {
                   <Button
                     size="sm"
                     onClick={handleAssign}
-                    disabled={!selectedBlockId || checkedIds.size === 0 || assignProducts.isPending}
+                    disabled={!selectedBlockId || checkedIds.size === 0 || assignOverride.isPending}
                     className="flex-1"
                   >
-                    {assignProducts.isPending ? (
+                    {assignOverride.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <>Auswahl → {selectedBlock?.name ?? '...'} zuweisen</>
@@ -396,7 +439,7 @@ export function BackshopWarengruppenPanel() {
                     variant="ghost"
                     className="text-muted-foreground"
                     onClick={handleUnassign}
-                    disabled={checkedIds.size === 0 || assignProducts.isPending}
+                    disabled={checkedIds.size === 0 || assignOverride.isPending}
                   >
                     Zuordnung aufheben
                   </Button>

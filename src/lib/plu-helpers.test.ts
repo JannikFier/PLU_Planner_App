@@ -9,6 +9,7 @@ import {
   isPriceOnlyPlu,
   getDisplayPlu,
   filterItemsBySearch,
+  splitTextForHighlight,
   groupItemsByLetter,
   splitIntoColumns,
   type PLUItemBase,
@@ -172,6 +173,24 @@ describe('plu-helpers', () => {
     })
     it('columnCount <= 0 gibt alle Items in einer Spalte', () => {
       expect(splitIntoColumns([1, 2], 0)).toEqual([[1, 2]])
+    })
+  })
+
+  describe('splitTextForHighlight', () => {
+    it('markiert Treffer case-insensitive', () => {
+      expect(splitTextForHighlight('Apple BIO', 'bio')).toEqual([
+        { text: 'Apple ', match: false },
+        { text: 'BIO', match: true },
+      ])
+    })
+    it('mehrere Treffer in einem String', () => {
+      expect(splitTextForHighlight('aa', 'a')).toEqual([
+        { text: 'a', match: true },
+        { text: 'a', match: true },
+      ])
+    })
+    it('leere Query liefert ein Segment ohne Treffer', () => {
+      expect(splitTextForHighlight('x', '  ')).toEqual([{ text: 'x', match: false }])
     })
   })
 })

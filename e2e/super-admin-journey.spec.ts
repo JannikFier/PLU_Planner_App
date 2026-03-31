@@ -41,6 +41,7 @@ test.describe('Super-Admin-Journey @extended', () => {
     await expect(page.getByRole('heading', { name: 'Obst und Gemüse', level: 2 })).toBeVisible()
     await expect(page.getByText('PLU Upload Obst/Gemüse')).toBeVisible()
     await expect(page.getByText('Versionen')).toBeVisible()
+    await expect(page.getByText('Zentrale Werbung (Exit)')).toBeVisible()
   })
 
   test('Backshop-Bereich: Upload sichtbar', async ({ page }) => {
@@ -50,6 +51,23 @@ test.describe('Super-Admin-Journey @extended', () => {
     await expect(page).toHaveURL(/\/super-admin\/backshop/)
     await expect(page.getByRole('heading', { name: 'Backshop', level: 2 })).toBeVisible()
     await expect(page.getByText('Backshop Upload')).toBeVisible()
+    await expect(page.getByText('Zentrale Werbung (Exit)')).toBeVisible()
+  })
+
+  test('Zentrale Werbung (Obst): Upload-Seite lädt', async ({ page }) => {
+    await page.goto('/super-admin/central-werbung/obst')
+    await expect(page).toHaveURL(/\/super-admin\/central-werbung\/obst/)
+    await expect(
+      page.getByRole('heading', { name: 'Zentrale Werbung (Obst/Gemüse)', level: 2 }),
+    ).toBeVisible({ timeout: 15_000 })
+  })
+
+  test('Zentrale Werbung (Backshop): Upload-Seite lädt', async ({ page }) => {
+    await page.goto('/super-admin/central-werbung/backshop')
+    await expect(page).toHaveURL(/\/super-admin\/central-werbung\/backshop/)
+    await expect(
+      page.getByRole('heading', { name: 'Zentrale Werbung (Backshop)', level: 2 }),
+    ).toBeVisible({ timeout: 15_000 })
   })
 
   test('Benutzerverwaltung erreichbar', async ({ page }) => {

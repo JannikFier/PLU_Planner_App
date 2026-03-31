@@ -31,10 +31,12 @@ versions (KW-Versionen) – NATIONAL, kein store_id
     ├──→ master_plu_items (1:n) – Alle PLU-Eintraege einer Version
     └──→ version_notifications (1:n, pro store_id)
 
-layout_settings (Singleton) – NATIONAL
-bezeichnungsregeln (Keyword-Regeln) – NATIONAL
+layout_settings (pro store_id, UNIQUE) – Markt-Layout Obst/Gemüse
+bezeichnungsregeln (Keyword-Regeln, pro store_id) – Markt
+store_obst_block_order (optional Reihenfolge Warengruppen pro Markt)
+store_obst_name_block_override (Markt: effektive Warengruppe nach normalisiertem Artikelnamen)
 
-blocks (Warengruppen/Bloecke) – NATIONAL
+blocks (Warengruppen/Bloecke) – NATIONAL (Referenz/Upload)
     │
     └──→ block_rules (1:n) – Zuweisungsregeln pro Block
 
@@ -44,7 +46,8 @@ backshop_versions → backshop_master_plu_items (inkl. image_url) – NATIONAL
 backshop_blocks → backshop_block_rules – NATIONAL
 backshop_custom_products (pro store_id), backshop_hidden_items (pro store_id)
 backshop_renamed_items (pro store_id), backshop_offer_items (pro store_id)
-backshop_layout_settings (Singleton), backshop_bezeichnungsregeln – NATIONAL
+backshop_layout_settings (pro store_id), backshop_bezeichnungsregeln (pro store_id)
+store_backshop_block_order, store_backshop_name_block_override – analog Obst
 ```
 
 ## Multi-Tenancy-Tabellen
@@ -221,7 +224,7 @@ Automatische Zuweisungsregeln für Blöcke.
 
 ### layout_settings
 
-Singleton-Tabelle (genau 1 Zeile) für Layout-Konfiguration.
+Eine Zeile pro Markt (`store_id` UNIQUE). Kanonische PLU-Zuordnung bleibt in `master_plu_items`; die Anzeige am Markt kann über `store_obst_name_block_override` und `store_obst_block_order` abweichen (Migration 052).
 
 | Feld | Typ | Standard | Beschreibung |
 |------|-----|----------|-------------|
@@ -237,13 +240,18 @@ Singleton-Tabelle (genau 1 Zeile) für Layout-Konfiguration.
 
 ### bezeichnungsregeln
 
-Automatische Namensanpassungen (z.B. "Bio" immer vorne).
+Automatische Namensanpassungen (z.B. "Bio" immer vorne). **Pro Markt** (`store_id`, UNIQUE pro `store_id` + `keyword`).
 
 | Feld | Typ | Beschreibung |
 |------|-----|-------------|
+| `store_id` | UUID (FK → stores) | Markt |
 | `keyword` | TEXT | z.B. "Bio", "Fairtrade" |
 | `position` | TEXT | `PREFIX` oder `SUFFIX` |
 | `is_active` | BOOLEAN | Aktiv/Inaktiv |
+
+### store_obst_block_order / store_obst_name_block_override
+
+Optionale Markt-Sortierung der Warengruppen (`order_index` pro `block_id`) bzw. Override der effektiven Warengruppe nach `system_name_normalized` (= `lower(trim(system_name))`), solange der Name in der aktuellen Version vorkommt. Backshop: `store_backshop_block_order`, `store_backshop_name_block_override`.
 
 ### custom_products (NEU – Runde 2)
 
@@ -275,6 +283,8 @@ Marktspezifisch ausgeblendete PLUs. KW-unabhängig.
 | `hidden_by` | UUID (FK → profiles) | Wer hat ausgeblendet |
 | `created_at` | TIMESTAMPTZ | Ausgeblendet am |
 
+**RLS (Schreiben):** Insert/Update/Delete nur, wenn `store_id = get_current_store_id()` und `current_store_id` gesetzt (Migration 049; kein Super-Admin-Bypass mehr). Lesen: Zugriff über zugewiesene Märkte bzw. Super-Admin liest alle.
+
 ### renamed_items (Obst/Gemüse – Umbenennungen pro Markt)
 
 Marktspezifische Umbenennungen von Master-Produkten. Überschreiben `display_name` und `is_manually_renamed` zur Laufzeit.
@@ -294,19 +304,24 @@ UNIQUE(plu, store_id).
 
 ### plu_offer_items (Werbung/Angebot – Obst/Gemüse)
 
-Produkte, die als „Angebot“ in der Werbung geführt werden. Laufzeit in Wochen (1–4), Start = aktuelle KW beim Anlegen.
+Manuelle Werbung: Laufzeit in Wochen (1–4), Start = aktuelle KW beim Anlegen. Zusätzlich `promo_price` (Aktionspreis), `offer_source` = `manual`. Pro Markt (`store_id`); UNIQUE (`plu`, `store_id`).
 
 | Feld | Typ | Beschreibung |
 |------|-----|-------------|
 | `id` | UUID (PK) | Eintrag-ID |
-| `plu` | TEXT (UNIQUE) | PLU des Angebots |
+| `plu` | TEXT | PLU des Angebots |
+| `store_id` | UUID (FK → stores) | Markt |
 | `start_kw` | INT | Start-Kalenderwoche |
 | `start_jahr` | INT | Start-Jahr |
 | `duration_weeks` | INT (1–4) | Laufzeit in Wochen |
+| `promo_price` | NUMERIC | Aktionspreis (VK) |
+| `offer_source` | TEXT | `manual` |
 | `created_by` | UUID (FK → profiles) | Wer hat hinzugefügt |
 | `created_at` | TIMESTAMPTZ | Angelegt am |
 
-**RLS:** Lesen für alle Auth-User; Einfügen/Löschen/Update nur für User, Admin, Super-Admin (nicht Viewer).
+**Zentrale Werbung (global, nicht in dieser Tabelle dupliziert):** `obst_offer_campaigns` (eine Zeile pro KW/Jahr), `obst_offer_campaign_lines` (PLU + Aktionspreis), `obst_offer_store_disabled` (Megafon aus pro `store_id` + `plu`). Migration 050.
+
+**RLS:** Lesen für alle Auth-User; Einfügen/Löschen/Update nur für User, Admin, Super-Admin (nicht Viewer). Kampagnen: nur Super-Admin schreiben (siehe Migration 050).
 
 ### version_notifications (NEU – Runde 2)
 
@@ -351,7 +366,7 @@ Getrennte Tabellen für die zweite PLU-Liste „Backshop“. Keine Änderung an 
 
 **Funktion:** `get_active_backshop_version()` – gibt die aktive Backshop-Version zurück (analog `get_active_version()`).
 
-**RLS:** Lesen für alle authentifizierten User; Schreiben für versions/items/blocks/regeln/layout/bezeichnungsregeln nur Super-Admin; custom_products/hidden_items wie bei Obst/Gemüse.
+**RLS:** Lesen für alle authentifizierten User; Schreiben für versions/items/blocks/regeln/layout/bezeichnungsregeln nur Super-Admin; `backshop_custom_products` wie `custom_products`; `backshop_hidden_items` wie `hidden_items` (Schreiben nur aktueller Markt, Migration 049).
 
 ## Supabase Storage (Backshop-Bilder)
 

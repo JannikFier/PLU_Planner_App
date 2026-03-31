@@ -1,0 +1,76 @@
+import { Navigate, useNavigate } from 'react-router-dom'
+import { DashboardLayout } from '@/components/layout/DashboardLayout'
+import { DashboardCard } from '@/components/layout/DashboardCard'
+import { useUserListVisibility } from '@/hooks/useStoreListVisibility'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
+import { LayoutGrid, BookText, GripVertical } from 'lucide-react'
+
+/**
+ * Admin: Konfiguration Backshop – Layout, Regeln, Block-Sortierung.
+ */
+export function AdminBackshopKonfigurationPage() {
+  const navigate = useNavigate()
+  const { currentStoreId } = useCurrentStore()
+  const { data: visibility, isLoading } = useUserListVisibility()
+  const backshopVisible = visibility?.find(v => v.list_type === 'backshop')?.is_visible ?? true
+
+  if (!currentStoreId) {
+    return (
+      <DashboardLayout>
+        <div className="p-6 text-center text-muted-foreground">Kein Markt zugewiesen.</div>
+      </DashboardLayout>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="animate-pulse bg-muted h-32 rounded-lg" />
+      </DashboardLayout>
+    )
+  }
+
+  if (!backshopVisible) {
+    return <Navigate to="/admin" replace />
+  }
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-8">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-800">Konfiguration Backshop</h2>
+          <p className="text-muted-foreground">
+            Layout, Bezeichnungsregeln und Warengruppen – nur bei Bedarf ändern.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <DashboardCard
+            title="Layout Backshop"
+            description="Darstellung und Optionen für diesen Markt"
+            icon={LayoutGrid}
+            onClick={() => navigate('/admin/backshop-layout')}
+            color="text-amber-800"
+            bg="bg-amber-50"
+          />
+          <DashboardCard
+            title="Bezeichnungsregeln (Backshop)"
+            description="Keyword-Regeln für Namen in diesem Markt"
+            icon={BookText}
+            onClick={() => navigate('/admin/backshop-rules')}
+            color="text-amber-800"
+            bg="bg-amber-50"
+          />
+          <DashboardCard
+            title="Warengruppen sortieren (Backshop)"
+            description="Drag & Drop für diesen Markt"
+            icon={GripVertical}
+            onClick={() => navigate('/admin/backshop-block-sort')}
+            color="text-amber-800"
+            bg="bg-amber-50"
+          />
+        </div>
+      </div>
+    </DashboardLayout>
+  )
+}

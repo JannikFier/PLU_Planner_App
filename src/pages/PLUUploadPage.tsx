@@ -44,6 +44,8 @@ import { usePLUUpload } from '@/hooks/usePLUUpload'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
 import { useBlocks } from '@/hooks/useBlocks'
 import { useBezeichnungsregeln } from '@/hooks/useBezeichnungsregeln'
+import { useStoreObstBlockOrder, useStoreObstNameBlockOverrides } from '@/hooks/useStoreObstBlockLayout'
+import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
 import { PLUTable } from '@/components/plu/PLUTable'
 import { generateUUID } from '@/lib/utils'
 import { formatKWLabel, formatKWShort } from '@/lib/plu-helpers'
@@ -87,6 +89,12 @@ export function PLUUploadPage() {
   const { data: layoutSettings } = useLayoutSettings()
   const { data: blocks = [] } = useBlocks()
   const { data: regeln = [] } = useBezeichnungsregeln()
+  const { data: storeObstBlockOrder = [] } = useStoreObstBlockOrder()
+  const { data: storeObstNameOverrides = [] } = useStoreObstNameBlockOverrides()
+  const uploadPreviewNameOverrides = useMemo(
+    () => buildNameBlockOverrideMap(storeObstNameOverrides),
+    [storeObstNameOverrides],
+  )
 
   const displayMode = layoutSettings?.display_mode ?? 'MIXED'
   const sortMode = layoutSettings?.sort_mode ?? 'ALPHABETICAL'
@@ -134,9 +142,11 @@ export function PLUUploadPage() {
       versionJahr,
       currentKwNummer: getCurrentKW(),
       currentJahr: new Date().getFullYear(),
+      nameBlockOverrides: uploadPreviewNameOverrides,
+      storeBlockOrder: storeObstBlockOrder,
     })
     return result.items
-  }, [step, previewItems, regeln, blocks, layoutSettings, sortMode, displayMode, targetKW, targetJahr])
+  }, [step, previewItems, regeln, blocks, layoutSettings, sortMode, displayMode, targetKW, targetJahr, uploadPreviewNameOverrides, storeObstBlockOrder])
 
   const step2ContainerRef = useRef<HTMLDivElement>(null)
   const [step2Boundary, setStep2Boundary] = useState<HTMLDivElement | null>(null)

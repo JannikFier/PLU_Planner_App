@@ -12,6 +12,12 @@ import { supabase } from '@/lib/supabase'
 import { extractSubdomain, isAdminSubdomain } from '@/lib/subdomain'
 import { useAuth } from '@/hooks/useAuth'
 import type { Profile } from '@/types/database'
+import { readUserPreviewState } from '@/lib/user-preview-session'
+
+export interface SetActiveStoreOptions {
+  /** Standard true; bei Super-Admin-Vorschau false, damit profiles.current_store_id unverändert bleibt. */
+  syncToProfile?: boolean
+}
 
 interface StoreContextType {
   currentStoreId: string | null
@@ -24,7 +30,9 @@ interface StoreContextType {
   subdomain: string | null
   isLoading: boolean
   error: string | null
-  setActiveStore: (storeId: string) => void
+  setActiveStore: (storeId: string, options?: SetActiveStoreOptions) => Promise<void>
+  /** Nach Ende der Vorschau ohne bekannten vorherigen Markt: Profil-/Access-Auflösung erneut ausführen. */
+  reresolveStoreFromAuth: () => void
 }
 
 const StoreContext = createContext<StoreContextType>({
@@ -38,7 +46,8 @@ const StoreContext = createContext<StoreContextType>({
   subdomain: null,
   isLoading: true,
   error: null,
-  setActiveStore: () => {},
+  setActiveStore: async () => {},
+  reresolveStoreFromAuth: () => {},
 })
 
 const APP_DOMAIN = import.meta.env.VITE_APP_DOMAIN || 'localhost'
@@ -208,7 +217,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return true
     }
     return false
-  }, [])
+  }, [setState])
 
   // BroadcastChannel: Store-Wechsel in anderen Tabs synchronisieren (nur bei expliziter User-Aktion)
   useEffect(() => {
@@ -232,6 +241,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const resolveByProfileFromAuth = useCallback(
     async (userId: string, authProfile: Profile | null) => {
       try {
+        const preview = readUserPreviewState()
+        if (preview?.active && preview.storeId) {
+          const row = await loadStoreRow(preview.storeId)
+          if (row) {
+            setState(storeRowToState(row))
+            loadCompanyInBackground(row.company_id, setState)
+            return
+          }
+        }
+
         const profileStoreId = authProfile?.current_store_id ?? null
         const profileRole = authProfile?.role ?? null
 
@@ -299,15 +318,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }))
       }
     },
-    [],
+    [setState],
   )
 
-  // --- Schritt 1: Subdomain-basierte Aufloesung (sofort bei Mount) ---
-  useEffect(() => {
-    resolveBySubdomain()
-  }, [])
-
-  async function resolveBySubdomain() {
+  const resolveBySubdomain = useCallback(async () => {
     try {
       const params = new URLSearchParams(window.location.search)
       const devOverride = import.meta.env.DEV ? params.get('store') : null
@@ -375,7 +389,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         error: 'Markt konnte nicht geladen werden.',
       }))
     }
-  }
+  }, [setState])
+
+  // --- Schritt 1: Subdomain-basierte Aufloesung (sofort bei Mount) ---
+  useEffect(() => {
+    void Promise.resolve().then(() => resolveBySubdomain())
+  }, [resolveBySubdomain])
 
   // --- Schritt 2: Auth-basierter Fallback (kein Subdomain ODER Admin-Subdomain ohne Store) ---
   useEffect(() => {
@@ -389,7 +408,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         } catch {
           /* ignore */
         }
-        setStateRaw({ ...INITIAL_STATE, isLoading: false })
+        queueMicrotask(() => {
+          setStateRaw({ ...INITIAL_STATE, isLoading: false })
+        })
       }
       return
     }
@@ -397,19 +418,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (fallbackTriggered.current && state.currentStoreId) return
     if (!resolvedBySubdomain.current || (state.isAdminDomain && !state.currentStoreId)) {
       fallbackTriggered.current = true
-      void resolveByProfileFromAuth(user.id, profile)
+      void Promise.resolve().then(() => resolveByProfileFromAuth(user.id, profile))
     }
   }, [user?.id, profile, session, authLoading, state.isAdminDomain, state.currentStoreId, resolveByProfileFromAuth])
 
-  const setActiveStore = useCallback(async (storeId: string) => {
+  const setActiveStore = useCallback(async (storeId: string, options?: SetActiveStoreOptions) => {
+    const syncToProfile = options?.syncToProfile !== false
     const ok = await loadAndSetStore(storeId)
     if (ok) {
-      syncCurrentStoreToDb(storeId)
+      if (syncToProfile) {
+        syncCurrentStoreToDb(storeId)
+      }
       channelRef.current?.postMessage({ type: 'STORE_CHANGED', storeId })
     }
   }, [loadAndSetStore])
 
-  const value = useMemo(() => ({ ...state, setActiveStore }), [state, setActiveStore])
+  const reresolveStoreFromAuth = useCallback(() => {
+    fallbackTriggered.current = false
+    if (user?.id) {
+      void resolveByProfileFromAuth(user.id, profile)
+    }
+  }, [user, profile, resolveByProfileFromAuth])
+
+  const value = useMemo(
+    () => ({ ...state, setActiveStore, reresolveStoreFromAuth }),
+    [state, setActiveStore, reresolveStoreFromAuth],
+  )
 
   return (
     <StoreContext.Provider value={value}>
@@ -418,6 +452,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export function useStoreContext() {
+export function useStoreContext() { // eslint-disable-line react-refresh/only-export-components
   return useContext(StoreContext)
 }

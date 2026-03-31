@@ -23,6 +23,7 @@ import { useUpdateBackshopCustomProduct } from '@/hooks/useBackshopCustomProduct
 import { useAuth } from '@/hooks/useAuth'
 import { uploadBackshopImage } from '@/lib/backshop-storage'
 import { toast } from 'sonner'
+import { BackshopThumbnail } from '@/components/plu/BackshopThumbnail'
 import { ImagePlus, Trash2, Camera } from 'lucide-react'
 import type { BackshopBlock } from '@/types/database'
 import type { BackshopCustomProduct } from '@/types/database'
@@ -146,11 +147,7 @@ export function EditBackshopCustomProductDialog({
             />
             <div className="flex items-center gap-3 flex-wrap">
               {currentImageUrl && (
-                <img
-                  src={currentImageUrl}
-                  alt=""
-                  className="h-20 w-20 object-contain rounded border border-border"
-                />
+                <BackshopThumbnail src={currentImageUrl} size="xl" />
               )}
               <div className="flex gap-2 flex-wrap">
                 <Button

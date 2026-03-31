@@ -1,7 +1,8 @@
-// Hook: Layout-Einstellungen laden + aktualisieren (Singleton)
+// Hook: Layout-Einstellungen laden + aktualisieren (pro Markt)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, queryRest } from '@/lib/supabase'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import type { LayoutSettings } from '@/types/database'
 import type { Database } from '@/types/database'
 
@@ -31,6 +32,7 @@ function clampFontUpdates(updates: LayoutSettingsUpdate): LayoutSettingsUpdate {
 /** Standard-Werte falls keine Einstellungen in der DB vorhanden */
 const DEFAULT_LAYOUT: LayoutSettings = {
   id: '',
+  store_id: '',
   sort_mode: 'ALPHABETICAL',
   display_mode: 'MIXED',
   flow_direction: 'ROW_BY_ROW',
@@ -50,20 +52,25 @@ const DEFAULT_LAYOUT: LayoutSettings = {
 }
 
 /**
- * Lädt die Layout-Einstellungen (Singleton-Tabelle, nur 1 Zeile).
+ * Lädt die Layout-Einstellungen fuer den aktuellen Markt.
  * Fallback: Default-Werte wenn keine Zeile gefunden wird.
  */
 export function useLayoutSettings() {
+  const { currentStoreId } = useCurrentStore()
+
   return useQuery<LayoutSettings>({
-    queryKey: ['layout-settings'],
+    queryKey: ['layout-settings', currentStoreId],
     staleTime: 5 * 60_000,
+    enabled: !!currentStoreId,
     queryFn: async ({ signal }) => {
+      if (!currentStoreId) return DEFAULT_LAYOUT
       const data = await queryRest<LayoutSettings[]>('layout_settings', {
         select: '*',
+        store_id: `eq.${currentStoreId}`,
         limit: '1',
       }, { signal })
       const arr = Array.isArray(data) ? data : []
-      if (arr.length === 0) return DEFAULT_LAYOUT
+      if (arr.length === 0) return { ...DEFAULT_LAYOUT, store_id: currentStoreId }
       return arr[0] as LayoutSettings
     },
   })
@@ -75,16 +82,22 @@ export function useLayoutSettings() {
  */
 export function useUpdateLayoutSettings() {
   const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
 
   return useMutation({
     mutationFn: async (updates: LayoutSettingsUpdate) => {
       const clamped = clampFontUpdates(updates)
 
-      let settingsId = queryClient.getQueryData<LayoutSettings>(['layout-settings'])?.id
+      if (!currentStoreId) {
+        throw new Error('Kein Markt ausgewählt.')
+      }
+
+      let settingsId = queryClient.getQueryData<LayoutSettings>(['layout-settings', currentStoreId])?.id
 
       if (!settingsId) {
         const rows = await queryRest<LayoutSettings[]>('layout_settings', {
           select: 'id',
+          store_id: `eq.${currentStoreId}`,
           limit: '1',
         })
         settingsId = rows?.[0]?.id
@@ -103,6 +116,7 @@ export function useUpdateLayoutSettings() {
           .from('layout_settings')
           .update((clamped as LayoutSettingsUpdate) as never)
           .eq('id', settingsId)
+          .eq('store_id', currentStoreId)
           .abortSignal(controller.signal)
         if (error) throw error
       } catch (err) {
@@ -117,9 +131,9 @@ export function useUpdateLayoutSettings() {
     onMutate: async (updates) => {
       // Optimistisch: Cache sofort mit begrenzten Werten aktualisieren
       const clamped = clampFontUpdates(updates)
-      const previous = queryClient.getQueryData<LayoutSettings>(['layout-settings'])
-      if (previous && clamped) {
-        queryClient.setQueryData<LayoutSettings>(['layout-settings'], {
+      const previous = queryClient.getQueryData<LayoutSettings>(['layout-settings', currentStoreId])
+      if (previous && clamped && currentStoreId) {
+        queryClient.setQueryData<LayoutSettings>(['layout-settings', currentStoreId], {
           ...previous,
           ...clamped,
           updated_at: new Date().toISOString(),
@@ -129,9 +143,9 @@ export function useUpdateLayoutSettings() {
     },
     onSuccess: (_data, updates) => {
       const clamped = clampFontUpdates(updates)
-      const current = queryClient.getQueryData<LayoutSettings>(['layout-settings'])
-      if (current && clamped) {
-        queryClient.setQueryData<LayoutSettings>(['layout-settings'], {
+      const current = queryClient.getQueryData<LayoutSettings>(['layout-settings', currentStoreId])
+      if (current && clamped && currentStoreId) {
+        queryClient.setQueryData<LayoutSettings>(['layout-settings', currentStoreId], {
           ...current,
           ...clamped,
           updated_at: new Date().toISOString(),
@@ -140,8 +154,8 @@ export function useUpdateLayoutSettings() {
     },
     onError: (_err, _updates, context) => {
       // Bei Fehler: vorherigen Zustand wiederherstellen
-      if (context?.previous) {
-        queryClient.setQueryData(['layout-settings'], context.previous)
+      if (context?.previous && currentStoreId) {
+        queryClient.setQueryData(['layout-settings', currentStoreId], context.previous)
       }
     },
   })

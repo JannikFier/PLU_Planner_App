@@ -50,17 +50,42 @@ import {
   useCreateBlock,
   useUpdateBlock,
   useDeleteBlock,
-  useAssignProducts,
 } from '@/hooks/useBlocks'
+import {
+  useStoreObstBlockOrder,
+  useStoreObstNameBlockOverrides,
+  useAssignObstProductBlockOverride,
+} from '@/hooks/useStoreObstBlockLayout'
+import {
+  buildNameBlockOverrideMap,
+  effectiveBlockIdForStoreOverride,
+  sortBlocksWithStoreOrder,
+} from '@/lib/block-override-utils'
 import type { MasterPLUItem } from '@/types/database'
 export function WarengruppenPanel() {
   const { data: activeVersion } = useActiveVersion()
   const { data: items = [] } = usePLUData(activeVersion?.id)
   const { data: blocks = [] } = useBlocks()
+  const { data: storeBlockOrder = [] } = useStoreObstBlockOrder()
+  const { data: storeNameOverrides = [] } = useStoreObstNameBlockOverrides()
+  const nameBlockOverrideMap = useMemo(
+    () => buildNameBlockOverrideMap(storeNameOverrides),
+    [storeNameOverrides],
+  )
+  const sortedBlocks = useMemo(
+    () => sortBlocksWithStoreOrder(blocks, storeBlockOrder),
+    [blocks, storeBlockOrder],
+  )
   const createBlock = useCreateBlock()
   const updateBlock = useUpdateBlock()
   const deleteBlock = useDeleteBlock()
-  const assignProducts = useAssignProducts()
+  const assignOverride = useAssignObstProductBlockOverride()
+
+  const effBlock = useCallback(
+    (item: MasterPLUItem) =>
+      effectiveBlockIdForStoreOverride(item.system_name, item.block_id, nameBlockOverrideMap),
+    [nameBlockOverrideMap],
+  )
 
   // State
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
@@ -78,11 +103,11 @@ export function WarengruppenPanel() {
   const blockItemCounts = useMemo(() => {
     const counts = new Map<string | null, number>()
     for (const item of items) {
-      const key = item.block_id
+      const key = effBlock(item)
       counts.set(key, (counts.get(key) ?? 0) + 1)
     }
     return counts
-  }, [items])
+  }, [items, effBlock])
 
   // Gefilterte Produkte (rechte Seite)
   const filteredItems = useMemo(() => {
@@ -104,10 +129,10 @@ export function WarengruppenPanel() {
         return
       }
       setSelectedBlockId(blockId)
-      const blockItems = items.filter((i) => i.block_id === blockId)
+      const blockItems = items.filter((i) => effBlock(i) === blockId)
       setCheckedIds(new Set(blockItems.map((i) => i.id)))
     },
-    [items, selectedBlockId],
+    [items, selectedBlockId, effBlock],
   )
 
   // Checkbox toggle
@@ -123,14 +148,19 @@ export function WarengruppenPanel() {
     })
   }, [])
 
-  // Zuweisen
+  // Zuweisen (Markt-Overrides, nicht globales master_plu_items.block_id)
   const handleAssign = async () => {
     if (!selectedBlockId || checkedIds.size === 0) return
     try {
-      await assignProducts.mutateAsync({
-        itemIds: Array.from(checkedIds),
-        blockId: selectedBlockId,
-      })
+      for (const id of checkedIds) {
+        const item = items.find((i) => i.id === id)
+        if (!item) continue
+        await assignOverride.mutateAsync({
+          systemName: item.system_name,
+          masterBlockId: item.block_id,
+          targetBlockId: selectedBlockId,
+        })
+      }
       toast.success(`${checkedIds.size} Produkte zugewiesen`)
     } catch {
       toast.error('Fehler beim Zuweisen')
@@ -208,13 +238,20 @@ export function WarengruppenPanel() {
     const isBlock = blocks.some((b) => b.id === targetBlockId)
     if (!isBlock) return
 
+    const item = items.find((i) => i.id === itemId)
+    if (!item) return
+
     try {
-      await assignProducts.mutateAsync({ itemIds: [itemId], blockId: targetBlockId })
+      await assignOverride.mutateAsync({
+        systemName: item.system_name,
+        masterBlockId: item.block_id,
+        targetBlockId: targetBlockId,
+      })
       toast.success('Produkt zugewiesen')
     } catch {
       toast.error('Fehler beim Zuweisen')
     }
-  }, [blocks, assignProducts])
+  }, [blocks, items, assignOverride])
 
   return (
     <>
@@ -231,7 +268,7 @@ export function WarengruppenPanel() {
         <CardContent className="space-y-2">
           <ScrollArea className="h-[300px]">
             <div className="space-y-1">
-              {blocks.map((block) => (
+              {sortedBlocks.map((block) => (
                 <DroppableBlock
                   key={block.id}
                   blockId={block.id}
@@ -292,7 +329,8 @@ export function WarengruppenPanel() {
             <div className="space-y-0.5">
               {filteredItems.map((item) => {
                 const isChecked = checkedIds.has(item.id)
-                const assignedBlock = item.block_id ? blocks.find((b) => b.id === item.block_id) : null
+                const effId = effBlock(item)
+                const assignedBlock = effId ? blocks.find((b) => b.id === effId) : null
                 const isOtherBlock = assignedBlock && assignedBlock.id !== selectedBlockId
 
                 return (
@@ -314,10 +352,10 @@ export function WarengruppenPanel() {
             <Button
               size="sm"
               onClick={handleAssign}
-              disabled={!selectedBlockId || checkedIds.size === 0 || assignProducts.isPending}
+              disabled={!selectedBlockId || checkedIds.size === 0 || assignOverride.isPending}
               className="flex-1"
             >
-              {assignProducts.isPending ? (
+              {assignOverride.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>Auswahl → {selectedBlock?.name ?? '...'} zuweisen</>

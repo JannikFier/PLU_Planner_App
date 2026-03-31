@@ -19,6 +19,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { uploadBackshopImage } from '@/lib/backshop-storage'
 import { getDisplayPlu } from '@/lib/plu-helpers'
 import { toast } from 'sonner'
+import { BackshopThumbnail } from '@/components/plu/BackshopThumbnail'
 import { ImagePlus, Trash2 } from 'lucide-react'
 import type { DisplayItem } from '@/types/plu'
 
@@ -185,11 +186,7 @@ function RenameDialogForm({
             />
             <div className="flex items-center gap-3 flex-wrap">
               {showImagePreview && (
-                <img
-                  src={showImagePreview}
-                  alt=""
-                  className="h-20 w-20 object-contain rounded border border-border"
-                />
+                <BackshopThumbnail src={showImagePreview} size="xl" />
               )}
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>

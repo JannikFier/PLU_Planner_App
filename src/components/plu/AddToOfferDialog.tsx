@@ -1,5 +1,5 @@
 // AddToOfferDialog: Produkte zur Werbung hinzufügen
-// Suchfeld (PLU/Name), Laufzeit 1–4 Wochen, Klick auf Treffer = hinzufügen
+// Suche wie Masterliste; Megafon öffnet Formular mit PLU, Name, Preis, Laufzeit
 
 import { useState, useMemo } from 'react'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Search, Megaphone } from 'lucide-react'
+import { Search, Megaphone, ChevronLeft } from 'lucide-react'
+import { toast } from 'sonner'
 import { filterItemsBySearch, getDisplayPlu } from '@/lib/plu-helpers'
 import { cn } from '@/lib/utils'
 
@@ -29,6 +30,13 @@ function normalizeLetterForGrouping(char: string): string {
   if (upper === 'Ö') return 'O'
   if (upper === 'Ü') return 'U'
   return upper
+}
+
+interface SearchableItem {
+  id: string
+  plu: string
+  display_name: string
+  system_name?: string
 }
 
 function groupByLetter(items: SearchableItem[]): { letter: string; items: SearchableItem[] }[] {
@@ -44,13 +52,6 @@ function groupByLetter(items: SearchableItem[]): { letter: string; items: Search
   return Array.from(grouped.entries())
     .sort(([a], [b]) => a.localeCompare(b, 'de'))
     .map(([letter, items]) => ({ letter, items }))
-}
-
-interface SearchableItem {
-  id: string
-  plu: string
-  display_name: string
-  system_name?: string
 }
 
 /** Baut Reihen: Header pro Gruppe, dann Items paarweise (links/rechts) wie Master-PLU-Liste */
@@ -71,9 +72,11 @@ export interface AddToOfferDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   searchableItems: SearchableItem[]
-  /** Klick auf Produkt: (plu, durationWeeks) → hinzufügen */
-  onAdd: (plu: string, durationWeeks: number) => void
+  /** Klick: Aktionspreis + Laufzeit; mode: kw = gewählte Wochen, billing = 4 Wochen (Abrechnungsperiode) */
+  onAdd: (plu: string, durationWeeks: number, promoPrice: number) => void
   isAdding?: boolean
+  /** PLUs die bereits in der zentralen Werbung sind (nicht erneut manuell) */
+  blockedPlus?: Set<string>
 }
 
 export function AddToOfferDialog({
@@ -82,10 +85,13 @@ export function AddToOfferDialog({
   searchableItems,
   onAdd,
   isAdding = false,
+  blockedPlus,
 }: AddToOfferDialogProps) {
   const [searchText, setSearchText] = useState('')
   const deferredSearch = useDebouncedValue(searchText, 200)
   const [durationWeeks, setDurationWeeks] = useState(1)
+  const [promoPriceInput, setPromoPriceInput] = useState('')
+  const [selected, setSelected] = useState<SearchableItem | null>(null)
 
   const filteredItems = useMemo(() => {
     const q = deferredSearch.trim().toLowerCase()
@@ -96,12 +102,34 @@ export function AddToOfferDialog({
   const groups = useMemo(() => groupByLetter(filteredItems), [filteredItems])
   const tableRows = useMemo(() => buildTableRows(groups), [groups])
 
-  const handleAdd = (plu: string) => {
-    onAdd(plu, durationWeeks)
+  const openMegaphoneForm = (item: SearchableItem) => {
+    if (blockedPlus?.has(item.plu)) {
+      toast.error('Diese PLU ist bereits in der zentralen Werbung.')
+      return
+    }
+    setSelected(item)
+    setPromoPriceInput('')
+    setDurationWeeks(1)
+  }
+
+  const submitAdd = (weeks: number, mode: 'kw' | 'billing') => {
+    if (!selected) return
+    const promo = parseFloat(promoPriceInput.replace(',', '.'))
+    if (!Number.isFinite(promo) || promo <= 0) {
+      toast.error('Bitte einen Aktionspreis größer 0 eingeben.')
+      return
+    }
+    const w = mode === 'billing' ? 4 : weeks
+    onAdd(selected.plu, w, promo)
+    setSelected(null)
   }
 
   const handleClose = (nextOpen: boolean) => {
-    if (!nextOpen) setSearchText('')
+    if (!nextOpen) {
+      setSearchText('')
+      setPromoPriceInput('')
+      setSelected(null)
+    }
     onOpenChange(nextOpen)
   }
 
@@ -109,14 +137,82 @@ export function AddToOfferDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[90vw] lg:max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Produkte zur Werbung hinzufügen</DialogTitle>
+          <DialogTitle>
+            {selected ? 'Produkt zur Werbung hinzufügen' : 'Produkte zur Werbung hinzufügen'}
+          </DialogTitle>
           <DialogDescription>
-            Suche nach PLU oder Name. Klicke auf ein Produkt, um es mit der gewählten Laufzeit zur Werbung hinzuzufügen.
+            {selected
+              ? 'Aktionspreis und Laufzeit festlegen, dann zur Aktion hinzufügen.'
+              : 'Liste wie in der PLU-Liste sortiert. Auf das Megafon tippen, um Preis und Laufzeit einzugeben.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4 min-w-0 flex flex-col flex-1 overflow-hidden">
-          <div className="flex flex-wrap items-center gap-3">
+        {selected ? (
+          <div className="space-y-4 py-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-fit -ml-2"
+              onClick={() => setSelected(null)}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Zurück zur Liste
+            </Button>
+            <div className="rounded-lg border p-4 space-y-1">
+              <p className="text-sm text-muted-foreground">Artikel</p>
+              <p className="font-medium">{selected.display_name ?? selected.system_name}</p>
+              <p className="font-mono text-sm text-muted-foreground">PLU {getDisplayPlu(selected.plu)}</p>
+            </div>
+            <div className="space-y-2">
+              <span className="text-sm font-medium">Aktionspreis (€)</span>
+              <Input
+                type="text"
+                inputMode="decimal"
+                placeholder="z. B. 1,99"
+                value={promoPriceInput}
+                onChange={(e) => setPromoPriceInput(e.target.value)}
+                className="max-w-[200px]"
+                aria-label="Aktionspreis in Euro"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">Laufzeit:</span>
+              <Select value={String(durationWeeks)} onValueChange={(v) => setDurationWeeks(Number(v))}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 Woche</SelectItem>
+                  <SelectItem value="2">2 Wochen</SelectItem>
+                  <SelectItem value="3">3 Wochen</SelectItem>
+                  <SelectItem value="4">4 Wochen</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={() => submitAdd(durationWeeks, 'kw')}
+                disabled={isAdding}
+              >
+                Zur Aktion hinzufügen (ab dieser KW)
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                onClick={() => submitAdd(4, 'billing')}
+                disabled={isAdding}
+                title="4 Wochen Laufzeit (volle Abrechnungsperiode)"
+              >
+                Abrechnungsperiode (4 Wochen)
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 py-4 min-w-0 flex flex-col flex-1 overflow-hidden">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -128,133 +224,119 @@ export function AddToOfferDialog({
                 aria-label="Suche"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground whitespace-nowrap">Laufzeit:</span>
-              <Select value={String(durationWeeks)} onValueChange={(v) => setDurationWeeks(Number(v))}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 Woche</SelectItem>
-                  <SelectItem value="2">2 Wochen</SelectItem>
-                  <SelectItem value="3">3 Wochen</SelectItem>
-                  <SelectItem value="4">4 Wochen</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
 
-          <div className="border rounded-lg overflow-hidden min-h-[400px] max-h-[60vh] flex flex-col min-w-0">
-            {filteredItems.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center p-8">
-                <p className="text-sm text-muted-foreground text-center">
-                  {searchText.trim() ? 'Keine Treffer.' : 'Keine Produkte vorhanden.'}
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-y-auto overflow-x-hidden flex-1 min-h-0 min-w-0">
-                <table className="w-full table-fixed" style={{ tableLayout: 'fixed' }}>
-                  <colgroup>
-                    <col className="w-[70px] min-w-[70px]" />
-                    <col />
-                    <col className="w-[58px] min-w-[58px]" />
-                    <col className="w-[70px] min-w-[70px]" />
-                    <col />
-                    <col className="w-[58px] min-w-[58px]" />
-                  </colgroup>
-                  <thead className="sticky top-0 bg-background z-10">
-                    <tr className="border-b-2 border-border">
-                      <th className="px-1.5 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-0 overflow-hidden">
-                        PLU
-                      </th>
-                      <th className="px-1.5 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border min-w-0 overflow-hidden">
-                        Artikel
-                      </th>
-                      <th className="px-1 py-1.5 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border w-[58px]">
-                        Aktion
-                      </th>
-                      <th className="px-1.5 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l-2 border-border min-w-0 overflow-hidden">
-                        PLU
-                      </th>
-                      <th className="px-1.5 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border min-w-0 overflow-hidden">
-                        Artikel
-                      </th>
-                      <th className="px-1 py-1.5 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border w-[58px]">
-                        Aktion
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableRows.map((row, i) => {
-                      if (row.type === 'header') {
+            <div className="border rounded-lg overflow-hidden min-h-[400px] max-h-[60vh] flex flex-col min-w-0">
+              {filteredItems.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center p-8">
+                  <p className="text-sm text-muted-foreground text-center">
+                    {searchText.trim() ? 'Keine Treffer.' : 'Keine Produkte vorhanden.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-y-auto overflow-x-hidden flex-1 min-h-0 min-w-0">
+                  <table className="w-full table-fixed" style={{ tableLayout: 'fixed' }}>
+                    <colgroup>
+                      <col className="w-[70px] min-w-[70px]" />
+                      <col />
+                      <col className="w-[58px] min-w-[58px]" />
+                      <col className="w-[70px] min-w-[70px]" />
+                      <col />
+                      <col className="w-[58px] min-w-[58px]" />
+                    </colgroup>
+                    <thead className="sticky top-0 bg-background z-10">
+                      <tr className="border-b-2 border-border">
+                        <th className="px-1.5 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-0 overflow-hidden">
+                          PLU
+                        </th>
+                        <th className="px-1.5 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border min-w-0 overflow-hidden">
+                          Artikel
+                        </th>
+                        <th className="px-1 py-1.5 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border w-[58px]">
+                          Aktion
+                        </th>
+                        <th className="px-1.5 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l-2 border-border min-w-0 overflow-hidden">
+                          PLU
+                        </th>
+                        <th className="px-1.5 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border min-w-0 overflow-hidden">
+                          Artikel
+                        </th>
+                        <th className="px-1 py-1.5 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border w-[58px]">
+                          Aktion
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tableRows.map((row, i) => {
+                        if (row.type === 'header') {
+                          return (
+                            <tr key={`h-${i}-${row.label}`} className="border-b border-border">
+                              <td
+                                colSpan={6}
+                                className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm"
+                              >
+                                {row.label}
+                              </td>
+                            </tr>
+                          )
+                        }
                         return (
-                          <tr key={`h-${i}-${row.label}`} className="border-b border-border">
-                            <td
-                              colSpan={6}
-                              className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm"
-                            >
-                              {row.label}
+                          <tr
+                            key={`r-${i}`}
+                            className={cn(
+                              'border-b border-border last:border-b-0 hover:bg-muted/30',
+                              isAdding && 'opacity-70',
+                            )}
+                          >
+                            <td className="px-1.5 py-1 font-mono text-sm min-w-0 overflow-hidden">
+                              {row.left ? getDisplayPlu(row.left.plu) : ''}
+                            </td>
+                            <td className="px-1.5 py-1 text-sm break-words min-w-0 overflow-hidden border-l border-border">
+                              {row.left?.display_name ?? row.left?.system_name ?? ''}
+                            </td>
+                            <td className="px-1 py-1 text-center border-l border-border w-[58px]">
+                              {row.left ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0"
+                                  onClick={() => openMegaphoneForm(row.left!)}
+                                  disabled={isAdding}
+                                  title="Preis und Laufzeit eingeben"
+                                >
+                                  <Megaphone className="h-4 w-4" />
+                                </Button>
+                              ) : null}
+                            </td>
+                            <td className="px-1.5 py-1 font-mono text-sm border-l-2 border-border min-w-0 overflow-hidden">
+                              {row.right ? getDisplayPlu(row.right.plu) : ''}
+                            </td>
+                            <td className="px-1.5 py-1 text-sm break-words min-w-0 overflow-hidden border-l border-border">
+                              {row.right?.display_name ?? row.right?.system_name ?? ''}
+                            </td>
+                            <td className="px-1 py-1 text-center border-l border-border w-[58px]">
+                              {row.right ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0"
+                                  onClick={() => openMegaphoneForm(row.right!)}
+                                  disabled={isAdding}
+                                  title="Preis und Laufzeit eingeben"
+                                >
+                                  <Megaphone className="h-4 w-4" />
+                                </Button>
+                              ) : null}
                             </td>
                           </tr>
                         )
-                      }
-                      return (
-                        <tr
-                          key={`r-${i}`}
-                          className={cn(
-                            'border-b border-border last:border-b-0 hover:bg-muted/30',
-                            isAdding && 'opacity-70',
-                          )}
-                        >
-                          {/* Linke Spalte */}
-                          <td className="px-1.5 py-1 font-mono text-sm min-w-0 overflow-hidden">{row.left ? getDisplayPlu(row.left.plu) : ''}</td>
-                          <td className="px-1.5 py-1 text-sm break-words min-w-0 overflow-hidden border-l border-border">
-                            {row.left?.display_name ?? row.left?.system_name ?? ''}
-                          </td>
-                          <td className="px-1 py-1 text-center border-l border-border w-[58px]">
-                            {row.left ? (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 shrink-0"
-                                onClick={() => { const p = row.left?.plu; if (p) handleAdd(p) }}
-                                disabled={isAdding}
-                                title="Zur Werbung hinzufügen"
-                              >
-                                <Megaphone className="h-4 w-4" />
-                              </Button>
-                            ) : null}
-                          </td>
-                          {/* Rechte Spalte */}
-                          <td className="px-1.5 py-1 font-mono text-sm border-l-2 border-border min-w-0 overflow-hidden">
-                            {row.right ? getDisplayPlu(row.right.plu) : ''}
-                          </td>
-                          <td className="px-1.5 py-1 text-sm break-words min-w-0 overflow-hidden border-l border-border">
-                            {row.right?.display_name ?? row.right?.system_name ?? ''}
-                          </td>
-                          <td className="px-1 py-1 text-center border-l border-border w-[58px]">
-                            {row.right ? (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 shrink-0"
-                                onClick={() => { const p = row.right?.plu; if (p) handleAdd(p) }}
-                                disabled={isAdding}
-                                title="Zur Werbung hinzufügen"
-                              >
-                                <Megaphone className="h-4 w-4" />
-                              </Button>
-                            ) : null}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   )

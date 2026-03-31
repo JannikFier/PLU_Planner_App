@@ -4,7 +4,38 @@ import {
   normalizeKeywordInName,
   isAlreadyCorrect,
   nameContainsKeyword,
+  applyActiveBezeichnungsregelnToName,
+  applyAllRulesToItems,
+  applyAllRulesWithRenamedMerge,
 } from './keyword-rules'
+import type { Bezeichnungsregel, MasterPLUItem } from '@/types/database'
+
+const bioPrefixRegel: Bezeichnungsregel = {
+  id: 'test-bio',
+  keyword: 'Bio',
+  position: 'PREFIX',
+  case_sensitive: false,
+  is_active: true,
+  created_at: '',
+  created_by: null,
+}
+
+function minimalMasterItem(partial: Partial<MasterPLUItem> & Pick<MasterPLUItem, 'id' | 'plu' | 'system_name'>): MasterPLUItem {
+  return {
+    version_id: 'v1',
+    item_type: 'PIECE',
+    status: 'UNCHANGED',
+    old_plu: null,
+    warengruppe: null,
+    block_id: null,
+    is_admin_eigen: false,
+    preis: null,
+    created_at: '',
+    display_name: null,
+    is_manually_renamed: false,
+    ...partial,
+  } as MasterPLUItem
+}
 
 describe('keyword-rules', () => {
   describe('normalizeKeywordInName', () => {
@@ -24,6 +55,14 @@ describe('keyword-rules', () => {
     it('entfernt Keyword nur als ganzes Wort (nicht in Bionda)', () => {
       expect(normalizeKeywordInName('Bionda Apfel', 'Bio', 'PREFIX')).toBe('Bio Bionda Apfel')
     })
+    it('erkennt Keyword vor Komma oder Punkt (PREFIX)', () => {
+      expect(normalizeKeywordInName('Banane Bio, regional', 'Bio', 'PREFIX')).toContain('Bio')
+      expect(normalizeKeywordInName('Banane Bio, regional', 'Bio', 'PREFIX')).toContain('Banane')
+      expect(normalizeKeywordInName('Banane Bio, regional', 'Bio', 'PREFIX')).toContain('regional')
+    })
+    it('erkennt Keyword vor Punkt am Ende (SUFFIX)', () => {
+      expect(normalizeKeywordInName('Banane Bio.', 'Bio', 'SUFFIX')).toBe('Banane Bio.')
+    })
   })
 
   describe('isAlreadyCorrect', () => {
@@ -38,6 +77,8 @@ describe('keyword-rules', () => {
     it('SUFFIX: true wenn Name mit Keyword endet', () => {
       expect(isAlreadyCorrect('Banane Bio', 'Bio', 'SUFFIX')).toBe(true)
       expect(isAlreadyCorrect('(Demeter) Bio', 'Bio', 'SUFFIX')).toBe(true)
+      expect(isAlreadyCorrect('Banane Bio,', 'Bio', 'SUFFIX')).toBe(true)
+      expect(isAlreadyCorrect('Banane Bio.', 'Bio', 'SUFFIX')).toBe(true)
     })
     it('SUFFIX: false wenn Keyword nicht am Ende', () => {
       expect(isAlreadyCorrect('Bio Banane', 'Bio', 'SUFFIX')).toBe(false)
@@ -57,8 +98,64 @@ describe('keyword-rules', () => {
       expect(nameContainsKeyword('Bionda', 'Bio')).toBe(false)
       expect(nameContainsKeyword('Biologie', 'Bio')).toBe(false)
     })
+    it('trifft Keyword vor Komma oder Punkt', () => {
+      expect(nameContainsKeyword('Banane Bio, regional', 'Bio')).toBe(true)
+      expect(nameContainsKeyword('Banane Bio.', 'Bio')).toBe(true)
+    })
     it('ist case-insensitive', () => {
       expect(nameContainsKeyword('BIO Banane', 'Bio')).toBe(true)
+    })
+  })
+
+  describe('applyActiveBezeichnungsregelnToName', () => {
+    it('wendet PREFIX-Regel auf Namen an', () => {
+      expect(applyActiveBezeichnungsregelnToName('Banane Bio', [bioPrefixRegel])).toBe('Bio Banane')
+    })
+  })
+
+  describe('applyAllRulesToItems', () => {
+    it('normalisiert auch bei is_manually_renamed auf dem Master (Basisdisplay_name)', () => {
+      const items: MasterPLUItem[] = [
+        minimalMasterItem({
+          id: 'i1',
+          plu: '401',
+          system_name: 'Speisekürbis Hokkaido',
+          display_name: 'Kürbis, Hokkaido, Bio',
+          is_manually_renamed: true,
+        }),
+      ]
+      const updates = applyAllRulesToItems(items, [bioPrefixRegel])
+      expect(updates).toHaveLength(1)
+      expect(updates[0].display_name).toContain('Bio')
+      expect(updates[0].display_name.startsWith('Bio')).toBe(true)
+    })
+  })
+
+  describe('applyAllRulesWithRenamedMerge', () => {
+    it('schreibt Änderungen in renamedUpdates wenn renamed_items-Zeile existiert', () => {
+      const items: MasterPLUItem[] = [
+        minimalMasterItem({
+          id: 'i1',
+          plu: '401',
+          system_name: 'Speisekürbis Hokkaido',
+          display_name: 'Speisekürbis Hokkaido',
+          is_manually_renamed: false,
+        }),
+      ]
+      const renamedRows = [
+        {
+          plu: '401',
+          store_id: 'store-1',
+          display_name: 'Kürbis, Hokkaido, Bio',
+          is_manually_renamed: true,
+        },
+      ]
+      const { masterUpdates, renamedUpdates } = applyAllRulesWithRenamedMerge(items, renamedRows, [bioPrefixRegel])
+      expect(masterUpdates).toHaveLength(0)
+      expect(renamedUpdates).toHaveLength(1)
+      expect(renamedUpdates[0].plu).toBe('401')
+      expect(renamedUpdates[0].store_id).toBe('store-1')
+      expect(renamedUpdates[0].display_name.startsWith('Bio')).toBe(true)
     })
   })
 })

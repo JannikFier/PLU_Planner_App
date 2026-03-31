@@ -1,5 +1,10 @@
+import { useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { useUserPreview } from '@/contexts/UserPreviewContext'
+import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
+import { getHomeDashboardPath } from '@/lib/effective-route-prefix'
+import { SuperAdminUserPreviewDialog } from '@/components/layout/SuperAdminUserPreviewDialog'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useStoreAccessByUser } from '@/hooks/useStoreAccess'
 import { useAllStores } from '@/hooks/useStores'
@@ -19,8 +24,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { LogOut, Settings, User, Shield, Crown, ChevronLeft, Eye, Store, FlaskConical } from 'lucide-react'
 import { useTestMode } from '@/contexts/TestModeContext'
-import { NotificationBell } from '@/components/plu/NotificationBell'
-import { BackshopNotificationBell } from '@/components/plu/BackshopNotificationBell'
+import { UnifiedNotificationBell } from '@/components/plu/UnifiedNotificationBell'
 import { cn } from '@/lib/utils'
 
 /**
@@ -30,6 +34,9 @@ import { cn } from '@/lib/utils'
  */
 export function AppHeader() {
   const { profile, isAdmin, isSuperAdmin, isViewer, logout, user } = useAuth()
+  const { isUserPreviewActive, preview, exitUserPreview } = useUserPreview()
+  const effectiveRole = useEffectiveRouteRole()
+  const [userPreviewDialogOpen, setUserPreviewDialogOpen] = useState(false)
   const { isTestMode, enableTestMode, setShowExitConfirm } = useTestMode()
   const { storeName, isAdminDomain, currentStoreId } = useCurrentStore()
   const { data: userStoreAccess } = useStoreAccessByUser(user?.id)
@@ -57,15 +64,12 @@ export function AppHeader() {
   const accessibleStores = allStores?.filter(s => accessibleStoreIds.includes(s.id) && s.is_active) ?? []
   const showStoreSwitcher = accessibleStores.length > 1
 
-  // Home-Pfad = Dashboard je nach Rolle
-  const homePath = isSuperAdmin ? '/super-admin' : isAdmin ? '/admin' : isViewer ? '/viewer' : '/user'
+  // Home-Pfad = Dashboard je nach Rolle (inkl. Super-Admin-Vorschau)
+  const homePath = getHomeDashboardPath(profile?.role, preview)
 
-  // Super-Admin in User-/Viewer-Ansicht: gleicher Zurück-Flow wie echter User, Wechsel nur über Avatar-Menü
-  const viewingAsUser = isSuperAdmin && (location.pathname.startsWith('/user') || location.pathname.startsWith('/viewer'))
-  // Logo-Klick: in User-Ansicht zum User-/Viewer-Dashboard, sonst normales homePath
-  const effectiveHomePath = viewingAsUser
-    ? (location.pathname.startsWith('/user') ? '/user' : '/viewer')
-    : homePath
+  /** Super-Admin simuliert User/Viewer/Admin – Zurück-Navigation wie in diesem Bereich */
+  const inSuperAdminPreview = isSuperAdmin && isUserPreviewActive
+  const effectiveHomePath = homePath
 
   // Obst/Gemüse-Unter-Seiten (eigene Produkte, ausgeblendet, Werbung, umbenannt) → Zurück zur Masterliste
   const USER_OBST_SUB = ['/user/custom-products', '/user/hidden-products', '/user/offer-products', '/user/renamed-products', '/user/hidden-items']
@@ -90,13 +94,33 @@ export function AppHeader() {
     return '/viewer'
   }
 
-  /** Zurück-Ziel für Admin-Bereich (/admin) – Obst-Unter-Seiten → Masterliste, Backshop-Unter-Seiten → Backshop-Liste */
+  /** Zurück-Ziel für Admin-Bereich – Hierarchie wie Super-Admin Markt: /admin → /admin/obst|backshop → Liste|Konfiguration */
   function getAdminAreaBackTarget(path: string): string | null {
     if (path === '/admin') return null
+
+    if (path === '/admin/obst') return '/admin'
+    if (path === '/admin/backshop') return '/admin'
+    if (path === '/admin/obst/konfiguration') return '/admin/obst'
+    if (path === '/admin/backshop/konfiguration') return '/admin/backshop'
+    if (path === '/admin/users') return '/admin'
+
+    if (path === '/admin/masterlist') return '/admin/obst'
+    if (path === '/admin/backshop-list') return '/admin/backshop'
+
+    if (path === '/admin/layout' || path === '/admin/rules' || path === '/admin/block-sort') {
+      return '/admin/obst/konfiguration'
+    }
+    if (
+      path === '/admin/backshop-layout'
+      || path === '/admin/backshop-rules'
+      || path === '/admin/backshop-block-sort'
+    ) {
+      return '/admin/backshop/konfiguration'
+    }
+
     if (ADMIN_OBST_SUB.includes(path)) return '/admin/masterlist'
-    if (path === '/admin/masterlist') return '/admin'
     if (ADMIN_BACKSHOP_SUB.includes(path)) return '/admin/backshop-list'
-    if (path === '/admin/backshop-list') return '/admin'
+
     return '/admin'
   }
 
@@ -119,11 +143,16 @@ export function AppHeader() {
     if (path === '/super-admin/backshop') return '/super-admin/upload'
 
     // Obst-Global-Unterseiten → Obst-Bereichsseite
-    const obstGlobalSub = ['/super-admin/plu-upload', '/super-admin/versions']
+    const obstGlobalSub = ['/super-admin/plu-upload', '/super-admin/versions', '/super-admin/central-werbung/obst']
     if (obstGlobalSub.includes(path)) return '/super-admin/obst'
 
     // Backshop-Global-Unterseiten → Backshop-Bereichsseite
-    const backshopGlobalSub = ['/super-admin/backshop-upload', '/super-admin/backshop-versions', '/super-admin/backshop-warengruppen']
+    const backshopGlobalSub = [
+      '/super-admin/backshop-upload',
+      '/super-admin/backshop-versions',
+      '/super-admin/backshop-warengruppen',
+      '/super-admin/central-werbung/backshop',
+    ]
     if (backshopGlobalSub.includes(path)) return '/super-admin/backshop'
 
     // Firmen-Verwaltung
@@ -162,9 +191,11 @@ export function AppHeader() {
   const backTarget = (() => {
     const path = location.pathname
     if (isSuperAdmin) {
-      if (viewingAsUser) {
+      if (inSuperAdminPreview) {
         if (path.startsWith('/user')) return getUserAreaBackTarget(path)
-        return getViewerAreaBackTarget(path)
+        if (path.startsWith('/viewer')) return getViewerAreaBackTarget(path)
+        if (path.startsWith('/admin')) return getAdminAreaBackTarget(path)
+        return null
       }
       return getSuperAdminBackTarget(path)
     }
@@ -182,9 +213,19 @@ export function AppHeader() {
     ? profile.display_name.slice(0, 2).toUpperCase()
     : profile?.email?.slice(0, 2).toUpperCase() ?? '??'
 
-  // Rollen-Anzeige
-  const roleLabel = isSuperAdmin ? 'Super-Admin' : isAdmin ? 'Admin' : isViewer ? 'Viewer' : null
-  const RoleIcon = isSuperAdmin ? Crown : isAdmin ? Shield : Eye
+  // Rollen-Anzeige (Vorschau: simulierte Rolle kennzeichnen)
+  const previewRoleLabel =
+    inSuperAdminPreview && preview?.simulatedRole === 'user'
+      ? 'Vorschau: User'
+      : inSuperAdminPreview && preview?.simulatedRole === 'viewer'
+        ? 'Vorschau: Viewer'
+        : inSuperAdminPreview && preview?.simulatedRole === 'admin'
+          ? 'Vorschau: Admin'
+          : null
+  const roleLabel =
+    previewRoleLabel
+    ?? (isSuperAdmin ? 'Super-Admin' : isAdmin ? 'Admin' : isViewer ? 'Viewer' : null)
+  const RoleIcon = previewRoleLabel ? Eye : isSuperAdmin ? Crown : isAdmin ? Shield : Eye
 
   const handleLogout = async () => {
     try {
@@ -231,17 +272,23 @@ export function AppHeader() {
               {isSuperAdminCompanyDetail && headerCompany?.name && (
                 <span className="text-xs text-muted-foreground truncate block max-w-[150px] sm:max-w-none">{headerCompany.name}</span>
               )}
-              {/* Admin/User/Viewer (nicht Super-Admin) */}
-              {!isSuperAdmin && storeName && !isAdminDomain && (
+              {/* Marktname: auch in User-Vorschau (Super-Admin mit simuliertem Kontext) */}
+              {(!isSuperAdmin || inSuperAdminPreview) && storeName && !isAdminDomain && (
                 <span className="text-xs text-muted-foreground truncate block max-w-[150px] sm:max-w-none">{storeName}</span>
               )}
               {!isSuperAdmin && isAdminDomain && isAdmin && (
+                <span className="text-xs text-muted-foreground">Administration</span>
+              )}
+              {inSuperAdminPreview && isAdminDomain && preview?.simulatedRole === 'admin' && (
                 <span className="text-xs text-muted-foreground">Administration</span>
               )}
               {!isSuperAdmin && !isAdminDomain && !storeName && isAdmin && (
                 <span className="text-xs text-muted-foreground">Administration</span>
               )}
               {!isSuperAdmin && !isAdminDomain && !storeName && isViewer && (
+                <span className="text-xs text-muted-foreground">Nur Ansicht</span>
+              )}
+              {inSuperAdminPreview && !storeName && preview?.simulatedRole === 'viewer' && (
                 <span className="text-xs text-muted-foreground">Nur Ansicht</span>
               )}
             </div>
@@ -254,17 +301,15 @@ export function AppHeader() {
           {roleLabel && (
             <div className={cn(
               'hidden sm:flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium',
-              isSuperAdmin ? 'bg-amber-100 text-amber-800' : isAdmin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+              previewRoleLabel ? 'bg-sky-100 text-sky-900' : isSuperAdmin ? 'bg-amber-100 text-amber-800' : isAdmin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
             )}>
               <RoleIcon className="h-3 w-3" />
               {roleLabel}
             </div>
           )}
 
-          {/* Benachrichtigungs-Glocke nur für Admin/User (nicht Super-Admin, nicht Viewer) */}
-          {!isSuperAdmin && !isViewer && <NotificationBell />}
-          {/* Backshop-Glocke nur auf Backshop-Seiten, nie für Super-Admin */}
-          {!isSuperAdmin && !isViewer && location.pathname.includes('backshop') && <BackshopNotificationBell />}
+          {/* Eine Glocke: Obst + Backshop – nicht für Viewer/Super-Admin (Vorschau: effektive Rolle) */}
+          {effectiveRole !== 'viewer' && effectiveRole !== 'super_admin' && <UnifiedNotificationBell />}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -272,7 +317,7 @@ export function AppHeader() {
                 <Avatar className="h-9 w-9">
                   <AvatarFallback className={cn(
                     'text-sm font-medium',
-                    isSuperAdmin ? 'bg-amber-100 text-amber-800' : isAdmin ? 'bg-primary/10 text-primary' : isViewer ? 'bg-muted text-muted-foreground' : 'bg-muted text-muted-foreground'
+                    previewRoleLabel ? 'bg-sky-100 text-sky-900' : isSuperAdmin ? 'bg-amber-100 text-amber-800' : isAdmin ? 'bg-primary/10 text-primary' : isViewer ? 'bg-muted text-muted-foreground' : 'bg-muted text-muted-foreground'
                   )}>
                     {initials}
                   </AvatarFallback>
@@ -292,17 +337,24 @@ export function AppHeader() {
               </div>
               <DropdownMenuSeparator />
 
-              {/* Super-Admin: Wechsel User-Ansicht ↔ Super-Admin-Ansicht nur über dieses Menü */}
-              {isSuperAdmin && viewingAsUser && (
-                <DropdownMenuItem onClick={() => navigate('/super-admin')}>
+              {/* Super-Admin: User-Vorschau starten / beenden */}
+              {isSuperAdmin && inSuperAdminPreview && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    void (async () => {
+                      await exitUserPreview()
+                      navigate('/super-admin')
+                    })()
+                  }}
+                >
                   <Crown className="mr-2 h-4 w-4" />
                   Zur Super-Admin-Ansicht
                 </DropdownMenuItem>
               )}
-              {isSuperAdmin && !viewingAsUser && (
-                <DropdownMenuItem onClick={() => navigate('/user')}>
+              {isSuperAdmin && !inSuperAdminPreview && (
+                <DropdownMenuItem onClick={() => setUserPreviewDialogOpen(true)}>
                   <User className="mr-2 h-4 w-4" />
-                  User-Ansicht (wie Mitarbeiter)
+                  User-Vorschau (Firma &amp; Markt)
                 </DropdownMenuItem>
               )}
 
@@ -314,8 +366,8 @@ export function AppHeader() {
                 </DropdownMenuItem>
               )}
 
-              {/* Testmodus-Toggle */}
-              {!isViewer && (
+              {/* Testmodus-Toggle (Viewer und Vorschau-Viewer ausblenden) */}
+              {effectiveRole !== 'viewer' && (
                 <DropdownMenuItem onClick={() => {
                   if (isTestMode) {
                     setShowExitConfirm(true)
@@ -364,6 +416,8 @@ export function AppHeader() {
           </DropdownMenu>
         </div>
       </div>
+
+      <SuperAdminUserPreviewDialog open={userPreviewDialogOpen} onOpenChange={setUserPreviewDialogOpen} />
     </header>
   )
 }

@@ -1,6 +1,7 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { useAuth } from '@/hooks/useAuth'
+import { useUserPreview } from '@/contexts/UserPreviewContext'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { BereichsauswahlCard } from '@/components/layout/BereichsauswahlCard'
 import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
@@ -14,6 +15,7 @@ import { Apple, Croissant } from 'lucide-react'
 export function UserDashboard() {
   const navigate = useNavigate()
   const { isSuperAdmin } = useAuth()
+  const { isUserPreviewActive } = useUserPreview()
   const { currentStoreId } = useCurrentStore()
   usePrefetchForNavigation()
 
@@ -21,8 +23,8 @@ export function UserDashboard() {
   const obstVisible = visibility?.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
   const backshopVisible = visibility?.find(v => v.list_type === 'backshop')?.is_visible ?? true
 
-  // Super-Admin gehoert auf /super-admin (Schutz-Redirect bei falschem Routing)
-  if (isSuperAdmin) {
+  // Super-Admin gehoert auf /super-admin – ausser bei aktiver User-Vorschau (simulierte Rolle)
+  if (isSuperAdmin && !isUserPreviewActive) {
     return <Navigate to="/super-admin" replace />
   }
 

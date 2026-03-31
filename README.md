@@ -140,12 +140,14 @@ supabase/
 
 Ausführliche Dokumentation findest du im `docs/` Ordner:
 
+- **[PROJEKT_UEBERSICHT_FUER_ERWEITERUNG.md](docs/PROJEKT_UEBERSICHT_FUER_ERWEITERUNG.md)** – Einstieg für externe KI und neue Module (Architektur, Konventionen, Links)
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** – System-Architektur, Datenfluss, State Management
 - **[ROLES_AND_PERMISSIONS.md](docs/ROLES_AND_PERMISSIONS.md)** – Drei-Rollen-System, Login-Flows, Passwort-Management
 - **[DATABASE.md](docs/DATABASE.md)** – Alle Tabellen, ER-Diagramm, RLS-Regeln
 - **[FEATURES.md](docs/FEATURES.md)** – Alle Features, Business-Regeln, Farbcodes
 - **[TESTING.md](docs/TESTING.md)** – Unit-Tests (Vitest), E2E (Playwright), Konvention
 - **[TEST_UND_RELEASE.md](docs/TEST_UND_RELEASE.md)** – Routen-Matrix, manuelle Test-Checkliste, Vor-Release-Check
+- **[SECURITY_LIVING.md](docs/SECURITY_LIVING.md)** – Sicherheit: Wissen, Checklisten, laufender Prozess (ergänzend zu [SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md))
 
 ## Lizenz
 

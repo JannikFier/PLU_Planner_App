@@ -14,45 +14,34 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Search, EyeOff } from 'lucide-react'
 import { useBackshopHideProduct } from '@/hooks/useBackshopHiddenItems'
-import { filterItemsBySearch, getDisplayPlu } from '@/lib/plu-helpers'
+import {
+  filterItemsBySearch,
+  getDisplayPlu,
+  groupItemsForDialog,
+  groupItemsForDialogAlignedWithList,
+  itemMatchesSearch,
+} from '@/lib/plu-helpers'
+import type { Block } from '@/types/database'
+import type { StoreBlockOrderRow } from '@/lib/block-override-utils'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 
 interface SearchableItem {
   id: string
   plu: string
   display_name: string
   system_name?: string
-}
-
-function normalizeLetterForGrouping(char: string): string {
-  const upper = char.toUpperCase()
-  if (upper === 'Ä') return 'A'
-  if (upper === 'Ö') return 'O'
-  if (upper === 'Ü') return 'U'
-  return upper
-}
-
-function groupByLetter(items: SearchableItem[]): { letter: string; items: SearchableItem[] }[] {
-  const grouped = new Map<string, SearchableItem[]>()
-  for (const item of items) {
-    const name = item.display_name ?? item.system_name ?? ''
-    const firstChar = name.charAt(0)
-    const letter = normalizeLetterForGrouping(firstChar) || '?'
-    const existing = grouped.get(letter)
-    if (existing) existing.push(item)
-    else grouped.set(letter, [item])
-  }
-  return Array.from(grouped.entries())
-    .sort(([a], [b]) => a.localeCompare(b, 'de'))
-    .map(([letter, items]) => ({ letter, items }))
+  item_type?: 'PIECE' | 'WEIGHT' | string | null
+  block_id?: string | null
 }
 
 type TableRow = { type: 'header'; label: string } | { type: 'row'; left?: SearchableItem; right?: SearchableItem }
-function buildTableRows(groups: { letter: string; items: SearchableItem[] }[]): TableRow[] {
+
+function buildTableRows(groups: { label: string; items: SearchableItem[] }[]): TableRow[] {
   const rows: TableRow[] = []
   for (const group of groups) {
-    rows.push({ type: 'header', label: `— ${group.letter} —` })
+    rows.push({ type: 'header', label: group.label })
     const items = group.items
     for (let i = 0; i < items.length; i += 2) {
       rows.push({ type: 'row', left: items[i], right: items[i + 1] })
@@ -65,12 +54,21 @@ interface HideBackshopProductsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   searchableItems: SearchableItem[]
+  displayMode?: 'MIXED' | 'SEPARATED'
+  listLayout?: {
+    sortMode: 'ALPHABETICAL' | 'BY_BLOCK'
+    blocks: Block[]
+    storeBlockOrder: StoreBlockOrderRow[]
+    nameBlockOverrides: Map<string, string>
+  }
 }
 
 export function HideBackshopProductsDialog({
   open,
   onOpenChange,
   searchableItems,
+  displayMode = 'MIXED',
+  listLayout,
 }: HideBackshopProductsDialogProps) {
   const [searchText, setSearchText] = useState('')
   const deferredSearch = useDebouncedValue(searchText, 200)
@@ -84,17 +82,23 @@ export function HideBackshopProductsDialog({
     return filterItemsBySearch(searchableItems, deferredSearch)
   }, [searchableItems, deferredSearch])
 
-  const groups = useMemo(() => groupByLetter(filteredItems), [filteredItems])
+  const groups = useMemo(() => {
+    if (listLayout) {
+      return groupItemsForDialogAlignedWithList(
+        filteredItems,
+        displayMode,
+        listLayout.sortMode,
+        listLayout.blocks,
+        listLayout.storeBlockOrder,
+        listLayout.nameBlockOverrides,
+      )
+    }
+    return groupItemsForDialog(filteredItems, displayMode)
+  }, [filteredItems, displayMode, listLayout])
+
   const tableRows = useMemo(() => buildTableRows(groups), [groups])
 
   const searchLower = deferredSearch.trim().toLowerCase()
-  const isMatch = (item: SearchableItem) => {
-    if (!searchLower) return false
-    const pluMatch = item.plu.toLowerCase().includes(searchLower)
-    const name = (item.display_name ?? item.system_name ?? '').toLowerCase()
-    const sys = (item.system_name ?? '').toLowerCase()
-    return pluMatch || name.includes(searchLower) || sys.includes(searchLower)
-  }
 
   useEffect(() => {
     if (!open || !searchLower || filteredItems.length === 0 || !listRef.current) return
@@ -185,17 +189,26 @@ export function HideBackshopProductsDialog({
                   <thead className="sticky top-0 bg-background z-10">
                     <tr className="border-b-2 border-border">
                       <th className="px-1 py-1.5 w-[36px]">
+                        <Label htmlFor="backshop-select-all" className="sr-only">Alle auswählen</Label>
                         <Checkbox
                           id="backshop-select-all"
                           checked={selectedPLUs.size === filteredItems.length && filteredItems.length > 0}
                           onCheckedChange={selectAll}
                         />
                       </th>
-                      <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase w-[80px]">PLU</th>
-                      <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase border-l border-border">Artikel</th>
+                      <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
+                        PLU
+                      </th>
+                      <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
+                        Artikel
+                      </th>
                       <th className="px-1 py-1.5 w-[36px] border-l-2 border-border" />
-                      <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase w-[80px]">PLU</th>
-                      <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase border-l border-border">Artikel</th>
+                      <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
+                        PLU
+                      </th>
+                      <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
+                        Artikel
+                      </th>
                     </tr>
                   </thead>
                   <tbody ref={listRef}>
@@ -203,42 +216,87 @@ export function HideBackshopProductsDialog({
                       if (row.type === 'header') {
                         return (
                           <tr key={`h-${i}-${row.label}`} className="border-b border-border">
-                            <td colSpan={6} className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm">
+                            <td
+                              colSpan={6}
+                              className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm"
+                            >
                               {row.label}
                             </td>
                           </tr>
                         )
                       }
-                      const leftMatch = row.left ? isMatch(row.left) : false
-                      const rightMatch = row.right ? isMatch(row.right) : false
+                      const leftH = row.left ? itemMatchesSearch(row.left, deferredSearch) : false
+                      const rightH = row.right ? itemMatchesSearch(row.right, deferredSearch) : false
+                      const leftSel = row.left ? selectedPLUs.has(row.left.plu) : false
+                      const rightSel = row.right ? selectedPLUs.has(row.right.plu) : false
+                      const hasMatch = (row.left && leftH) || (row.right && rightH)
                       return (
-                        <tr key={`r-${i}`} className={cn('border-b border-border', (leftMatch || rightMatch) && 'bg-primary/5')}>
-                          <td className="px-1 py-1.5">
-                            {row.left && (
+                        <tr
+                          key={`r-${i}`}
+                          data-highlight={hasMatch ? 'true' : undefined}
+                          className={cn(
+                            'border-b border-border last:border-b-0',
+                            hasMatch && 'bg-primary/10',
+                          )}
+                        >
+                          <td className="px-1 py-1 text-center">
+                            {row.left ? (
                               <Checkbox
-                                checked={selectedPLUs.has(row.left.plu)}
+                                checked={leftSel}
                                 onCheckedChange={() => { const p = row.left?.plu; if (p) toggleSelect(p) }}
+                                onClick={(e) => e.stopPropagation()}
                               />
-                            )}
+                            ) : null}
                           </td>
-                          <td className="px-2 py-1.5 font-mono text-sm" data-highlight={leftMatch ? 'true' : undefined}>
+                          <td
+                            className={cn(
+                              'px-2 py-1 text-sm font-mono',
+                              row.left && 'cursor-pointer hover:bg-muted/30',
+                              leftH && 'bg-primary/10',
+                            )}
+                            onClick={row.left ? () => { const p = row.left?.plu; if (p) toggleSelect(p) } : undefined}
+                          >
                             {row.left ? getDisplayPlu(row.left.plu) : ''}
                           </td>
-                          <td className="px-2 py-1.5 border-l border-border" data-highlight={leftMatch ? 'true' : undefined}>
+                          <td
+                            className={cn(
+                              'px-2 py-1 text-sm break-words min-w-0 border-l border-border',
+                              row.left && 'cursor-pointer hover:bg-muted/30',
+                              leftH && 'bg-primary/10',
+                            )}
+                            title={row.left?.display_name}
+                            onClick={row.left ? () => { const p = row.left?.plu; if (p) toggleSelect(p) } : undefined}
+                          >
                             {row.left?.display_name ?? ''}
                           </td>
-                          <td className="px-1 py-1.5 border-l-2 border-border">
-                            {row.right && (
+                          <td className="px-1 py-1 text-center border-l-2 border-border">
+                            {row.right ? (
                               <Checkbox
-                                checked={selectedPLUs.has(row.right.plu)}
+                                checked={rightSel}
                                 onCheckedChange={() => { const p = row.right?.plu; if (p) toggleSelect(p) }}
+                                onClick={(e) => e.stopPropagation()}
                               />
-                            )}
+                            ) : null}
                           </td>
-                          <td className="px-2 py-1.5 font-mono text-sm" data-highlight={rightMatch ? 'true' : undefined}>
+                          <td
+                            className={cn(
+                              'px-2 py-1 text-sm font-mono',
+                              row.right && 'cursor-pointer hover:bg-muted/30',
+                              rightH && 'bg-primary/10',
+                            )}
+                            onClick={row.right ? () => { const p = row.right?.plu; if (p) toggleSelect(p) } : undefined}
+                          >
                             {row.right ? getDisplayPlu(row.right.plu) : ''}
                           </td>
-                          <td className="px-2 py-1.5 border-l border-border" data-highlight={rightMatch ? 'true' : undefined}>
+                          <td
+                            className={cn(
+                              'px-2 py-1 text-sm break-words min-w-0 border-l border-border',
+                              row.right && 'cursor-pointer hover:bg-muted/30',
+                              rightH && 'bg-primary/10',
+                            )}
+                            title={row.right?.display_name}
+                            onClick={row.right ? () => { const p = row.right?.plu; if (p) toggleSelect(p) } : undefined}
+                          >
                             {row.right?.display_name ?? ''}
                           </td>
                         </tr>
@@ -257,7 +315,7 @@ export function HideBackshopProductsDialog({
               disabled={selectedPLUs.size === 0 || hideProduct.isPending}
             >
               <EyeOff className="h-4 w-4 mr-2" />
-              {selectedPLUs.size} Produkt{selectedPLUs.size !== 1 ? 'e' : ''} ausblenden
+              {hideProduct.isPending ? 'Wird ausgeblendet…' : `${selectedPLUs.size} Produkt${selectedPLUs.size !== 1 ? 'e' : ''} ausblenden`}
             </Button>
           </DialogFooter>
         </div>

@@ -2,6 +2,8 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Home } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { useUserPreview } from '@/contexts/UserPreviewContext'
+import { getHomeDashboardPath } from '@/lib/effective-route-prefix'
 
 /**
  * 404-Seite – wird angezeigt wenn eine Route nicht existiert.
@@ -9,10 +11,10 @@ import { useAuth } from '@/hooks/useAuth'
  */
 export function NotFound() {
   const navigate = useNavigate()
-  const { isSuperAdmin, isAdmin, isViewer } = useAuth()
+  const { profile } = useAuth()
+  const { preview } = useUserPreview()
 
-  const dashboardPath =
-    isSuperAdmin ? '/super-admin' : isAdmin ? '/admin' : isViewer ? '/viewer' : '/user'
+  const dashboardPath = getHomeDashboardPath(profile?.role, preview)
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">

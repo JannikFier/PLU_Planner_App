@@ -1,13 +1,16 @@
 # PLU Planner – Sicherheitsüberblick
 
-Stand: Februar 2025
+**Stand:** März 2026
+
+**Laufender Prozess** (Wissen, Checklisten, Branchenlage, Entscheidungen mit dem Inhaber): [SECURITY_LIVING.md](SECURITY_LIVING.md)
 
 ## Kurzfassung
 
 - **Zugang:** Ohne Login kommt niemand an Daten; alle App-Routen außer `/login` sind geschützt.
 - **Rollen:** Frontend und Backend (RLS + Edge Functions) trennen User / Admin / Super-Admin konsistent.
 - **Kritischer Punkt (behoben):** Über die Tabelle `profiles` konnte man theoretisch die eigene Rolle anpassen (Rollen-Eskalation). Das wird durch eine schärfere RLS-Policy verhindert.
-- **Weitere Hinweise:** Personalnummer-Lookup ist für Anonyme aufrufbar (E-Mail-Erkennung möglich); ausgeblendete PLUs sind global – jeder eingeloggte User kann Einträge in `hidden_items` löschen.
+- **Weitere Hinweise:** Personalnummer-Lookup ist für Anonyme aufrufbar (E-Mail-Erkennung möglich). **`hidden_items`** sind **pro Markt** (`store_id`); Schreiben nur für `store_id = current_store_id` (Migration 049).
+- **Neuere DB-Erweiterungen:** Ab Migration 050 u. a. Zentral-Angebote, marktbezogene Preise, Layout-Overrides – technische und rechtliche Details in `supabase/migrations/` und [DATABASE.md](DATABASE.md); bei Security-Reviews Policies und Rollen wie bei bestehenden Tabellen mitprüfen.
 
 ---
 
@@ -30,7 +33,7 @@ Stand: Februar 2025
   - **profiles:** Eigenes Profil lesen/aktualisieren; Admins lesen alle Profile (UPDATE siehe unten).
   - **versions, master_plu_items, blocks, block_rules, layout_settings, bezeichnungsregeln:** Lesen für alle eingeloggten User; Schreiben nur Super-Admin (bzw. wie in den Migrations definiert).
   - **custom_products:** Alle lesen/einfügen; Updat/Löschen nur Ersteller oder Super-Admin.
-  - **hidden_items:** Alle lesen/einfügen/löschen (globale Liste; siehe Abschnitt 3).
+  - **hidden_items / backshop_hidden_items:** Lesen nach Marktzugriff; Schreiben nur im aktuellen Markt (`get_current_store_id()`); siehe Migration 049 und Abschnitt 3.2.
   - **version_notifications:** Eigenen Eintrag lesen/aktualisieren; Anlegen nur Super-Admin.
   - **user_overrides, notifications_queue:** Eigenen Daten bzw. Admin-Berechtigung wie in ROLES_AND_PERMISSIONS.md.
 - **Helper-Funktionen:** `is_admin()` und `is_super_admin()` sind `SECURITY DEFINER` und lesen die Rolle aus `profiles`; sie werden in den Policies korrekt verwendet.
@@ -75,11 +78,11 @@ Stand: Februar 2025
 - **Risiko:** Informationsleck für Enumerationsangriffe; kein Zugriff auf Passwort oder andere Daten.
 - **Optionen:** Wenn das vermieden werden soll: Login-Flow so umbauen, dass die Funktion nur von authentifizierten Nutzern oder über eine geschützte Edge Function aufgerufen wird (dann ggf. anderes Login-Flow-Design).
 
-### 3.2 `hidden_items`: Löschen für alle
+### 3.2 `hidden_items` (Multi-Tenancy, Migration 028/049)
 
-- Die Policy erlaubt **allen eingeloggten Usern**, beliebige Einträge in `hidden_items` zu **löschen** („wieder einblenden“).
-- Wenn „ausblenden“ als **globale** Liste gedacht ist (ein Ausblenden = für alle sichtbar ausgeblendet), kann ein User Einträge, die ein anderer ausgeblendet hat, wieder einblenden.
-- Das ist eine **Design-/Produktentscheidung**. Wenn Ausblenden nur pro User gewünscht ist, müsste die Tabelle nutzerbezogen sein und die DELETE-Policy eingeschränkt werden (z. B. nur `hidden_by = auth.uid()`).
+- Zeilen sind **pro Markt** (`store_id`). Schreiben (einfügen/löschen) gilt nur für den **aktuellen Markt** (`profiles.current_store_id` = `get_current_store_id()`), nicht firmenweit und ohne Super-Admin-Bypass auf fremde Märkte.
+- Die App blendet Ausblend-/Einblend-Aktionen für **Super-Admin** aus; user/admin am jeweiligen Markt pflegen die Liste.
+- Wenn Ausblenden künftig **nur pro erzeugendem User** gelten soll, müsste die Policy zusätzlich `hidden_by` prüfen (aktuell: marktweite Liste).
 
 ### 3.3 Cron-Jobs (Migration 007)
 

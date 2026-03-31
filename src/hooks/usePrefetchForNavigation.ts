@@ -1,5 +1,5 @@
 /**
- * Prefetch von Daten für MasterList, LayoutSettingsPage und Benutzerverwaltung.
+ * Prefetch von Daten für MasterList, LayoutSettingsPage, Benutzerverwaltung und (Super-Admin) Firmenliste.
  * Wird beim App-Start (AuthPrefetch) und auf den Dashboards aufgerufen,
  * damit beim Klick auf "Masterliste", "Layout" oder "Benutzer" die Daten bereits im Cache sind.
  */
@@ -7,7 +7,7 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
-import { queryRest } from '@/lib/supabase'
+import { queryRest, supabase } from '@/lib/supabase'
 import type {
   Profile,
   Version,
@@ -26,6 +26,12 @@ import type {
   BackshopHiddenItem,
   BackshopRenamedItem,
   BackshopOfferItem,
+  StoreObstBlockOrder,
+  StoreObstNameBlockOverride,
+  StoreBackshopBlockOrder,
+  StoreBackshopNameBlockOverride,
+  BackshopBezeichnungsregel,
+  Company,
 } from '@/types/database'
 
 /** Liest aktive Version-ID aus Cache (version/active oder aus versions-Liste). */
@@ -54,19 +60,8 @@ export function runMasterListPrefetch(queryClient: QueryClient): void {
     queryFn: () => queryRest<Version[]>('versions', { select: '*', order: 'jahr.desc,kw_nummer.desc' }),
   })
   void queryClient.prefetchQuery({
-    queryKey: ['layout-settings'],
-    queryFn: async () => {
-      const data = await queryRest<LayoutSettings[]>('layout_settings', { select: '*', limit: '1' })
-      return (data && data.length > 0) ? data[0] : null
-    },
-  })
-  void queryClient.prefetchQuery({
     queryKey: ['blocks'],
     queryFn: () => queryRest<Block[]>('blocks', { select: '*', order: 'order_index.asc' }),
-  })
-  void queryClient.prefetchQuery({
-    queryKey: ['bezeichnungsregeln'],
-    queryFn: () => queryRest<Bezeichnungsregel[]>('bezeichnungsregeln', { select: '*', order: 'created_at.asc' }),
   })
 
   Promise.any([versionPromise, versionsPromise])
@@ -99,6 +94,43 @@ export function runStorePrefetch(queryClient: QueryClient, storeId: string): voi
     queryKey: ['offer-items', storeId],
     queryFn: () => queryRest<OfferItem[]>('plu_offer_items', { select: '*', store_id: `eq.${storeId}`, order: 'created_at.desc' }),
   })
+  void queryClient.prefetchQuery({
+    queryKey: ['layout-settings', storeId],
+    queryFn: async () => {
+      const data = await queryRest<LayoutSettings[]>('layout_settings', {
+        select: '*',
+        store_id: `eq.${storeId}`,
+        limit: '1',
+      })
+      return data?.[0] ?? null
+    },
+  })
+  void queryClient.prefetchQuery({
+    queryKey: ['bezeichnungsregeln', storeId],
+    queryFn: () =>
+      queryRest<Bezeichnungsregel[]>('bezeichnungsregeln', {
+        select: '*',
+        store_id: `eq.${storeId}`,
+        order: 'created_at.asc',
+      }),
+  })
+  void queryClient.prefetchQuery({
+    queryKey: ['store-obst-block-order', storeId],
+    queryFn: () =>
+      queryRest<StoreObstBlockOrder[]>('store_obst_block_order', {
+        select: '*',
+        store_id: `eq.${storeId}`,
+        order: 'order_index.asc',
+      }),
+  })
+  void queryClient.prefetchQuery({
+    queryKey: ['store-obst-name-block-override', storeId],
+    queryFn: () =>
+      queryRest<StoreObstNameBlockOverride[]>('store_obst_name_block_override', {
+        select: '*',
+        store_id: `eq.${storeId}`,
+      }),
+  })
 }
 
 /** Backshop-Version-ID aus Cache lesen (analog zur Obst-Version). */
@@ -124,13 +156,6 @@ export function runBackshopPrefetch(queryClient: QueryClient): void {
   const versionsPromise = queryClient.prefetchQuery({
     queryKey: ['backshop-versions'],
     queryFn: () => queryRest<BackshopVersion[]>('backshop_versions', { select: '*', order: 'jahr.desc,kw_nummer.desc' }),
-  })
-  void queryClient.prefetchQuery({
-    queryKey: ['backshop-layout-settings'],
-    queryFn: async () => {
-      const data = await queryRest<BackshopLayoutSettings[]>('backshop_layout_settings', { select: '*', limit: '1' })
-      return (data && data.length > 0) ? data[0] : null
-    },
   })
   void queryClient.prefetchQuery({
     queryKey: ['backshop-blocks'],
@@ -165,6 +190,43 @@ export function runBackshopStorePrefetch(queryClient: QueryClient, storeId: stri
     queryKey: ['backshop-offer-items', storeId],
     queryFn: () => queryRest<BackshopOfferItem[]>('backshop_offer_items', { select: '*', store_id: `eq.${storeId}`, order: 'created_at.desc' }),
   })
+  void queryClient.prefetchQuery({
+    queryKey: ['backshop-layout-settings', storeId],
+    queryFn: async () => {
+      const data = await queryRest<BackshopLayoutSettings[]>('backshop_layout_settings', {
+        select: '*',
+        store_id: `eq.${storeId}`,
+        limit: '1',
+      })
+      return data?.[0] ?? null
+    },
+  })
+  void queryClient.prefetchQuery({
+    queryKey: ['backshop-bezeichnungsregeln', storeId],
+    queryFn: () =>
+      queryRest<BackshopBezeichnungsregel[]>('backshop_bezeichnungsregeln', {
+        select: '*',
+        store_id: `eq.${storeId}`,
+        order: 'created_at.asc',
+      }),
+  })
+  void queryClient.prefetchQuery({
+    queryKey: ['store-backshop-block-order', storeId],
+    queryFn: () =>
+      queryRest<StoreBackshopBlockOrder[]>('store_backshop_block_order', {
+        select: '*',
+        store_id: `eq.${storeId}`,
+        order: 'order_index.asc',
+      }),
+  })
+  void queryClient.prefetchQuery({
+    queryKey: ['store-backshop-name-block-override', storeId],
+    queryFn: () =>
+      queryRest<StoreBackshopNameBlockOverride[]>('store_backshop_name_block_override', {
+        select: '*',
+        store_id: `eq.${storeId}`,
+      }),
+  })
 }
 
 /** Prefetch für Benutzerverwaltung (Admin/Super-Admin). Damit der "Alle Benutzer"-Kasten nach Reload schnell gefüllt ist. */
@@ -178,6 +240,25 @@ export function runAdminPrefetch(queryClient: QueryClient): void {
       })
       return data ?? []
     },
+  })
+}
+
+/**
+ * Prefetch Firmenliste (Super-Admin) – gleiche Query wie useCompanies().
+ * Läuft nach Login, damit „Firmen & Märkte“ nicht erst beim Öffnen der Seite lädt.
+ */
+export function runSuperAdminCompaniesPrefetch(queryClient: QueryClient): void {
+  void queryClient.prefetchQuery({
+    queryKey: ['companies'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('companies' as never)
+        .select('*')
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      return data as unknown as Company[]
+    },
+    staleTime: 5 * 60 * 1000,
   })
 }
 

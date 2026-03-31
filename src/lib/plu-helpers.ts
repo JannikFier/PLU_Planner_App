@@ -2,7 +2,12 @@
 
 import { generateUUID } from '@/lib/utils'
 import type { Block } from '@/types/database'
-import type { PLUStatus } from '@/types/plu'
+import type { DisplayItem, PLUStatus } from '@/types/plu'
+import {
+  effectiveBlockIdForStoreOverride,
+  sortBlocksWithStoreOrder,
+  type StoreBlockOrderRow,
+} from '@/lib/block-override-utils'
 
 // ============================================================
 // Gemeinsame Basis-Schnittstelle für PLU-Items
@@ -60,6 +65,31 @@ export function parseBlockNameToItemType(s: string | null): 'PIECE' | 'WEIGHT' |
   if (t.includes('gewicht')) return 'WEIGHT'
   if (t.includes('stück') || t.includes('stueck')) return 'PIECE'
   return null
+}
+
+/**
+ * Zerlegt Text in Segmente für Treffer-Hervorhebung (case-insensitive).
+ * Leere oder nur-Leerzeichen-Query → ein Segment ohne Treffer.
+ */
+export function splitTextForHighlight(
+  text: string,
+  query: string,
+): { text: string; match: boolean }[] {
+  const q = query.trim()
+  if (!q) return [{ text, match: false }]
+  const lower = text.toLowerCase()
+  const qLower = q.toLowerCase()
+  const parts: { text: string; match: boolean }[] = []
+  let start = 0
+  let idx = lower.indexOf(qLower, start)
+  while (idx !== -1) {
+    if (idx > start) parts.push({ text: text.slice(start, idx), match: false })
+    parts.push({ text: text.slice(idx, idx + q.length), match: true })
+    start = idx + q.length
+    idx = lower.indexOf(qLower, start)
+  }
+  if (start < text.length) parts.push({ text: text.slice(start), match: false })
+  return parts.length > 0 ? parts : [{ text, match: false }]
 }
 
 /** Prüft, ob ein Item den Suchtext in PLU oder Name enthält (case-insensitive). Für Find-in-Page und Filter. */
@@ -162,6 +192,8 @@ export interface DialogItemBase {
   display_name: string
   system_name?: string
   item_type?: 'PIECE' | 'WEIGHT' | string | null
+  /** Master-Warengruppe; für BY_BLOCK mit Markt-Overrides */
+  block_id?: string | null
 }
 
 export function groupItemsForDialog<T extends DialogItemBase>(
@@ -205,6 +237,73 @@ export function groupItemsForDialog<T extends DialogItemBase>(
     label: `— ${letter} —`,
     items: letterItems,
   }))
+}
+
+/** Dialog-Gruppierung wie Masterliste: alphabetisch oder nach Warengruppe (inkl. Markt-Overrides). */
+export function groupItemsForDialogAlignedWithList<T extends DialogItemBase>(
+  items: T[],
+  displayMode: 'MIXED' | 'SEPARATED',
+  sortMode: 'ALPHABETICAL' | 'BY_BLOCK',
+  blocks: Block[],
+  storeBlockOrder: StoreBlockOrderRow[],
+  nameBlockOverrides: Map<string, string> | undefined,
+): { label: string; items: T[] }[] {
+  if (sortMode === 'ALPHABETICAL') {
+    return groupItemsForDialog(items, displayMode)
+  }
+
+  const sortedBlocks = sortBlocksWithStoreOrder(blocks, storeBlockOrder)
+
+  const effBlock = (item: T) =>
+    effectiveBlockIdForStoreOverride(
+      item.system_name ?? '',
+      item.block_id ?? null,
+      nameBlockOverrides,
+    )
+
+  const sortByName = (a: T, b: T) =>
+    (a.display_name ?? a.system_name ?? '').localeCompare(b.display_name ?? b.system_name ?? '', 'de')
+
+  const groupSubset = (subset: T[]): { label: string; items: T[] }[] => {
+    const byBlock = new Map<string | null, T[]>()
+    for (const item of subset) {
+      const k = effBlock(item)
+      const arr = byBlock.get(k)
+      if (arr) arr.push(item)
+      else byBlock.set(k, [item])
+    }
+    const result: { label: string; items: T[] }[] = []
+    for (const b of sortedBlocks) {
+      const list = byBlock.get(b.id)
+      if (list?.length) {
+        list.sort(sortByName)
+        result.push({ label: `═══ ${b.name} ═══`, items: list })
+      }
+    }
+    const unassigned = byBlock.get(null)
+    if (unassigned?.length) {
+      unassigned.sort(sortByName)
+      result.push({ label: '═══ Ohne Zuordnung ═══', items: unassigned })
+    }
+    return result
+  }
+
+  if (displayMode === 'SEPARATED') {
+    const piece = items.filter((i) => i.item_type === 'PIECE')
+    const weight = items.filter((i) => i.item_type === 'WEIGHT')
+    const result: { label: string; items: T[] }[] = []
+    if (piece.length > 0) {
+      result.push({ label: '═══ Stück ═══', items: [] })
+      result.push(...groupSubset(piece))
+    }
+    if (weight.length > 0) {
+      result.push({ label: '═══ Gewicht ═══', items: [] })
+      result.push(...groupSubset(weight))
+    }
+    return result
+  }
+
+  return groupSubset(items)
 }
 
 /**
@@ -275,16 +374,27 @@ export interface BlockGroup<T extends PLUItemBase = PLUItemBase> {
  * Items ohne block_id landen in "Ohne Zuordnung" am Ende.
  * Innerhalb jeder Gruppe: alphabetisch nach display_name/system_name.
  */
-export function groupItemsByBlock<T extends PLUItemBase>(items: T[], blocks: Block[]): BlockGroup<T>[] {
+export function groupItemsByBlock<T extends PLUItemBase>(
+  items: T[],
+  blocks: Block[],
+  options?: {
+    /** Wenn gesetzt, ersetzt item.block_id für Gruppierung (z. B. Markt-Override nach Namen) */
+    resolveBlockId?: (item: T) => string | null
+    /** Blöcke bereits in gewünschter Reihenfolge (z. B. nach Markt-store_obst_block_order) */
+    sortedBlocks?: Block[]
+  },
+): BlockGroup<T>[] {
   const blockMap = new Map<string, Block>()
   for (const block of blocks) {
     blockMap.set(block.id, block)
   }
 
+  const resolve = options?.resolveBlockId ?? ((item: T) => item.block_id)
+
   // Items nach block_id gruppieren
   const grouped = new Map<string | null, T[]>()
   for (const item of items) {
-    const key = item.block_id
+    const key = resolve(item)
     const existing = grouped.get(key)
     if (existing) {
       existing.push(item)
@@ -298,7 +408,8 @@ export function groupItemsByBlock<T extends PLUItemBase>(items: T[], blocks: Blo
 
   // Blöcke nach order_index sortiert, dann "Ohne Zuordnung"
   const result: BlockGroup<T>[] = []
-  const sortedBlocks = [...blocks].sort((a, b) => a.order_index - b.order_index)
+  const sortedBlocks =
+    options?.sortedBlocks ?? [...blocks].sort((a, b) => a.order_index - b.order_index)
 
   for (const block of sortedBlocks) {
     const blockItems = grouped.get(block.id)
@@ -389,6 +500,21 @@ export function calculatePLUStats(items: PLUItemBase[], hidden?: number, customC
     hidden: hidden ?? 0,
     customCount: customCount ?? 0,
   }
+}
+
+// ============================================================
+// Werbung / Preis in der Liste
+// ============================================================
+
+/** Anzeige-Preis: Aktionspreis bei Werbung, sonst Listenpreis (Fallback bei fehlendem Aktionspreis) */
+export function getDisplayPreisForItem(item: DisplayItem): number | null {
+  if (item.is_offer) {
+    if (item.offer_promo_price != null && !Number.isNaN(Number(item.offer_promo_price))) {
+      return Number(item.offer_promo_price)
+    }
+  }
+  if (item.preis != null) return item.preis
+  return null
 }
 
 // ============================================================

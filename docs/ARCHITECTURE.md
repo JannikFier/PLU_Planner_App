@@ -113,7 +113,7 @@ MasterList-Seite
     │   ├── Master-Items als Basis
     │   ├── + Custom Products (nur wenn PLU nicht in Master)
     │   ├── - Hidden Items (herausfiltern)
-    │   ├── Bezeichnungsregeln anwenden (is_manually_renamed → skip)
+    │   ├── Bezeichnungsregeln auf effektiven display_name (inkl. marktspezifischer Umbenennung), wenn Keyword als ganzes Wort vorkommt
     │   ├── Block-Namen zuweisen
     │   └── Sortieren + Statistiken
     │
@@ -170,7 +170,8 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | `excel-parser.ts` | Excel-Parsing (xlsx), Typ/KW-Erkennung (Dateiname + Header-Zeile: Stück/Gewicht), PLU-Validierung |
 | `comparison-logic.ts` | KW-Vergleich (UNCHANGED, NEW, CHANGED, CONFLICT) |
 | `publish-version.ts` | Version veröffentlichen (freeze, insert, activate, version_notifications erstellen) |
-| `layout-engine.ts` | **NEU (Runde 2)**: Baut finale DisplayItem-Liste (Master + Custom - Hidden + Regeln) |
+| `layout-engine.ts` | DisplayItem-Liste (Master + Custom − Hidden + Regeln); berücksichtigt **Markt-Overrides** (`nameBlockOverrides`, `storeBlockOrder`) |
+| `block-override-utils.ts` | Normalisierung `system_name`, effektive `block_id`, Sortierung Blöcke mit optionaler Markt-Reihenfolge |
 | `pdf-generator.ts` | **NEU (Runde 2)**: PDF-Export mit jsPDF (A4, Zwei-Spalten, Farben, Footer) |
 | `plu-helpers.ts` | PLU-spezifische Helper (Gruppierung, Block-Gruppierung, Statistiken) – jetzt generisch mit PLUItemBase |
 | `keyword-rules.ts` | Bezeichnungsregeln: Keyword-Normalisierung, Position, Batch-Apply |
@@ -183,7 +184,8 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 |----------|-------------|
 | `formatKWLabel(kw, jahr)` | KW-Label formatieren → "KW07/2026" |
 | `groupItemsByLetter(items)` | Items nach Anfangsbuchstabe gruppieren |
-| `groupItemsByBlock(items, blocks)` | Items nach Warengruppe gruppieren (BY_BLOCK) |
+| `groupItemsByBlock(items, blocks, options?)` | Items nach Warengruppe gruppieren; optional `resolveBlockId` / `sortedBlocks` für Markt-Overrides |
+| `groupItemsForDialogAlignedWithList(...)` | Dialog-Gruppierung wie Masterliste (alphabetisch oder nach Block) |
 | `splitLetterGroupsIntoColumns(groups)` | Buchstabengruppen auf 2 Spalten (COLUMN_FIRST) |
 | `splitItemsRowByRow(items)` | Items abwechselnd links/rechts (ROW_BY_ROW) |
 | `calculatePLUStats(items)` | Statistiken berechnen (gesamt, neu, geändert) |
@@ -199,7 +201,7 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | `PLUFooter` | Erweiterte Stats (Gesamt, Neu, Geändert, Eigene, Ausgeblendet) |
 | `CustomProductDialog` | **NEU**: Dialog zum Hinzufügen eigener Produkte (Zod-Validierung) |
 | `ExportPDFDialog` | **NEU**: Dialog mit Vorschau-Infos vor PDF-Download |
-| `NotificationBell` | **NEU**: Glocken-Icon mit Badge für ungelesene Notifications |
+| `UnifiedNotificationBell` | Eine Glocke im Header: Badge = ungelesene Obst- + Backshop-Notifications; Dialog `UnifiedNotificationDialog` |
 | `NotificationDialog` | **NEU**: Neue Produkte einer Version prüfen + ausblenden |
 | `RenameDialog` | **NEU**: Dialog zum Umbenennen (Custom + Master Products) |
 | `LayoutPreview` | Live-Vorschau für Layout-Einstellungen (reaktiv auf Form-State) |

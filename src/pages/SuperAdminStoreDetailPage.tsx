@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, invokeEdgeFunction } from '@/lib/supabase'
@@ -38,7 +38,7 @@ import {
 } from 'lucide-react'
 import { validateSubdomain } from '@/lib/subdomain'
 import { toast } from 'sonner'
-import type { Profile } from '@/types/database'
+import type { Profile, UserListVisibility } from '@/types/database'
 import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer, roleBadgeLabel, generateOneTimePassword } from '@/lib/profile-helpers'
 
 type Section = 'overview' | 'listen' | 'listen-obst' | 'listen-backshop' | 'benutzer' | 'einstellungen'
@@ -869,6 +869,65 @@ export function SuperAdminStoreDetailPage() {
 
 type StoreUser = Profile & { isHomeStore: boolean }
 
+interface UserDetailVisibilitySwitchesProps {
+  user: StoreUser
+  storeId: string
+  visibilityRows: UserListVisibility[]
+  updateVisibility: ReturnType<typeof useUpdateUserListVisibility>
+}
+
+/** Eigener Mount pro Benutzer/Markt (key) – initiale Schalter aus Serverdaten ohne setState im Effect */
+function UserDetailVisibilitySwitches({
+  user,
+  storeId,
+  visibilityRows,
+  updateVisibility,
+}: UserDetailVisibilitySwitchesProps) {
+  const obst = visibilityRows.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
+  const backshop = visibilityRows.find(v => v.list_type === 'backshop')?.is_visible ?? true
+  const [obstLocal, setObstLocal] = useState(obst)
+  const [backshopLocal, setBackshopLocal] = useState(backshop)
+
+  const setVisibility = async (listType: string, isVisible: boolean) => {
+    if (listType === 'obst_gemuese') setObstLocal(isVisible)
+    else setBackshopLocal(isVisible)
+    await updateVisibility.mutateAsync({ userId: user.id, storeId, listType, isVisible })
+  }
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sichtbare Bereiche</Label>
+        <p className="text-xs text-muted-foreground mt-0.5">Welche Listen sieht dieser Benutzer?</p>
+      </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between rounded-lg border p-3">
+          <div className="flex items-center gap-2">
+            <Apple className="h-4 w-4 text-emerald-600" />
+            <span className="text-sm font-medium">Obst & Gemüse</span>
+          </div>
+          <Switch
+            checked={obstLocal}
+            disabled={updateVisibility.isPending}
+            onCheckedChange={(checked) => setVisibility('obst_gemuese', checked)}
+          />
+        </div>
+        <div className="flex items-center justify-between rounded-lg border p-3">
+          <div className="flex items-center gap-2">
+            <Croissant className="h-4 w-4 text-amber-700" />
+            <span className="text-sm font-medium">Backshop</span>
+          </div>
+          <Switch
+            checked={backshopLocal}
+            disabled={updateVisibility.isPending}
+            onCheckedChange={(checked) => setVisibility('backshop', checked)}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 interface UserDetailDialogProps {
   user: StoreUser | null
   open: boolean
@@ -890,32 +949,9 @@ function UserDetailDialog({
   const { data: visibilityRows } = useUserListVisibilityForUser(user?.id, storeId)
   const updateVisibility = useUpdateUserListVisibility()
 
-  const [obstLocal, setObstLocal] = useState(true)
-  const [backshopLocal, setBackshopLocal] = useState(true)
-  const lastSyncedKeyRef = useRef<string | null>(null)
-
   const syncKey = user?.id && storeId ? `${user.id}-${storeId}` : ''
-  useEffect(() => {
-    if (!open) {
-      lastSyncedKeyRef.current = null
-      return
-    }
-    if (!syncKey || visibilityRows === undefined) return
-    if (lastSyncedKeyRef.current === syncKey) return
-    lastSyncedKeyRef.current = syncKey
-    const obst = visibilityRows?.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
-    const backshop = visibilityRows?.find(v => v.list_type === 'backshop')?.is_visible ?? true
-    setObstLocal(obst)
-    setBackshopLocal(backshop)
-  }, [open, syncKey, visibilityRows])
 
   if (!user) return null
-
-  const setVisibility = async (listType: string, isVisible: boolean) => {
-    if (listType === 'obst_gemuese') setObstLocal(isVisible)
-    else setBackshopLocal(isVisible)
-    await updateVisibility.mutateAsync({ userId: user.id, storeId, listType, isVisible })
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -974,36 +1010,26 @@ function UserDetailDialog({
           <Separator />
 
           {/* ── Sichtbare Bereiche ── */}
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sichtbare Bereiche</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">Welche Listen sieht dieser Benutzer?</p>
-            </div>
+          {visibilityRows !== undefined ? (
+            <UserDetailVisibilitySwitches
+              key={open ? syncKey : 'closed'}
+              user={user}
+              storeId={storeId}
+              visibilityRows={visibilityRows}
+              updateVisibility={updateVisibility}
+            />
+          ) : (
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-lg border p-3">
-                <div className="flex items-center gap-2">
-                  <Apple className="h-4 w-4 text-emerald-600" />
-                  <span className="text-sm font-medium">Obst & Gemüse</span>
-                </div>
-                <Switch
-                  checked={obstLocal}
-                  disabled={updateVisibility.isPending}
-                  onCheckedChange={(checked) => setVisibility('obst_gemuese', checked)}
-                />
+              <div>
+                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sichtbare Bereiche</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Welche Listen sieht dieser Benutzer?</p>
               </div>
-              <div className="flex items-center justify-between rounded-lg border p-3">
-                <div className="flex items-center gap-2">
-                  <Croissant className="h-4 w-4 text-amber-700" />
-                  <span className="text-sm font-medium">Backshop</span>
-                </div>
-                <Switch
-                  checked={backshopLocal}
-                  disabled={updateVisibility.isPending}
-                  onCheckedChange={(checked) => setVisibility('backshop', checked)}
-                />
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Lade Bereiche…
               </div>
             </div>
-          </div>
+          )}
 
           <Separator />
 

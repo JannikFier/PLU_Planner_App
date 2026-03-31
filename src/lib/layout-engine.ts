@@ -1,14 +1,20 @@
 // Layout-Engine: Baut aus allen Datenquellen die finale gemeinsame PLU-Liste
 //
 // Datenfluss:
-//   master_plu_items + custom_products - hidden_items + bezeichnungsregeln = finale Liste
+//   master_plu_items + custom_products - hidden_items → Bezeichnungsregeln (auch nach manueller Umbenennung, wenn Keyword als ganzes Wort vorkommt) → finale Liste
 
 // CustomProduct Typ wird via LayoutEngineInput referenziert
 import type { DisplayItem, LayoutEngineInput, LayoutEngineOutput, PLUStatus } from '@/types/plu'
+import type { OfferDisplayInfo } from '@/lib/offer-display'
 import type { BackshopMasterPLUItem } from '@/types/database'
 import type { Block } from '@/types/database'
 import { nameContainsKeyword, normalizeKeywordInName } from '@/lib/keyword-rules'
-import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
+import { getKWAndYearFromDate, weeksBetweenIsoWeeks } from '@/lib/date-kw-utils'
+import {
+  blockOrderPositionMapFromSorted,
+  effectiveBlockIdForStoreOverride,
+  sortBlocksWithStoreOrder,
+} from '@/lib/block-override-utils'
 
 /**
  * Baut die finale Anzeigeliste für alle Rollen.
@@ -17,7 +23,7 @@ import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
  * 1. Master-Items als Basis übernehmen
  * 2. Custom Products hinzufügen (nur wenn PLU nicht in Master – Master hat Vorrang)
  * 3. Ausgeblendete Items herausfiltern
- * 4. Bezeichnungsregeln anwenden (is_manually_renamed = true → überspringen!)
+ * 4. Bezeichnungsregeln anwenden (bei Treffer als ganzes Wort; auch nach manueller Umbenennung)
  * 5. Block-Namen zuweisen
  * 6. Sortieren
  * 7. Statistiken berechnen
@@ -28,34 +34,38 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
     customProducts,
     hiddenPLUs,
     offerPLUs,
+    offerDisplayByPlu,
     renamedItems = [],
     bezeichnungsregeln,
     blocks,
     sortMode,
     markYellowKwCount,
-    versionKwNummer,
-    versionJahr,
     currentKwNummer,
     currentJahr,
+    nameBlockOverrides,
+    storeBlockOrder = [],
   } = input
 
   const renamedByPlu = new Map(renamedItems.map((r) => [r.plu, r]))
 
-  // Wochen-Differenz: wie viele KW seit der Version vergangen sind (für „neu“-Dauer)
-  const weeksSinceVersion =
-    (currentJahr - versionJahr) * 52 + (currentKwNummer - versionKwNummer)
-
-  // SCHRITT 1: Master-Items als Basis („Neu“ nur markYellowKwCount KW anzeigen)
+  // SCHRITT 1: Master-Items als Basis („Neu“-Gelb: Dauer an Kalender-KW ab Einführung in Stammdaten
+  // / created_at, nicht an der Versions-KW der Liste)
   // Master-Items können optional image_url haben (Backshop); Obst/Gemüse hat keins
   const masterWithImage = masterItems as Array<{ image_url?: string | null } & (typeof masterItems)[number]>
   let items: DisplayItem[] = masterItems.map((item, idx) => {
     const renamed = renamedByPlu.get(item.plu)
     let status = item.status as PLUStatus
-    if (
-      status === 'NEW_PRODUCT_YELLOW' &&
-      weeksSinceVersion >= markYellowKwCount
-    ) {
-      status = 'UNCHANGED'
+    if (status === 'NEW_PRODUCT_YELLOW') {
+      const { kw: introKw, year: introYear } = getKWAndYearFromDate(new Date(item.created_at))
+      const weeksSinceIntro = weeksBetweenIsoWeeks(
+        currentKwNummer,
+        currentJahr,
+        introKw,
+        introYear,
+      )
+      if (weeksSinceIntro >= markYellowKwCount) {
+        status = 'UNCHANGED'
+      }
     }
     return {
       id: item.id,
@@ -86,8 +96,12 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
       // Status kalenderwochenbasiert (wie Master): Hinzugefüge-KW aus created_at, dann wie viele KW vergangen
       const createdDate = new Date(cp.created_at)
       const { kw: addedKw, year: addedYear } = getKWAndYearFromDate(createdDate)
-      const weeksSinceAdded =
-        (currentJahr - addedYear) * 52 + (currentKwNummer - addedKw)
+      const weeksSinceAdded = weeksBetweenIsoWeeks(
+        currentKwNummer,
+        currentJahr,
+        addedKw,
+        addedYear,
+      )
       const status: PLUStatus =
         weeksSinceAdded < markYellowKwCount ? 'NEW_PRODUCT_YELLOW' : 'UNCHANGED'
 
@@ -114,23 +128,31 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
   // SCHRITT 3: Ausgeblendete Items herausfiltern (NICHT löschen, nur nicht anzeigen)
   items = items.filter((item) => !hiddenPLUs.has(item.plu))
 
-  // Angebot/Werbung: is_offer setzen
-  items = items.map((item) => ({
-    ...item,
-    is_offer: offerPLUs?.has(item.plu) ?? false,
-  }))
+  // Angebot/Werbung: is_offer + Aktionspreis/Quelle
+  items = items.map((item) => {
+    if (offerDisplayByPlu) {
+      const o = offerDisplayByPlu.get(item.plu)
+      return {
+        ...item,
+        is_offer: o != null,
+        offer_promo_price: o?.promoPrice ?? null,
+        offer_source_kind: o?.source,
+        offer_central_reference_price:
+          o?.source === 'central' ? (o.centralReferencePrice ?? null) : undefined,
+      }
+    }
+    const on = offerPLUs?.has(item.plu) ?? false
+    return {
+      ...item,
+      is_offer: on,
+      offer_promo_price: null,
+      offer_source_kind: on ? ('manual' as const) : undefined,
+    }
+  })
 
-  // SCHRITT 4: Bezeichnungsregeln anwenden
-  // WICHTIG: Prüfung NUR über das Flag is_manually_renamed!
-  // NICHT über display_name !== system_name prüfen, weil auch
-  // Bezeichnungsregeln selbst den display_name ändern.
-  // Das Flag is_manually_renamed unterscheidet die beiden Fälle sauber.
+  // SCHRITT 4: Bezeichnungsregeln anwenden (effektiver display_name inkl. marktspezifischer Umbenennung)
   for (const regel of bezeichnungsregeln) {
     items = items.map((item) => {
-      // RICHTIG: Flag prüfen
-      if (item.is_manually_renamed) return item
-      // FALSCH wäre: if (item.display_name !== item.system_name) return item
-
       if (nameContainsKeyword(item.display_name, regel.keyword)) {
         return {
           ...item,
@@ -145,6 +167,18 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
     })
   }
 
+  // Markt: effektive Warengruppe (Name-Override vor Master-block_id)
+  items = items.map((item) => ({
+    ...item,
+    block_id: effectiveBlockIdForStoreOverride(
+      item.system_name,
+      item.block_id,
+      nameBlockOverrides,
+    ),
+  }))
+
+  const sortedBlocksForDisplay = sortBlocksWithStoreOrder(blocks, storeBlockOrder)
+
   // SCHRITT 5: Block-Namen zuweisen
   const blockMap = new Map(blocks.map((b) => [b.id, b.name]))
   items = items.map((item) => ({
@@ -156,12 +190,7 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
   if (sortMode === 'ALPHABETICAL') {
     items.sort((a, b) => a.display_name.localeCompare(b.display_name, 'de'))
   } else if (sortMode === 'BY_BLOCK') {
-    // Block-Reihenfolge nach order_index
-    const blockOrder = new Map(
-      [...blocks]
-        .sort((a, b) => a.order_index - b.order_index)
-        .map((b, i) => [b.id, i]),
-    )
+    const blockOrder = blockOrderPositionMapFromSorted(sortedBlocksForDisplay)
 
     items.sort((a, b) => {
       const aOrder = a.block_id ? (blockOrder.get(a.block_id) ?? 999) : 999
@@ -184,7 +213,7 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
 }
 
 // ============================================================
-// Backshop: Anzeigeliste ohne Custom/Bezeichnungsregeln (Phase 3)
+// Backshop: Anzeigeliste (Master + Custom + Bezeichnungsregeln)
 // ============================================================
 
 /** Custom-Product-Eintrag für Backshop (id, plu, name, image_url, block_id) */
@@ -194,6 +223,7 @@ export type BackshopCustomProductInput = {
   name: string
   image_url: string
   block_id?: string | null
+  created_at?: string
 }
 
 /** Minimale Regel für Anzeige (keyword, position, is_active) */
@@ -216,6 +246,7 @@ export interface BackshopDisplayListInput {
   hiddenPLUs?: Set<string>
   /** PLUs die aktuell als Angebot/Werbung gelten (für is_offer auf DisplayItem) */
   offerPLUs?: Set<string>
+  offerDisplayByPlu?: Map<string, OfferDisplayInfo>
   sortMode: 'ALPHABETICAL' | 'BY_BLOCK'
   blocks?: Block[]
   /** Eigene Backshop-Produkte; werden nur hinzugefügt, wenn PLU nicht in Master vorkommt */
@@ -224,6 +255,14 @@ export interface BackshopDisplayListInput {
   bezeichnungsregeln?: BackshopBezeichnungsregelInput[]
   /** Globale Umbenennungen (überschreiben display_name, is_manually_renamed, image_url aus Master) */
   renamedItems?: BackshopRenamedItemInput[]
+  /** „Neu“-Gelb: Dauer an Kalender-KW ab created_at (Master + Eigene) */
+  markYellowKwCount: number
+  currentKwNummer: number
+  currentJahr: number
+  /** Markt: normalisierter system_name → block_id */
+  nameBlockOverrides?: Map<string, string>
+  /** Markt: optionale Block-Reihenfolge */
+  storeBlockOrder?: { block_id: string; order_index: number }[]
 }
 
 /**
@@ -236,11 +275,17 @@ export function buildBackshopDisplayList(input: BackshopDisplayListInput): Layou
     masterItems,
     hiddenPLUs = new Set(),
     offerPLUs,
+    offerDisplayByPlu,
     sortMode,
     blocks = [],
     customProducts = [],
     bezeichnungsregeln = [],
     renamedItems = [],
+    markYellowKwCount,
+    currentKwNummer,
+    currentJahr,
+    nameBlockOverrides,
+    storeBlockOrder = [],
   } = input
 
   const renamedByPlu = new Map(renamedItems.map((r) => [r.plu, r]))
@@ -248,15 +293,42 @@ export function buildBackshopDisplayList(input: BackshopDisplayListInput): Layou
   const masterFiltered = masterItems.filter((item) => !hiddenPLUs.has(item.plu))
   const masterPLUs = new Set(masterFiltered.map((i) => i.plu))
 
+  const resolveBackshopOffer = (plu: string) => {
+    if (offerDisplayByPlu) {
+      const o = offerDisplayByPlu.get(plu)
+      return {
+        is_offer: o != null,
+        offer_promo_price: o?.promoPrice ?? null,
+        offer_source_kind: o?.source,
+        offer_central_reference_price:
+          o?.source === 'central' ? (o.centralReferencePrice ?? null) : undefined,
+      }
+    }
+    const on = offerPLUs?.has(plu) ?? false
+    return {
+      is_offer: on,
+      offer_promo_price: null as number | null,
+      offer_source_kind: on ? ('manual' as const) : undefined,
+      offer_central_reference_price: undefined as number | null | undefined,
+    }
+  }
+
   let items: DisplayItem[] = masterFiltered.map((item) => {
     const renamed = renamedByPlu.get(item.plu)
+    const off = resolveBackshopOffer(item.plu)
+    let status = item.status as import('@/types/plu').PLUStatus
+    if (status === 'NEW_PRODUCT_YELLOW') {
+      const { kw: introKw, year: introYear } = getKWAndYearFromDate(new Date(item.created_at))
+      const w = weeksBetweenIsoWeeks(currentKwNummer, currentJahr, introKw, introYear)
+      if (w >= markYellowKwCount) status = 'UNCHANGED'
+    }
     return {
       id: item.id,
       plu: item.plu,
       system_name: item.system_name,
       display_name: renamed?.display_name ?? item.display_name ?? item.system_name,
       item_type: 'PIECE' as const,
-      status: item.status as import('@/types/plu').PLUStatus,
+      status,
       old_plu: item.old_plu,
       warengruppe: item.warengruppe,
       block_id: item.block_id,
@@ -265,19 +337,28 @@ export function buildBackshopDisplayList(input: BackshopDisplayListInput): Layou
       is_custom: false,
       is_manually_renamed: renamed?.is_manually_renamed ?? item.is_manually_renamed ?? false,
       image_url: (renamed?.image_url ?? item.image_url) ?? undefined,
-      is_offer: offerPLUs?.has(item.plu) ?? false,
+      is_offer: off.is_offer,
+      offer_promo_price: off.offer_promo_price,
+      offer_source_kind: off.offer_source_kind,
+      offer_central_reference_price: off.offer_central_reference_price,
     }
   })
 
   for (const cp of customProducts) {
     if (!masterPLUs.has(cp.plu)) {
+      const off = resolveBackshopOffer(cp.plu)
+      const createdDate = cp.created_at ? new Date(cp.created_at) : new Date()
+      const { kw: addedKw, year: addedYear } = getKWAndYearFromDate(createdDate)
+      const w = weeksBetweenIsoWeeks(currentKwNummer, currentJahr, addedKw, addedYear)
+      const status: import('@/types/plu').PLUStatus =
+        w < markYellowKwCount ? 'NEW_PRODUCT_YELLOW' : 'UNCHANGED'
       items.push({
         id: cp.id,
         plu: cp.plu,
         system_name: cp.name,
         display_name: cp.name,
         item_type: 'PIECE',
-        status: 'UNCHANGED',
+        status,
         old_plu: null,
         warengruppe: null,
         block_id: cp.block_id ?? null,
@@ -286,16 +367,18 @@ export function buildBackshopDisplayList(input: BackshopDisplayListInput): Layou
         is_custom: true,
         is_manually_renamed: false,
         image_url: cp.image_url,
-        is_offer: offerPLUs?.has(cp.plu) ?? false,
+        is_offer: off.is_offer,
+        offer_promo_price: off.offer_promo_price,
+        offer_source_kind: off.offer_source_kind,
+        offer_central_reference_price: off.offer_central_reference_price,
       })
     }
   }
 
-  // Bezeichnungsregeln anwenden (nur aktive; manuell umbenannte überspringen)
+  // Bezeichnungsregeln anwenden (nur aktive; auch nach manueller Umbenennung bei Keyword-Treffer)
   const activeRegeln = bezeichnungsregeln.filter((r) => r.is_active)
   for (const regel of activeRegeln) {
     items = items.map((item) => {
-      if (item.is_manually_renamed) return item
       if (nameContainsKeyword(item.display_name, regel.keyword)) {
         return {
           ...item,
@@ -310,6 +393,17 @@ export function buildBackshopDisplayList(input: BackshopDisplayListInput): Layou
     })
   }
 
+  items = items.map((item) => ({
+    ...item,
+    block_id: effectiveBlockIdForStoreOverride(
+      item.system_name,
+      item.block_id,
+      nameBlockOverrides,
+    ),
+  }))
+
+  const sortedBlocksForDisplay = sortBlocksWithStoreOrder(blocks, storeBlockOrder)
+
   const blockMap = new Map(blocks.map((b) => [b.id, b.name]))
   items = items.map((item) => ({
     ...item,
@@ -319,11 +413,7 @@ export function buildBackshopDisplayList(input: BackshopDisplayListInput): Layou
   if (sortMode === 'ALPHABETICAL') {
     items.sort((a, b) => a.display_name.localeCompare(b.display_name, 'de'))
   } else if (sortMode === 'BY_BLOCK') {
-    const blockOrder = new Map(
-      [...blocks]
-        .sort((a, b) => a.order_index - b.order_index)
-        .map((b, i) => [b.id, i]),
-    )
+    const blockOrder = blockOrderPositionMapFromSorted(sortedBlocksForDisplay)
     items.sort((a, b) => {
       const aOrder = a.block_id ? (blockOrder.get(a.block_id) ?? 999) : 999
       const bOrder = b.block_id ? (blockOrder.get(b.block_id) ?? 999) : 999

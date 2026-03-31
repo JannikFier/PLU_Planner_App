@@ -273,7 +273,7 @@ export function useBackshopUpload() {
     } finally {
       setIsProcessing(false)
     }
-  }, [user, targetKW, targetJahr, comparison, replaceExistingVersion, queryClient])
+  }, [user, targetKW, targetJahr, comparison, replaceExistingVersion, queryClient, currentStoreId])
 
   const assignImageToProduct = useCallback(async (plu: string, dataUrl: string) => {
     const url = await uploadManualImage(dataUrl, plu, lastUploadId, lastXlsxIndex)
