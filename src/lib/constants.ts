@@ -9,7 +9,7 @@ export const PUBLISH_BATCH_SIZE = 500
 
 /** Basis-Klasse für PLU-Tabellen-Header (grau, z. B. „PLU-Liste“). */
 export const PLU_TABLE_HEADER_CLASS =
-  'rounded-t-lg bg-gray-500/10 border border-b-0 border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 uppercase tracking-wider text-center'
+  'rounded-t-lg bg-gray-500/10 border border-b-0 border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wider text-center sm:px-4 sm:py-2 sm:text-sm'
 
 /** Header-Klasse Stück (blau). */
 export const PLU_TABLE_HEADER_STUECK_CLASS =

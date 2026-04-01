@@ -25,7 +25,7 @@ export function HighlightedSearchText({ text, query, markClassName, className }:
           <mark
             key={i}
             className={cn(
-              'rounded-sm px-0.5 not-italic bg-amber-200/90 text-foreground',
+              'rounded-sm px-0.5 not-italic bg-primary text-primary-foreground ring-1 ring-primary/40',
               markClassName,
             )}
           >

@@ -178,19 +178,17 @@ export function ExportPDFDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[580px] sm:min-w-[520px]">
-        <DialogHeader>
-          <DialogTitle>PDF exportieren</DialogTitle>
-          <DialogDescription>
-            Vorschau und Layout-Infos vor dem Herunterladen.
-          </DialogDescription>
+      <DialogContent className="flex max-h-[min(92dvh,720px)] w-[calc(100%-1rem)] max-w-[min(560px,calc(100vw-1rem))] flex-col gap-2 overflow-hidden p-3 sm:max-w-[540px] sm:gap-3 sm:p-5">
+        <DialogHeader className="shrink-0 space-y-0.5 text-left sm:space-y-1">
+          <DialogTitle className="text-base sm:text-lg">PDF exportieren</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">Vorschau und Layout vor dem Download.</DialogDescription>
         </DialogHeader>
 
-        <div className="py-4 space-y-4">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto py-1 sm:space-y-3 sm:py-2">
           {/* KW-Auswahl (aktuelle KW vorausgewählt) */}
           {versions.length > 0 && selectedVersionId != null && onVersionChange && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Kalenderwoche für PDF</label>
+            <div className="space-y-1 sm:space-y-2">
+              <label className="text-xs font-medium sm:text-sm">Kalenderwoche für PDF</label>
               <KWSelector
                 versions={versions}
                 selectedId={selectedVersionId}
@@ -200,60 +198,60 @@ export function ExportPDFDialog({
             </div>
           )}
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Inhalt</label>
-            <div className="grid gap-2 sm:grid-cols-2">
+          <div className="space-y-1.5 sm:space-y-2">
+            <label className="text-xs font-medium sm:text-sm">Inhalt</label>
+            <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2">
               <RadioCard
                 selected={primaryExport === 'full'}
                 onClick={() => setPrimaryExport('full')}
                 title={
-                  <span className="flex items-center gap-2">
-                    <LayoutList className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                  <span className="flex items-center gap-1.5 sm:gap-2">
+                    <LayoutList className="h-3.5 w-3.5 shrink-0 text-primary sm:h-4 sm:w-4" aria-hidden />
                     Volle Liste
                   </span>
                 }
-                description="Alle sichtbaren Artikel; darunter mit oder ohne Angebots-Hinweise (Megafon, hervorgehobener Preis)."
+                description="Alle Artikel; optional mit oder ohne Angebots-Hinweise."
               />
               <RadioCard
                 selected={primaryExport === 'offers_only'}
                 onClick={() => canExportOffers && setPrimaryExport('offers_only')}
                 title={
-                  <span className="flex items-center gap-2">
-                    <Megaphone className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                  <span className="flex items-center gap-1.5 sm:gap-2">
+                    <Megaphone className="h-3.5 w-3.5 shrink-0 text-primary sm:h-4 sm:w-4" aria-hidden />
                     Nur Angebote
                   </span>
                 }
-                description="Nur Werbe-/Angebotszeilen, alphabetisch, ein eigener Titel."
+                description="Nur Angebotszeilen, A–Z, eigener Titel."
               />
             </div>
             {primaryExport === 'full' && (
-              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Volle Liste</p>
-                <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 p-2 sm:space-y-2 sm:p-3">
+                <p className="text-[11px] font-medium text-muted-foreground sm:text-xs">Volle Liste</p>
+                <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2">
                   <RadioCard
                     selected={fullListVariant === 'with_offers'}
                     onClick={() => setFullListVariant('with_offers')}
                     title={
-                      <span className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1" aria-hidden>
-                          <LayoutList className="h-4 w-4 shrink-0 text-primary" />
-                          <Megaphone className="h-4 w-4 shrink-0 text-red-800" />
+                      <span className="flex items-center gap-1.5 sm:gap-2">
+                        <span className="inline-flex items-center gap-0.5" aria-hidden>
+                          <LayoutList className="h-3.5 w-3.5 shrink-0 text-primary sm:h-4 sm:w-4" />
+                          <Megaphone className="h-3.5 w-3.5 shrink-0 text-red-800 sm:h-4 sm:w-4" />
                         </span>
                         Mit Angeboten
                       </span>
                     }
-                    description="Wie in der Hauptliste – inkl. Werbung (Megafon, Aktionspreis)."
+                    description="Wie Hauptliste inkl. Werbung (Megafon, Aktionspreis)."
                   />
                   <RadioCard
                     selected={fullListVariant === 'without_offers'}
                     onClick={() => setFullListVariant('without_offers')}
                     title={
-                      <span className="flex items-center gap-2">
-                        <ListMinus className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                      <span className="flex items-center gap-1.5 sm:gap-2">
+                        <ListMinus className="h-3.5 w-3.5 shrink-0 text-primary sm:h-4 sm:w-4" aria-hidden />
                         Ohne Angebots-Hinweise
                       </span>
                     }
-                    description="Alle Artikel wie in der Liste; ohne Megafon und ohne hervorgehobenen Aktionspreis."
+                    description="Alle Artikel; ohne Megafon und ohne hervorgehobenen Aktionspreis."
                   />
                 </div>
               </div>
@@ -264,10 +262,10 @@ export function ExportPDFDialog({
           </div>
 
           {/* Vorschau-Infos */}
-          <div className="rounded-lg border border-border p-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">{kwLabel}</span>
-              <span className="text-sm text-muted-foreground">
+          <div className="space-y-1.5 rounded-lg border border-border p-2 sm:space-y-2 sm:p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium sm:text-sm">{kwLabel}</span>
+              <span className="text-right text-xs text-muted-foreground sm:text-sm">
                 {exportMode === 'offers_only'
                   ? `${offerCount} Angebote`
                   : exportMode === 'full_without_offers'
@@ -276,69 +274,71 @@ export function ExportPDFDialog({
               </span>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
               {stats.newCount > 0 && (
-                <Badge variant="secondary" className="bg-plu-new-bg text-plu-new-text border-0 text-xs">
+                <Badge variant="secondary" className="bg-plu-new-bg text-plu-new-text border-0 text-[10px] sm:text-xs">
                   {stats.newCount} Neue
                 </Badge>
               )}
               {stats.changedCount > 0 && (
-                <Badge variant="secondary" className="bg-plu-changed-bg text-plu-changed-text border-0 text-xs">
+                <Badge variant="secondary" className="bg-plu-changed-bg text-plu-changed-text border-0 text-[10px] sm:text-xs">
                   {stats.changedCount} PLU geändert
                 </Badge>
               )}
               {stats.customCount > 0 && (
-                <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-0 text-xs">
+                <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-0 text-[10px] sm:text-xs">
                   {stats.customCount} Eigene
                 </Badge>
               )}
             </div>
 
             {stats.hidden > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {stats.hidden} ausgeblendet (nicht im PDF)
-              </p>
+              <p className="text-[11px] text-muted-foreground sm:text-xs">{stats.hidden} ausgeblendet (nicht im PDF)</p>
             )}
           </div>
 
           {/* Layout-Infos */}
-          <div className="text-xs text-muted-foreground space-y-1">
+          <div className="space-y-0.5 text-[11px] text-muted-foreground sm:space-y-1 sm:text-xs">
             <p>Sortierung: {sortMode === 'ALPHABETICAL' ? 'Alphabetisch' : 'Nach Warengruppe'}</p>
             <p>Darstellung: {displayMode === 'MIXED' ? 'Gemischt' : 'Getrennt (Stück/Gewicht)'}</p>
-            <p>Flussrichtung: {flowDirection === 'ROW_BY_ROW' ? 'Zeilenweise' : 'Spaltenweise'}</p>
+            <p>Fluss: {flowDirection === 'ROW_BY_ROW' ? 'Zeilenweise' : 'Spaltenweise'}</p>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="!flex-row flex-wrap justify-end gap-1.5 border-t border-border pt-2 sm:gap-2 sm:pt-3 shrink-0">
+          <Button variant="outline" size="sm" className="shrink-0" onClick={() => onOpenChange(false)}>
             Abbrechen
           </Button>
           <Button
             variant="outline"
+            size="sm"
+            className="shrink-0"
             onClick={handlePrint}
             disabled={
               isGenerating || items.length === 0 || (exportMode === 'offers_only' && !canExportOffers)
             }
           >
             {isGenerating ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
             ) : (
-              <Printer className="h-4 w-4 mr-2" />
+              <Printer className="h-3.5 w-3.5 mr-1.5" />
             )}
             Drucken
           </Button>
           <Button
+            size="sm"
+            className="shrink-0"
             onClick={handleDownload}
             disabled={isGenerating || items.length === 0 || (exportMode === 'offers_only' && !canExportOffers)}
           >
             {isGenerating ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                 Erstelle PDF...
               </>
             ) : (
               <>
-                <FileDown className="h-4 w-4 mr-2" />
+                <FileDown className="h-3.5 w-3.5 mr-1.5" />
                 PDF herunterladen
               </>
             )}

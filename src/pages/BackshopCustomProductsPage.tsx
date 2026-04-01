@@ -12,7 +12,6 @@ import { useBackshopHiddenItems, useBackshopHideProduct, useBackshopUnhideProduc
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
 import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
-import { useAuth } from '@/hooks/useAuth'
 import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
 import { canManageMarketHiddenItems } from '@/lib/permissions'
 import { getDisplayPlu } from '@/lib/plu-helpers'
@@ -32,7 +31,6 @@ import {
 } from '@/components/ui/alert-dialog'
 export function BackshopCustomProductsPage() {
   const { pathname } = useLocation()
-  const { user } = useAuth()
   const effectiveRole = useEffectiveRouteRole()
   const canHideUnhide = canManageMarketHiddenItems(effectiveRole, pathname)
 
@@ -111,7 +109,6 @@ export function BackshopCustomProductsPage() {
               <BackshopCustomProductsList
                 products={customProducts}
                 blocks={blocks}
-                currentUserId={user?.id ?? null}
                 isHidden={(plu) => hiddenItems.some((h) => h.plu === plu)}
                 onEdit={(cp) => setEditingProduct(cp)}
                 onDelete={(cp) => setProductToDelete(cp)}

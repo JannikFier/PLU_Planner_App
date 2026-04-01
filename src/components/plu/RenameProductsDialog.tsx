@@ -23,6 +23,7 @@ import {
 import type { Block } from '@/types/database'
 import type { StoreBlockOrderRow } from '@/lib/block-override-utils'
 import { RenameDialog } from '@/components/plu/RenameDialog'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { MasterPLUItem, BackshopMasterPLUItem } from '@/types/database'
 import type { DisplayItem } from '@/types/plu'
@@ -37,6 +38,21 @@ interface SearchableItem {
 }
 
 type TableRow = { type: 'header'; label: string } | { type: 'row'; left?: SearchableItem; right?: SearchableItem }
+type MobileFlatRow =
+  | { type: 'header'; label: string }
+  | { type: 'item'; item: SearchableItem }
+
+function buildMobileFlatRows(groups: { label: string; items: SearchableItem[] }[]): MobileFlatRow[] {
+  const out: MobileFlatRow[] = []
+  for (const g of groups) {
+    out.push({ type: 'header', label: g.label })
+    for (const item of g.items) {
+      out.push({ type: 'item', item })
+    }
+  }
+  return out
+}
+
 function buildTableRows(groups: { label: string; items: SearchableItem[] }[]): TableRow[] {
   const rows: TableRow[] = []
   for (const group of groups) {
@@ -124,7 +140,7 @@ export function RenameProductsDialog({
   const deferredSearch = useDebouncedValue(searchText, 200)
   const [renameItem, setRenameItem] = useState<DisplayItem | null>(null)
   const queryClient = useQueryClient()
-  const listRef = useRef<HTMLTableSectionElement | null>(null)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
 
   const overrideByPlu = useMemo(
     () => new Map(renamedOverrides.map((r) => [r.plu, r.display_name])),
@@ -167,12 +183,13 @@ export function RenameProductsDialog({
     return groupItemsForDialog(filteredItems, displayMode)
   }, [filteredItems, displayMode, listLayout])
   const tableRows = useMemo(() => buildTableRows(groups), [groups])
+  const mobileFlatRows = useMemo(() => buildMobileFlatRows(groups), [groups])
 
   // Bei Suchänderung zum ersten Treffer scrollen (wie HideProductsDialog)
   const searchLower = deferredSearch.trim().toLowerCase()
   useEffect(() => {
-    if (!open || !searchLower || filteredItems.length === 0 || !listRef.current) return
-    const first = listRef.current.querySelector('[data-highlight="true"]')
+    if (!open || !searchLower || filteredItems.length === 0 || !scrollContainerRef.current) return
+    const first = scrollContainerRef.current.querySelector('[data-highlight="true"]')
     if (first) first.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [open, searchLower, filteredItems.length])
 
@@ -213,16 +230,16 @@ export function RenameProductsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-6xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-6xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Produkte umbenennen</DialogTitle>
             <DialogDescription>
               Suche nach PLU oder Name, dann klicke auf den Stift, um den Anzeigenamen zu ändern.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            <div className="relative">
+          <div className="flex flex-1 min-h-0 flex-col gap-4 py-4 overflow-hidden">
+            <div className="relative shrink-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
@@ -234,7 +251,7 @@ export function RenameProductsDialog({
               />
             </div>
 
-            <div className="border rounded-lg overflow-hidden min-h-[400px] max-h-[60vh] flex flex-col">
+            <div className="border rounded-lg overflow-hidden flex flex-1 min-h-0 flex-col md:min-h-[400px]">
               {filteredItems.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center p-8">
                   <p className="text-sm text-muted-foreground text-center">
@@ -242,8 +259,50 @@ export function RenameProductsDialog({
                   </p>
                 </div>
               ) : (
-                <div className="overflow-auto flex-1 min-h-0">
-                  <table className="w-full table-fixed border-collapse">
+                <div ref={scrollContainerRef} className="overflow-auto flex-1 min-h-0">
+                  <ul className="md:hidden divide-y divide-border" data-testid="rename-products-dialog-mobile-list">
+                    {mobileFlatRows.map((row, i) => {
+                      if (row.type === 'header') {
+                        return (
+                          <li
+                            key={`mrh-${i}-${row.label}`}
+                            className="px-3 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm"
+                          >
+                            {row.label}
+                          </li>
+                        )
+                      }
+                      const item = row.item
+                      const match = itemMatchesSearch(item, deferredSearch)
+                      return (
+                        <li
+                          key={item.id}
+                          data-highlight={match ? 'true' : undefined}
+                          className={cn('flex items-start gap-2 px-3 py-2', match && 'bg-primary/10')}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="font-mono text-sm">{getDisplayPlu(item.plu)}</p>
+                            <p className="text-sm break-words mt-0.5">{item.display_name}</p>
+                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                className="h-10 w-10 shrink-0"
+                                onClick={() => handleOpenRename(item)}
+                                aria-label="Umbenennen"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="left">Umbenennen</TooltipContent>
+                          </Tooltip>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  <table className="hidden md:table w-full table-fixed border-collapse">
                     <colgroup>
                       <col className="w-[80px]" />
                       <col />
@@ -266,7 +325,7 @@ export function RenameProductsDialog({
                         </th>
                       </tr>
                     </thead>
-                    <tbody ref={listRef}>
+                    <tbody>
                       {tableRows.map((row, i) => {
                         if (row.type === 'header') {
                           return (

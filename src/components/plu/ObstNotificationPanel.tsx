@@ -8,6 +8,8 @@ import { useNewProducts, useChangedProducts, useMarkNotificationRead } from '@/h
 import { useLocation } from 'react-router-dom'
 import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
 import { useHiddenItems, useHideProduct } from '@/hooks/useHiddenItems'
+import { useObstOfferCampaignWithLines } from '@/hooks/useCentralOfferCampaigns'
+import { effectiveHiddenPluSet } from '@/lib/hidden-visibility'
 import { canManageMarketHiddenItems } from '@/lib/permissions'
 import { getDisplayPlu } from '@/lib/plu-helpers'
 import { cn } from '@/lib/utils'
@@ -36,12 +38,14 @@ export function ObstNotificationPanel({
   const { data: newProducts = [] } = useNewProducts(versionId)
   const { data: changedProducts = [] } = useChangedProducts(versionId)
   const { data: hiddenItems = [] } = useHiddenItems()
+  const { data: obstCampaign } = useObstOfferCampaignWithLines()
   const hideProduct = useHideProduct()
   const markRead = useMarkNotificationRead()
 
   const hiddenPLUs = useMemo(
-    () => new Set(hiddenItems.map((h) => h.plu)),
-    [hiddenItems],
+    () =>
+      effectiveHiddenPluSet(new Set(hiddenItems.map((h) => h.plu)), obstCampaign?.lines),
+    [hiddenItems, obstCampaign?.lines],
   )
 
   const isEmpty = newProducts.length === 0 && changedProducts.length === 0

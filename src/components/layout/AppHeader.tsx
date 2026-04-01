@@ -263,7 +263,7 @@ export function AppHeader() {
             <div className="min-w-0">
               <h1 className="text-lg font-semibold leading-tight">PLU Planner</h1>
               {/* Super-Admin: Dashboard/Global = kein Markt, Firma = Firmenname, Laden = Marktname */}
-              {isSuperAdminGlobal && (
+              {isSuperAdminGlobal && !inSuperAdminPreview && (
                 <span className="text-xs text-muted-foreground">Super-Administration</span>
               )}
               {isSuperAdminStoreDetail && storeName && (

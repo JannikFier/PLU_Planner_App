@@ -29,6 +29,21 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 
 type TableRow = { type: 'header'; label: string } | { type: 'row'; left?: SearchableItem; right?: SearchableItem }
+type MobileFlatRow =
+  | { type: 'header'; label: string }
+  | { type: 'item'; item: SearchableItem }
+
+function buildMobileFlatRows(groups: { label: string; items: SearchableItem[] }[]): MobileFlatRow[] {
+  const out: MobileFlatRow[] = []
+  for (const g of groups) {
+    out.push({ type: 'header', label: g.label })
+    for (const item of g.items) {
+      out.push({ type: 'item', item })
+    }
+  }
+  return out
+}
+
 function buildTableRows(groups: { label: string; items: SearchableItem[] }[]): TableRow[] {
   const rows: TableRow[] = []
   for (const group of groups) {
@@ -77,7 +92,7 @@ export function HideProductsDialog({
   const deferredSearch = useDebouncedValue(searchText, 200)
   const [selectedPLUs, setSelectedPLUs] = useState<Set<string>>(new Set())
   const hideBatch = useHideProductsBatch()
-  const listRef = useRef<HTMLTableSectionElement | null>(null)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
 
   // Leere Suche = alle Items; sonst gefiltert
   const filteredItems = useMemo(() => {
@@ -100,13 +115,14 @@ export function HideProductsDialog({
     return groupItemsForDialog(filteredItems, displayMode)
   }, [filteredItems, displayMode, listLayout])
   const tableRows = useMemo(() => buildTableRows(groups), [groups])
+  const mobileFlatRows = useMemo(() => buildMobileFlatRows(groups), [groups])
 
   const searchLower = deferredSearch.trim().toLowerCase()
 
   // Nach Suchen-Änderung: Zum ersten Treffer scrollen
   useEffect(() => {
-    if (!open || !searchLower || filteredItems.length === 0 || !listRef.current) return
-    const first = listRef.current.querySelector('[data-highlight="true"]')
+    if (!open || !searchLower || filteredItems.length === 0 || !scrollContainerRef.current) return
+    const first = scrollContainerRef.current.querySelector('[data-highlight="true"]')
     if (first) {
       first.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
@@ -151,16 +167,16 @@ export function HideProductsDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-6xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-6xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Produkte ausblenden</DialogTitle>
           <DialogDescription>
             Suche nach PLU oder Name und wähle die Produkte aus, die ausgeblendet werden sollen.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="relative">
+        <div className="flex flex-1 min-h-0 flex-col gap-4 py-4 overflow-hidden">
+          <div className="relative shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
@@ -172,7 +188,7 @@ export function HideProductsDialog({
             />
           </div>
 
-          <div className="border rounded-lg overflow-hidden min-h-[400px] max-h-[60vh] flex flex-col">
+          <div className="border rounded-lg overflow-hidden flex flex-1 min-h-0 flex-col md:min-h-[400px]">
             {filteredItems.length === 0 ? (
               <div className="flex-1 flex items-center justify-center p-8">
                 <p className="text-sm text-muted-foreground text-center">
@@ -180,8 +196,52 @@ export function HideProductsDialog({
                 </p>
               </div>
             ) : (
-              <div className="overflow-auto flex-1 min-h-0">
-                <table className="w-full table-fixed">
+              <div ref={scrollContainerRef} className="overflow-auto flex-1 min-h-0">
+                <ul className="md:hidden divide-y divide-border" data-testid="hide-products-dialog-mobile-list">
+                  {mobileFlatRows.map((row, i) => {
+                    if (row.type === 'header') {
+                      return (
+                        <li
+                          key={`mh-${i}-${row.label}`}
+                          className="px-3 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm"
+                        >
+                          {row.label}
+                        </li>
+                      )
+                    }
+                    const item = row.item
+                    const match = itemMatchesSearch(item, deferredSearch)
+                    const sel = selectedPLUs.has(item.plu)
+                    return (
+                      <li
+                        key={item.id}
+                        data-highlight={match ? 'true' : undefined}
+                        className={cn(
+                          'flex items-start gap-2 px-3 py-2',
+                          match && 'bg-primary/10',
+                          sel && 'ring-1 ring-inset ring-primary/20',
+                        )}
+                      >
+                        <div className="pt-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={sel}
+                            onCheckedChange={() => toggleSelect(item.plu)}
+                            aria-label={`Auswahl PLU ${getDisplayPlu(item.plu)}`}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 text-left"
+                          onClick={() => toggleSelect(item.plu)}
+                        >
+                          <span className="font-mono text-sm">{getDisplayPlu(item.plu)}</span>
+                          <p className="text-sm break-words mt-0.5">{item.display_name}</p>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <table className="hidden md:table w-full table-fixed">
                   <colgroup>
                     <col className="w-[36px]" />
                     <col className="w-[80px]" />
@@ -215,7 +275,7 @@ export function HideProductsDialog({
                       </th>
                     </tr>
                   </thead>
-                  <tbody ref={listRef}>
+                  <tbody>
                     {tableRows.map((row, i) => {
                       if (row.type === 'header') {
                         return (
@@ -292,7 +352,7 @@ export function HideProductsDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={() => handleClose(false)}>
             Abbrechen
           </Button>

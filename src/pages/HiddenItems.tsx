@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/select'
 import { Undo2, EyeOff, Layers, Plus, FileSpreadsheet, Trash2, Megaphone } from 'lucide-react'
 import { useHiddenItems, useUnhideProduct, useUnhideAll, useHideProductsBatch, useHideProduct } from '@/hooks/useHiddenItems'
+import { useObstOfferCampaignWithLines } from '@/hooks/useCentralOfferCampaigns'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
 import { useCustomProducts, useAddCustomProductsBatch, useDeleteCustomProduct } from '@/hooks/useCustomProducts'
@@ -55,6 +56,10 @@ import { CustomProductDialog } from '@/components/plu/CustomProductDialog'
 import { ObstCustomProductsList } from '@/components/plu/ObstCustomProductsList'
 import { ExcelPreviewBox } from '@/components/plu/ExcelPreviewBox'
 import { HideProductsDialog } from '@/components/plu/HideProductsDialog'
+import {
+  HiddenProductsResponsiveList,
+  type HiddenProductDisplayRow,
+} from '@/components/plu/HiddenProductsResponsiveList'
 import type { Profile, CustomProduct } from '@/types/database'
 import type { CustomProductParseResult, ParsedCustomProductRow } from '@/types/plu'
 
@@ -97,6 +102,7 @@ export function HiddenItems() {
 
   // Daten laden
   const { data: hiddenItems = [], isLoading: hiddenLoading, isError: hiddenError } = useHiddenItems()
+  const { data: obstCampaign } = useObstOfferCampaignWithLines()
   const { data: activeVersion } = useActiveVersion()
   const { data: masterItems = [] } = usePLUData(activeVersion?.id)
   const { data: customProducts = [], isLoading: customProductsLoading } = useCustomProducts()
@@ -129,6 +135,11 @@ export function HiddenItems() {
   const existingPLUs = useMemo(
     () => new Set([...masterItems.map((m) => m.plu), ...customProducts.map((c) => c.plu)]),
     [masterItems, customProducts],
+  )
+
+  const centralCampaignPluSet = useMemo(
+    () => new Set((obstCampaign?.lines ?? []).map((l) => l.plu)),
+    [obstCampaign],
   )
 
   // Suchbare Items: Master + Custom, noch nicht ausgeblendet
@@ -230,6 +241,24 @@ export function HiddenItems() {
       }
     })
   }, [hiddenItems, masterItems, customProducts, profileMap])
+
+  /** Zeilen für die responsive Ausgeblendete-Liste (Obst) */
+  const hiddenItemsDisplayRows: HiddenProductDisplayRow[] = useMemo(
+    () =>
+      hiddenProductInfos.map((info) => ({
+        plu: info.plu,
+        name: info.name,
+        hiddenByName: info.hiddenByName,
+        hidden_by: info.hidden_by,
+        showVonMirBadge: !!(currentUserId && info.hidden_by === currentUserId),
+        source: info.source,
+        showCentralCampaignBadge: centralCampaignPluSet.has(info.plu),
+        typLabel:
+          info.itemType === 'PIECE' ? 'Stück' : info.itemType === 'WEIGHT' ? 'Gewicht' : null,
+        thumbUrl: null,
+      })),
+    [hiddenProductInfos, currentUserId, centralCampaignPluSet],
+  )
 
   // Mutations
   const unhideProduct = useUnhideProduct()
@@ -513,7 +542,12 @@ export function HiddenItems() {
         {/* === Sektion 2: Ausgeblendete Produkte === */}
         <div className="flex flex-col gap-4 mt-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h3 className="text-lg font-semibold">Ausgeblendete Produkte</h3>
+            <div>
+              <h3 className="text-lg font-semibold">Ausgeblendete Produkte</h3>
+              <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+                Zentrale Werbung kann die Anzeige in der Hauptliste vorübergehend übersteuern (Badge „Sichtbar durch Werbung“).
+              </p>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               {canManageHidden && (
                 <>
@@ -575,78 +609,13 @@ export function HiddenItems() {
         {!hiddenLoading && hiddenProductInfos.length > 0 && (
           <Card>
             <CardContent className="p-0">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b-2 border-border">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
-                      PLU
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Artikel
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[100px]">
-                      Typ
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[150px]">
-                      Ausgeblendet von
-                    </th>
-                    <th className="px-4 py-3 text-right w-[130px]" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {hiddenProductInfos.map((info) => (
-                    <tr
-                      key={info.plu}
-                      className="border-b border-border last:border-b-0 hover:bg-muted/30"
-                    >
-                      <td className="px-4 py-3 font-mono text-sm">{getDisplayPlu(info.plu)}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span className="flex items-center gap-2">
-                          {info.name}
-                          {info.source === 'custom' && (
-                            <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">
-                              Eigen
-                            </Badge>
-                          )}
-                          {info.source === 'unknown' && (
-                            <Badge variant="secondary" className="text-xs">
-                              Unbekannt
-                            </Badge>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {info.itemType === 'PIECE' ? 'Stück' : info.itemType === 'WEIGHT' ? 'Gewicht' : '–'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-2">
-                          {info.hiddenByName}
-                          {currentUserId && info.hidden_by === currentUserId && (
-                            <Badge variant="secondary" className="text-xs shrink-0">
-                              Von mir
-                            </Badge>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {canManageHidden ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => unhideProduct.mutate(info.plu)}
-                            disabled={unhideProduct.isPending}
-                          >
-                            <Undo2 className="h-4 w-4 mr-1" />
-                            Einblenden
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <HiddenProductsResponsiveList
+                variant="obst"
+                rows={hiddenItemsDisplayRows}
+                canManageHidden={canManageHidden}
+                unhidePending={unhideProduct.isPending}
+                onUnhide={(plu) => unhideProduct.mutate(plu)}
+              />
             </CardContent>
           </Card>
         )}

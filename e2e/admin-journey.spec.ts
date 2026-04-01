@@ -46,7 +46,7 @@ test.describe('Admin-Journey @extended', () => {
     await page.getByRole('heading', { name: 'PLU-Liste' }).click()
     await expect(page).toHaveURL(/\/admin\/masterlist/)
     await page.waitForLoadState('networkidle')
-    await expect(page.getByRole('heading', { name: 'PLU-Masterliste' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: 'PLU Obst und Gemüse' })).toBeVisible({ timeout: 15_000 })
   })
 
   test('Admin hat keinen Zugang zu /super-admin (Redirect)', async ({ page }) => {

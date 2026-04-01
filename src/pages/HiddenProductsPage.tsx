@@ -6,9 +6,8 @@ import { useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { EyeOff, Undo2, Pencil } from 'lucide-react'
+import { EyeOff } from 'lucide-react'
 import { useHiddenItems, useUnhideProduct } from '@/hooks/useHiddenItems'
 import { useOfferItems } from '@/hooks/useOfferItems'
 import {
@@ -37,6 +36,7 @@ import { orderByPluDisplayOrder } from '@/lib/list-order'
 import { useQuery } from '@tanstack/react-query'
 import { HideProductsDialog } from '@/components/plu/HideProductsDialog'
 import { EditCustomProductDialog } from '@/components/plu/EditCustomProductDialog'
+import { HiddenProductsResponsiveList } from '@/components/plu/HiddenProductsResponsiveList'
 import type { Profile } from '@/types/database'
 import type { CustomProduct } from '@/types/database'
 
@@ -102,6 +102,11 @@ export function HiddenProductsPage() {
         obstLocalOverrides,
       ),
     [currentKw, currentJahr, obstCampaign, obstStoreDisabled, offerItems, obstLocalOverrides],
+  )
+
+  const centralCampaignPluSet = useMemo(
+    () => new Set((obstCampaign?.lines ?? []).map((l) => l.plu)),
+    [obstCampaign],
   )
 
   const canonicalListOrderPlu = useMemo(() => {
@@ -275,7 +280,8 @@ export function HiddenProductsPage() {
             <div>
               <h2 className="text-2xl font-bold tracking-tight">Ausgeblendete Produkte</h2>
               <p className="text-sm text-muted-foreground">
-                Produkte einblenden oder weitere ausblenden.
+                Produkte einblenden oder weitere ausblenden. Steht eine PLU in der zentralen Werbung, kann sie
+                in der Hauptliste trotzdem sichtbar sein (Badge in der Tabelle).
               </p>
             </div>
           </div>
@@ -317,73 +323,29 @@ export function HiddenProductsPage() {
         {!hiddenLoading && sortedHiddenProductInfos.length > 0 && (
           <Card>
             <CardContent className="p-0">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b-2 border-border">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">PLU</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Artikel</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[100px]">Typ</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[150px]">Ausgeblendet von</th>
-                    <th className="px-4 py-3 text-right w-[180px]" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedHiddenProductInfos.map((info) => (
-                    <tr key={info.plu} className="border-b border-border last:border-b-0 hover:bg-muted/30">
-                      <td className="px-4 py-3 font-mono text-sm">{getDisplayPlu(info.plu)}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span className="flex items-center gap-2">
-                          {info.name}
-                          {info.source === 'custom' && (
-                            <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">Eigen</Badge>
-                          )}
-                          {info.source === 'unknown' && (
-                            <Badge variant="secondary" className="text-xs">Unbekannt</Badge>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {info.itemType === 'PIECE' ? 'Stück' : info.itemType === 'WEIGHT' ? 'Gewicht' : '–'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-2">
-                          {info.hiddenByName}
-                          {currentUserId && info.hidden_by === currentUserId && (
-                            <Badge variant="secondary" className="text-xs shrink-0">Von mir</Badge>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-1">
-                          {info.customProduct && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => { if (info.customProduct) setEditingProduct(info.customProduct) }}
-                            >
-                              <Pencil className="h-3 w-3 mr-1" />
-                              Bearbeiten
-                            </Button>
-                          )}
-                          {canManageHidden ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => unhideProduct.mutate(info.plu)}
-                              disabled={unhideProduct.isPending}
-                            >
-                              <Undo2 className="h-4 w-4 mr-1" />
-                              Einblenden
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <HiddenProductsResponsiveList
+                variant="obst"
+                canManageHidden={canManageHidden}
+                unhidePending={unhideProduct.isPending}
+                onUnhide={(plu) => unhideProduct.mutate(plu)}
+                rows={sortedHiddenProductInfos.map((info) => ({
+                  plu: info.plu,
+                  name: info.name,
+                  hiddenByName: info.hiddenByName,
+                  hidden_by: info.hidden_by,
+                  showVonMirBadge: Boolean(currentUserId && info.hidden_by === currentUserId),
+                  source: info.source,
+                  showCentralCampaignBadge: centralCampaignPluSet.has(info.plu),
+                  typLabel:
+                    info.itemType === 'PIECE' ? 'Stück' : info.itemType === 'WEIGHT' ? 'Gewicht' : '–',
+                  thumbUrl: null,
+                  onEdit: info.customProduct
+                    ? () => {
+                        if (info.customProduct) setEditingProduct(info.customProduct)
+                      }
+                    : undefined,
+                }))}
+              />
             </CardContent>
           </Card>
         )}

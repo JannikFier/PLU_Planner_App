@@ -219,7 +219,7 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | `AdminDashboard` | `/admin` | Admin-Dashboard |
 | `SuperAdminDashboard` | `/super-admin` | Super-Admin-Dashboard |
 | `PLUUploadPage` | `/super-admin/plu-upload` | 4-Schritt Excel-Upload (Vollbild: Dateien, Vergleich, Konflikte, Fertig) |
-| `MasterList` | `*/masterlist` | PLU-Masterliste (User/Admin-Modus), Button „Neuer Upload“ → PLU-Upload-Seite |
+| `MasterList` | `*/masterlist` | PLU Obst und Gemüse (User/Admin-Modus), Button „Neuer Upload“ → PLU-Upload-Seite |
 | `LayoutSettingsPage` | `/super-admin/layout` | Layout-Konfiguration |
 | `RulesPage` | `/super-admin/rules` | Bezeichnungsregeln + Warengruppen |
 | `VersionsPage` | `/super-admin/versions` | Versionen-Manager |

@@ -16,7 +16,7 @@ alwaysApply: true
 - **Größere Features** (neue Seite, neuer Flow, neue Rolle): E2E-Test hinzufügen oder erweitern.
 - **Kleine Änderungen** (Text, Styling, Bugfix): Kein neuer Test nötig.
 - **Regel:** Wenn ein User-Flow neu ist oder sich wesentlich ändert → Test anpassen.
-- **Neue `/user/`-Seite mit breiter Tabelle/Liste:** `e2e/mobile-layout.spec.ts` um einen Fall mit derselben Scrollbreiten-Prüfung ergänzen (Handy + iPad-Projekte laufen automatisch mit).
+- **Neue `/user/`-Seite mit breiter Tabelle/Liste:** `e2e/mobile-layout.spec.ts` um einen Fall mit derselben Scrollbreiten-Prüfung ergänzen (Handy + iPad-Projekte laufen automatisch mit). Wo sinnvoll **`data-testid`** auf dem Listen-Wrapper und zusätzliche **`expectNoHorizontalOverflowInLocator`** (siehe bestehende Tests für `hidden-products-scroll-root`).
 
 ## Struktur
 

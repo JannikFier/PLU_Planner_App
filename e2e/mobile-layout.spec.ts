@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 
 /**
  * Keine horizontale Scrollbreite auf kritischen User-Routen (Handy + Tablet).
@@ -9,6 +9,32 @@ import type { Page } from '@playwright/test'
  * Bei neuen breiten Tabellen/Listen unter /user/** diese Datei ergänzen (siehe docs/TESTING.md).
  * @mobile – optional vor Publish zusammen mit test:e2e:full
  */
+
+/**
+ * Prüft documentElement, body und main (DashboardLayout) – erfasst auch
+ * Overflow nur im Hauptbereich, solange äußeres Fenster schmal bleibt.
+ */
+async function expectNoHorizontalOverflow(page: Page) {
+  const deltas = await page.evaluate(() => {
+    const delta = (el: Element | null) => (el ? el.scrollWidth - el.clientWidth : 0)
+    const main = document.querySelector('main')
+    return {
+      html: delta(document.documentElement),
+      body: delta(document.body),
+      main: delta(main),
+    }
+  })
+  expect(deltas.html, 'documentElement: Seite nicht breiter als Viewport').toBeLessThanOrEqual(1)
+  expect(deltas.body, 'body: kein horizontales Übermaß').toBeLessThanOrEqual(1)
+  expect(deltas.main, 'main: Inhaltsbereich nicht breiter als Viewport').toBeLessThanOrEqual(1)
+}
+
+/** Prüft ein konkretes Element (z. B. Listen-Wrapper mit data-testid) – fängt innere Überbreite. */
+async function expectNoHorizontalOverflowInLocator(locator: Locator, label: string) {
+  const delta = await locator.evaluate((el) => el.scrollWidth - el.clientWidth)
+  expect(delta, `${label}: kein horizontales Übermaß`).toBeLessThanOrEqual(1)
+}
+
 test.describe('Mobile Layout @mobile @extended', () => {
   test.beforeEach(async ({ page }) => {
     const email = process.env.E2E_USER_EMAIL
@@ -25,25 +51,6 @@ test.describe('Mobile Layout @mobile @extended', () => {
     await page.waitForLoadState('networkidle')
   })
 
-  /**
-   * Prüft documentElement, body und main (DashboardLayout) – erfasst auch
-   * Overflow nur im Hauptbereich, solange äußeres Fenster schmal bleibt.
-   */
-  async function expectNoHorizontalOverflow(page: Page) {
-    const deltas = await page.evaluate(() => {
-      const delta = (el: Element | null) => (el ? el.scrollWidth - el.clientWidth : 0)
-      const main = document.querySelector('main')
-      return {
-        html: delta(document.documentElement),
-        body: delta(document.body),
-        main: delta(main),
-      }
-    })
-    expect(deltas.html, 'documentElement: Seite nicht breiter als Viewport').toBeLessThanOrEqual(1)
-    expect(deltas.body, 'body: kein horizontales Übermaß').toBeLessThanOrEqual(1)
-    expect(deltas.main, 'main: Inhaltsbereich nicht breiter als Viewport').toBeLessThanOrEqual(1)
-  }
-
   test('Dashboard: keine horizontale Scrollbreite', async ({ page }) => {
     await page.goto('/user')
     await expect(page).toHaveURL(/\/user\/?$/)
@@ -56,7 +63,7 @@ test.describe('Mobile Layout @mobile @extended', () => {
     await page.goto('/user/masterlist')
     await expect(page).toHaveURL(/\/user\/masterlist/)
     await page.waitForLoadState('networkidle')
-    await expect(page.getByRole('heading', { name: 'PLU-Masterliste' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: /PLU Obst und Gemüse/ })).toBeVisible({ timeout: 15_000 })
     await expectNoHorizontalOverflow(page)
   })
 
@@ -66,7 +73,7 @@ test.describe('Mobile Layout @mobile @extended', () => {
     await page.waitForLoadState('networkidle')
     await expect(
       page
-        .getByRole('heading', { name: 'PLU-Liste Backshop' })
+        .getByRole('heading', { name: /PLU-Liste Backshop|PLU Backshop/ })
         .or(page.getByText('Keine Kalenderwoche'))
         .or(page.getByText('Keine PLU-Daten')),
     ).toBeVisible({ timeout: 15_000 })
@@ -95,6 +102,13 @@ test.describe('Mobile Layout @mobile @extended', () => {
     await page.waitForLoadState('networkidle')
     await expect(page.getByRole('heading', { name: 'Eigene & Ausgeblendete' })).toBeVisible({ timeout: 15_000 })
     await expectNoHorizontalOverflow(page)
+    const hiddenSectionRoot = page.locator('[data-testid="hidden-products-scroll-root"]')
+    if ((await hiddenSectionRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(
+        hiddenSectionRoot.first(),
+        'hidden-products-scroll-root (Eigene & Ausgeblendete – Abschnitt Ausgeblendete)',
+      )
+    }
   })
 
   test('Ausgeblendete Produkte: keine horizontale Scrollbreite', async ({ page }) => {
@@ -103,6 +117,10 @@ test.describe('Mobile Layout @mobile @extended', () => {
     await page.waitForLoadState('networkidle')
     await expect(page.getByRole('heading', { name: 'Ausgeblendete Produkte' })).toBeVisible({ timeout: 15_000 })
     await expectNoHorizontalOverflow(page)
+    const hiddenRoot = page.locator('[data-testid="hidden-products-scroll-root"]')
+    if ((await hiddenRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(hiddenRoot.first(), 'hidden-products-scroll-root')
+    }
   })
 
   test('Produkte in der Werbung: keine horizontale Scrollbreite', async ({ page }) => {
@@ -113,6 +131,14 @@ test.describe('Mobile Layout @mobile @extended', () => {
       timeout: 15_000,
     })
     await expectNoHorizontalOverflow(page)
+    const centralRoot = page.locator('[data-testid="offer-central-campaign-scroll-root"]')
+    if ((await centralRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(centralRoot.first(), 'offer-central-campaign-scroll-root')
+    }
+    const localRoot = page.locator('[data-testid="offer-local-advertising-scroll-root"]')
+    if ((await localRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(localRoot.first(), 'offer-local-advertising-scroll-root')
+    }
   })
 
   test('Umbenannte Produkte: keine horizontale Scrollbreite', async ({ page }) => {
@@ -121,6 +147,10 @@ test.describe('Mobile Layout @mobile @extended', () => {
     await page.waitForLoadState('networkidle')
     await expect(page.getByRole('heading', { name: 'Umbenannte Produkte' })).toBeVisible({ timeout: 15_000 })
     await expectNoHorizontalOverflow(page)
+    const renamedRoot = page.locator('[data-testid="renamed-products-scroll-root"]')
+    if ((await renamedRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(renamedRoot.first(), 'renamed-products-scroll-root')
+    }
   })
 
   test('Backshop Ausgeblendete: keine horizontale Scrollbreite', async ({ page }) => {
@@ -131,6 +161,10 @@ test.describe('Mobile Layout @mobile @extended', () => {
       timeout: 15_000,
     })
     await expectNoHorizontalOverflow(page)
+    const hiddenRoot = page.locator('[data-testid="hidden-products-scroll-root"]')
+    if ((await hiddenRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(hiddenRoot.first(), 'hidden-products-scroll-root (Backshop)')
+    }
   })
 
   test('Backshop Werbung: keine horizontale Scrollbreite', async ({ page }) => {
@@ -141,6 +175,20 @@ test.describe('Mobile Layout @mobile @extended', () => {
       page.getByRole('heading', { name: 'Produkte in der Werbung (Backshop)', level: 2 }),
     ).toBeVisible({ timeout: 15_000 })
     await expectNoHorizontalOverflow(page)
+    const centralRoot = page.locator('[data-testid="backshop-offer-central-campaign-scroll-root"]')
+    if ((await centralRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(
+        centralRoot.first(),
+        'backshop-offer-central-campaign-scroll-root',
+      )
+    }
+    const localRoot = page.locator('[data-testid="backshop-offer-local-advertising-scroll-root"]')
+    if ((await localRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(
+        localRoot.first(),
+        'backshop-offer-local-advertising-scroll-root',
+      )
+    }
   })
 
   test('Backshop Umbenannte: keine horizontale Scrollbreite', async ({ page }) => {
@@ -151,5 +199,59 @@ test.describe('Mobile Layout @mobile @extended', () => {
       timeout: 15_000,
     })
     await expectNoHorizontalOverflow(page)
+    const renamedRoot = page.locator('[data-testid="renamed-products-scroll-root"]')
+    if ((await renamedRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(renamedRoot.first(), 'renamed-products-scroll-root (Backshop)')
+    }
+  })
+
+  test('Ausblenden-Dialog: Footer-Buttons im Modal sichtbar (kurze Viewport-Höhe)', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 420 })
+    await page.goto('/user/hidden-products')
+    await expect(page).toHaveURL(/\/user\/hidden-products/)
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('heading', { name: 'Ausgeblendete Produkte' })).toBeVisible({ timeout: 15_000 })
+    const openBtn = page.getByRole('button', { name: 'Produkte ausblenden' })
+    if ((await openBtn.count()) === 0) {
+      testInfo.skip(true, 'Button „Produkte ausblenden“ nicht verfügbar (Rolle/Berechtigung)')
+      return
+    }
+    await openBtn.click()
+    await expect(page.getByRole('dialog', { name: 'Produkte ausblenden' })).toBeVisible({ timeout: 10_000 })
+    const cancel = page.getByRole('button', { name: 'Abbrechen' })
+    const confirm = page.getByRole('button', { name: /Produkt.*ausblenden/ })
+    await expect(cancel).toBeVisible()
+    await expect(confirm).toBeVisible()
+    await expect(cancel).toBeInViewport()
+    await expect(confirm).toBeInViewport()
+  })
+})
+
+test.describe('Mobile Layout Super-Admin hidden-products @mobile @extended', () => {
+  test.beforeEach(async ({ page }) => {
+    const email = process.env.E2E_SUPER_ADMIN_EMAIL
+    const password = process.env.E2E_SUPER_ADMIN_PASSWORD
+    if (!email || !password) {
+      test.skip()
+      return
+    }
+    await page.goto('/login')
+    await page.getByLabel(/E-Mail-Adresse \/ Personalnummer/i).fill(email)
+    await page.getByLabel(/^Passwort$/i).fill(password)
+    await page.getByRole('button', { name: 'Anmelden' }).click()
+    await expect(page).toHaveURL(/\/super-admin/, { timeout: 15_000 })
+    await page.waitForLoadState('networkidle')
+  })
+
+  test('Super-Admin Ausgeblendete Produkte: keine horizontale Scrollbreite', async ({ page }) => {
+    await page.goto('/super-admin/hidden-products')
+    await expect(page).toHaveURL(/\/super-admin\/hidden-products/)
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('heading', { name: 'Ausgeblendete Produkte' })).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalOverflow(page)
+    const hiddenRoot = page.locator('[data-testid="hidden-products-scroll-root"]')
+    if ((await hiddenRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(hiddenRoot.first(), 'hidden-products-scroll-root (Super-Admin)')
+    }
   })
 })

@@ -1,0 +1,23 @@
+---
+description: Breite Tabellen und Listen für Handy/Tablet – Desktop-Tabelle + Mobile-Karten
+alwaysApply: false
+---
+
+# Responsive Listen (Handy/Tablet)
+
+## Leitbild
+
+- Unter **`md` (768px):** Keine mehrspaltigen Breit-Tabellen als einzige Darstellung. Stattdessen **eine Zeile pro Eintrag** (Liste/Karten), **Icons** mit `aria-label` und optional **Tooltip** (deutscher Text), lange Aktionen in **Dialoge** auslagern.
+- **Referenz:** [src/components/plu/BackshopCustomProductsList.tsx](src/components/plu/BackshopCustomProductsList.tsx) – `hidden md:block` für Tabelle, `md:hidden` für kompakte Liste, `data-testid` auf der Mobile-Liste.
+- **Ausnahme:** Horizontales Scrollen nur bewusst (`overflow-x-auto` mit klarem UX-Hinweis), nicht als Standard für ganze Seiten.
+
+## Checkliste bei neuen oder geänderten Seiten
+
+1. Enthält die Seite eine **Tabelle mit vielen Spalten** oder **zwei Produkte pro Zeile**?
+2. Falls ja: **Mobile-Variante** (Karten oder einspaltige Liste) bis `md` oder `lg` vorsehen.
+3. **Touch:** Icon-Buttons mind. ~40px (`h-10 w-10`) auf Mobile, wo sinnvoll.
+4. **`data-testid`** am Listen-Wrapper für E2E ([e2e/mobile-layout.spec.ts](e2e/mobile-layout.spec.ts) – zusätzliche Overflow-Prüfung auf Container).
+
+## E2E
+
+- Neue breite Listen unter `/user/…` oder `/super-admin/…`: Mobile-Layout-Tests erweitern; bei kritischen Listen **Container-Assertion** (nicht nur `html`/`body`/`main`). Siehe [docs/TESTING.md](docs/TESTING.md).

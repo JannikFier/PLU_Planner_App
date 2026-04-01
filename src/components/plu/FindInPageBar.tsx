@@ -1,6 +1,6 @@
 // FindInPageBar: Such-Input + „X von Y“ + Vorheriger/Nächster (Chrome-artige Find-in-Page)
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { Search, ChevronUp, ChevronDown, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -46,22 +46,37 @@ export function FindInPageBar({
     return () => cancelAnimationFrame(id)
   }, [])
 
+  /** Pfeiltasten: Treffer wechseln statt Seite scrollen (Tablet/Tastatur) */
+  const onSearchKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (totalMatches <= 0) return
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault()
+        e.stopPropagation()
+        if (e.key === 'ArrowUp') onPrev()
+        else onNext()
+      }
+    },
+    [totalMatches, onPrev, onNext],
+  )
+
   return (
-    <div className={cn('flex flex-wrap items-center gap-2', className)}>
-      <div ref={inputWrapRef} className="relative max-w-[260px] min-w-[180px]">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+    <div className={cn('flex flex-wrap items-center gap-1.5 sm:gap-2', className)}>
+      <div ref={inputWrapRef} className="relative min-w-0 max-w-[min(100%,220px)] flex-1 sm:max-w-[260px] sm:min-w-[180px]">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none sm:left-3 sm:h-4 sm:w-4" />
         <Input
           type="search"
           placeholder={placeholder}
           value={searchText}
           onChange={(e) => onSearchTextChange(e.target.value)}
-          className="pl-9"
+          onKeyDown={onSearchKeyDown}
+          className="h-8 pl-8 text-sm sm:h-9 sm:pl-9"
           aria-label="Suche"
         />
       </div>
       {totalMatches > 0 && (
         <>
-          <span className="text-sm text-muted-foreground whitespace-nowrap">
+          <span className="whitespace-nowrap text-xs text-muted-foreground sm:text-sm">
             {currentIndex + 1} von {totalMatches}
           </span>
           <div className="flex items-center gap-0.5">

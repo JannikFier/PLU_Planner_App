@@ -3,13 +3,15 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
-export type BackshopThumbnailSize = 'sm' | 'md' | 'lg' | 'xl'
+export type BackshopThumbnailSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl'
 
 const SIZE_CLASS: Record<BackshopThumbnailSize, string> = {
   sm: 'h-8 w-8',
   md: 'h-10 w-10',
   lg: 'h-12 w-12',
   xl: 'h-20 w-20',
+  /** Listen (Desktop): große Vorschau neben PLU/Name */
+  '2xl': 'h-24 w-24',
 }
 
 export interface BackshopThumbnailProps {

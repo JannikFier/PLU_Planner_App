@@ -92,7 +92,7 @@ test.describe('Super-Admin-Journey @extended', () => {
     await expect(page).toHaveURL(/\/super-admin\/masterlist/)
     await page.waitForLoadState('networkidle')
     await expect(
-      page.getByRole('heading', { name: 'PLU-Masterliste' })
+      page.getByRole('heading', { name: 'PLU Obst und Gemüse' })
         .or(page.getByText('Keine Kalenderwoche'))
         .or(page.getByText('Keine PLU-Daten'))
     ).toBeVisible({ timeout: 15_000 })

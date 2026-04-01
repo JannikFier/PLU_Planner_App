@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import type { Version } from '@/types/database'
 
 interface KWSelectorProps {
@@ -19,6 +20,8 @@ interface KWSelectorProps {
   onSelect: (versionId: string) => void
   /** Deaktiviert den Selector */
   disabled?: boolean
+  /** Zusätzliche Klassen für den Trigger (z. B. schmalere Breite auf dem Handy) */
+  triggerClassName?: string
 }
 
 /** Status-Label für die Version */
@@ -39,7 +42,7 @@ function getStatusLabel(status: Version['status']) {
  * Dropdown zur Auswahl einer Kalenderwoche (Version).
  * Zeigt das KW-Label und den Status als Badge.
  */
-export function KWSelector({ versions, selectedId, onSelect, disabled }: KWSelectorProps) {
+export function KWSelector({ versions, selectedId, onSelect, disabled, triggerClassName }: KWSelectorProps) {
   if (versions.length === 0) {
     return (
       <div className="text-sm text-muted-foreground">
@@ -50,7 +53,7 @@ export function KWSelector({ versions, selectedId, onSelect, disabled }: KWSelec
 
   return (
     <Select value={selectedId ?? ''} onValueChange={onSelect} disabled={disabled}>
-      <SelectTrigger className="w-[200px]">
+      <SelectTrigger className={cn('w-[200px]', triggerClassName)}>
         <SelectValue placeholder="KW auswählen..." />
       </SelectTrigger>
       <SelectContent>

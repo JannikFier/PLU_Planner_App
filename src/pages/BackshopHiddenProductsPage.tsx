@@ -5,9 +5,8 @@ import { useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { EyeOff, Undo2, Pencil } from 'lucide-react'
+import { EyeOff } from 'lucide-react'
 import { useBackshopHiddenItems, useBackshopUnhideProduct } from '@/hooks/useBackshopHiddenItems'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
@@ -38,8 +37,8 @@ import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import { orderByPluDisplayOrder } from '@/lib/list-order'
 import { useQuery } from '@tanstack/react-query'
 import { HideBackshopProductsDialog } from '@/components/plu/HideBackshopProductsDialog'
-import { BackshopThumbnail } from '@/components/plu/BackshopThumbnail'
 import { EditBackshopCustomProductDialog } from '@/components/plu/EditBackshopCustomProductDialog'
+import { HiddenProductsResponsiveList } from '@/components/plu/HiddenProductsResponsiveList'
 import type { BackshopCustomProduct, Block } from '@/types/database'
 import type { Profile } from '@/types/database'
 
@@ -107,6 +106,11 @@ export function BackshopHiddenProductsPage() {
         backshopLocalOverrides,
       ),
     [currentKw, currentJahr, backshopCampaign, backshopStoreDisabled, offerItems, backshopLocalOverrides],
+  )
+
+  const centralCampaignPluSet = useMemo(
+    () => new Set((backshopCampaign?.lines ?? []).map((l) => l.plu)),
+    [backshopCampaign],
   )
 
   const renamedByPlu = useMemo(() => new Map(renamedItems.map((r) => [r.plu, r])), [renamedItems])
@@ -264,7 +268,8 @@ export function BackshopHiddenProductsPage() {
             <div>
               <h2 className="text-2xl font-bold tracking-tight">Ausgeblendete Produkte (Backshop)</h2>
               <p className="text-sm text-muted-foreground">
-                Produkte einblenden oder weitere ausblenden.
+                Produkte einblenden oder weitere ausblenden. Steht eine PLU in der zentralen Werbung, kann sie
+                in der Hauptliste trotzdem sichtbar sein (Badge in der Tabelle).
               </p>
             </div>
           </div>
@@ -306,73 +311,28 @@ export function BackshopHiddenProductsPage() {
         {!hiddenLoading && sortedHiddenProductInfos.length > 0 && (
           <Card>
             <CardContent className="p-0">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b-2 border-border">
-                    <th className="px-4 py-3 w-14 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider" aria-label="Bild" />
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">PLU</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Artikel</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[150px]">Ausgeblendet von</th>
-                    <th className="px-4 py-3 text-right w-[180px]" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedHiddenProductInfos.map((info) => (
-                    <tr key={info.plu} className="border-b border-border last:border-b-0 hover:bg-muted/30">
-                      <td className="px-4 py-3 w-14 align-middle">
-                        <BackshopThumbnail src={info.thumbUrl} size="md" />
-                      </td>
-                      <td className="px-4 py-3 font-mono text-sm">{getDisplayPlu(info.plu)}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span className="flex items-center gap-2">
-                          {info.name}
-                          {info.source === 'custom' && (
-                            <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">Eigen</Badge>
-                          )}
-                          {info.source === 'unknown' && (
-                            <Badge variant="secondary" className="text-xs">Unbekannt</Badge>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-2">
-                          {info.hiddenByName}
-                          {user && info.hidden_by === user.id && (
-                            <Badge variant="secondary" className="text-xs shrink-0">Von mir</Badge>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-1">
-                          {info.customProduct && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => { if (info.customProduct) setEditingProduct(info.customProduct) }}
-                            >
-                              <Pencil className="h-3 w-3 mr-1" />
-                              Bearbeiten
-                            </Button>
-                          )}
-                          {canManageHidden ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => unhideProduct.mutate(info.plu)}
-                              disabled={unhideProduct.isPending}
-                            >
-                              <Undo2 className="h-4 w-4 mr-1" />
-                              Einblenden
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <HiddenProductsResponsiveList
+                variant="backshop"
+                canManageHidden={canManageHidden}
+                unhidePending={unhideProduct.isPending}
+                onUnhide={(plu) => unhideProduct.mutate(plu)}
+                rows={sortedHiddenProductInfos.map((info) => ({
+                  plu: info.plu,
+                  name: info.name,
+                  hiddenByName: info.hiddenByName,
+                  hidden_by: info.hidden_by,
+                  showVonMirBadge: Boolean(user && info.hidden_by === user.id),
+                  source: info.source,
+                  showCentralCampaignBadge: centralCampaignPluSet.has(info.plu),
+                  typLabel: null,
+                  thumbUrl: info.thumbUrl,
+                  onEdit: info.customProduct
+                    ? () => {
+                        if (info.customProduct) setEditingProduct(info.customProduct)
+                      }
+                    : undefined,
+                }))}
+              />
             </CardContent>
           </Card>
         )}

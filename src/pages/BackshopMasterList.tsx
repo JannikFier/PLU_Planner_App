@@ -7,16 +7,26 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ListFilter, RefreshCw, AlertCircle, FileDown, Plus, EyeOff, Pencil, Megaphone, Search } from 'lucide-react'
+import {
+  ListFilter,
+  RefreshCw,
+  AlertCircle,
+  FileDown,
+  Plus,
+  EyeOff,
+  Pencil,
+  Megaphone,
+  Search,
+  LayoutGrid,
+} from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { KWSelector } from '@/components/plu/KWSelector'
+import { PLUListPageActionsMenu, type PLUListPageActionMenuItem } from '@/components/plu/PLUListPageActionsMenu'
 import { PLUTable, type PLUTableHandle } from '@/components/plu/PLUTable'
 import { PLUFooter } from '@/components/plu/PLUFooter'
 const ExportBackshopPDFDialog = lazy(() =>
   import('@/components/plu/ExportBackshopPDFDialog').then((m) => ({ default: m.ExportBackshopPDFDialog })),
 )
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
-import { useBackshopVersions } from '@/hooks/useBackshopVersions'
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
 import { useBackshopLayoutSettings } from '@/hooks/useBackshopLayoutSettings'
 import { useBackshopCustomProducts } from '@/hooks/useBackshopCustomProducts'
@@ -34,6 +44,7 @@ import {
 import type { PLUStats } from '@/lib/plu-helpers'
 import { formatBackshopActiveListToolbarRange, getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import { buildOfferDisplayMap } from '@/lib/offer-display'
+import { effectiveHiddenPluSet } from '@/lib/hidden-visibility'
 import {
   useBackshopOfferCampaignWithLines,
   useBackshopOfferStoreDisabled,
@@ -42,7 +53,7 @@ import { useBackshopOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalP
 
 /**
  * Backshop-Masterliste: Tabelle mit Bild, PLU, Name.
- * Phase 3: Nur Anzeige, keine Custom/Hidden; PDF und Upload über eigene Seiten.
+ * Immer die aktive eingespielte Liste (keine KW-/Archiv-Umschaltung auf der Seite).
  */
 export function BackshopMasterList() {
   const navigate = useNavigate()
@@ -56,25 +67,11 @@ export function BackshopMasterList() {
     : '/user'
 
   const { data: activeVersion, isLoading: versionLoading } = useActiveBackshopVersion()
-  const { data: versions = [], isLoading: versionsLoading } = useBackshopVersions()
   const { data: layoutSettings } = useBackshopLayoutSettings()
 
-  const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>(undefined)
-  const effectiveVersionId = selectedVersionId ?? activeVersion?.id
-
-  /** Bei neuem aktivem Upload: wieder die aktive Liste zeigen (nicht in alter KW-Version hängen bleiben). */
-  const prevActiveVersionIdRef = useRef<string | undefined>(undefined)
-  useEffect(() => {
-    const id = activeVersion?.id
-    if (!id) return
-    if (prevActiveVersionIdRef.current !== undefined && prevActiveVersionIdRef.current !== id) {
-      setSelectedVersionId(undefined)
-    }
-    prevActiveVersionIdRef.current = id
-  }, [activeVersion?.id])
+  const effectiveVersionId = activeVersion?.id
 
   const [showPdfDialog, setShowPdfDialog] = useState(false)
-  const [pdfDialogVersionId, setPdfDialogVersionId] = useState<string | undefined>(undefined)
 
   const {
     data: rawItems = [],
@@ -83,10 +80,6 @@ export function BackshopMasterList() {
     error: itemsError,
     refetch: refetchItems,
   } = useBackshopPLUData(effectiveVersionId)
-
-  const { data: pdfRawItems = [] } = useBackshopPLUData(pdfDialogVersionId, {
-    enabled: showPdfDialog && !!pdfDialogVersionId,
-  })
 
   const { data: customProducts = [] } = useBackshopCustomProducts()
   const { data: hiddenItems = [] } = useBackshopHiddenItems()
@@ -106,9 +99,13 @@ export function BackshopMasterList() {
     [storeBackshopNameOverrides],
   )
 
-  const hiddenPLUs = useMemo(
+  const rawHiddenPluSet = useMemo(
     () => new Set(hiddenItems.map((h) => h.plu)),
     [hiddenItems],
+  )
+  const effectiveHiddenPLUs = useMemo(
+    () => effectiveHiddenPluSet(rawHiddenPluSet, backshopCampaign?.lines),
+    [rawHiddenPluSet, backshopCampaign?.lines],
   )
   const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
   const markYellowKwCount = layoutSettings?.mark_yellow_kw_count ?? 4
@@ -136,7 +133,7 @@ export function BackshopMasterList() {
   const { displayItems, stats } = useMemo(() => {
     const result = buildBackshopDisplayList({
       masterItems: rawItems,
-      hiddenPLUs,
+      hiddenPLUs: effectiveHiddenPLUs,
       offerDisplayByPlu,
       sortMode,
       blocks,
@@ -165,23 +162,15 @@ export function BackshopMasterList() {
       customCount: result.stats.customCount,
     }
     return { displayItems: result.items, stats: pluStats }
-  }, [rawItems, hiddenPLUs, offerDisplayByPlu, sortMode, blocks, customProducts, bezeichnungsregeln, renamedItems, markYellowKwCount, currentKw, currentJahr, nameBlockOverrides, storeBackshopBlockOrder])
+  }, [rawItems, effectiveHiddenPLUs, offerDisplayByPlu, sortMode, blocks, customProducts, bezeichnungsregeln, renamedItems, markYellowKwCount, currentKw, currentJahr, nameBlockOverrides, storeBackshopBlockOrder])
 
-  const currentVersion = useMemo(
-    () => versions.find((v) => v.id === effectiveVersionId) ?? activeVersion,
-    [versions, effectiveVersionId, activeVersion],
-  )
-
-  const pdfDialogVersion = useMemo(
-    () => (pdfDialogVersionId ? versions.find((v) => v.id === pdfDialogVersionId) : null),
-    [versions, pdfDialogVersionId],
-  )
+  const currentVersion = activeVersion
 
   const pdfDisplayResult = useMemo(() => {
-    if (!showPdfDialog || !pdfDialogVersionId) return { items: [], stats: { total: 0, newCount: 0, changedCount: 0, hidden: 0, customCount: 0 } }
+    if (!showPdfDialog) return { items: [], stats: { total: 0, newCount: 0, changedCount: 0, hidden: 0, customCount: 0 } }
     return buildBackshopDisplayList({
-      masterItems: pdfRawItems,
-      hiddenPLUs,
+      masterItems: rawItems,
+      hiddenPLUs: effectiveHiddenPLUs,
       offerDisplayByPlu,
       sortMode,
       blocks,
@@ -201,7 +190,7 @@ export function BackshopMasterList() {
       nameBlockOverrides,
       storeBlockOrder: storeBackshopBlockOrder,
     })
-  }, [showPdfDialog, pdfDialogVersionId, pdfRawItems, hiddenPLUs, offerDisplayByPlu, sortMode, blocks, customProducts, bezeichnungsregeln, renamedItems, markYellowKwCount, currentKw, currentJahr, nameBlockOverrides, storeBackshopBlockOrder])
+  }, [showPdfDialog, rawItems, effectiveHiddenPLUs, offerDisplayByPlu, sortMode, blocks, customProducts, bezeichnungsregeln, renamedItems, markYellowKwCount, currentKw, currentJahr, nameBlockOverrides, storeBackshopBlockOrder])
 
   const pdfStats: PLUStats = useMemo(
     () => ({
@@ -215,10 +204,7 @@ export function BackshopMasterList() {
     [pdfDisplayResult.stats],
   )
 
-  const openPdfDialog = () => {
-    setPdfDialogVersionId(effectiveVersionId ?? undefined)
-    setShowPdfDialog(true)
-  }
+  const openPdfDialog = () => setShowPdfDialog(true)
 
   const pluTableRef = useRef<PLUTableHandle>(null)
 
@@ -232,32 +218,84 @@ export function BackshopMasterList() {
     return () => document.removeEventListener('visibilitychange', handler)
   }, [])
 
-  const isLoading = versionLoading || versionsLoading || itemsLoading
-  const hasNoVersion = !versionLoading && !versionsLoading && !activeVersion && versions.length === 0
+  const isLoading = versionLoading || itemsLoading
+  const hasNoVersion = !versionLoading && !activeVersion
+
+  /** Mobile (max-sm): Aktionen im ⋮-Menü */
+  const backshopMobileMenuItems = useMemo((): PLUListPageActionMenuItem[] => {
+    if (isViewer) return []
+    const backTo = location.pathname + location.search
+    const nav = (path: string) => () =>
+      navigate(`${rolePrefix}${path}?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+    const pdfDisabled = isLoading || displayItems.length === 0
+    const items: PLUListPageActionMenuItem[] = [
+      {
+        label: 'Eigene Produkte',
+        icon: <Plus className="h-4 w-4" />,
+        onClick: nav('/backshop-custom-products'),
+      },
+      {
+        label: 'Ausgeblendete',
+        icon: <EyeOff className="h-4 w-4" />,
+        onClick: nav('/backshop-hidden-products'),
+      },
+      {
+        label: 'Werbung',
+        icon: <Megaphone className="h-4 w-4" />,
+        onClick: nav('/backshop-offer-products'),
+      },
+    ]
+    if (isSuperAdmin && location.pathname.startsWith('/super-admin')) {
+      items.push({
+        label: 'Warengruppen bearbeiten',
+        icon: <LayoutGrid className="h-4 w-4" />,
+        onClick: nav('/backshop-warengruppen'),
+      })
+    }
+    items.push(
+      {
+        label: 'Umbenennen',
+        icon: <Pencil className="h-4 w-4" />,
+        onClick: nav('/backshop-renamed-products'),
+      },
+      {
+        label: 'PDF exportieren',
+        icon: <FileDown className="h-4 w-4" />,
+        onClick: () => setShowPdfDialog(true),
+        disabled: pdfDisabled,
+      },
+    )
+    return items
+  }, [
+    isViewer,
+    isSuperAdmin,
+    isLoading,
+    displayItems.length,
+    location.pathname,
+    location.search,
+    rolePrefix,
+    navigate,
+  ])
 
   return (
     <DashboardLayout>
       <div className="space-y-4">
-        {/* === Header (wie MasterList) === */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">PLU-Liste Backshop</h2>
-            <p className="text-sm text-muted-foreground">
-              Backshop-Produkte mit Bild, PLU und Name.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {versionsLoading ? (
-              <Skeleton className="h-9 w-[200px]" />
-            ) : (
-              <KWSelector
-                versions={versions as import('@/types/database').Version[]}
-                selectedId={effectiveVersionId}
-                onSelect={setSelectedVersionId}
-                disabled={isLoading}
-              />
-            )}
-          </div>
+        {/* === Header: Mobile – kurzer Titel + ⋮ (keine KW-Auswahl) === */}
+        <div className="sm:hidden flex items-center justify-between gap-3 min-w-0">
+          <h2 className="text-base font-bold leading-snug tracking-tight min-w-0" title="PLU-Liste Backshop">
+            PLU Backshop
+          </h2>
+          {currentVersion && !isLoading && !hasNoVersion && (
+            <PLUListPageActionsMenu ariaLabel="Listen-Aktionen" items={backshopMobileMenuItems} />
+          )}
+        </div>
+
+        {/* === Header: Desktop === */}
+        <div className="hidden sm:block space-y-1">
+          <h2 className="text-2xl font-bold tracking-tight">PLU-Liste Backshop</h2>
+          <p className="text-sm text-muted-foreground">
+            Aktuelle eingespielte Liste – Backshop-Produkte mit Bild, PLU und Name.
+          </p>
         </div>
 
         {/* === Toolbar (wie MasterList: Infos links, Aktionen rechts) === */}
@@ -274,7 +312,7 @@ export function BackshopMasterList() {
             >
               <Search className="h-4 w-4" />
             </Button>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground sm:flex-initial sm:max-w-none">
               <ListFilter className="h-4 w-4 shrink-0" />
               <span
                 className="text-foreground font-medium"
@@ -294,73 +332,87 @@ export function BackshopMasterList() {
                 <Badge variant="outline" className="text-xs">Archiv</Badge>
               )}
             </div>
-            <div className="flex-1" />
-            {!isViewer && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const backTo = location.pathname + location.search
-                    navigate(`${rolePrefix}/backshop-custom-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Eigene Produkte
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const backTo = location.pathname + location.search
-                    navigate(`${rolePrefix}/backshop-hidden-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
-                  }}
-                >
-                  <EyeOff className="h-4 w-4 mr-1" />
-                  Ausgeblendete
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const backTo = location.pathname + location.search
-                    navigate(`${rolePrefix}/backshop-offer-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
-                  }}
-                >
-                  <Megaphone className="h-4 w-4 mr-1" />
-                  Werbung
-                </Button>
-                {isSuperAdmin && location.pathname.startsWith('/super-admin') && (
+            <div className="hidden sm:block sm:flex-1" />
+            <div className="hidden sm:flex sm:flex-wrap items-center gap-2">
+              {!isViewer && (
+                <>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => {
                       const backTo = location.pathname + location.search
-                      navigate(`${rolePrefix}/backshop-warengruppen?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                      navigate(`${rolePrefix}/backshop-custom-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
                     }}
                   >
-                    Warengruppen bearbeiten
+                    <Plus className="h-4 w-4 mr-1" />
+                    Eigene Produkte
                   </Button>
-                )}
-              </>
-            )}
-            {!isViewer && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const backTo = location.pathname + location.search
+                      navigate(`${rolePrefix}/backshop-hidden-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                    }}
+                  >
+                    <EyeOff className="h-4 w-4 mr-1" />
+                    Ausgeblendete
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const backTo = location.pathname + location.search
+                      navigate(`${rolePrefix}/backshop-offer-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                    }}
+                  >
+                    <Megaphone className="h-4 w-4 mr-1" />
+                    Werbung
+                  </Button>
+                  {isSuperAdmin && location.pathname.startsWith('/super-admin') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const backTo = location.pathname + location.search
+                        navigate(`${rolePrefix}/backshop-warengruppen?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                      }}
+                    >
+                      Warengruppen bearbeiten
+                    </Button>
+                  )}
+                </>
+              )}
+              {!isViewer && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const backTo = location.pathname + location.search
+                    navigate(`${rolePrefix}/backshop-renamed-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                  }}
+                >
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Umbenennen
+                </Button>
+              )}
+              {!hasNoVersion && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openPdfDialog}
+                  disabled={isLoading || displayItems.length === 0}
+                >
+                  <FileDown className="h-4 w-4 mr-1" />
+                  PDF
+                </Button>
+              )}
+            </div>
+            {isViewer && !hasNoVersion && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  const backTo = location.pathname + location.search
-                  navigate(`${rolePrefix}/backshop-renamed-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
-                }}
-              >
-                <Pencil className="h-4 w-4 mr-1" />
-                Umbenennen
-              </Button>
-            )}
-            {!hasNoVersion && (
-              <Button
-                variant="outline"
-                size="sm"
+                className="shrink-0 sm:hidden"
                 onClick={openPdfDialog}
                 disabled={isLoading || displayItems.length === 0}
               >
@@ -455,13 +507,13 @@ export function BackshopMasterList() {
             onOpenChange={setShowPdfDialog}
             items={pdfDisplayResult.items}
             stats={pdfStats}
-            kwLabel={pdfDialogVersion?.kw_label ?? 'Backshop'}
+            kwLabel={activeVersion?.kw_label ?? 'Backshop'}
             sortMode={sortMode}
             flowDirection={flowDirection}
             blocks={blocks}
-            versions={versions}
-            selectedVersionId={pdfDialogVersionId}
-            onVersionChange={setPdfDialogVersionId}
+            versions={[]}
+            selectedVersionId={undefined}
+            onVersionChange={undefined}
             fontSizes={fontSizes}
           />
           </Suspense>

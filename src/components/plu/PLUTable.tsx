@@ -1,7 +1,15 @@
 // PLUTable: Zwei-Spalten-Tabelle mit Buchstaben-/Block-Headern, Flussrichtung und Trennlinien
 // Unterstützt Auswahl-Modus (Checkboxen), optional Find-in-Page (Suche mit Pfeilen + Markierung)
 
-import { useMemo, useState, useEffect, useCallback, forwardRef, useImperativeHandle, type ReactNode } from 'react'
+import {
+  useMemo,
+  useState,
+  useEffect,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+  type ReactNode,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
@@ -18,6 +26,7 @@ import {
   itemMatchesSearch,
 } from '@/lib/plu-helpers'
 import { cn } from '@/lib/utils'
+import { scrollToDataRowIndex } from '@/lib/find-in-page-scroll'
 import { useFindInPage } from '@/hooks/useFindInPage'
 import { Megaphone, Search, Tag } from 'lucide-react'
 import { FindInPageBar } from '@/components/plu/FindInPageBar'
@@ -64,24 +73,33 @@ export interface FontSizes {
 
 const DEFAULT_FONT_SIZES: FontSizes = { header: 24, column: 16, product: 12 }
 
-/** Backshop: Bildspaltenbreite und Bildgröße (mind. doppelt so groß wie früher für Produkterkennung). */
-const BACKSHOP_IMAGE_COL = 'w-[128px]'
-const BACKSHOP_IMAGE_SIZE = 'h-24 w-24'
+/** Backshop: Bildspalte – auf schmalen Screens kleiner, damit PLU/Artikel/Preis nicht überlappen */
+const BACKSHOP_IMAGE_COL = 'w-[72px] sm:w-[96px] md:w-[128px]'
+const BACKSHOP_IMAGE_SIZE = 'h-14 w-14 sm:h-20 sm:w-20 md:h-24 md:w-24'
 /** object-contain = nichts abschneiden; crisp-edges = schärfere Skalierung */
 const BACKSHOP_IMAGE_CLASS = 'object-contain rounded border border-border [image-rendering:crisp-edges]'
 
+/** Mobile Kartenliste (nur md:hidden): größeres Bild zur besseren Erkennbarkeit */
+const BACKSHOP_IMAGE_SIZE_LIST = 'h-24 w-24'
+
 /** Zeigt Backshop-Bild oder Platzhalter; bei Lade fehler (kaputte URL) ebenfalls Platzhalter statt Broken-Icon. */
-function BackshopImage({ src }: { src: string | null | undefined }) {
+function BackshopImage({ src, size = 'default' }: { src: string | null | undefined; size?: 'default' | 'list' }) {
   const [loadFailed, setLoadFailed] = useState(false)
   const showPlaceholder = !src || loadFailed
+  const box = size === 'list' ? BACKSHOP_IMAGE_SIZE_LIST : BACKSHOP_IMAGE_SIZE
   if (showPlaceholder) {
     return (
-      <span className={cn('inline-block', BACKSHOP_IMAGE_SIZE, 'rounded border border-border bg-muted/50 text-muted-foreground text-xs flex items-center justify-center')}>
+      <span
+        className={cn(
+          'inline-flex items-center justify-center rounded border border-border bg-muted/50 text-muted-foreground text-xs',
+          box,
+        )}
+      >
         –
       </span>
     )
   }
-  return <img src={src} alt="" className={cn(BACKSHOP_IMAGE_SIZE, BACKSHOP_IMAGE_CLASS)} onError={() => setLoadFailed(true)} />
+  return <img src={src} alt="" className={cn(box, BACKSHOP_IMAGE_CLASS)} onError={() => setLoadFailed(true)} />
 }
 
 interface PLUTableProps {
@@ -282,6 +300,7 @@ function PLUColumn({
                   'border-b border-border last:border-b-0',
                   selectionMode && 'cursor-pointer hover:bg-muted/30',
                   isSelected && 'bg-primary/5',
+                  isActiveFindRow && 'bg-primary/15 ring-1 ring-inset ring-primary/35',
                 )}
                 onClick={selectionMode ? () => onToggleSelect?.(item.plu) : undefined}
               >
@@ -346,9 +365,126 @@ function PLUColumn({
   )
 }
 
+/** Mobile Backshop: Kartenliste (Bild + Name + Preis + PLU) statt enger 4-Spalten-Tabelle */
+function BackshopPLUMobileList({
+  rows,
+  fonts,
+  selectionMode,
+  selectedPLUs,
+  onToggleSelect,
+  findInPageRowOffset,
+  findInPageHighlightRowIndex,
+  findInPageQuery,
+}: {
+  rows: FlatRow[]
+  fonts: FontSizes
+  selectionMode?: boolean
+  selectedPLUs?: Set<string>
+  onToggleSelect?: (plu: string) => void
+  findInPageRowOffset?: number
+  findInPageHighlightRowIndex?: number | null
+  findInPageQuery?: string
+}) {
+  return (
+    <div className="flex-1 min-w-0 divide-y divide-border bg-background">
+      {rows.map((row, i) => {
+        if (row.type === 'header') {
+          const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
+          return (
+            <div
+              key={`mheader-${i}-${row.label}`}
+              {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}
+              className="bg-muted/50 px-2 py-1.5 text-center font-bold uppercase tracking-wider text-muted-foreground"
+              style={{ fontSize: Math.min(fonts.column, 14) + 'px' }}
+            >
+              {row.label}
+            </div>
+          )
+        }
+
+        const item = row.item
+        if (!item) return null
+        const isSelected = selectedPLUs?.has(item.plu) ?? false
+        const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
+        const isActiveFindRow =
+          findInPageHighlightRowIndex != null &&
+          rowIndex !== undefined &&
+          rowIndex === findInPageHighlightRowIndex
+        const hq = isActiveFindRow ? findInPageQuery : undefined
+        const preisVal = getDisplayPreisForItem(item)
+        const showOfferOrPreisRow = item.is_offer || preisVal != null
+
+        return (
+          <div
+            key={item.id}
+            {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}
+            className={cn(
+              'flex gap-3 px-2 py-2.5',
+              selectionMode && 'cursor-pointer active:bg-muted/30',
+              isSelected && 'bg-primary/5',
+              isActiveFindRow && 'bg-primary/15 ring-1 ring-inset ring-primary/35',
+            )}
+            onClick={selectionMode ? () => onToggleSelect?.(item.plu) : undefined}
+          >
+            {selectionMode && (
+              <div className="flex shrink-0 items-start pt-1" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onToggleSelect?.(item.plu)}
+                  className="h-4 w-4 rounded border-border"
+                />
+              </div>
+            )}
+            <div className="shrink-0 self-start">
+              <BackshopImage src={item.image_url} size="list" />
+            </div>
+            {/* Reihenfolge: Name → PLU → (Angebot + Preis eine Zeile) – nur mobile Kartenliste */}
+            <div className="min-w-0 flex-1 flex flex-col gap-1">
+              <div
+                className="font-medium leading-snug text-foreground"
+                style={{ fontSize: fonts.product + 'px' }}
+              >
+                {hq?.trim() ? (
+                  <HighlightedSearchText
+                    text={getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
+                    query={hq}
+                  />
+                ) : (
+                  getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)
+                )}
+              </div>
+              <div>
+                <StatusBadge
+                  plu={item.plu}
+                  status={item.status}
+                  oldPlu={item.old_plu}
+                  style={{ fontSize: Math.max(10, fonts.product - 1) + 'px' }}
+                  highlightQuery={hq}
+                />
+              </div>
+              {showOfferOrPreisRow && (
+                <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-0.5">
+                  <div className="min-w-0 flex-1">{item.is_offer ? <OfferKindBadge item={item} /> : null}</div>
+                  <div className="shrink-0">
+                    {preisVal != null ? (
+                      <PreisBadge value={preisVal} style={{ fontSize: fonts.product + 'px' }} />
+                    ) : null}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 /** Rendert eine Tabelle mit 4 Spalten für ROW_BY_ROW (Header über volle Breite). Bei backshop: Bild | PLU | Artikel pro Seite */
 function RowByRowTable({
   tableRows,
+  flatRows,
   fonts,
   selectionMode,
   selectedPLUs,
@@ -359,6 +495,8 @@ function RowByRowTable({
   listType = 'obst',
 }: {
   tableRows: TableRow[]
+  /** Gleiche flache Liste wie bei der mobilen Ansicht – Zuordnung data-row-index pro Artikel */
+  flatRows: FlatRow[]
   fonts: FontSizes
   selectionMode?: boolean
   selectedPLUs?: Set<string>
@@ -369,6 +507,13 @@ function RowByRowTable({
   listType?: 'obst' | 'backshop'
 }) {
   const showImageColumn = listType === 'backshop'
+  const flatIndexByItemId = useMemo(() => {
+    const m = new Map<string, number>()
+    flatRows.forEach((r, i) => {
+      if (r.type === 'item' && r.item) m.set(r.item.id, i)
+    })
+    return m
+  }, [flatRows])
   const hasAnyPrice = useMemo(
     () =>
       tableRows.some(
@@ -410,10 +555,16 @@ function RowByRowTable({
       </thead>
       <tbody>
         {tableRows.map((row, i) => {
+          const off = findInPageRowOffset ?? 0
           if (row.type === 'fullHeader') {
-            const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
+            const headerFlatIdx = flatRows.findIndex((r) => r.type === 'header' && r.label === row.label)
+            const headerDataIdx = headerFlatIdx >= 0 ? off + headerFlatIdx : undefined
             return (
-              <tr key={`header-${i}-${row.label}`} className="border-b border-border" {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}>
+              <tr
+                key={`header-${i}-${row.label}`}
+                className="border-b border-border"
+                {...(headerDataIdx !== undefined && { 'data-row-index': headerDataIdx })}
+              >
                 <td colSpan={totalCols} className="px-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50" style={{ fontSize: fonts.column + 'px', paddingTop: '0.35em', paddingBottom: '0.35em' }}>{row.label}</td>
               </tr>
             )
@@ -421,32 +572,54 @@ function RowByRowTable({
 
           const leftSelected = row.left ? (selectedPLUs?.has(row.left.plu) ?? false) : false
           const rightSelected = row.right ? (selectedPLUs?.has(row.right.plu) ?? false) : false
-          const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
-          const isActiveFindRow =
-            findInPageHighlightRowIndex != null &&
-            rowIndex !== undefined &&
-            rowIndex === findInPageHighlightRowIndex
-          const hq = isActiveFindRow ? findInPageQuery : undefined
-
-          const imageCell = (item: DisplayItem) => (
-            <td className="px-1 py-1 align-middle border-l border-r border-border">
-              <BackshopImage src={item.image_url} />
-            </td>
-          )
+          const flatLeft = row.left ? flatIndexByItemId.get(row.left.id) : undefined
+          const flatRight = row.right ? flatIndexByItemId.get(row.right.id) : undefined
+          const absLeft = flatLeft !== undefined ? off + flatLeft : undefined
+          const absRight = flatRight !== undefined ? off + flatRight : undefined
+          const hlLeft = findInPageHighlightRowIndex != null && absLeft === findInPageHighlightRowIndex
+          const hlRight = findInPageHighlightRowIndex != null && absRight === findInPageHighlightRowIndex
+          const hqLeft = hlLeft ? findInPageQuery : undefined
+          const hqRight = hlRight ? findInPageQuery : undefined
+          /** Nur die Produkt-Hälfte (links/rechts), nicht die ganze Tabellenzeile */
+          const findHL = 'bg-primary/15 ring-1 ring-inset ring-primary/35'
 
           return (
-            <tr key={`pair-${i}`} className="border-b border-border last:border-b-0" {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}>
+            <tr key={`pair-${i}`} className="border-b border-border last:border-b-0">
               {row.left ? (
                 <>
-                  {selectionMode && <td className="px-1 py-1 text-center"><input type="checkbox" checked={leftSelected} onChange={() => { const p = row.left?.plu; if (p) onToggleSelect?.(p) }} className="h-4 w-4 rounded border-border" /></td>}
-                  {showImageColumn && imageCell(row.left)}
-                  <td className="px-2" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}><StatusBadge plu={row.left.plu} status={row.left.status} oldPlu={row.left.old_plu} style={{ fontSize: fonts.product + 'px' }} highlightQuery={hq} /></td>
-                  <td className="px-2 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }} title={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}>
+                  {selectionMode && (
+                    <td
+                      className={cn('px-1 py-1 text-center', hlLeft && findHL)}
+                      {...(absLeft !== undefined && { 'data-row-index': absLeft })}
+                    >
+                      <input type="checkbox" checked={leftSelected} onChange={() => { const p = row.left?.plu; if (p) onToggleSelect?.(p) }} className="h-4 w-4 rounded border-border" />
+                    </td>
+                  )}
+                  {showImageColumn && (
+                    <td
+                      className={cn('px-1 py-1 align-middle border-l border-r border-border', hlLeft && findHL)}
+                      {...(!selectionMode && absLeft !== undefined && { 'data-row-index': absLeft })}
+                    >
+                      <BackshopImage src={row.left.image_url} />
+                    </td>
+                  )}
+                  <td
+                    className={cn('px-2', hlLeft && findHL)}
+                    style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}
+                    {...(!selectionMode && !showImageColumn && absLeft !== undefined && { 'data-row-index': absLeft })}
+                  >
+                    <StatusBadge plu={row.left.plu} status={row.left.status} oldPlu={row.left.old_plu} style={{ fontSize: fonts.product + 'px' }} highlightQuery={hqLeft} />
+                  </td>
+                  <td
+                    className={cn('px-2 break-words min-w-0 border-l border-border', hlLeft && findHL)}
+                    style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}
+                    title={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}
+                  >
                     <span className="inline-flex items-center gap-1.5 flex-wrap">
-                      {hq?.trim() ? (
+                      {hqLeft?.trim() ? (
                         <HighlightedSearchText
                           text={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}
-                          query={hq}
+                          query={hqLeft}
                         />
                       ) : (
                         getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)
@@ -455,7 +628,10 @@ function RowByRowTable({
                     </span>
                   </td>
                   {hasAnyPrice && (
-                    <td className="w-[90px] min-w-[90px] px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}>
+                    <td
+                      className={cn('w-[90px] min-w-[90px] px-2 border-l border-border', hlLeft && findHL)}
+                      style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}
+                    >
                       {(() => {
                         const p = getDisplayPreisForItem(row.left)
                         return p != null ? <PreisBadge value={p} style={{ fontSize: fonts.product + 'px' }} /> : null
@@ -473,15 +649,43 @@ function RowByRowTable({
               )}
               {row.right ? (
                 <>
-                  {selectionMode && <td className="px-1 py-1 text-center border-l-2 border-border"><input type="checkbox" checked={rightSelected} onChange={() => { const p = row.right?.plu; if (p) onToggleSelect?.(p) }} className="h-4 w-4 rounded border-border" /></td>}
-                  {showImageColumn && imageCell(row.right)}
-                  <td className={cn('px-2', !selectionMode && !showImageColumn && 'border-l-2 border-border')} style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}><StatusBadge plu={row.right.plu} status={row.right.status} oldPlu={row.right.old_plu} style={{ fontSize: fonts.product + 'px' }} highlightQuery={hq} /></td>
-                  <td className="px-2 break-words min-w-0 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }} title={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}>
+                  {selectionMode && (
+                    <td
+                      className={cn('px-1 py-1 text-center border-l-2 border-border', hlRight && findHL)}
+                      {...(absRight !== undefined && { 'data-row-index': absRight })}
+                    >
+                      <input type="checkbox" checked={rightSelected} onChange={() => { const p = row.right?.plu; if (p) onToggleSelect?.(p) }} className="h-4 w-4 rounded border-border" />
+                    </td>
+                  )}
+                  {showImageColumn && (
+                    <td
+                      className={cn('px-1 py-1 align-middle border-l-2 border-r border-border', hlRight && findHL)}
+                      {...(!selectionMode && absRight !== undefined && { 'data-row-index': absRight })}
+                    >
+                      <BackshopImage src={row.right.image_url} />
+                    </td>
+                  )}
+                  <td
+                    className={cn(
+                      'px-2',
+                      !selectionMode && !showImageColumn && 'border-l-2 border-border',
+                      hlRight && findHL,
+                    )}
+                    style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}
+                    {...(!selectionMode && !showImageColumn && absRight !== undefined && { 'data-row-index': absRight })}
+                  >
+                    <StatusBadge plu={row.right.plu} status={row.right.status} oldPlu={row.right.old_plu} style={{ fontSize: fonts.product + 'px' }} highlightQuery={hqRight} />
+                  </td>
+                  <td
+                    className={cn('px-2 break-words min-w-0 border-l border-border', hlRight && findHL)}
+                    style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}
+                    title={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}
+                  >
                     <span className="inline-flex items-center gap-1.5 flex-wrap">
-                      {hq?.trim() ? (
+                      {hqRight?.trim() ? (
                         <HighlightedSearchText
                           text={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}
-                          query={hq}
+                          query={hqRight}
                         />
                       ) : (
                         getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)
@@ -490,7 +694,10 @@ function RowByRowTable({
                     </span>
                   </td>
                   {hasAnyPrice && (
-                    <td className="w-[90px] min-w-[90px] px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}>
+                    <td
+                      className={cn('w-[90px] min-w-[90px] px-2 border-l border-border', hlRight && findHL)}
+                      style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}
+                    >
                       {(() => {
                         const p = getDisplayPreisForItem(row.right)
                         return p != null ? <PreisBadge value={p} style={{ fontSize: fonts.product + 'px' }} /> : null
@@ -515,29 +722,38 @@ function RowByRowTable({
   )
 }
 
-/** Suchbare Zeilen für Find-in-Page (Reihenfolge wie im DOM). */
-type SearchableRow = TableRow | FlatRow
-
-function isRowMatch(row: SearchableRow, searchText: string): boolean {
+/** Suchbare Zeilen: nur FlatRow – gleiche Reihenfolge wie mobile Liste und allFlatRows (Scroll-Treffer). */
+function isFlatRowMatch(row: FlatRow, searchText: string): boolean {
   const q = searchText.trim().toLowerCase()
   if (!q) return false
-  if (row.type === 'fullHeader' || row.type === 'header') return false
-  if (row.type === 'itemPair')
-    return (
-      (row.left != null && itemMatchesSearch(row.left, searchText)) ||
-      (row.right != null && itemMatchesSearch(row.right, searchText))
-    )
-  if (row.type === 'item') return row.item != null && itemMatchesSearch(row.item, searchText)
-  return false
+  if (row.type === 'header') return false
+  return row.item != null && itemMatchesSearch(row.item, searchText)
 }
 
-/** Find-in-Page-Leiste: gleicher horizontaler Rahmen wie DashboardLayout (max-w-7xl + Padding) */
+/** Find-in-Page-Leiste: unter Header fixiert; bei Tastatur (visualViewport) am sichtbaren oberen Rand */
 function FindInPageFixedPortal({ children }: { children: ReactNode }) {
+  const [topPx, setTopPx] = useState(64)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const HEADER = 64
+    const sync = () => {
+      setTopPx(Math.max(HEADER, Math.round(vv.offsetTop) + 8))
+    }
+    vv.addEventListener('resize', sync)
+    vv.addEventListener('scroll', sync)
+    sync()
+    return () => {
+      vv.removeEventListener('resize', sync)
+      vv.removeEventListener('scroll', sync)
+    }
+  }, [])
   if (typeof document === 'undefined') return null
   return createPortal(
-    <div className="fixed top-16 left-0 right-0 z-[45] pointer-events-none">
-      <div className="mx-auto max-w-7xl px-4 pt-2 sm:px-6 pointer-events-auto">
-        <div className="max-w-[min(100%,420px)] rounded-lg border border-border bg-background p-3 shadow-lg">
+    <div className="fixed left-0 right-0 z-[45] pointer-events-none" style={{ top: topPx }}>
+      {/* links wie Hauptinhalt (max-w-7xl), nicht mittig – kein mx-auto auf der Karte */}
+      <div className="mx-auto flex max-w-7xl justify-start px-2 pt-1 sm:px-6 sm:pt-2 pointer-events-auto">
+        <div className="w-full max-w-[min(100%,300px)] rounded-lg border border-border bg-background/95 p-2 shadow-lg backdrop-blur-sm sm:max-w-[min(100%,420px)] sm:p-3">
           {children}
         </div>
       </div>
@@ -567,21 +783,26 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
   ref,
 ) {
   const fonts = fontSizes ?? DEFAULT_FONT_SIZES
-  /** Backshop: immer eine Liste (Bild | PLU | Name), kein Stück/Gewicht-Split */
+  /** Backshop: eine gemeinsame Liste (Bild | PLU | Name), kein Stück/Gewicht-Split; Layout wie Obst (md+: zwei Spalten bei ROW_BY_ROW) */
   const effectiveDisplayMode = listType === 'backshop' ? 'MIXED' : displayMode
 
   const { searchableRows, sectionOffsets } = useMemo((): {
-    searchableRows: SearchableRow[]
+    searchableRows: FlatRow[]
     sectionOffsets: number[]
   } => {
     if (!showFindInPage || items.length === 0) return { searchableRows: [], sectionOffsets: [0] }
-    const buildForItems = (its: DisplayItem[]): SearchableRow[] => {
+    /** Immer flache Zeilen wie allFlatRows / mobile DOM – Indizes = data-row-index (Scroll zum Treffer). */
+    const buildForItems = (its: DisplayItem[]): FlatRow[] => {
       const grp =
         sortMode === 'BY_BLOCK'
           ? groupItemsByBlock(its, blocks)
           : groupItemsByLetter(its)
-      if (flowDirection === 'ROW_BY_ROW')
-        return buildRowByRowTable(grp as (LetterGroup<DisplayItem> | BlockGroup<DisplayItem>)[])
+      if (flowDirection === 'ROW_BY_ROW') {
+        if (sortMode === 'ALPHABETICAL') {
+          return buildFlatRowsFromLetterGroups(grp as LetterGroup<DisplayItem>[])
+        }
+        return buildFlatRowsFromBlockGroups(grp as BlockGroup<DisplayItem>[])
+      }
       if (sortMode === 'ALPHABETICAL') {
         const [leftGroups, rightGroups] = splitLetterGroupsIntoColumns(grp as LetterGroup<DisplayItem>[])
         return [
@@ -614,7 +835,7 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
   const { matchIndices, currentIndex, goNext, goPrev, totalMatches } = useFindInPage(
     searchableRows,
     deferredSearch,
-    (row) => isRowMatch(row, deferredSearch),
+    (row) => isFlatRowMatch(row, deferredSearch),
   )
   const findInPageHighlightRowIndex = totalMatches > 0 ? matchIndices[currentIndex] ?? null : null
 
@@ -622,9 +843,11 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
     if (!showFindInPage || totalMatches === 0) return
     const idx = matchIndices[currentIndex]
     if (idx == null) return
-    const el = document.querySelector(`[data-row-index="${idx}"]`)
-    if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }, [showFindInPage, currentIndex, totalMatches, matchIndices])
+    const run = () => {
+      scrollToDataRowIndex(idx)
+    }
+    requestAnimationFrame(() => requestAnimationFrame(run))
+  }, [showFindInPage, currentIndex, totalMatches, matchIndices, deferredSearch])
 
   const closeFindInPage = useCallback(() => {
     setSearchOpen(false)
@@ -763,7 +986,17 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
         className={PLU_TABLE_HEADER_CLASS}
         style={{ fontSize: fonts.header + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}
       >
-        {listType === 'backshop' ? 'PLU-Liste Backshop' : 'PLU-Liste'}
+        {listType === 'backshop' ? (
+          <>
+            <span className="sm:hidden">Backshop</span>
+            <span className="hidden sm:inline">PLU-Liste Backshop</span>
+          </>
+        ) : (
+          <>
+            <span className="sm:hidden">Obst & Gemüse</span>
+            <span className="hidden sm:inline">PLU-Liste</span>
+          </>
+        )}
       </div>
       {showFindInPage && !showSearchBar && !findInPageExternalTrigger && (
         <div className="border-x border-t border-border bg-muted/30 px-4 py-2">
@@ -869,6 +1102,7 @@ function TwoColumnLayout({
         <div className="hidden md:block">
           <RowByRowTable
             tableRows={rowByRowData}
+            flatRows={allFlatRows}
             fonts={fonts}
             selectionMode={selectionMode}
             selectedPLUs={selectedPLUs}
@@ -880,17 +1114,30 @@ function TwoColumnLayout({
           />
         </div>
         <div className="md:hidden">
-          <PLUColumn
-            rows={allFlatRows}
-            fonts={fonts}
-            selectionMode={selectionMode}
-            selectedPLUs={selectedPLUs}
-            onToggleSelect={onToggleSelect}
-            findInPageRowOffset={findInPageRowOffset}
-            findInPageHighlightRowIndex={findInPageHighlightRowIndex}
-            findInPageQuery={findInPageQuery}
-            listType={listType}
-          />
+          {listType === 'backshop' ? (
+            <BackshopPLUMobileList
+              rows={allFlatRows}
+              fonts={fonts}
+              selectionMode={selectionMode}
+              selectedPLUs={selectedPLUs}
+              onToggleSelect={onToggleSelect}
+              findInPageRowOffset={findInPageRowOffset}
+              findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+              findInPageQuery={findInPageQuery}
+            />
+          ) : (
+            <PLUColumn
+              rows={allFlatRows}
+              fonts={fonts}
+              selectionMode={selectionMode}
+              selectedPLUs={selectedPLUs}
+              onToggleSelect={onToggleSelect}
+              findInPageRowOffset={findInPageRowOffset}
+              findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+              findInPageQuery={findInPageQuery}
+              listType={listType}
+            />
+          )}
         </div>
       </div>
     )
@@ -924,17 +1171,30 @@ function TwoColumnLayout({
         />
       </div>
       <div className="md:hidden">
-        <PLUColumn
-          rows={allFlatRows}
-          fonts={fonts}
-          selectionMode={selectionMode}
-          selectedPLUs={selectedPLUs}
-          onToggleSelect={onToggleSelect}
-          findInPageRowOffset={findInPageRowOffset}
-          findInPageHighlightRowIndex={findInPageHighlightRowIndex}
-          findInPageQuery={findInPageQuery}
-          listType={listType}
-        />
+        {listType === 'backshop' ? (
+          <BackshopPLUMobileList
+            rows={allFlatRows}
+            fonts={fonts}
+            selectionMode={selectionMode}
+            selectedPLUs={selectedPLUs}
+            onToggleSelect={onToggleSelect}
+            findInPageRowOffset={findInPageRowOffset}
+            findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+            findInPageQuery={findInPageQuery}
+          />
+        ) : (
+          <PLUColumn
+            rows={allFlatRows}
+            fonts={fonts}
+            selectionMode={selectionMode}
+            selectedPLUs={selectedPLUs}
+            onToggleSelect={onToggleSelect}
+            findInPageRowOffset={findInPageRowOffset}
+            findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+            findInPageQuery={findInPageQuery}
+            listType={listType}
+          />
+        )}
       </div>
     </div>
   )

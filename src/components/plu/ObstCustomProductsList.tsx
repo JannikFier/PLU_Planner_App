@@ -61,28 +61,35 @@ export function ObstCustomProductsList({
     <div className="max-w-full min-w-0">
       {/* Desktop: Tabelle */}
       <div className="hidden md:block overflow-x-auto">
-        <table className="w-full min-w-0">
+        <table className="w-full min-w-0 table-fixed">
+          <colgroup>
+            <col className="w-[5.5rem]" />
+            <col className="w-[42%]" />
+            <col className="w-[6rem]" />
+            <col className="w-[5.5rem]" />
+            <col className="w-[15%]" />
+            <col className={cn(isFull ? 'w-[11rem]' : 'w-[9.5rem]')} />
+          </colgroup>
           <thead>
             <tr className="border-b border-border">
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 PLU
               </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-0">
                 Name
               </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[100px]">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Typ
               </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Preis
               </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[120px]">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Warengruppe
               </th>
               <th
                 className={cn(
-                  'px-4 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider',
-                  isFull ? 'w-[180px]' : 'w-[140px]',
+                  'px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider',
                 )}
               >
                 Aktionen
@@ -94,8 +101,8 @@ export function ObstCustomProductsList({
               const rowHidden = isFull ? isHidden(cp.plu) : false
               return (
                 <tr key={cp.id} className="border-b border-border last:border-b-0 hover:bg-muted/30">
-                  <td className="px-4 py-3 font-mono text-sm">{getDisplayPlu(cp.plu)}</td>
-                  <td className="px-4 py-3 text-sm">
+                  <td className="px-3 py-3 font-mono text-sm align-middle whitespace-nowrap">{getDisplayPlu(cp.plu)}</td>
+                  <td className="px-3 py-3 text-sm align-middle min-w-0">
                     <span className="flex items-center gap-2 flex-wrap">
                       {cp.name}
                       {currentUserId && cp.created_by === currentUserId && (
@@ -105,14 +112,16 @@ export function ObstCustomProductsList({
                       )}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
+                  <td className="px-3 py-3 text-sm text-muted-foreground align-middle whitespace-nowrap">
                     {cp.item_type === 'PIECE' ? 'Stück' : 'Gewicht'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
+                  <td className="px-3 py-3 text-sm text-muted-foreground align-middle whitespace-nowrap">
                     {cp.preis != null ? formatPreisEur(cp.preis) : '–'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{blockName(cp.block_id)}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-3 py-3 text-sm text-muted-foreground align-middle break-words">
+                    {blockName(cp.block_id)}
+                  </td>
+                  <td className="px-3 py-3 text-right align-middle">
                     {isFull ? (
                       <div className="flex justify-end gap-1">
                         <Tooltip>

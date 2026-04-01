@@ -1,6 +1,5 @@
 // Eigene Produkte Backshop: Desktop-Tabelle mit Bild, Mobile kompakte Zeilen
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { getDisplayPlu } from '@/lib/plu-helpers'
@@ -14,7 +13,6 @@ const mobileIconBtnClass = 'h-10 w-10 shrink-0 md:h-8 md:w-8'
 export interface BackshopCustomProductsListProps {
   products: BackshopCustomProduct[]
   blocks: Array<{ id: string; name: string }>
-  currentUserId: string | null
   isHidden: (plu: string) => boolean
   onEdit: (product: BackshopCustomProduct) => void
   onDelete: (product: BackshopCustomProduct) => void
@@ -30,7 +28,6 @@ export interface BackshopCustomProductsListProps {
 export function BackshopCustomProductsList({
   products,
   blocks,
-  currentUserId,
   isHidden,
   onEdit,
   onDelete,
@@ -43,7 +40,8 @@ export function BackshopCustomProductsList({
 }: BackshopCustomProductsListProps) {
   const blockName = (blockId: string | null) => blocks.find((b) => b.id === blockId)?.name ?? '–'
 
-  const thumb = (cp: BackshopCustomProduct) => <BackshopThumbnail src={cp.image_url} size="lg" />
+  /** Desktop-Tabelle: große Vorschau (einheitlich mit anderen Backshop-Verwaltungslisten) */
+  const thumb = (cp: BackshopCustomProduct) => <BackshopThumbnail src={cp.image_url} size="2xl" />
 
   return (
     <div className="max-w-full min-w-0">
@@ -51,19 +49,19 @@ export function BackshopCustomProductsList({
         <table className="w-full min-w-0">
           <thead>
             <tr className="border-b border-border">
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-28">
                 Bild
               </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[5.5rem]">
                 PLU
               </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-0">
                 Name
               </th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[120px]">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[min(14rem,22%)]">
                 Warengruppe
               </th>
-              <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[180px]">
+              <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[11rem]">
                 Aktionen
               </th>
             </tr>
@@ -73,20 +71,11 @@ export function BackshopCustomProductsList({
               const rowHidden = isHidden(cp.plu)
               return (
                 <tr key={cp.id} className="border-b border-border last:border-b-0 hover:bg-muted/30">
-                  <td className="px-4 py-3">{thumb(cp)}</td>
-                  <td className="px-4 py-3 font-mono text-sm">{getDisplayPlu(cp.plu)}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className="flex items-center gap-2 flex-wrap">
-                      {cp.name}
-                      {currentUserId && cp.created_by === currentUserId && (
-                        <Badge variant="secondary" className="text-xs shrink-0">
-                          Von mir
-                        </Badge>
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{blockName(cp.block_id)}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-3 py-3 align-middle w-28">{thumb(cp)}</td>
+                  <td className="px-3 py-3 font-mono text-sm align-middle whitespace-nowrap">{getDisplayPlu(cp.plu)}</td>
+                  <td className="px-3 py-3 text-sm align-middle min-w-0 break-words">{cp.name}</td>
+                  <td className="px-3 py-3 text-sm text-muted-foreground align-middle">{blockName(cp.block_id)}</td>
+                  <td className="px-3 py-3 text-right align-middle">
                     <div className="flex justify-end gap-1">
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -141,13 +130,12 @@ export function BackshopCustomProductsList({
           return (
             <li key={cp.id} className="py-3 first:pt-0">
               <div className="flex gap-2 min-w-0 items-start">
-                <div className="shrink-0 pt-0.5">{thumb(cp)}</div>
+                <div className="shrink-0 pt-0.5">
+                  <BackshopThumbnail src={cp.image_url} size="xl" />
+                </div>
                 <div className="min-w-0 flex-1 pt-1">
                   <p className="font-mono text-sm">{getDisplayPlu(cp.plu)}</p>
-                  <p className="text-sm break-words mt-0.5">{cp.name}</p>
-                  {currentUserId && cp.created_by === currentUserId && (
-                    <span className="text-xs text-muted-foreground">Von mir</span>
-                  )}
+                  <p className="text-sm font-medium break-words mt-0.5">{cp.name}</p>
                   <p className="text-xs text-muted-foreground mt-1 break-words">{blockName(cp.block_id)}</p>
                 </div>
                 <div className="flex shrink-0 gap-0.5 items-start pt-1">

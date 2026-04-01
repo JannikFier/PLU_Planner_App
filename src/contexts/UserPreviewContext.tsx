@@ -35,12 +35,17 @@ export function UserPreviewProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth()
   const { setActiveStore, currentStoreId, reresolveStoreFromAuth } = useStoreContext()
 
-  const [preview, setPreview] = useState<UserPreviewSessionState | null>(() => readUserPreviewState())
+  /** Nur zur Re-Synchronisation: Vorschau kommt immer frisch aus sessionStorage (eine Quelle der Wahrheit). */
+  const [previewRevision, setPreviewRevision] = useState(0)
+  const preview = useMemo(
+    () => readUserPreviewState(),
+    [previewRevision, user?.id],
+  )
 
   useEffect(() => {
     if (!user) {
       clearUserPreviewState()
-      queueMicrotask(() => setPreview(null))
+      queueMicrotask(() => setPreviewRevision(r => r + 1))
     }
   }, [user])
 
@@ -54,7 +59,7 @@ export function UserPreviewProvider({ children }: { children: ReactNode }) {
         previousStoreId,
       }
       writeUserPreviewState(next)
-      setPreview(next)
+      setPreviewRevision(r => r + 1)
       await setActiveStore(params.storeId, { syncToProfile: false })
     },
     [currentStoreId, profile?.current_store_id, setActiveStore],
@@ -63,7 +68,7 @@ export function UserPreviewProvider({ children }: { children: ReactNode }) {
   const exitUserPreview = useCallback(async () => {
     const snap = readUserPreviewState()
     clearUserPreviewState()
-    setPreview(null)
+    setPreviewRevision(r => r + 1)
 
     if (snap?.previousStoreId) {
       await setActiveStore(snap.previousStoreId, { syncToProfile: true })

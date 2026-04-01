@@ -34,6 +34,12 @@ Admin und Super-Admin können in der Benutzerverwaltung pro User einstellen, wel
 
 Die PDF-Statusmarkierungen sind auch in Schwarz-Weiss erkennbar: Neues Produkt = gestrichelter Rahmen, PLU geändert = fetter Rahmen. Zusätzlich zur Farbmarkierung (gelb/rot).
 
+## Responsive Listen (Handy/Tablet)
+
+Seiten mit **breiten Tabellen** (viele Spalten, Badges, Buttons) liefern auf schmalen Viewports eine **zweite Darstellung**: kompakte **Listen/Karten** (eine Zeile pro Eintrag), **Symbole** für Aktionen mit Beschriftung in Tooltips/`aria-label`, analog zu **Eigene Produkte (Backshop)**. Desktop bleibt bei Tabellenansicht ab **`md`**. Technische Leitlinie: [.cursor/rules/mobile-responsive-lists.mdc](../.cursor/rules/mobile-responsive-lists.mdc).
+
+**Desktop-Layout Verwaltungslisten:** Backshop-Tabellen nutzen **große Bildvorschau** (Thumbnail-Größe `2xl`, 96×96 px) in einer festen ersten Spalte; **Obst & Gemüse** dieselben Seiten **ohne Bildspalte**, dafür **`table-fixed`** mit breiterer **Name/Artikel-Spalte**, damit der Inhalt den Platz nutzt. Zellen sind vertikal **mittig** ausgerichtet, wo sinnvoll.
+
 ## Kern-Konzept
 
 Der PLU Planner verwaltet wöchentliche Preis-Look-Up (PLU) Listen für Obst- und Gemüseabteilungen. Jede Kalenderwoche liefert die Zentrale neue Excel-Dateien, die hochgeladen und mit der Vorwoche verglichen werden. Es gibt **vier Rollen**: Super-Admin (Inhaber, alles inkl. Rollen tauschen), Admin (Benutzerverwaltung ohne Rollenänderung, PLU inkl. Umbenennen), User (volle PLU-Funktionen, keine Benutzerverwaltung), Viewer (nur PLU-Liste ansehen + PDF). Details in [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md).
@@ -87,7 +93,7 @@ Von der **Masterliste** aus führt der Button „Neuer Upload“ zur PLU-Upload-
 Alle Rollen arbeiten an EINER gemeinsamen Liste. Änderungen gelten für alle.
 
 ### Masterliste – KW in der Toolbar
-- **Obst/Gemüse:** Neben dem Anzeigemodus (Stück/Gewicht) wird nur die **KW der zuletzt eingespielten Liste** angezeigt (`Liste …` = `kw_label` der aktiven Version).
+- **Obst/Gemüse:** Seitenüberschrift **„PLU Obst und Gemüse“** (`*/masterlist`). Neben dem Anzeigemodus (Stück/Gewicht) wird nur die **KW der zuletzt eingespielten Liste** angezeigt (`Liste …` = `kw_label` der aktiven Version).
 - **Backshop:** Eine Zeile für den **Zeitraum der aktuellen Liste** (Einspiel-KW bis heute, ISO-8601): in der **ersten Woche** nach dem Upload nur `KW 10 · 2026` oder `KW 21 · 2026`; danach **Bereich** z. B. `KW 10 – KW 14 · 2026` (die zweite Zahl steigt wöchentlich, bis eine neue Liste eingespielt wird). Am **Jahreswechsel** z. B. `KW 52 · 2026 – KW 2 · 2027`.
 - Kalenderwochen werden **einheitlich nach ISO-8601** berechnet (`getISOWeek` / ISO-Kalenderjahr), damit die Anzeige mit der üblichen deutschen KW-Zählung übereinstimmt.
 
@@ -113,11 +119,12 @@ Alle Rollen arbeiten an EINER gemeinsamen Liste. Änderungen gelten für alle.
 - **„Von mir ausgeblendet“:** In der Tabelle Ausgeblendete Produkte wird bei Einträgen, die der aktuelle User ausgeblendet hat (`hidden_by`), zusätzlich „Von mir“ angezeigt.
 - Verwaltung über die Seite **Eigene & Ausgeblendete** (`*/hidden-items`): zwei Sektionen – oben „Eigene Produkte“ (Liste + hinzufügen), darunter „Ausgeblendete Produkte“ (Einblenden, Per Excel ausblenden)
 - **Backshop** (`backshop_hidden_items`): Auf **Ausgeblendete Produkte (Backshop)** gruppiert der Dialog „Produkte ausblenden (Backshop)“ wie die Backshop-Masterliste (alphabetisch vs. nach Warengruppe inkl. Markt-Block-Reihenfolge und namensbasierte Block-Overrides); angezeigte Namen berücksichtigen globale Backshop-Umbenennungen. Entspricht der Logik des Dialogs „Produkte ausblenden“ bei Obst/Gemüse.
+- **Zentrale Werbung vs. Ausblendung:** Steht eine PLU in der **aktuell geladenen** zentralen Werbekampagne (Obst/Gemüse bzw. Backshop, dieselbe KW-Logik wie in der App), erscheint sie in **Hauptliste und PDF** trotz Eintrag in `hidden_items` / `backshop_hidden_items`; die Ausblend-Zeile in der DB bleibt. Sobald die PLU **nicht mehr** in dieser Kampagne vorkommt (neuer Upload ohne die PLU, leere Kampagne, oder KW-Wechsel ohne passende Kampagne), ist die Ausblendung für die Anzeige wieder wirksam. Auf den Seiten „Ausgeblendete Produkte“ kann ein Badge **„Sichtbar durch Werbung“** erscheinen. **Manuelle** Werbung (`plu_offer_items` / `backshop_offer_items`) ändert diese Logik nicht.
 
 ### Werbung/Angebot (plu_offer_items / backshop_offer_items)
 - **User, Admin und Super-Admin** können Produkte als „Angebot“ markieren (Viewer nur Lesen).
 - **Laufzeit (manuell):** Beim Hinzufügen werden **Aktionspreis** (Pflicht), Laufzeit 1–4 Wochen und Start = aktuelle KW gewählt. Nach Ablauf gilt das Produkt nicht mehr als Angebot.
-- **Zentrale Werbung (Super-Admin):** Getrennt für Obst/Gemüse und Backshop. Exit-Excel (Spalten u. a. Art. Nr., Artikel, Akt. UVP) unter `/super-admin/central-werbung/obst` bzw. `/super-admin/central-werbung/backshop` hochladen; Zuordnung Excel-Zeile → PLU aus der **aktiven Masterliste**; Speichern ersetzt die Kampagne für die gewählte ISO-KW. **Megafon aus** pro Markt (`obst_offer_store_disabled` / `backshop_offer_store_disabled`): zentrale Zeile wird vor Ort ausgegraut und nicht als Werbung in Liste/PDF gezählt (persistiert pro PLU/Markt bis wieder eingeschaltet).
+- **Zentrale Werbung (Super-Admin):** Getrennt für Obst/Gemüse und Backshop. Exit-Excel (Spalten u. a. Art. Nr., Artikel, Akt. UVP) unter `/super-admin/central-werbung/obst` bzw. `/super-admin/central-werbung/backshop` hochladen; Zuordnung Excel-Zeile → PLU aus der **aktiven Masterliste**; Speichern ersetzt die Kampagne für die gewählte ISO-KW. **Megafon aus** pro Markt (`obst_offer_store_disabled` / `backshop_offer_store_disabled`): zentrale Zeile wird vor Ort ausgegraut und nicht als Werbung in Liste/PDF gezählt (persistiert pro PLU/Markt bis wieder eingeschaltet). **Interaktion mit Ausblendung:** siehe oben unter „Produkte ausblenden“ (zentrale Kampagne kann die **Anzeige** der Ausblendung vorübergehend übersteuern).
 - **Toolbar:** In der Masterliste (Obst/Gemüse und Backshop) zwischen „Ausgeblendete“ und „Umbenennen“: Button **„Werbung“** → Seite **Produkte in der Werbung** (`*/offer-products` bzw. `*/backshop-offer-products`).
 - **Seite Werbung:** Zwei Sektionen (oben zentral, unten eigen), Sortierung wie Hauptliste. Liste mit PLU, Artikel, Laufzeit, Aktionspreis, Megafon-Toggle (zentral), **„Aus Werbung entfernen“**, **„Produkte zur Werbung hinzufügen“** (Dialog mit Aktionspreis; zentrale PLUs sind blockiert).
 - **Excel-Import (manuell):** Super-Admin kann **„Per Excel hinzufügen“**: Spalte 1 = PLU, 2 = Name (optional), 3 = Wochen (1–4). Start = aktuelle KW.

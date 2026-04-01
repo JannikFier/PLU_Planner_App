@@ -39,7 +39,7 @@ test.describe('User-Journey @extended', () => {
     await page.getByRole('heading', { name: 'Obst und Gemüse', level: 3 }).click()
     await expect(page).toHaveURL(/\/user\/masterlist/)
     await page.waitForLoadState('networkidle')
-    await expect(page.getByRole('heading', { name: 'PLU-Masterliste' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: 'PLU Obst und Gemüse' })).toBeVisible({ timeout: 15_000 })
   })
 
   test('Backshop-Karte führt zur Backshop-Liste', async ({ page }) => {

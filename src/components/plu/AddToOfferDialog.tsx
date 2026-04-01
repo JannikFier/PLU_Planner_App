@@ -54,7 +54,7 @@ function groupByLetter(items: SearchableItem[]): { letter: string; items: Search
     .map(([letter, items]) => ({ letter, items }))
 }
 
-/** Baut Reihen: Header pro Gruppe, dann Items paarweise (links/rechts) wie Master-PLU-Liste */
+/** Baut Reihen: Header pro Gruppe, dann Items paarweise (links/rechts) wie Master-PLU-Liste – nur Desktop */
 type TableRow = { type: 'header'; label: string } | { type: 'row'; left?: SearchableItem; right?: SearchableItem }
 function buildTableRows(groups: { letter: string; items: SearchableItem[] }[]): TableRow[] {
   const rows: TableRow[] = []
@@ -66,6 +66,22 @@ function buildTableRows(groups: { letter: string; items: SearchableItem[] }[]): 
     }
   }
   return rows
+}
+
+/** Mobil: eine Zeile pro Artikel (keine Zwei-Spalten-Tabelle – verhindert unleserliche Buchstaben-Spalten) */
+type MobileFlatRow =
+  | { type: 'header'; label: string }
+  | { type: 'item'; item: SearchableItem }
+
+function buildMobileFlatRows(groups: { letter: string; items: SearchableItem[] }[]): MobileFlatRow[] {
+  const out: MobileFlatRow[] = []
+  for (const g of groups) {
+    out.push({ type: 'header', label: `— ${g.letter} —` })
+    for (const item of g.items) {
+      out.push({ type: 'item', item })
+    }
+  }
+  return out
 }
 
 export interface AddToOfferDialogProps {
@@ -101,6 +117,7 @@ export function AddToOfferDialog({
 
   const groups = useMemo(() => groupByLetter(filteredItems), [filteredItems])
   const tableRows = useMemo(() => buildTableRows(groups), [groups])
+  const mobileFlatRows = useMemo(() => buildMobileFlatRows(groups), [groups])
 
   const openMegaphoneForm = (item: SearchableItem) => {
     if (blockedPlus?.has(item.plu)) {
@@ -135,8 +152,8 @@ export function AddToOfferDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[90vw] lg:max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[90vw] lg:max-w-4xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle>
             {selected ? 'Produkt zur Werbung hinzufügen' : 'Produkte zur Werbung hinzufügen'}
           </DialogTitle>
@@ -212,8 +229,8 @@ export function AddToOfferDialog({
             </div>
           </div>
         ) : (
-          <div className="space-y-4 py-4 min-w-0 flex flex-col flex-1 overflow-hidden">
-            <div className="relative flex-1 min-w-[200px]">
+          <div className="flex flex-1 min-h-0 flex-col gap-4 py-4 overflow-hidden">
+            <div className="relative shrink-0 min-w-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
@@ -225,7 +242,7 @@ export function AddToOfferDialog({
               />
             </div>
 
-            <div className="border rounded-lg overflow-hidden min-h-[400px] max-h-[60vh] flex flex-col min-w-0">
+            <div className="border rounded-lg overflow-hidden flex flex-1 min-h-0 flex-col min-w-0 md:min-h-[400px]">
               {filteredItems.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center p-8">
                   <p className="text-sm text-muted-foreground text-center">
@@ -234,7 +251,53 @@ export function AddToOfferDialog({
                 </div>
               ) : (
                 <div className="overflow-y-auto overflow-x-hidden flex-1 min-h-0 min-w-0">
-                  <table className="w-full table-fixed" style={{ tableLayout: 'fixed' }}>
+                  <ul className="md:hidden divide-y divide-border" data-testid="add-to-offer-dialog-mobile-list">
+                    {mobileFlatRows.map((row, i) => {
+                      if (row.type === 'header') {
+                        return (
+                          <li
+                            key={`moh-${i}-${row.label}`}
+                            className="px-3 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm"
+                          >
+                            {row.label}
+                          </li>
+                        )
+                      }
+                      const item = row.item
+                      const blocked = blockedPlus?.has(item.plu)
+                      return (
+                        <li key={item.id} className="flex items-center gap-2 px-3 py-2 min-w-0">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-mono text-sm">{getDisplayPlu(item.plu)}</p>
+                            <p className="text-sm break-words mt-0.5">
+                              {item.display_name ?? item.system_name ?? ''}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-10 w-10 shrink-0"
+                            onClick={() => openMegaphoneForm(item)}
+                            disabled={isAdding || blocked}
+                            title={
+                              blocked
+                                ? 'Bereits in der zentralen Werbung'
+                                : 'Preis und Laufzeit eingeben'
+                            }
+                            aria-label={
+                              blocked
+                                ? 'Bereits in zentraler Werbung'
+                                : `Werbung: ${getDisplayPlu(item.plu)}`
+                            }
+                          >
+                            <Megaphone className={cn('h-4 w-4', blocked && 'opacity-40')} />
+                          </Button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  <table className="hidden md:table w-full table-fixed">
                     <colgroup>
                       <col className="w-[70px] min-w-[70px]" />
                       <col />
@@ -300,10 +363,19 @@ export function AddToOfferDialog({
                                   size="icon"
                                   className="h-8 w-8 shrink-0"
                                   onClick={() => openMegaphoneForm(row.left!)}
-                                  disabled={isAdding}
-                                  title="Preis und Laufzeit eingeben"
+                                  disabled={isAdding || blockedPlus?.has(row.left.plu)}
+                                  title={
+                                    blockedPlus?.has(row.left.plu)
+                                      ? 'Bereits in der zentralen Werbung'
+                                      : 'Preis und Laufzeit eingeben'
+                                  }
                                 >
-                                  <Megaphone className="h-4 w-4" />
+                                  <Megaphone
+                                    className={cn(
+                                      'h-4 w-4',
+                                      blockedPlus?.has(row.left.plu) && 'opacity-40',
+                                    )}
+                                  />
                                 </Button>
                               ) : null}
                             </td>
@@ -320,10 +392,19 @@ export function AddToOfferDialog({
                                   size="icon"
                                   className="h-8 w-8 shrink-0"
                                   onClick={() => openMegaphoneForm(row.right!)}
-                                  disabled={isAdding}
-                                  title="Preis und Laufzeit eingeben"
+                                  disabled={isAdding || blockedPlus?.has(row.right.plu)}
+                                  title={
+                                    blockedPlus?.has(row.right.plu)
+                                      ? 'Bereits in der zentralen Werbung'
+                                      : 'Preis und Laufzeit eingeben'
+                                  }
                                 >
-                                  <Megaphone className="h-4 w-4" />
+                                  <Megaphone
+                                    className={cn(
+                                      'h-4 w-4',
+                                      blockedPlus?.has(row.right.plu) && 'opacity-40',
+                                    )}
+                                  />
                                 </Button>
                               ) : null}
                             </td>

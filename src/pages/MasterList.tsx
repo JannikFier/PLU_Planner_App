@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 
 // PLU-Komponenten
-import { KWSelector } from '@/components/plu/KWSelector'
+import { PLUListPageActionsMenu, type PLUListPageActionMenuItem } from '@/components/plu/PLUListPageActionsMenu'
 import { PLUTable, type PLUTableHandle } from '@/components/plu/PLUTable'
 import { PLUFooter } from '@/components/plu/PLUFooter'
 
@@ -49,6 +49,7 @@ import { useStoreObstBlockOrder, useStoreObstNameBlockOverrides } from '@/hooks/
 import type { PLUStats } from '@/lib/plu-helpers'
 import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import { buildOfferDisplayMap } from '@/lib/offer-display'
+import { effectiveHiddenPluSet } from '@/lib/hidden-visibility'
 import {
   useObstOfferCampaignWithLines,
   useObstOfferStoreDisabled,
@@ -65,8 +66,7 @@ interface MasterListProps {
  *
  * Orchestriert:
  * - Layout-Engine (baut finale Liste aus Master + Custom - Hidden + Regeln)
- * - KW-Auswahl (KWSelector)
- * - PLU-Tabelle (PLUTable mit DisplayItem[])
+ * - PLU-Tabelle (PLUTable mit DisplayItem[]) – immer aktive eingespielte Liste
  * - Toolbar (Eigenes Produkt, Ausblenden, PDF, Ausgeblendete)
  * - Statistiken (PLUFooter)
  */
@@ -102,6 +102,14 @@ export function MasterList({ mode }: MasterListProps) {
   )
 
   const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
+  const rawHiddenPluSet = useMemo(
+    () => new Set(hiddenItems.map((h) => h.plu)),
+    [hiddenItems],
+  )
+  const effectiveHiddenPLUs = useMemo(
+    () => effectiveHiddenPluSet(rawHiddenPluSet, obstCampaign?.lines),
+    [rawHiddenPluSet, obstCampaign?.lines],
+  )
   const offerDisplayByPlu = useMemo(
     () =>
       buildOfferDisplayMap(
@@ -115,26 +123,11 @@ export function MasterList({ mode }: MasterListProps) {
     [currentKw, currentJahr, obstCampaign, obstDisabled, offerItems, obstLocalPriceOverrides],
   )
 
-  // Gewählte Version (standardmäßig die aktive)
-  const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>(undefined)
-
-  /** Bei neuem aktivem Upload: wieder die aktive Liste zeigen (nicht in alter KW-Version hängen bleiben). */
-  const prevActiveVersionIdRef = useRef<string | undefined>(undefined)
-  useEffect(() => {
-    const id = activeVersion?.id
-    if (!id) return
-    if (prevActiveVersionIdRef.current !== undefined && prevActiveVersionIdRef.current !== id) {
-      setSelectedVersionId(undefined)
-    }
-    prevActiveVersionIdRef.current = id
-  }, [activeVersion?.id])
-
   // Dialoge
   const [showPDFDialog, setShowPDFDialog] = useState(false)
-  const [pdfExportVersionId, setPdfExportVersionId] = useState<string | undefined>(undefined)
 
-  // Wenn keine Version manuell gewählt: aktive Version nehmen
-  const effectiveVersionId = selectedVersionId ?? activeVersion?.id
+  /** Immer die aktive eingespielte Liste (keine KW-Umschaltung auf der Seite). */
+  const effectiveVersionId = activeVersion?.id
 
   // PLU-Items für die gewählte Version laden
   const {
@@ -145,10 +138,9 @@ export function MasterList({ mode }: MasterListProps) {
     refetch: refetchItems,
   } = usePLUData(effectiveVersionId)
 
-  // PLU-Items für PDF-Export (gewählte KW im Dialog)
-  const effectivePdfVersionId = pdfExportVersionId ?? effectiveVersionId ?? activeVersion?.id
-  const { data: pdfRawItems = [] } = usePLUData(effectivePdfVersionId ?? '', {
-    enabled: showPDFDialog && !!effectivePdfVersionId,
+  // PLU-Items für PDF-Export (aktive Version, kein KW-Wechsel im Dialog)
+  const { data: pdfRawItems = [] } = usePLUData(effectiveVersionId ?? '', {
+    enabled: showPDFDialog && !!effectiveVersionId,
   })
 
   // Layout-Settings auslesen
@@ -172,14 +164,12 @@ export function MasterList({ mode }: MasterListProps) {
         case_sensitive: r.case_sensitive,
       }))
 
-    const version = selectedVersionId
-      ? versions.find((v) => v.id === selectedVersionId) ?? activeVersion
-      : activeVersion
+    const version = activeVersion
     const now = new Date()
     const result = buildDisplayList({
       masterItems: rawItems,
       customProducts,
-      hiddenPLUs: new Set(hiddenItems.map((h) => h.plu)),
+      hiddenPLUs: effectiveHiddenPLUs,
       offerDisplayByPlu,
       renamedItems: renamedItems.map((r) => ({ plu: r.plu, display_name: r.display_name, is_manually_renamed: r.is_manually_renamed })),
       bezeichnungsregeln: activeRegeln,
@@ -207,19 +197,10 @@ export function MasterList({ mode }: MasterListProps) {
     }
 
     return { displayItems: result.items, stats: pluStats }
-  }, [rawItems, customProducts, hiddenItems, offerDisplayByPlu, renamedItems, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion, selectedVersionId, versions, currentKw, currentJahr, nameBlockOverrides, storeObstBlockOrder])
+  }, [rawItems, customProducts, effectiveHiddenPLUs, offerDisplayByPlu, renamedItems, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion, currentKw, currentJahr, nameBlockOverrides, storeObstBlockOrder])
 
-  // Aktuelle Version finden (für Anzeige im Header)
-  const currentVersion = useMemo(
-    () => versions.find((v) => v.id === effectiveVersionId) ?? activeVersion,
-    [versions, effectiveVersionId, activeVersion],
-  )
+  const currentVersion = activeVersion
 
-  // PDF-Export: Display-Items für gewählte KW (aktuelle KW vorausgewählt)
-  const pdfVersion = useMemo(
-    () => versions.find((v) => v.id === effectivePdfVersionId) ?? activeVersion,
-    [versions, effectivePdfVersionId, activeVersion],
-  )
   const { displayItems: pdfDisplayItems, stats: pdfStats } = useMemo(() => {
     if (!pdfRawItems.length && !customProducts.length) {
       return { displayItems: [] as ReturnType<typeof buildDisplayList>['items'], stats: { total: 0, unchanged: 0, newCount: 0, changedCount: 0, hidden: 0, customCount: 0 } as PLUStats }
@@ -231,7 +212,7 @@ export function MasterList({ mode }: MasterListProps) {
     const result = buildDisplayList({
       masterItems: pdfRawItems,
       customProducts,
-      hiddenPLUs: new Set(hiddenItems.map((h) => h.plu)),
+      hiddenPLUs: effectiveHiddenPLUs,
       offerDisplayByPlu,
       renamedItems: renamedItems.map((r) => ({ plu: r.plu, display_name: r.display_name, is_manually_renamed: r.is_manually_renamed })),
       bezeichnungsregeln: activeRegeln,
@@ -240,8 +221,8 @@ export function MasterList({ mode }: MasterListProps) {
       displayMode,
       markRedKwCount: layoutSettings?.mark_red_kw_count ?? 0,
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
-      versionKwNummer: pdfVersion?.kw_nummer ?? activeVersion?.kw_nummer ?? 0,
-      versionJahr: pdfVersion?.jahr ?? activeVersion?.jahr ?? now.getFullYear(),
+      versionKwNummer: activeVersion?.kw_nummer ?? 0,
+      versionJahr: activeVersion?.jahr ?? now.getFullYear(),
       currentKwNummer: currentKw,
       currentJahr,
       nameBlockOverrides,
@@ -258,7 +239,7 @@ export function MasterList({ mode }: MasterListProps) {
         customCount: result.stats.customCount,
       } as PLUStats,
     }
-  }, [pdfRawItems, customProducts, hiddenItems, offerDisplayByPlu, renamedItems, regeln, blocks, layoutSettings, sortMode, displayMode, pdfVersion, activeVersion, currentKw, currentJahr, nameBlockOverrides, storeObstBlockOrder])
+  }, [pdfRawItems, customProducts, effectiveHiddenPLUs, offerDisplayByPlu, renamedItems, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion, currentKw, currentJahr, nameBlockOverrides, storeObstBlockOrder])
 
   // Loading-State
   const isLoading = versionLoading || versionsLoading || itemsLoading
@@ -294,14 +275,77 @@ export function MasterList({ mode }: MasterListProps) {
     return () => document.removeEventListener('visibilitychange', handler)
   }, [])
 
+  /** Mobile (max-sm): Aktionen im ⋮-Menü – gleiche Ziele wie die Desktop-Buttons */
+  const obstMobileMenuItems = useMemo((): PLUListPageActionMenuItem[] => {
+    if (mode === 'viewer') return []
+    const backTo = location.pathname + location.search
+    const nav = (path: string) => () =>
+      navigate(`${rolePrefix}${path}?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+    const items: PLUListPageActionMenuItem[] = []
+    if (mode === 'admin') {
+      items.push({
+        label: 'Neuer Upload',
+        icon: <Upload className="h-4 w-4" />,
+        onClick: () => navigate('/super-admin/plu-upload'),
+        separatorAfter: true,
+      })
+    }
+    items.push(
+      {
+        label: 'Eigene Produkte',
+        icon: <Plus className="h-4 w-4" />,
+        onClick: nav('/custom-products'),
+      },
+      {
+        label: 'Ausgeblendete',
+        icon: <EyeOff className="h-4 w-4" />,
+        onClick: nav('/hidden-products'),
+      },
+      {
+        label: 'Werbung',
+        icon: <Megaphone className="h-4 w-4" />,
+        onClick: nav('/offer-products'),
+      },
+      {
+        label: 'Umbenennen',
+        icon: <Pencil className="h-4 w-4" />,
+        onClick: nav('/renamed-products'),
+      },
+      {
+        label: 'PDF exportieren',
+        icon: <FileDown className="h-4 w-4" />,
+        onClick: () => setShowPDFDialog(true),
+      },
+    )
+    return items
+  }, [mode, location.pathname, location.search, rolePrefix, navigate])
+
   return (
     <DashboardLayout>
       <div className="space-y-4">
-        {/* === Header === */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {/* === Header: Mobile kompakt (Titel | ⋮) === */}
+        <div className="sm:hidden flex items-center justify-between gap-3 min-w-0">
+          <h2
+            className="text-[15px] font-bold leading-snug tracking-tight min-w-0"
+            title="PLU Obst und Gemüse"
+          >
+            PLU Obst und Gemüse
+            {mode === 'admin' && (
+              <Badge variant="outline" className="ml-1.5 text-[10px] font-normal align-middle shrink-0">
+                Admin
+              </Badge>
+            )}
+          </h2>
+          {currentVersion && !isLoading && !hasNoVersion && (
+            <PLUListPageActionsMenu ariaLabel="Listen-Aktionen" items={obstMobileMenuItems} />
+          )}
+        </div>
+
+        {/* === Header: Desktop === */}
+        <div className="hidden sm:flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
-              PLU-Masterliste
+              PLU Obst und Gemüse
               {mode === 'admin' && (
                 <Badge variant="outline" className="ml-2 text-xs font-normal align-middle">
                   Admin
@@ -309,31 +353,21 @@ export function MasterList({ mode }: MasterListProps) {
               )}
             </h2>
             <p className="text-sm text-muted-foreground">
+              Aktuelle eingespielte Liste –{' '}
               {mode === 'admin'
-                ? 'PLU-Liste verwalten und bearbeiten.'
-                : 'Deine PLU-Übersicht für die aktuelle Kalenderwoche.'}
+                ? 'verwalten und bearbeiten.'
+                : 'deine PLU-Übersicht für Obst & Gemüse.'}
             </p>
           </div>
 
-          {/* KW-Auswahl + Neuer Upload (nur Super-Admin / mode admin) */}
-          <div className="flex items-center gap-2">
-            {mode === 'admin' && (
+          {mode === 'admin' && (
+            <div className="flex shrink-0 items-center gap-2">
               <Button onClick={() => navigate('/super-admin/plu-upload')} size="sm">
                 <Upload className="h-4 w-4 mr-2" />
                 Neuer Upload
               </Button>
-            )}
-            {versionsLoading ? (
-              <Skeleton className="h-9 w-[200px]" />
-            ) : (
-              <KWSelector
-                versions={versions}
-                selectedId={effectiveVersionId}
-                onSelect={setSelectedVersionId}
-                disabled={isLoading}
-              />
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* === Toolbar === */}
@@ -351,7 +385,7 @@ export function MasterList({ mode }: MasterListProps) {
               <Search className="h-4 w-4" />
             </Button>
             {/* Anzeige-Infos: links (Nach Typ getrennt, KW, Aktiv) */}
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground sm:flex-initial sm:max-w-none">
               <ListFilter className="h-4 w-4 shrink-0" />
               <span>
                 {displayMode === 'MIXED'
@@ -370,70 +404,77 @@ export function MasterList({ mode }: MasterListProps) {
               )}
             </div>
 
-            <div className="flex-1" />
+            <div className="hidden sm:block sm:flex-1" />
 
-            {/* Aktionen: rechts (Viewer nur PDF) */}
-            {mode !== 'viewer' && (
-              <>
+            {/* Aktionen: Desktop ab sm; auf dem Handy ⋮ im Seitenkopf */}
+            <div className="hidden sm:flex sm:flex-wrap items-center gap-2">
+              {mode !== 'viewer' && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const backTo = location.pathname + location.search
+                      navigate(`${rolePrefix}/custom-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Eigene Produkte
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const backTo = location.pathname + location.search
+                      navigate(`${rolePrefix}/hidden-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                    }}
+                  >
+                    <EyeOff className="h-4 w-4 mr-1" />
+                    Ausgeblendete
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const backTo = location.pathname + location.search
+                      navigate(`${rolePrefix}/offer-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                    }}
+                  >
+                    <Megaphone className="h-4 w-4 mr-1" />
+                    Werbung
+                  </Button>
+                </>
+              )}
+              {mode !== 'viewer' && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
                     const backTo = location.pathname + location.search
-                    navigate(`${rolePrefix}/custom-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+                    navigate(`${rolePrefix}/renamed-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
                   }}
                 >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Eigene Produkte
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Umbenennen
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const backTo = location.pathname + location.search
-                    navigate(`${rolePrefix}/hidden-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
-                  }}
-                >
-                  <EyeOff className="h-4 w-4 mr-1" />
-                  Ausgeblendete
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const backTo = location.pathname + location.search
-                    navigate(`${rolePrefix}/offer-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
-                  }}
-                >
-                  <Megaphone className="h-4 w-4 mr-1" />
-                  Werbung
-                </Button>
-              </>
-            )}
-            {mode !== 'viewer' && (
+              )}
+              <Button variant="outline" size="sm" onClick={() => setShowPDFDialog(true)}>
+                <FileDown className="h-4 w-4 mr-1" />
+                PDF
+              </Button>
+            </div>
+            {/* Viewer: PDF auf dem Handy ohne ⋮-Menü */}
+            {mode === 'viewer' && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  const backTo = location.pathname + location.search
-                  navigate(`${rolePrefix}/renamed-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
-                }}
+                className="shrink-0 sm:hidden"
+                onClick={() => setShowPDFDialog(true)}
               >
-                <Pencil className="h-4 w-4 mr-1" />
-                Umbenennen
+                <FileDown className="h-4 w-4 mr-1" />
+                PDF
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setPdfExportVersionId(undefined)
-                setShowPDFDialog(true)
-              }}
-            >
-              <FileDown className="h-4 w-4 mr-1" />
-              PDF
-            </Button>
           </div>
         )}
 
@@ -537,14 +578,14 @@ export function MasterList({ mode }: MasterListProps) {
             onOpenChange={setShowPDFDialog}
             items={pdfDisplayItems}
             stats={pdfStats}
-            kwLabel={pdfVersion?.kw_label ?? ''}
+            kwLabel={activeVersion?.kw_label ?? ''}
             displayMode={displayMode}
             sortMode={sortMode}
             flowDirection={flowDirection}
             blocks={blocks}
-            versions={versions}
-            selectedVersionId={effectivePdfVersionId}
-            onVersionChange={setPdfExportVersionId}
+            versions={[]}
+            selectedVersionId={undefined}
+            onVersionChange={undefined}
             fontSizes={fontSizes}
           />
         </Suspense>

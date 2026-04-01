@@ -300,11 +300,21 @@ export function BackshopWarengruppenPanel() {
                 </div>
               </ScrollArea>
               {selectedBlock && (
-                <div className="flex gap-2 pt-2 border-t border-border">
-                  <Button size="sm" variant="outline" onClick={() => { setBlockName(selectedBlock.name); setShowRenameBlock(true) }}>
+                <div className="flex min-w-0 flex-col gap-2 pt-2 border-t border-border sm:flex-row sm:flex-wrap">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full justify-center sm:w-auto"
+                    onClick={() => { setBlockName(selectedBlock.name); setShowRenameBlock(true) }}
+                  >
                     <Pencil className="h-3 w-3 mr-1" /> Umbenennen
                   </Button>
-                  <Button size="sm" variant="outline" onClick={handleDeleteBlockClick}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full justify-center sm:w-auto"
+                    onClick={handleDeleteBlockClick}
+                  >
                     <Trash2 className="h-3 w-3 mr-1 text-destructive" /> Löschen
                   </Button>
                 </div>
@@ -416,20 +426,27 @@ export function BackshopWarengruppenPanel() {
                 </div>
               </ScrollArea>
               <div className="flex flex-col gap-2 pt-2 border-t border-border">
-                <div className="flex gap-2">
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
                   <Button
                     size="sm"
                     onClick={handleAssign}
                     disabled={!selectedBlockId || checkedIds.size === 0 || assignOverride.isPending}
-                    className="flex-1"
+                    className="w-full min-w-0 shrink sm:flex-1"
                   >
                     {assignOverride.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <>Auswahl → {selectedBlock?.name ?? '...'} zuweisen</>
+                      <span className="text-center leading-tight break-words">
+                        Auswahl → {selectedBlock?.name ?? '...'} zuweisen
+                      </span>
                     )}
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => setCheckedIds(new Set())}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full shrink-0 sm:w-auto"
+                    onClick={() => setCheckedIds(new Set())}
+                  >
                     Alle abwählen
                   </Button>
                 </div>

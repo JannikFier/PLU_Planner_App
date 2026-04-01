@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Pencil, Undo2 } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
 import { useBackshopCustomProducts } from '@/hooks/useBackshopCustomProducts'
@@ -31,7 +31,6 @@ import { useBackshopOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalP
 import { useBackshopRenamedItems } from '@/hooks/useBackshopRenamedItems'
 import { useResetBackshopProductName } from '@/hooks/useBackshopRename'
 import { useAuth } from '@/hooks/useAuth'
-import { getDisplayPlu } from '@/lib/plu-helpers'
 import { buildBackshopDisplayList } from '@/lib/layout-engine'
 import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
 import {
@@ -42,7 +41,7 @@ import { buildOfferDisplayMap } from '@/lib/offer-display'
 import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import { orderByPluDisplayOrder } from '@/lib/list-order'
 import { RenameProductsDialog } from '@/components/plu/RenameProductsDialog'
-import { BackshopThumbnail } from '@/components/plu/BackshopThumbnail'
+import { RenamedProductsResponsiveList } from '@/components/plu/RenamedProductsResponsiveList'
 import type { BackshopMasterPLUItem, Block } from '@/types/database'
 
 export function BackshopRenamedProductsPage() {
@@ -218,44 +217,21 @@ export function BackshopRenamedProductsPage() {
         {!itemsLoading && !renamedLoading && sortedRenamedItems.length > 0 && (
           <Card>
             <CardContent className="p-0">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b-2 border-border">
-                    <th className="px-4 py-3 w-14 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider" aria-label="Bild" />
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">PLU</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Original</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Aktuell</th>
-                    <th className="px-4 py-3 text-right w-[160px]" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedRenamedItems.map((item) => {
-                    const r = globalRenamed.find((g) => g.plu === item.plu)
-                    const thumb = (r?.image_url ?? item.image_url) || null
-                    return (
-                    <tr key={item.id} className="border-b border-border last:border-b-0 hover:bg-muted/30">
-                      <td className="px-4 py-3 w-14 align-middle">
-                        <BackshopThumbnail src={thumb} size="md" />
-                      </td>
-                      <td className="px-4 py-3 font-mono text-sm">{getDisplayPlu(item.plu)}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{item.system_name}</td>
-                      <td className="px-4 py-3 text-sm">{item.display_name ?? item.system_name}</td>
-                      <td className="px-4 py-3 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setResetConfirmItem(item)}
-                          disabled={resetName.isPending}
-                        >
-                          <Undo2 className="h-4 w-4 mr-1" />
-                          Zurücksetzen
-                        </Button>
-                      </td>
-                    </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <RenamedProductsResponsiveList
+                variant="backshop"
+                resetPending={resetName.isPending}
+                rows={sortedRenamedItems.map((item) => {
+                  const r = globalRenamed.find((g) => g.plu === item.plu)
+                  const thumb = (r?.image_url ?? item.image_url) || null
+                  return {
+                    plu: item.plu,
+                    systemName: item.system_name,
+                    currentName: item.display_name ?? item.system_name,
+                    thumbUrl: thumb,
+                    onReset: () => setResetConfirmItem(item),
+                  }
+                })}
+              />
             </CardContent>
           </Card>
         )}
