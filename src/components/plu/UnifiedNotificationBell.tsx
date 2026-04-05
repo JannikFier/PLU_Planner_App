@@ -5,7 +5,7 @@ import { Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useUnreadNotificationCount } from '@/hooks/useNotifications'
 import { useBackshopUnreadNotificationCount } from '@/hooks/useBackshopNotifications'
-import { useUserListVisibility } from '@/hooks/useStoreListVisibility'
+import { useEffectiveListVisibility } from '@/hooks/useStoreListVisibility'
 import { UnifiedNotificationDialog } from './UnifiedNotificationDialog'
 
 /**
@@ -16,10 +16,7 @@ export function UnifiedNotificationBell() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const { data: obstUnread = 0 } = useUnreadNotificationCount()
   const { data: backshopUnread = 0 } = useBackshopUnreadNotificationCount()
-  const { data: visibility } = useUserListVisibility()
-
-  const obstVisible = visibility?.find((v) => v.list_type === 'obst_gemuese')?.is_visible ?? true
-  const backshopVisible = visibility?.find((v) => v.list_type === 'backshop')?.is_visible ?? true
+  const { obstGemuese: obstVisible, backshop: backshopVisible } = useEffectiveListVisibility()
 
   const totalUnread = (obstVisible ? obstUnread : 0) + (backshopVisible ? backshopUnread : 0)
 

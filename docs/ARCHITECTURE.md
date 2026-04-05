@@ -160,7 +160,7 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | `useNotifications()` | Version-Notifications (read/unread count) | Implementiert (Runde 2) |
 | `useRenameMasterProduct()` | Master-Produkt umbenennen (Super-Admin) | Implementiert (Runde 2) |
 | `useBezeichnungsregeln()` | Keyword-Regeln (CRUD + Apply) | Implementiert |
-| `useApplyAllRules()` | Alle Regeln auf Masterliste anwenden | Implementiert |
+| `useApplyAllRules()` | Regeln anwenden: nur marktspezifische `renamed_items`-Updates, keine zentralen Master-Schreibzugriffe | Implementiert |
 | `usePLUUpload()` | 4-Schritt Excel-Upload (Dateien, Vergleich, Konflikte, Publish) | Implementiert |
 
 ## Lib-Module (`src/lib/`)

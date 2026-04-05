@@ -1,6 +1,5 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { QueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import { Toaster } from '@/components/ui/sonner'
@@ -17,8 +16,9 @@ import { SpeedInsights } from '@vercel/speed-insights/react'
 
 // Layout (nicht lazy – wird überall gebraucht)
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
+import { ListAreaGuard } from '@/components/layout/ListAreaGuard'
 import { RedirectRolePrefixed } from '@/components/RedirectRolePrefixed'
-import { isAbortError } from '@/lib/error-utils'
+import { CACHE_MAX_AGE_MS, queryClient } from '@/lib/query-client'
 import { shouldPersistQuery } from '@/lib/query-persist-allowlist'
 
 // Seiten – lazy geladen
@@ -91,24 +91,6 @@ function PageLoadingFallback() {
     </div>
   )
 }
-
-// TanStack Query Client – zentrale Konfiguration
-// gcTime mindestens so hoch wie maxAge der Persistenz, damit gecachte Daten nach Reload nicht sofort verworfen werden
-const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 // 24 Stunden
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      gcTime: CACHE_MAX_AGE_MS,
-      retry: (failureCount, error) => {
-        if (isAbortError(error)) return failureCount < 2
-        return failureCount < 1
-      },
-      retryDelay: (attemptIndex) => Math.min(150 + attemptIndex * 150, 600),
-      refetchOnWindowFocus: false,
-    },
-  },
-})
 
 // Persister: Cache in sessionStorage speichern → nach Reload sofort letzte Daten anzeigen, dann im Hintergrund aktualisieren
 const persister = createSyncStoragePersister({
@@ -222,7 +204,9 @@ function App() {
               path="/user/masterlist"
               element={
                 <ProtectedRoute>
-                  <MasterList mode="user" />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <MasterList mode="user" />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -230,7 +214,9 @@ function App() {
               path="/user/hidden-items"
               element={
                 <ProtectedRoute>
-                  <HiddenItems />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <HiddenItems />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -238,7 +224,9 @@ function App() {
               path="/user/custom-products"
               element={
                 <ProtectedRoute>
-                  <CustomProductsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <CustomProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -246,7 +234,9 @@ function App() {
               path="/user/hidden-products"
               element={
                 <ProtectedRoute>
-                  <HiddenProductsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <HiddenProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -254,7 +244,9 @@ function App() {
               path="/user/offer-products"
               element={
                 <ProtectedRoute>
-                  <OfferProductsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <OfferProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -262,7 +254,9 @@ function App() {
               path="/user/renamed-products"
               element={
                 <ProtectedRoute>
-                  <RenamedProductsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <RenamedProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -270,7 +264,9 @@ function App() {
               path="/user/backshop-list"
               element={
                 <ProtectedRoute>
-                  <BackshopMasterList />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopMasterList />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -278,7 +274,9 @@ function App() {
               path="/user/backshop-custom-products"
               element={
                 <ProtectedRoute>
-                  <BackshopCustomProductsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopCustomProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -286,7 +284,9 @@ function App() {
               path="/user/backshop-hidden-products"
               element={
                 <ProtectedRoute>
-                  <BackshopHiddenProductsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopHiddenProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -294,7 +294,9 @@ function App() {
               path="/user/backshop-offer-products"
               element={
                 <ProtectedRoute>
-                  <BackshopOfferProductsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopOfferProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -302,7 +304,9 @@ function App() {
               path="/user/backshop-renamed-products"
               element={
                 <ProtectedRoute>
-                  <BackshopRenamedProductsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopRenamedProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -320,7 +324,9 @@ function App() {
               path="/viewer/masterlist"
               element={
                 <ProtectedRoute>
-                  <MasterList mode="viewer" />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <MasterList mode="viewer" />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -328,7 +334,9 @@ function App() {
               path="/viewer/backshop-list"
               element={
                 <ProtectedRoute>
-                  <BackshopMasterList />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopMasterList />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -378,7 +386,9 @@ function App() {
               path="/admin/masterlist"
               element={
                 <ProtectedRoute requireAdmin>
-                  <MasterList mode="user" />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <MasterList mode="user" />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -386,7 +396,9 @@ function App() {
               path="/admin/hidden-items"
               element={
                 <ProtectedRoute requireAdmin>
-                  <HiddenItems />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <HiddenItems />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -394,7 +406,9 @@ function App() {
               path="/admin/custom-products"
               element={
                 <ProtectedRoute requireAdmin>
-                  <CustomProductsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <CustomProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -402,7 +416,9 @@ function App() {
               path="/admin/hidden-products"
               element={
                 <ProtectedRoute requireAdmin>
-                  <HiddenProductsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <HiddenProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -410,7 +426,9 @@ function App() {
               path="/admin/offer-products"
               element={
                 <ProtectedRoute requireAdmin>
-                  <OfferProductsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <OfferProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -418,7 +436,9 @@ function App() {
               path="/admin/renamed-products"
               element={
                 <ProtectedRoute requireAdmin>
-                  <RenamedProductsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <RenamedProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -426,7 +446,9 @@ function App() {
               path="/admin/backshop-list"
               element={
                 <ProtectedRoute requireAdmin>
-                  <BackshopMasterList />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopMasterList />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -434,7 +456,9 @@ function App() {
               path="/admin/backshop-custom-products"
               element={
                 <ProtectedRoute requireAdmin>
-                  <BackshopCustomProductsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopCustomProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -442,7 +466,9 @@ function App() {
               path="/admin/backshop-hidden-products"
               element={
                 <ProtectedRoute requireAdmin>
-                  <BackshopHiddenProductsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopHiddenProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -450,7 +476,9 @@ function App() {
               path="/admin/backshop-offer-products"
               element={
                 <ProtectedRoute requireAdmin>
-                  <BackshopOfferProductsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopOfferProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -458,7 +486,9 @@ function App() {
               path="/admin/backshop-renamed-products"
               element={
                 <ProtectedRoute requireAdmin>
-                  <BackshopRenamedProductsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopRenamedProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -474,7 +504,9 @@ function App() {
               path="/admin/layout"
               element={
                 <ProtectedRoute requireAdmin>
-                  <LayoutSettingsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <LayoutSettingsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -482,7 +514,9 @@ function App() {
               path="/admin/rules"
               element={
                 <ProtectedRoute requireAdmin>
-                  <RulesPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <RulesPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -490,7 +524,9 @@ function App() {
               path="/admin/block-sort"
               element={
                 <ProtectedRoute requireAdmin>
-                  <BlockSortPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <BlockSortPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -498,7 +534,9 @@ function App() {
               path="/admin/backshop-layout"
               element={
                 <ProtectedRoute requireAdmin>
-                  <BackshopLayoutSettingsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopLayoutSettingsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -506,7 +544,9 @@ function App() {
               path="/admin/backshop-rules"
               element={
                 <ProtectedRoute requireAdmin>
-                  <BackshopRulesPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopRulesPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -514,7 +554,9 @@ function App() {
               path="/admin/backshop-block-sort"
               element={
                 <ProtectedRoute requireAdmin>
-                  <BackshopBlockSortPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopBlockSortPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -564,7 +606,9 @@ function App() {
               path="/super-admin/obst"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <SuperAdminObstBereichPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <SuperAdminObstBereichPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -572,7 +616,9 @@ function App() {
               path="/super-admin/backshop"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <SuperAdminBackshopBereichPage />
+                  <ListAreaGuard listType="backshop">
+                    <SuperAdminBackshopBereichPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -580,7 +626,9 @@ function App() {
               path="/super-admin/masterlist"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <MasterList mode="admin" />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <MasterList mode="admin" />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -588,7 +636,9 @@ function App() {
               path="/super-admin/hidden-items"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <HiddenItems />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <HiddenItems />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -596,7 +646,9 @@ function App() {
               path="/super-admin/custom-products"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <CustomProductsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <CustomProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -604,7 +656,9 @@ function App() {
               path="/super-admin/hidden-products"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <HiddenProductsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <HiddenProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -612,7 +666,9 @@ function App() {
               path="/super-admin/offer-products"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <OfferProductsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <OfferProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -620,7 +676,9 @@ function App() {
               path="/super-admin/renamed-products"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <RenamedProductsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <RenamedProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -628,7 +686,9 @@ function App() {
               path="/super-admin/plu-upload"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <PLUUploadPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <PLUUploadPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -636,7 +696,9 @@ function App() {
               path="/super-admin/central-werbung/obst"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <CentralCampaignUploadPage listType="obst" />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <CentralCampaignUploadPage listType="obst" />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -644,7 +706,9 @@ function App() {
               path="/super-admin/backshop-list"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <BackshopMasterList />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopMasterList />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -652,7 +716,9 @@ function App() {
               path="/super-admin/backshop-warengruppen"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <BackshopWarengruppenPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopWarengruppenPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -660,7 +726,9 @@ function App() {
               path="/super-admin/backshop-custom-products"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <BackshopCustomProductsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopCustomProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -668,7 +736,9 @@ function App() {
               path="/super-admin/backshop-hidden-products"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <BackshopHiddenProductsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopHiddenProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -676,7 +746,9 @@ function App() {
               path="/super-admin/backshop-offer-products"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <BackshopOfferProductsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopOfferProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -684,7 +756,9 @@ function App() {
               path="/super-admin/backshop-renamed-products"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <BackshopRenamedProductsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopRenamedProductsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -692,7 +766,9 @@ function App() {
               path="/super-admin/backshop-upload"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <BackshopUploadPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopUploadPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -700,7 +776,9 @@ function App() {
               path="/super-admin/central-werbung/backshop"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <CentralCampaignUploadPage listType="backshop" />
+                  <ListAreaGuard listType="backshop">
+                    <CentralCampaignUploadPage listType="backshop" />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -708,7 +786,9 @@ function App() {
               path="/super-admin/layout"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <LayoutSettingsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <LayoutSettingsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -716,7 +796,9 @@ function App() {
               path="/super-admin/rules"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <RulesPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <RulesPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -724,7 +806,9 @@ function App() {
               path="/super-admin/block-sort"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <BlockSortPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <BlockSortPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -732,7 +816,9 @@ function App() {
               path="/super-admin/backshop-layout"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <BackshopLayoutSettingsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopLayoutSettingsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -740,7 +826,9 @@ function App() {
               path="/super-admin/backshop-rules"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <BackshopRulesPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopRulesPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -748,7 +836,9 @@ function App() {
               path="/super-admin/backshop-block-sort"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <BackshopBlockSortPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopBlockSortPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -756,7 +846,9 @@ function App() {
               path="/super-admin/versions"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <VersionsPage />
+                  <ListAreaGuard listType="obst_gemuese">
+                    <VersionsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />
@@ -764,7 +856,9 @@ function App() {
               path="/super-admin/backshop-versions"
               element={
                 <ProtectedRoute requireSuperAdmin>
-                  <BackshopVersionsPage />
+                  <ListAreaGuard listType="backshop">
+                    <BackshopVersionsPage />
+                  </ListAreaGuard>
                 </ProtectedRoute>
               }
             />

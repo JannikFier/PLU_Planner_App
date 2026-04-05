@@ -1,7 +1,7 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { BereichsauswahlCard } from '@/components/layout/BereichsauswahlCard'
-import { useUserListVisibility } from '@/hooks/useStoreListVisibility'
+import { useEffectiveListVisibility } from '@/hooks/useStoreListVisibility'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { ClipboardList, LayoutGrid } from 'lucide-react'
 
@@ -11,8 +11,7 @@ import { ClipboardList, LayoutGrid } from 'lucide-react'
 export function AdminBackshopHubPage() {
   const navigate = useNavigate()
   const { currentStoreId } = useCurrentStore()
-  const { data: visibility, isLoading } = useUserListVisibility()
-  const backshopVisible = visibility?.find(v => v.list_type === 'backshop')?.is_visible ?? true
+  const { backshop: backshopVisible, isLoading } = useEffectiveListVisibility()
 
   if (!currentStoreId) {
     return (

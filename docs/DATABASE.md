@@ -92,6 +92,8 @@ store_backshop_block_order, store_backshop_name_block_override – analog Obst
 | `list_type` | TEXT | `obst_gemuese` oder `backshop` |
 | `is_visible` | BOOLEAN | Liste fuer diesen Markt sichtbar? |
 
+**Frontend:** Oberes Gate – eine Liste ist fuer eingeloggte Nutzer nur nutzbar, wenn hier sichtbar **und** der passende Eintrag in `user_list_visibility` (bzw. Default) ebenfalls sichtbar ist.
+
 ### user_list_visibility
 
 | Feld | Typ | Beschreibung |
@@ -103,7 +105,7 @@ store_backshop_block_order, store_backshop_name_block_override – analog Obst
 | `is_visible` | BOOLEAN | Liste fuer diesen User sichtbar? (Default: true) |
 | `created_at` | TIMESTAMPTZ | Erstellt am |
 
-UNIQUE-Constraint auf `(user_id, store_id, list_type)`. Kein Eintrag = sichtbar (Default-Logik im Frontend). RLS: User liest eigene; Admin/Super-Admin liest/schreibt alle im eigenen Markt (Migration 038).
+UNIQUE-Constraint auf `(user_id, store_id, list_type)`. Kein Eintrag = sichtbar (Default-Logik im Frontend). Zusammen mit `store_list_visibility` ergibt sich die effektive Sichtbarkeit (UND). RLS: User liest eigene; Admin/Super-Admin liest/schreibt alle im eigenen Markt (Migration 038).
 
 ### store_id in marktspezifischen Tabellen
 

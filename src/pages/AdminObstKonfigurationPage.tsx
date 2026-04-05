@@ -1,7 +1,7 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { DashboardCard } from '@/components/layout/DashboardCard'
-import { useUserListVisibility } from '@/hooks/useStoreListVisibility'
+import { useEffectiveListVisibility } from '@/hooks/useStoreListVisibility'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { LayoutGrid, BookText, GripVertical } from 'lucide-react'
 
@@ -11,8 +11,7 @@ import { LayoutGrid, BookText, GripVertical } from 'lucide-react'
 export function AdminObstKonfigurationPage() {
   const navigate = useNavigate()
   const { currentStoreId } = useCurrentStore()
-  const { data: visibility, isLoading } = useUserListVisibility()
-  const obstVisible = visibility?.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
+  const { obstGemuese: obstVisible, isLoading } = useEffectiveListVisibility()
 
   if (!currentStoreId) {
     return (

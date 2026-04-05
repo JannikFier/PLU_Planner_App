@@ -5,7 +5,7 @@ import { useUserPreview } from '@/contexts/UserPreviewContext'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { BereichsauswahlCard } from '@/components/layout/BereichsauswahlCard'
 import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
-import { useUserListVisibility } from '@/hooks/useStoreListVisibility'
+import { useEffectiveListVisibility } from '@/hooks/useStoreListVisibility'
 import { Apple, Croissant } from 'lucide-react'
 
 /**
@@ -19,9 +19,8 @@ export function UserDashboard() {
   const { currentStoreId } = useCurrentStore()
   usePrefetchForNavigation()
 
-  const { data: visibility, isLoading: visibilityLoading } = useUserListVisibility()
-  const obstVisible = visibility?.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
-  const backshopVisible = visibility?.find(v => v.list_type === 'backshop')?.is_visible ?? true
+  const { obstGemuese: obstVisible, backshop: backshopVisible, isLoading: visibilityLoading } =
+    useEffectiveListVisibility()
 
   // Super-Admin gehoert auf /super-admin – ausser bei aktiver User-Vorschau (simulierte Rolle)
   if (isSuperAdmin && !isUserPreviewActive) {

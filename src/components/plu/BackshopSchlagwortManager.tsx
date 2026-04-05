@@ -127,7 +127,17 @@ export function BackshopSchlagwortManager({ open, onOpenChange }: BackshopSchlag
   const handleApplyAll = async () => {
     try {
       const result = await applyAllMutation.mutateAsync()
-      toast.success(`${result.updatedCount} Produkte aktualisiert`)
+      if (result.persistedRenamedCount > 0) {
+        toast.success(
+          `${result.persistedRenamedCount} marktspezifische Umbenennung${result.persistedRenamedCount === 1 ? '' : 'en'} gespeichert.`,
+        )
+      } else if (result.affectedByRulesCount > 0) {
+        toast.success(
+          'Namensdarstellung ist für diesen Markt in der Backshop-Liste aktiv (keine zentrale Master-Speicherung).',
+        )
+      } else {
+        toast.success('Keine Anpassung nötig.')
+      }
     } catch {
       toast.error('Fehler beim Anwenden')
     }
@@ -144,7 +154,8 @@ export function BackshopSchlagwortManager({ open, onOpenChange }: BackshopSchlag
             Bezeichnungsregeln (Backshop)
           </DialogTitle>
           <DialogDescription>
-            Regeln für einheitliche Schlagwörter in der Backshop-Liste (vorne oder hinten).
+            Regeln gelten nur für den aktuell gewählten Markt. Schlagwörter in der Backshop-Liste vorne oder
+            hinten; die zentrale Backshop-Master-Liste wird dabei nicht überschrieben.
           </DialogDescription>
         </DialogHeader>
 

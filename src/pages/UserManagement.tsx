@@ -51,7 +51,11 @@ import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer, roleBadg
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useAllStores } from '@/hooks/useStores'
 import { useStoreAccessByUser, useAddUserToStore, useRemoveUserFromStore } from '@/hooks/useStoreAccess'
-import { useUserListVisibilityForUser, useUpdateUserListVisibility } from '@/hooks/useStoreListVisibility'
+import {
+  useUserListVisibilityForUser,
+  useUpdateUserListVisibility,
+  useStoreListAreaEnabled,
+} from '@/hooks/useStoreListVisibility'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 
@@ -155,6 +159,7 @@ export function UserManagement() {
   const [visibilityDialogUser, setVisibilityDialogUser] = useState<Profile | null>(null)
   const { data: userVisibility } = useUserListVisibilityForUser(visibilityDialogUser?.id, defaultStoreId)
   const updateUserVisibility = useUpdateUserListVisibility()
+  const { obstGemuese: storeObstEnabled, backshop: storeBackshopEnabled } = useStoreListAreaEnabled(defaultStoreId)
   const userObstVisible = userVisibility?.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
   const userBackshopVisible = userVisibility?.find(v => v.list_type === 'backshop')?.is_visible ?? true
 
@@ -735,43 +740,57 @@ export function UserManagement() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3 py-2">
-              <div className="flex items-center justify-between rounded-lg border px-3 py-3">
-                <div>
-                  <p className="text-sm font-medium">Obst und Gemüse</p>
-                  <p className="text-xs text-muted-foreground">PLU-Liste Obst/Gemüse anzeigen</p>
+              <div className="flex flex-col gap-2 rounded-lg border px-3 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Obst und Gemüse</p>
+                    <p className="text-xs text-muted-foreground">PLU-Liste Obst/Gemüse anzeigen</p>
+                  </div>
+                  <Switch
+                    checked={storeObstEnabled ? userObstVisible : false}
+                    disabled={updateUserVisibility.isPending || !defaultStoreId || !storeObstEnabled}
+                    onCheckedChange={async (checked) => {
+                      if (!visibilityDialogUser || !defaultStoreId || !storeObstEnabled) return
+                      await updateUserVisibility.mutateAsync({
+                        userId: visibilityDialogUser.id,
+                        storeId: defaultStoreId,
+                        listType: 'obst_gemuese',
+                        isVisible: checked,
+                      })
+                    }}
+                  />
                 </div>
-                <Switch
-                  checked={userObstVisible}
-                  disabled={updateUserVisibility.isPending || !defaultStoreId}
-                  onCheckedChange={async (checked) => {
-                    if (!visibilityDialogUser || !defaultStoreId) return
-                    await updateUserVisibility.mutateAsync({
-                      userId: visibilityDialogUser.id,
-                      storeId: defaultStoreId,
-                      listType: 'obst_gemuese',
-                      isVisible: checked,
-                    })
-                  }}
-                />
+                {defaultStoreId && !storeObstEnabled && (
+                  <p className="text-xs text-muted-foreground">
+                    Am Markt deaktiviert – die Listen-Sichtbarkeit kann der Super-Admin unter Firmen &amp; Märkte ändern.
+                  </p>
+                )}
               </div>
-              <div className="flex items-center justify-between rounded-lg border px-3 py-3">
-                <div>
-                  <p className="text-sm font-medium">Backshop</p>
-                  <p className="text-xs text-muted-foreground">Backshop-Liste anzeigen</p>
+              <div className="flex flex-col gap-2 rounded-lg border px-3 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Backshop</p>
+                    <p className="text-xs text-muted-foreground">Backshop-Liste anzeigen</p>
+                  </div>
+                  <Switch
+                    checked={storeBackshopEnabled ? userBackshopVisible : false}
+                    disabled={updateUserVisibility.isPending || !defaultStoreId || !storeBackshopEnabled}
+                    onCheckedChange={async (checked) => {
+                      if (!visibilityDialogUser || !defaultStoreId || !storeBackshopEnabled) return
+                      await updateUserVisibility.mutateAsync({
+                        userId: visibilityDialogUser.id,
+                        storeId: defaultStoreId,
+                        listType: 'backshop',
+                        isVisible: checked,
+                      })
+                    }}
+                  />
                 </div>
-                <Switch
-                  checked={userBackshopVisible}
-                  disabled={updateUserVisibility.isPending || !defaultStoreId}
-                  onCheckedChange={async (checked) => {
-                    if (!visibilityDialogUser || !defaultStoreId) return
-                    await updateUserVisibility.mutateAsync({
-                      userId: visibilityDialogUser.id,
-                      storeId: defaultStoreId,
-                      listType: 'backshop',
-                      isVisible: checked,
-                    })
-                  }}
-                />
+                {defaultStoreId && !storeBackshopEnabled && (
+                  <p className="text-xs text-muted-foreground">
+                    Am Markt deaktiviert – die Listen-Sichtbarkeit kann der Super-Admin unter Firmen &amp; Märkte ändern.
+                  </p>
+                )}
               </div>
             </div>
             <DialogFooter>

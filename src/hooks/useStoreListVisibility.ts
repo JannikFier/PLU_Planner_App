@@ -1,9 +1,22 @@
+import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import type { StoreListVisibility, UserListVisibility } from '@/types/database'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useAuth } from '@/hooks/useAuth'
+
+/** list_type-Werte in store_list_visibility / user_list_visibility */
+export const LIST_TYPE_OBST_GEMUESE = 'obst_gemuese' as const
+export const LIST_TYPE_BACKSHOP = 'backshop' as const
+export type ListTypeKey = typeof LIST_TYPE_OBST_GEMUESE | typeof LIST_TYPE_BACKSHOP
+
+function rowVisible(
+  rows: StoreListVisibility[] | UserListVisibility[] | undefined,
+  listType: string,
+): boolean {
+  return rows?.find((v) => v.list_type === listType)?.is_visible ?? true
+}
 
 export function useStoreListVisibility(storeId?: string) {
   const { currentStoreId } = useCurrentStore()
@@ -79,6 +92,59 @@ export function useIsUserListVisible(listType: string) {
   const { data: visibility } = useUserListVisibility()
   const entry = visibility?.find(v => v.list_type === listType)
   return entry?.is_visible ?? true
+}
+
+/**
+ * Kombiniert Markt- und User-Sichtbarkeit: sichtbar nur wenn beide true (kein Eintrag = true).
+ * Ohne currentStoreId: beide Anteile als true (globale Super-Admin-Arbeit ohne Marktkontext).
+ */
+export function useEffectiveListVisibility() {
+  const { currentStoreId } = useCurrentStore()
+  const { user } = useAuth()
+  const storeQ = useStoreListVisibility()
+  const userQ = useUserListVisibility()
+
+  const hasStoreContext = Boolean(currentStoreId && user?.id)
+  const storeLoading = Boolean(currentStoreId && storeQ.isLoading)
+  const userLoading = Boolean(currentStoreId && user?.id && userQ.isLoading)
+  const isLoading = storeLoading || userLoading
+
+  const result = useMemo(() => {
+    if (!currentStoreId) {
+      return { obstGemuese: true, backshop: true }
+    }
+    const s = storeQ.data
+    const u = userQ.data
+    const storeObst = rowVisible(s, LIST_TYPE_OBST_GEMUESE)
+    const storeBack = rowVisible(s, LIST_TYPE_BACKSHOP)
+    const userObst = u ? rowVisible(u, LIST_TYPE_OBST_GEMUESE) : true
+    const userBack = u ? rowVisible(u, LIST_TYPE_BACKSHOP) : true
+    return {
+      obstGemuese: storeObst && userObst,
+      backshop: storeBack && userBack,
+    }
+  }, [currentStoreId, storeQ.data, userQ.data])
+
+  return {
+    obstGemuese: result.obstGemuese,
+    backshop: result.backshop,
+    isLoading: hasStoreContext ? isLoading : false,
+  }
+}
+
+/** Nur Markt-Ebene (Schalter in Benutzerverwaltung deaktivieren, wenn Super-Admin Bereich am Markt aus hat) */
+export function useStoreListAreaEnabled(storeId: string | undefined) {
+  const storeQ = useStoreListVisibility(storeId)
+  const isLoading = Boolean(storeId && storeQ.isLoading)
+  const result = useMemo(() => {
+    if (!storeId) return { obstGemuese: true, backshop: true }
+    const s = storeQ.data
+    return {
+      obstGemuese: rowVisible(s, LIST_TYPE_OBST_GEMUESE),
+      backshop: rowVisible(s, LIST_TYPE_BACKSHOP),
+    }
+  }, [storeId, storeQ.data])
+  return { ...result, isLoading }
 }
 
 /** Lädt die Bereichs-Sichtbarkeit für einen bestimmten User (Admin-Ansicht) */

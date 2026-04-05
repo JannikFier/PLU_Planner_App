@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { toast } from 'sonner'
 import { supabase, clearSupabaseAuthStorage } from '@/lib/supabase'
+import { queryClient } from '@/lib/query-client'
 import { isAbortError } from '@/lib/error-utils'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
 import { loginEmailSchema, loginPersonalnummerSchema } from '@/lib/validation'
@@ -87,6 +88,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       sessionStorage.removeItem(PROFILE_CACHE_KEY)
       sessionStorage.removeItem(SESSION_CACHE_KEY)
+      // TanStack Query (RAM): leeren, damit nach Nutzerwechsel keine RLS-gefilterten Daten der vorherigen Rolle bleiben
+      sessionStorage.removeItem('PLU_PLANNER_QUERY_CACHE')
+      queryClient.clear()
     } catch {
       // ignorieren
     }
@@ -350,6 +354,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             sessionStorage.removeItem(PROFILE_CACHE_KEY)
             sessionStorage.removeItem(SESSION_CACHE_KEY)
             sessionStorage.removeItem('PLU_PLANNER_QUERY_CACHE')
+            queryClient.clear()
           } catch {
             // ignorieren
           }

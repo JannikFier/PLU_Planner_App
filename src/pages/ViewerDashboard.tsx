@@ -4,7 +4,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { DashboardCard } from '@/components/layout/DashboardCard'
 import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
-import { useUserListVisibility } from '@/hooks/useStoreListVisibility'
+import { useEffectiveListVisibility } from '@/hooks/useStoreListVisibility'
 import { ClipboardList } from 'lucide-react'
 
 /**
@@ -16,9 +16,8 @@ export function ViewerDashboard() {
   const { currentStoreId } = useCurrentStore()
   usePrefetchForNavigation()
 
-  const { data: visibility, isLoading: visibilityLoading } = useUserListVisibility()
-  const obstVisible = visibility?.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
-  const backshopVisible = visibility?.find(v => v.list_type === 'backshop')?.is_visible ?? true
+  const { obstGemuese: obstVisible, backshop: backshopVisible, isLoading: visibilityLoading } =
+    useEffectiveListVisibility()
 
   const cards = useMemo(() => {
     const result: {

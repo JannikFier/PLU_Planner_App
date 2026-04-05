@@ -112,10 +112,18 @@ export function useDeleteBezeichnungsregel() {
   })
 }
 
+/** Ergebnis von „Regeln anwenden“: keine Persistenz in master_plu_items (nur marktspezifisch in renamed_items). */
+export type ApplyObstRulesResult = {
+  /** In renamed_items geschriebene Zeilen (aktueller Markt) */
+  persistedRenamedCount: number
+  /** Logisch von Regeln betroffene Zeilen (inkl. Master ohne DB-Schreibzugriff) */
+  affectedByRulesCount: number
+}
+
 /**
  * Wendet alle aktiven Regeln auf die Items der aktiven Version an.
  * Nutzt gecachte Daten aus dem Query-Client; bei fehlendem Cache einmalig fetchen.
- * Schreibt display_name per parallelen Batch-Update in die DB.
+ * Schreibt nur noch marktspezifische Umbenennungen in renamed_items (keine Updates in master_plu_items).
  */
 const PARALLEL_UPDATE_CHUNK = 10
 
@@ -124,7 +132,7 @@ export function useApplyAllRules() {
   const { currentStoreId } = useCurrentStore()
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<ApplyObstRulesResult> => {
       if (!currentStoreId) {
         throw new Error('Kein Markt ausgewählt.')
       }
@@ -182,25 +190,12 @@ export function useApplyAllRules() {
         renamedRows,
         activeRegeln,
       )
-      const total = masterUpdates.length + renamedUpdates.length
-      if (total === 0) return { updatedCount: 0 }
-
-      for (let i = 0; i < masterUpdates.length; i += PARALLEL_UPDATE_CHUNK) {
-        const chunk = masterUpdates.slice(i, i + PARALLEL_UPDATE_CHUNK)
-        await Promise.all(
-          chunk.map((update) =>
-            supabase
-              .from('master_plu_items')
-              .update(
-                ({ display_name: update.display_name } as Database['public']['Tables']['master_plu_items']['Update']) as never,
-              )
-              .eq('id', update.id)
-              .then(({ error }) => {
-                if (error) throw error
-              }),
-          ),
-        )
+      const affectedByRulesCount = masterUpdates.length + renamedUpdates.length
+      if (affectedByRulesCount === 0) {
+        return { persistedRenamedCount: 0, affectedByRulesCount: 0 }
       }
+
+      // Keine Persistenz in master_plu_items (zentral) – Namensdarstellung nur über Layout-Engine je Markt
 
       for (let i = 0; i < renamedUpdates.length; i += PARALLEL_UPDATE_CHUNK) {
         const chunk = renamedUpdates.slice(i, i + PARALLEL_UPDATE_CHUNK)
@@ -221,11 +216,15 @@ export function useApplyAllRules() {
         )
       }
 
-      return { updatedCount: total }
+      return {
+        persistedRenamedCount: renamedUpdates.length,
+        affectedByRulesCount,
+      }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['plu-items'] })
-      queryClient.invalidateQueries({ queryKey: ['renamed-items', currentStoreId] })
+    onSuccess: (data) => {
+      if (data.persistedRenamedCount > 0) {
+        queryClient.invalidateQueries({ queryKey: ['renamed-items', currentStoreId] })
+      }
     },
     onError: (error) => {
       toast.error('Fehler: ' + (error instanceof Error ? error.message : String(error)))

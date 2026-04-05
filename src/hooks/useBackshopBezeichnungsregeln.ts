@@ -120,16 +120,22 @@ export function useDeleteBackshopBezeichnungsregel() {
 
 const PARALLEL_UPDATE_CHUNK = 10
 
+/** Ergebnis von „Regeln anwenden“ Backshop: keine Persistenz in backshop_master_plu_items. */
+export type ApplyBackshopRulesResult = {
+  persistedRenamedCount: number
+  affectedByRulesCount: number
+}
+
 /**
  * Wendet alle aktiven Backshop-Regeln auf die Items der aktiven Backshop-Version an.
- * Schreibt display_name in backshop_master_plu_items.
+ * Schreibt nur marktspezifische Umbenennungen in backshop_renamed_items (keine Updates in backshop_master_plu_items).
  */
 export function useApplyAllBackshopRules() {
   const queryClient = useQueryClient()
   const { currentStoreId } = useCurrentStore()
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<ApplyBackshopRulesResult> => {
       if (!currentStoreId) {
         throw new Error('Kein Markt ausgewählt.')
       }
@@ -197,24 +203,9 @@ export function useApplyAllBackshopRules() {
         renamedForMerge,
         activeRegeln as unknown as Bezeichnungsregel[],
       )
-      const total = masterUpdates.length + renamedUpdates.length
-      if (total === 0) return { updatedCount: 0 }
-
-      for (let i = 0; i < masterUpdates.length; i += PARALLEL_UPDATE_CHUNK) {
-        const chunk = masterUpdates.slice(i, i + PARALLEL_UPDATE_CHUNK)
-        await Promise.all(
-          chunk.map((update) =>
-            supabase
-              .from('backshop_master_plu_items')
-              .update(
-                ({ display_name: update.display_name } as Database['public']['Tables']['backshop_master_plu_items']['Update']) as never,
-              )
-              .eq('id', update.id)
-              .then(({ error }) => {
-                if (error) throw error
-              }),
-          ),
-        )
+      const affectedByRulesCount = masterUpdates.length + renamedUpdates.length
+      if (affectedByRulesCount === 0) {
+        return { persistedRenamedCount: 0, affectedByRulesCount: 0 }
       }
 
       for (let i = 0; i < renamedUpdates.length; i += PARALLEL_UPDATE_CHUNK) {
@@ -236,11 +227,15 @@ export function useApplyAllBackshopRules() {
         )
       }
 
-      return { updatedCount: total }
+      return {
+        persistedRenamedCount: renamedUpdates.length,
+        affectedByRulesCount,
+      }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-plu-items'] })
-      queryClient.invalidateQueries({ queryKey: ['backshop-renamed-items', currentStoreId] })
+    onSuccess: (data) => {
+      if (data.persistedRenamedCount > 0) {
+        queryClient.invalidateQueries({ queryKey: ['backshop-renamed-items', currentStoreId] })
+      }
     },
     onError: (error) => {
       toast.error('Fehler: ' + (error instanceof Error ? error.message : String(error)))

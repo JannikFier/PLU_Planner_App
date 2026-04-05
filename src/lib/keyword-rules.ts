@@ -128,7 +128,11 @@ export type RenamedRowForRules = {
 
 /**
  * Wie applyAllRulesToItems, aber mit marktspezifischen Einträgen aus renamed_items / backshop_renamed_items:
- * Wenn für die PLU ein Rename existiert, wird dort display_name aktualisiert, sonst Master-Tabelle.
+ * Wenn für die PLU ein Rename existiert, wird dort display_name aktualisiert, sonst fällt die Änderung in masterUpdates.
+ *
+ * Hinweis: masterUpdates werden nicht mehr in master_plu_items / backshop_master_plu_items persistiert
+ * (zentral für alle Märkte); die Anzeige kommt aus der Layout-Engine je Markt. Persistiert werden nur
+ * renamedUpdates in renamed_items (marktspezifisch).
  */
 export function applyAllRulesWithRenamedMerge<
   T extends {

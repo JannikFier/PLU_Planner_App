@@ -7,7 +7,13 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { BereichsauswahlCard } from '@/components/layout/BereichsauswahlCard'
 import { DashboardGroupCard, type DashboardGroupCardItem } from '@/components/layout/DashboardCard'
 import { useStoreById, useUpdateStore, useDeleteStore } from '@/hooks/useStores'
-import { useStoreListVisibility, useUpdateStoreListVisibility, useUserListVisibilityForUser, useUpdateUserListVisibility } from '@/hooks/useStoreListVisibility'
+import {
+  useStoreListVisibility,
+  useUpdateStoreListVisibility,
+  useUserListVisibilityForUser,
+  useUpdateUserListVisibility,
+  useStoreListAreaEnabled,
+} from '@/hooks/useStoreListVisibility'
 import { useStoreUserProfiles, useAddUserToStore, useRemoveUserFromStore } from '@/hooks/useStoreAccess'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -883,12 +889,15 @@ function UserDetailVisibilitySwitches({
   visibilityRows,
   updateVisibility,
 }: UserDetailVisibilitySwitchesProps) {
+  const { obstGemuese: storeObstOn, backshop: storeBackshopOn } = useStoreListAreaEnabled(storeId)
   const obst = visibilityRows.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
   const backshop = visibilityRows.find(v => v.list_type === 'backshop')?.is_visible ?? true
   const [obstLocal, setObstLocal] = useState(obst)
   const [backshopLocal, setBackshopLocal] = useState(backshop)
 
   const setVisibility = async (listType: string, isVisible: boolean) => {
+    if (listType === 'obst_gemuese' && !storeObstOn) return
+    if (listType === 'backshop' && !storeBackshopOn) return
     if (listType === 'obst_gemuese') setObstLocal(isVisible)
     else setBackshopLocal(isVisible)
     await updateVisibility.mutateAsync({ userId: user.id, storeId, listType, isVisible })
@@ -898,30 +907,40 @@ function UserDetailVisibilitySwitches({
     <div className="space-y-3">
       <div>
         <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sichtbare Bereiche</Label>
-        <p className="text-xs text-muted-foreground mt-0.5">Welche Listen sieht dieser Benutzer?</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Welche Listen sieht dieser Benutzer? (Nur möglich, wenn die Liste am Markt freigeschaltet ist.)</p>
       </div>
       <div className="space-y-3">
-        <div className="flex items-center justify-between rounded-lg border p-3">
-          <div className="flex items-center gap-2">
-            <Apple className="h-4 w-4 text-emerald-600" />
-            <span className="text-sm font-medium">Obst & Gemüse</span>
+        <div className="flex flex-col gap-1 rounded-lg border p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Apple className="h-4 w-4 text-emerald-600" />
+              <span className="text-sm font-medium">Obst & Gemüse</span>
+            </div>
+            <Switch
+              checked={storeObstOn ? obstLocal : false}
+              disabled={updateVisibility.isPending || !storeObstOn}
+              onCheckedChange={(checked) => void setVisibility('obst_gemuese', checked)}
+            />
           </div>
-          <Switch
-            checked={obstLocal}
-            disabled={updateVisibility.isPending}
-            onCheckedChange={(checked) => setVisibility('obst_gemuese', checked)}
-          />
+          {!storeObstOn && (
+            <p className="text-xs text-muted-foreground">Am Markt deaktiviert – unter Einstellungen dieses Marktes einschalten.</p>
+          )}
         </div>
-        <div className="flex items-center justify-between rounded-lg border p-3">
-          <div className="flex items-center gap-2">
-            <Croissant className="h-4 w-4 text-amber-700" />
-            <span className="text-sm font-medium">Backshop</span>
+        <div className="flex flex-col gap-1 rounded-lg border p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Croissant className="h-4 w-4 text-amber-700" />
+              <span className="text-sm font-medium">Backshop</span>
+            </div>
+            <Switch
+              checked={storeBackshopOn ? backshopLocal : false}
+              disabled={updateVisibility.isPending || !storeBackshopOn}
+              onCheckedChange={(checked) => void setVisibility('backshop', checked)}
+            />
           </div>
-          <Switch
-            checked={backshopLocal}
-            disabled={updateVisibility.isPending}
-            onCheckedChange={(checked) => setVisibility('backshop', checked)}
-          />
+          {!storeBackshopOn && (
+            <p className="text-xs text-muted-foreground">Am Markt deaktiviert – unter Einstellungen dieses Marktes einschalten.</p>
+          )}
         </div>
       </div>
     </div>

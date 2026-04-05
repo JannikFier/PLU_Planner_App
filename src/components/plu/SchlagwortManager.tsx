@@ -132,7 +132,17 @@ export function SchlagwortManager({ open, onOpenChange }: SchlagwortManagerProps
   const handleApplyAll = async () => {
     try {
       const result = await applyAllMutation.mutateAsync()
-      toast.success(`${result.updatedCount} Produkte aktualisiert`)
+      if (result.persistedRenamedCount > 0) {
+        toast.success(
+          `${result.persistedRenamedCount} marktspezifische Umbenennung${result.persistedRenamedCount === 1 ? '' : 'en'} gespeichert.`,
+        )
+      } else if (result.affectedByRulesCount > 0) {
+        toast.success(
+          'Namensdarstellung ist für diesen Markt in der Liste aktiv (keine zentrale Master-Speicherung).',
+        )
+      } else {
+        toast.success('Keine Anpassung nötig.')
+      }
     } catch {
       toast.error('Fehler beim Anwenden')
     }
@@ -149,7 +159,8 @@ export function SchlagwortManager({ open, onOpenChange }: SchlagwortManagerProps
             Schlagwort-Manager
           </DialogTitle>
           <DialogDescription>
-            Definiere globale Regeln, um Schlagwörter einheitlich am Anfang oder Ende anzuzeigen.
+            Regeln gelten nur für den aktuell gewählten Markt. Schlagwörter werden in der Liste einheitlich
+            vorne oder hinten angezeigt; die zentrale Master-Liste wird dabei nicht überschrieben.
           </DialogDescription>
         </DialogHeader>
 

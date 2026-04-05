@@ -11,7 +11,7 @@ import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useVersionNotification } from '@/hooks/useNotifications'
 import { useBackshopVersionNotification } from '@/hooks/useBackshopNotifications'
-import { useUserListVisibility } from '@/hooks/useStoreListVisibility'
+import { useEffectiveListVisibility } from '@/hooks/useStoreListVisibility'
 import { ObstNotificationPanel } from './ObstNotificationPanel'
 import { BackshopNotificationPanel } from './BackshopNotificationPanel'
 
@@ -21,9 +21,7 @@ interface UnifiedNotificationDialogProps {
 }
 
 export function UnifiedNotificationDialog({ open, onOpenChange }: UnifiedNotificationDialogProps) {
-  const { data: visibility } = useUserListVisibility()
-  const obstVisible = visibility?.find((v) => v.list_type === 'obst_gemuese')?.is_visible ?? true
-  const backshopVisible = visibility?.find((v) => v.list_type === 'backshop')?.is_visible ?? true
+  const { obstGemuese: obstVisible, backshop: backshopVisible } = useEffectiveListVisibility()
 
   const { data: activeObst } = useActiveVersion()
   const { data: activeBackshop } = useActiveBackshopVersion()
