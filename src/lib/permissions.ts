@@ -25,6 +25,7 @@ const SUPER_ADMIN_MARKET_STORE_PATHS = [
   '/super-admin/rules',
   '/super-admin/backshop-rules',
   '/super-admin/block-sort',
+  '/super-admin/obst-warengruppen',
   '/super-admin/backshop-block-sort',
 ] as const
 

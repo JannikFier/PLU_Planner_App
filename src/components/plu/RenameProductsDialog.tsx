@@ -1,6 +1,7 @@
 // RenameProductsDialog: Dialog „Produkte umbenennen“ – PLU-Liste mit Suche (Filter wie Ausgeblenden), Stift pro Zeile
+// Layout wie Masterliste: Zeilenweise / Spaltenweise (Zeitung bei Obst)
 
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -27,6 +28,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import type { MasterPLUItem, BackshopMasterPLUItem } from '@/types/database'
 import type { DisplayItem } from '@/types/plu'
+import {
+  buildDialogPluLayout,
+  newspaperPageMinHeightPx,
+  type DialogPluFontSizes,
+  type DialogFlatRow,
+} from '@/lib/dialog-plu-layout'
+import { newspaperRowsToFlatRows } from '@/lib/newspaper-column-pages'
+import { PLU_TABLE_HEADER_GEWICHT_CLASS, PLU_TABLE_HEADER_STUECK_CLASS } from '@/lib/constants'
 
 interface SearchableItem {
   id: string
@@ -38,31 +47,64 @@ interface SearchableItem {
 }
 
 type TableRow = { type: 'header'; label: string } | { type: 'row'; left?: SearchableItem; right?: SearchableItem }
-type MobileFlatRow =
-  | { type: 'header'; label: string }
-  | { type: 'item'; item: SearchableItem }
 
-function buildMobileFlatRows(groups: { label: string; items: SearchableItem[] }[]): MobileFlatRow[] {
-  const out: MobileFlatRow[] = []
-  for (const g of groups) {
-    out.push({ type: 'header', label: g.label })
-    for (const item of g.items) {
-      out.push({ type: 'item', item })
-    }
-  }
-  return out
-}
+const DEFAULT_FONT_OBST: DialogPluFontSizes = { header: 24, column: 16, product: 12 }
+const DEFAULT_FONT_BACKSHOP: DialogPluFontSizes = { header: 32, column: 18, product: 18 }
 
-function buildTableRows(groups: { label: string; items: SearchableItem[] }[]): TableRow[] {
-  const rows: TableRow[] = []
-  for (const group of groups) {
-    rows.push({ type: 'header', label: group.label })
-    const items = group.items
-    for (let i = 0; i < items.length; i += 2) {
-      rows.push({ type: 'row', left: items[i], right: items[i + 1] })
-    }
-  }
-  return rows
+/** Eine Spalte: PLU | Artikel + Stift */
+function RenameColumnTable({
+  rows,
+  deferredSearch,
+  onRename,
+}: {
+  rows: DialogFlatRow<SearchableItem>[]
+  deferredSearch: string
+  onRename: (item: SearchableItem) => void
+}) {
+  return (
+    <table className="w-full table-fixed flex-1 min-w-0">
+      <tbody>
+        {rows.map((row, i) => {
+          if (row.type === 'header') {
+            return (
+              <tr key={`rc-${i}`} className="border-b border-border">
+                <td
+                  colSpan={2}
+                  className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm"
+                >
+                  {row.label}
+                </td>
+              </tr>
+            )
+          }
+          const item = row.item
+          const match = itemMatchesSearch(item, deferredSearch)
+          return (
+            <tr key={item.id} data-highlight={match ? 'true' : undefined} className={cn('border-b border-border', match && 'bg-primary/10')}>
+              <td className={cn('px-2 py-1 text-sm font-mono w-[80px]', match && 'bg-primary/10')}>{getDisplayPlu(item.plu)}</td>
+              <td className={cn('px-2 py-1 text-sm border-l border-border', match && 'bg-primary/10')}>
+                <div className="flex items-center gap-1 min-w-0">
+                  <span className="flex-1 min-w-0 break-words" title={item.display_name}>
+                    {item.display_name}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    onClick={() => onRename(item)}
+                    aria-label="Umbenennen"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
 }
 
 /** Master-Item zu DisplayItem (für RenameDialog). */
@@ -125,6 +167,9 @@ export interface RenameProductsDialogProps {
     storeBlockOrder: StoreBlockOrderRow[]
     nameBlockOverrides: Map<string, string>
   }
+  /** Wie Masterliste; Backshop-Standard: zeilenweise */
+  flowDirection?: 'ROW_BY_ROW' | 'COLUMN_FIRST'
+  fontSizes?: DialogPluFontSizes
 }
 
 export function RenameProductsDialog({
@@ -135,7 +180,14 @@ export function RenameProductsDialog({
   renamedOverrides = [],
   displayMode = 'MIXED',
   listLayout,
+  flowDirection: flowDirectionProp,
+  fontSizes: fontSizesProp,
 }: RenameProductsDialogProps) {
+  const listKind = listType === 'backshop' ? 'backshop' : 'obst'
+  const flowDirection =
+    flowDirectionProp ?? (listKind === 'backshop' ? 'ROW_BY_ROW' : 'COLUMN_FIRST')
+  const fontSizes = fontSizesProp ?? (listKind === 'backshop' ? DEFAULT_FONT_BACKSHOP : DEFAULT_FONT_OBST)
+
   const [searchText, setSearchText] = useState('')
   const deferredSearch = useDebouncedValue(searchText, 200)
   const [renameItem, setRenameItem] = useState<DisplayItem | null>(null)
@@ -182,10 +234,25 @@ export function RenameProductsDialog({
     }
     return groupItemsForDialog(filteredItems, displayMode)
   }, [filteredItems, displayMode, listLayout])
-  const tableRows = useMemo(() => buildTableRows(groups), [groups])
-  const mobileFlatRows = useMemo(() => buildMobileFlatRows(groups), [groups])
 
-  // Bei Suchänderung zum ersten Treffer scrollen (wie HideProductsDialog)
+  const sortMode = listLayout?.sortMode ?? 'ALPHABETICAL'
+
+  const layout = useMemo(
+    () =>
+      buildDialogPluLayout({
+        groups,
+        filteredItems,
+        flowDirection,
+        displayMode,
+        sortMode,
+        listType: listKind,
+        fontSizes,
+      }),
+    [groups, filteredItems, flowDirection, displayMode, sortMode, listKind, fontSizes],
+  )
+
+  const tableRows: TableRow[] = layout.mode === 'row_by_row' ? layout.tableRows : []
+
   const searchLower = deferredSearch.trim().toLowerCase()
   useEffect(() => {
     if (!open || !searchLower || filteredItems.length === 0 || !scrollContainerRef.current) return
@@ -214,7 +281,6 @@ export function RenameProductsDialog({
     if (!master) return
     if (listType === 'backshop') {
       const display = backshopMasterItemToDisplayItem(master as BackshopMasterPLUItem)
-      // display_name aus Override (globale Umbenennung) oder aus Master
       display.display_name = overrideByPlu.get(master.plu) ?? display.display_name
       setRenameItem(display)
     } else {
@@ -261,7 +327,21 @@ export function RenameProductsDialog({
               ) : (
                 <div ref={scrollContainerRef} className="overflow-auto flex-1 min-h-0">
                   <ul className="md:hidden divide-y divide-border" data-testid="rename-products-dialog-mobile-list">
-                    {mobileFlatRows.map((row, i) => {
+                    {layout.mobileRows.map((row, i) => {
+                      if (row.type === 'section') {
+                        const stueck = row.title.includes('Stück')
+                        return (
+                          <li
+                            key={`mrs-${i}`}
+                            className={cn(
+                              stueck ? PLU_TABLE_HEADER_STUECK_CLASS : PLU_TABLE_HEADER_GEWICHT_CLASS,
+                              'list-none',
+                            )}
+                          >
+                            {row.title}
+                          </li>
+                        )
+                      }
                       if (row.type === 'header') {
                         return (
                           <li
@@ -302,106 +382,241 @@ export function RenameProductsDialog({
                       )
                     })}
                   </ul>
-                  <table className="hidden md:table w-full table-fixed border-collapse">
-                    <colgroup>
-                      <col className="w-[80px]" />
-                      <col />
-                      <col className="w-[80px]" />
-                      <col />
-                    </colgroup>
-                    <thead className="sticky top-0 bg-background z-10">
-                      <tr className="border-b-2 border-border">
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
-                          PLU
-                        </th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
-                          Artikel
-                        </th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px] border-l-2 border-border">
-                          PLU
-                        </th>
-                        <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
-                          Artikel
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tableRows.map((row, i) => {
-                        if (row.type === 'header') {
+
+                  {/* Zeilenweise */}
+                  {layout.mode === 'row_by_row' && (
+                    <table className="hidden md:table w-full table-fixed border-collapse">
+                      <colgroup>
+                        <col className="w-[80px]" />
+                        <col />
+                        <col className="w-[80px]" />
+                        <col />
+                      </colgroup>
+                      <thead className="sticky top-0 bg-background z-10">
+                        <tr className="border-b-2 border-border">
+                          <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
+                            PLU
+                          </th>
+                          <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
+                            Artikel
+                          </th>
+                          <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px] border-l-2 border-border">
+                            PLU
+                          </th>
+                          <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
+                            Artikel
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tableRows.map((row, i) => {
+                          if (row.type === 'header') {
+                            return (
+                              <tr key={`h-${i}-${row.label}`} className="border-b border-border">
+                                <td
+                                  colSpan={4}
+                                  className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm"
+                                >
+                                  {row.label}
+                                </td>
+                              </tr>
+                            )
+                          }
+                          const leftMatch = row.left ? itemMatchesSearch(row.left, deferredSearch) : false
+                          const rightMatch = row.right ? itemMatchesSearch(row.right, deferredSearch) : false
+                          const highlightRow = leftMatch || rightMatch
                           return (
-                            <tr key={`h-${i}-${row.label}`} className="border-b border-border">
-                              <td
-                                colSpan={4}
-                                className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm"
-                              >
-                                {row.label}
+                            <tr
+                              key={`r-${i}`}
+                              data-highlight={highlightRow ? 'true' : undefined}
+                              className={cn(
+                                'border-b border-border last:border-b-0',
+                                highlightRow && 'bg-primary/10',
+                              )}
+                            >
+                              <td className="px-2 py-1 text-sm font-mono">{row.left ? getDisplayPlu(row.left.plu) : ''}</td>
+                              <td className="px-2 py-1 text-sm border-l border-border">
+                                {row.left ? (
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    <span className="flex-1 min-w-0 truncate" title={row.left.display_name}>
+                                      {row.left.display_name}
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 shrink-0"
+                                      onClick={() => {
+                                        if (row.left) handleOpenRename(row.left)
+                                      }}
+                                      aria-label="Umbenennen"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  ''
+                                )}
+                              </td>
+                              <td className="px-2 py-1 text-sm font-mono border-l-2 border-border">
+                                {row.right ? getDisplayPlu(row.right.plu) : ''}
+                              </td>
+                              <td className="px-2 py-1 text-sm border-l border-border">
+                                {row.right ? (
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    <span className="flex-1 min-w-0 truncate" title={row.right.display_name}>
+                                      {row.right.display_name}
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 shrink-0"
+                                      onClick={() => {
+                                        if (row.right) handleOpenRename(row.right)
+                                      }}
+                                      aria-label="Umbenennen"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  ''
+                                )}
                               </td>
                             </tr>
                           )
-                        }
-                        const leftMatch = row.left ? itemMatchesSearch(row.left, deferredSearch) : false
-                        const rightMatch = row.right ? itemMatchesSearch(row.right, deferredSearch) : false
-                        const highlightRow = leftMatch || rightMatch
-                        return (
-                          <tr
-                            key={`r-${i}`}
-                            data-highlight={highlightRow ? 'true' : undefined}
-                            className={cn(
-                              'border-b border-border last:border-b-0',
-                              highlightRow && 'bg-primary/10',
-                            )}
-                          >
-                            <td className="px-2 py-1 text-sm font-mono">{row.left ? getDisplayPlu(row.left.plu) : ''}</td>
-                            <td className="px-2 py-1 text-sm border-l border-border">
-                              {row.left ? (
-                                <div className="flex items-center gap-1 min-w-0">
-                                  <span className="flex-1 min-w-0 truncate" title={row.left.display_name}>
-                                    {row.left.display_name}
-                                  </span>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 shrink-0"
-                                    onClick={() => { if (row.left) handleOpenRename(row.left) }}
-                                    aria-label="Umbenennen"
-                                  >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                              ) : (
-                                ''
-                              )}
-                            </td>
-                            <td className="px-2 py-1 text-sm font-mono border-l-2 border-border">
-                              {row.right ? getDisplayPlu(row.right.plu) : ''}
-                            </td>
-                            <td className="px-2 py-1 text-sm border-l border-border">
-                              {row.right ? (
-                                <div className="flex items-center gap-1 min-w-0">
-                                  <span className="flex-1 min-w-0 truncate" title={row.right.display_name}>
-                                    {row.right.display_name}
-                                  </span>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 shrink-0"
-                                    onClick={() => { if (row.right) handleOpenRename(row.right) }}
-                                    aria-label="Umbenennen"
-                                  >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                              ) : (
-                                ''
-                              )}
-                            </td>
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {/* Obst: Zeitung */}
+                  {layout.mode === 'newspaper_obst' && (
+                    <div className="hidden md:block">
+                      <table className="w-full table-fixed border-collapse">
+                        <colgroup>
+                          <col className="w-[80px]" />
+                          <col />
+                          <col className="w-[80px]" />
+                          <col />
+                        </colgroup>
+                        <thead className="sticky top-0 bg-background z-10">
+                          <tr className="border-b-2 border-border">
+                            <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
+                              PLU
+                            </th>
+                            <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
+                              Artikel
+                            </th>
+                            <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px] border-l-2 border-border">
+                              PLU
+                            </th>
+                            <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
+                              Artikel
+                            </th>
                           </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                        </thead>
+                        <tbody>
+                          {layout.sections.map((sec, secIdx) => (
+                            <Fragment key={`rsec-${secIdx}`}>
+                              {sec.sectionBanner && (
+                                <tr>
+                                  <td
+                                    colSpan={4}
+                                    className={cn(
+                                      'p-0',
+                                      sec.sectionBanner.includes('Stück')
+                                        ? PLU_TABLE_HEADER_STUECK_CLASS
+                                        : PLU_TABLE_HEADER_GEWICHT_CLASS,
+                                    )}
+                                  >
+                                    {sec.sectionBanner}
+                                  </td>
+                                </tr>
+                              )}
+                              {sec.pages.map((page, pageIdx) => (
+                                <Fragment key={`rpg-${secIdx}-${pageIdx}`}>
+                                  {pageIdx > 0 && (
+                                    <tr>
+                                      <td colSpan={4} className="p-0 border-0">
+                                        <div
+                                          className="flex items-center gap-3 border-t border-dashed border-border bg-muted/25 px-4 py-2.5 text-sm font-medium text-muted-foreground"
+                                          role="separator"
+                                          aria-label={`Seite ${pageIdx + 1}`}
+                                        >
+                                          <span className="h-px min-w-[2rem] flex-1 bg-border" aria-hidden />
+                                          Seite {pageIdx + 1}
+                                          <span className="h-px min-w-[2rem] flex-1 bg-border" aria-hidden />
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                  <tr className="border-0">
+                                    <td colSpan={4} className="p-0 align-top border-b border-border">
+                                      <div
+                                        className="flex divide-x divide-border items-start"
+                                        style={{
+                                          minHeight: newspaperPageMinHeightPx(pageIdx, sec.heights),
+                                        }}
+                                      >
+                                        <RenameColumnTable
+                                          rows={newspaperRowsToFlatRows(page.left)}
+                                          deferredSearch={deferredSearch}
+                                          onRename={handleOpenRename}
+                                        />
+                                        <RenameColumnTable
+                                          rows={newspaperRowsToFlatRows(page.right)}
+                                          deferredSearch={deferredSearch}
+                                          onRename={handleOpenRename}
+                                        />
+                                      </div>
+                                    </td>
+                                  </tr>
+                                </Fragment>
+                              ))}
+                            </Fragment>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Backshop: zwei Spalten-Listen (wie PLUTable split) */}
+                  {layout.mode === 'split_columns' && (
+                    <div className="hidden md:block">
+                      <div className="sticky top-0 z-10 bg-background border-b-2 border-border flex w-full">
+                        <div className="flex-1 flex min-w-0 border-r border-border">
+                          <span className="w-[80px] shrink-0 px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            PLU
+                          </span>
+                          <span className="flex-1 min-w-0 px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
+                            Artikel
+                          </span>
+                        </div>
+                        <div className="flex-1 flex min-w-0">
+                          <span className="w-[80px] shrink-0 px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            PLU
+                          </span>
+                          <span className="flex-1 min-w-0 px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
+                            Artikel
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex divide-x divide-border">
+                        <RenameColumnTable
+                          rows={layout.leftFlat}
+                          deferredSearch={deferredSearch}
+                          onRename={handleOpenRename}
+                        />
+                        <RenameColumnTable
+                          rows={layout.rightFlat}
+                          deferredSearch={deferredSearch}
+                          onRename={handleOpenRename}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

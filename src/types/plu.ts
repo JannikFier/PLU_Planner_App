@@ -1,7 +1,7 @@
 // PLU-spezifische Types für Business-Logik
 
 import type { MasterPLUItem, Block, CustomProduct } from './database'
-import type { OfferDisplayInfo } from '@/lib/offer-display'
+import type { OfferDisplayInfo, ObstCentralCampaignKind } from '@/lib/offer-display'
 
 /** Status eines PLU-Eintrags */
 export type PLUStatus = 'UNCHANGED' | 'NEW_PRODUCT_YELLOW' | 'PLU_CHANGED_RED'
@@ -35,6 +35,11 @@ export interface DisplayItem {
   offer_source_kind?: 'central' | 'manual'
   /** Nur bei zentraler Werbung: Original-Kampagnenpreis (wenn eigener VK abweicht) */
   offer_central_reference_price?: number | null
+  /**
+   * Nur Obst/Gemüse, zentrale Werbung: Namenszelle hervorheben (nicht PLU-Spalte).
+   * Neu/PLU geändert bleiben an der PLU-Zelle.
+   */
+  offer_name_highlight_kind?: ObstCentralCampaignKind
 }
 
 /** Geparste Zeile aus einer Excel-Datei */
@@ -54,15 +59,17 @@ export interface ExcelParseResult {
   skippedRows: number
 }
 
-/** Geparste Zeile aus Excel für eigene Produkte (Spalte 1: PLU oder Preis, 2: Name, 3: Warengruppe/Typ) */
+/** Geparste Zeile aus Excel für eigene Produkte (Spalte 1: PLU oder Preis, 2: Name, 3: Warengruppe und/oder Typ) */
 export interface ParsedCustomProductRow {
   /** 4–5 Ziffern, oder null wenn Spalte 1 ein Preis ist */
   plu: string | null
   /** Dezimalzahl, oder null wenn Spalte 1 eine PLU ist */
   preis: number | null
   name: string
-  /** Inhalt von Spalte 3 (Block-Name oder „Stück“/„Gewicht“) */
+  /** Spalte 3: Block-Name oder „Stück“/„Gewicht“ (je nach Layout) */
   blockNameOrType: string | null
+  /** Optional Spalte 4: Stück/Gewicht, wenn Spalte 3 die Warengruppe ist (Layout: getrennt + nach Blöcken) */
+  typColumn?: string | null
 }
 
 /** Ergebnis des Excel-Parsers für eigene Produkte */

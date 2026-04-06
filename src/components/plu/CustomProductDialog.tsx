@@ -1,7 +1,7 @@
-// CustomProductDialog: Dialog zum Hinzufügen eigener Produkte.
-// Pflichtfelder hängen vom Layout ab: BY_BLOCK = Warengruppe Pflicht, ALPHABETICAL = Typ Pflicht.
+// CustomProductDialog: Dialog zum Hinzufügen eigener Produkte (Obst/Gemüse).
+// Pflichtfelder: SEPARATED → Typ; BY_BLOCK + features_blocks → Warengruppe.
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { z } from 'zod'
 import {
   AlertDialog,
@@ -34,6 +34,11 @@ import { useAddCustomProduct } from '@/hooks/useCustomProducts'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
 import { useCreateBlock } from '@/hooks/useBlocks'
 import { generatePriceOnlyPlu } from '@/lib/plu-helpers'
+import {
+  OBST_CUSTOM_PRODUCT_DEFAULT_ITEM_TYPE,
+  obstCustomProductShowBlockField,
+  obstCustomProductShowItemTypeField,
+} from '@/lib/obst-custom-product-layout'
 import { toast } from 'sonner'
 import type { Block } from '@/types/database'
 
@@ -81,7 +86,14 @@ export function CustomProductDialog({
   const addProduct = useAddCustomProduct()
   const { data: layoutSettings } = useLayoutSettings()
   const createBlock = useCreateBlock()
-  const sortMode = layoutSettings?.sort_mode ?? 'ALPHABETICAL'
+  const showItemTypeField = useMemo(
+    () => obstCustomProductShowItemTypeField(layoutSettings),
+    [layoutSettings],
+  )
+  const showBlockField = useMemo(
+    () => obstCustomProductShowBlockField(layoutSettings),
+    [layoutSettings],
+  )
 
   const [plu, setPlu] = useState('')
   const [name, setName] = useState('')
@@ -142,12 +154,13 @@ export function CustomProductDialog({
       return
     }
 
-    if (sortMode === 'BY_BLOCK') {
+    if (showBlockField) {
       if (!blockId.trim()) {
         setErrors({ block_id: 'Bitte Warengruppe auswählen oder anlegen.' })
         return
       }
-    } else {
+    }
+    if (showItemTypeField) {
       if (!itemType) {
         setErrors({ item_type: 'Bitte Typ (Stück/Gewicht) auswählen.' })
         return
@@ -160,9 +173,12 @@ export function CustomProductDialog({
       return
     }
 
-    const item_type: 'PIECE' | 'WEIGHT' =
-      sortMode === 'BY_BLOCK' ? 'PIECE' : (itemType === 'WEIGHT' ? 'WEIGHT' : 'PIECE')
-    const block_id = sortMode === 'BY_BLOCK' ? blockId : (blockId || null)
+    const item_type: 'PIECE' | 'WEIGHT' = showItemTypeField
+      ? itemType === 'WEIGHT'
+        ? 'WEIGHT'
+        : 'PIECE'
+      : OBST_CUSTOM_PRODUCT_DEFAULT_ITEM_TYPE
+    const block_id = showBlockField ? blockId : undefined
 
     const pluToSave = hasPlu && baseResult.data.plu != null ? baseResult.data.plu : generatePriceOnlyPlu()
     const preisToSave = hasPreis && baseResult.data.preis != null ? baseResult.data.preis : null
@@ -180,7 +196,18 @@ export function CustomProductDialog({
       const msg = err instanceof Error ? err.message : 'Unbekannter Fehler'
       setErrorPopupMessage(msg)
     }
-  }, [plu, name, itemType, preis, blockId, sortMode, existingPLUs, addProduct, handleClose])
+  }, [
+    plu,
+    name,
+    itemType,
+    preis,
+    blockId,
+    showBlockField,
+    showItemTypeField,
+    existingPLUs,
+    addProduct,
+    handleClose,
+  ])
 
   const handleCreateBlock = useCallback(async () => {
     const nameTrimmed = newBlockName.trim()
@@ -260,8 +287,8 @@ export function CustomProductDialog({
             )}
           </div>
 
-          {/* Typ (nur bei ALPHABETICAL Pflicht) */}
-          {sortMode === 'ALPHABETICAL' && (
+          {/* Typ nur bei getrennter Stück/Gewicht-Darstellung (Layout) */}
+          {showItemTypeField && (
             <div className="space-y-2">
               <Label>Typ</Label>
               <Select
@@ -305,8 +332,8 @@ export function CustomProductDialog({
             </div>
           </div>
 
-          {/* Warengruppe: nur bei BY_BLOCK – dann Pflicht inkl. „Neue Warengruppe anlegen“. Bei ALPHABETICAL keine Warengruppe. */}
-          {sortMode === 'BY_BLOCK' && (
+          {/* Warengruppe: nur bei Sortierung nach Blöcken + Feature Warengruppen */}
+          {showBlockField && (
             <div className="space-y-2">
               <Label>Warengruppe</Label>
               {!showNewBlockInput ? (
@@ -386,8 +413,8 @@ export function CustomProductDialog({
             disabled={
               addProduct.isPending ||
               !hasExactlyOne ||
-              (sortMode === 'BY_BLOCK' && !blockId) ||
-              (sortMode === 'ALPHABETICAL' && !itemType)
+              (showBlockField && !blockId) ||
+              (showItemTypeField && !itemType)
             }
           >
             {addProduct.isPending ? 'Wird hinzugefügt...' : 'Hinzufügen'}

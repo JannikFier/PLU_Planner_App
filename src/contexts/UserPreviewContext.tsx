@@ -37,8 +37,10 @@ export function UserPreviewProvider({ children }: { children: ReactNode }) {
 
   /** Nur zur Re-Synchronisation: Vorschau kommt immer frisch aus sessionStorage (eine Quelle der Wahrheit). */
   const [previewRevision, setPreviewRevision] = useState(0)
+  // Absichtlich: sessionStorage bei Revisions-Bump oder User-Wechsel neu lesen (Callback ohne diese Werte).
   const preview = useMemo(
     () => readUserPreviewState(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Invalidierung über Revision/User, nicht über Closure
     [previewRevision, user?.id],
   )
 

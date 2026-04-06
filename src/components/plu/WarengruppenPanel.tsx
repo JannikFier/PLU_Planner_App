@@ -39,12 +39,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Plus, Trash2, Pencil, Search, Loader2, GripVertical } from 'lucide-react'
+import { Plus, Trash2, Pencil, Search, Loader2, GripVertical, UserPlus } from 'lucide-react'
 import { getDisplayPlu } from '@/lib/plu-helpers'
 import { cn } from '@/lib/utils'
 
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
+import { useLayoutSettings } from '@/hooks/useLayoutSettings'
+import { AssignProductsToBlockDialog } from '@/components/plu/AssignProductsToBlockDialog'
 import {
   useBlocks,
   useCreateBlock,
@@ -65,6 +67,15 @@ import type { MasterPLUItem } from '@/types/database'
 export function WarengruppenPanel() {
   const { data: activeVersion } = useActiveVersion()
   const { data: items = [] } = usePLUData(activeVersion?.id)
+  const { data: layoutSettings } = useLayoutSettings()
+  const displayMode = layoutSettings?.display_mode ?? 'MIXED'
+  const flowDirection = layoutSettings?.flow_direction ?? 'COLUMN_FIRST'
+  const sortModeForDialog = layoutSettings?.sort_mode ?? 'BY_BLOCK'
+  const dialogFontSizes = {
+    header: layoutSettings?.font_header_px ?? 24,
+    column: layoutSettings?.font_column_px ?? 16,
+    product: layoutSettings?.font_product_px ?? 12,
+  }
   const { data: blocks = [] } = useBlocks()
   const { data: storeBlockOrder = [] } = useStoreObstBlockOrder()
   const { data: storeNameOverrides = [] } = useStoreObstNameBlockOverrides()
@@ -95,7 +106,34 @@ export function WarengruppenPanel() {
   const [showAddBlock, setShowAddBlock] = useState(false)
   const [showRenameBlock, setShowRenameBlock] = useState(false)
   const [showDeleteBlockConfirm, setShowDeleteBlockConfirm] = useState(false)
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [blockName, setBlockName] = useState('')
+
+  const searchableDialogItems = useMemo(
+    () =>
+      items.map((i) => ({
+        id: i.id,
+        plu: i.plu,
+        display_name: i.display_name ?? i.system_name,
+        system_name: i.system_name,
+        item_type: i.item_type,
+        block_id: i.block_id,
+      })),
+    [items],
+  )
+
+  const dialogListLayout = useMemo(
+    () => ({
+      sortMode: sortModeForDialog as 'ALPHABETICAL' | 'BY_BLOCK',
+      blocks,
+      storeBlockOrder: storeBlockOrder.map((r) => ({
+        block_id: r.block_id,
+        order_index: r.order_index,
+      })),
+      nameBlockOverrides: nameBlockOverrideMap,
+    }),
+    [sortModeForDialog, blocks, storeBlockOrder, nameBlockOverrideMap],
+  )
 
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId)
 
@@ -316,8 +354,22 @@ export function WarengruppenPanel() {
 
       {/* === RECHTE SEITE: Produkte === */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Produkte</CardTitle>
+        <CardHeader className="space-y-3 pb-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-sm">Produkte</CardTitle>
+            {selectedBlockId && selectedBlock ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="w-full shrink-0 sm:w-auto"
+                onClick={() => setAssignDialogOpen(true)}
+              >
+                <UserPlus className="mr-1 h-3 w-3" />
+                Produkte hinzufügen…
+              </Button>
+            ) : null}
+          </div>
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -438,6 +490,18 @@ export function WarengruppenPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AssignProductsToBlockDialog
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
+        blockId={selectedBlockId}
+        blockName={selectedBlock?.name ?? ''}
+        searchableItems={searchableDialogItems}
+        displayMode={displayMode}
+        listLayout={dialogListLayout}
+        flowDirection={flowDirection}
+        fontSizes={dialogFontSizes}
+      />
 
       <AlertDialog open={showDeleteBlockConfirm} onOpenChange={setShowDeleteBlockConfirm}>
         <AlertDialogContent>

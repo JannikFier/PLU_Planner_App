@@ -18,6 +18,12 @@ import {
   computeColumnHeaderHeightMm,
   computeGroupHeaderHeightMm,
 } from '@/lib/pdf-layout-utils'
+import {
+  paginateNewspaperColumns,
+  computeObstNewspaperHeightsMm,
+  type NewspaperPage,
+  OBST_PDF_LEGEND_BOTTOM_RESERVED_MM,
+} from '@/lib/newspaper-column-pages'
 import type { MegaphonePdfRaster } from '@/lib/pdf-megaphone-raster'
 import { loadMegaphoneIconRaster } from '@/lib/pdf-megaphone-raster'
 
@@ -102,6 +108,12 @@ const COLORS = {
   groupText: [0, 0, 0] as [number, number, number],
   // Rahmen – schwarz für klare Tabelle (Drucker)
   border: [0, 0, 0] as [number, number, number],
+  // Zentrale Obst-Werbung: Namensspalte (nicht PLU) – PDF etwas kräftiger als Screen, damit Legende unterscheidbar
+  obstOfferNameWeekBg: [251, 219, 96] as [number, number, number],
+  obstOfferNameWeekText: [133, 77, 14] as [number, number, number],
+  /** 3-Tage-Preis: dunkles Gold (nicht hellgelb), gut erkennbar auf hellem Kasten + zu PLU-Neu */
+  obstOfferName3dayBg: [251, 191, 36] as [number, number, number],
+  obstOfferName3dayText: [100, 50, 10] as [number, number, number],
 }
 
 // Layout-Konstanten
@@ -297,6 +309,20 @@ function buildPDFRows(
   return rows
 }
 
+/** PDF-Zeilen → Gruppen mit Items (für Spalten-Zeitung) */
+function pdfRowsToItemGroups(rows: PDFRow[]): { label: string; items: DisplayItem[] }[] {
+  const groups: { label: string; items: DisplayItem[] }[] = []
+  for (const r of rows) {
+    if (r.type === 'group') {
+      groups.push({ label: r.label ?? '', items: [] })
+    } else if (r.type === 'item' && r.item) {
+      const g = groups[groups.length - 1]
+      if (g) g.items.push(r.item)
+    }
+  }
+  return groups
+}
+
 type FontSizes = PDFFontSizes & { group: number }
 
 /** Rendert eine Sektion (alle Zeilen) und gibt die Anzahl genutzter Seiten zurück */
@@ -364,9 +390,58 @@ function renderSection(
     yPos += layout.columnHeaderH + 1
   }
 
+  /** Legende unten auf der Seite (eine Zeile, weniger Höhe), nicht unter den Spaltenköpfen */
+  function drawObstOfferLegendBottom(footerLineY: number) {
+    const boxH = OBST_PDF_LEGEND_BOTTOM_RESERVED_MM - 2.2
+    const top = footerLineY - boxH - 2.2
+    const x0 = PAGE.marginLeft
+    doc.setFillColor(248, 248, 248)
+    doc.rect(x0, top, usableWidth, boxH, 'F')
+    doc.setDrawColor(...COLORS.border)
+    doc.setLineWidth(0.25)
+    doc.rect(x0, top, usableWidth, boxH, 'S')
+
+    const yMid = top + boxH / 2
+    let cx = x0 + 1.5
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(6.2)
+
+    const dot = (fill: [number, number, number], x: number, y: number) => {
+      doc.setFillColor(...fill)
+      doc.setDrawColor(170, 170, 170)
+      doc.setLineWidth(0.12)
+      doc.rect(x, y - 1.1, 2.2, 2.2, 'FD')
+    }
+
+    dot(COLORS.newBg, cx, yMid)
+    cx += 3.2
+    doc.setTextColor(55, 55, 55)
+    doc.text('PLU gelb = neu', cx, yMid, { baseline: 'middle' })
+    cx += doc.getTextWidth('PLU gelb = neu') + 2.5
+    dot(COLORS.changedBg, cx, yMid)
+    cx += 3.2
+    doc.text('PLU rot = geändert', cx, yMid, { baseline: 'middle' })
+    cx += doc.getTextWidth('PLU rot = geändert') + 2.5
+
+    if (showOfferHints) {
+      dot(COLORS.obstOfferNameWeekBg, cx, yMid)
+      cx += 3.2
+      doc.setTextColor(...COLORS.obstOfferNameWeekText)
+      doc.text('Artikelname gelb = zentrale Werbung (Woche)', cx, yMid, { baseline: 'middle' })
+      cx += doc.getTextWidth('Artikelname gelb = zentrale Werbung (Woche)') + 2.5
+      doc.setTextColor(55, 55, 55)
+      dot(COLORS.obstOfferName3dayBg, cx, yMid)
+      cx += 3.2
+      doc.setTextColor(...COLORS.obstOfferName3dayText)
+      doc.text('Artikelname dunkelgelb = 3-Tage-Preis (Do–Sa)', cx, yMid, { baseline: 'middle' })
+    }
+    doc.setTextColor(0, 0, 0)
+  }
+
   // === Footer ===
   function drawFooter(pageNum: number) {
     const footerY = PAGE.height - PAGE.marginBottom + 3
+    drawObstOfferLegendBottom(footerY)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7)
     doc.setTextColor(0, 0, 0)
@@ -383,11 +458,19 @@ function renderSection(
     drawColumnHeaders()
   }
 
-  // Zebra-Striping für ganze Zeile (vor drawItem aufrufen)
-  function drawRowZebraBackground(y: number, rowHeight: number, rowIndex: number) {
+  // Zebra-Striping (vor drawItem aufrufen); optional nur eine Tabellenhälfte (Spaltenweise)
+  function drawRowZebraBackground(
+    y: number,
+    rowHeight: number,
+    rowIndex: number,
+    x?: number,
+    width?: number,
+  ) {
     if (rowIndex % 2 === 0) {
       doc.setFillColor(...COLORS.zebraLight)
-      doc.rect(PAGE.marginLeft, y, usableWidth, rowHeight, 'F')
+      const x0 = x ?? PAGE.marginLeft
+      const w0 = width ?? usableWidth
+      doc.rect(x0, y, w0, rowHeight, 'F')
     }
   }
 
@@ -456,12 +539,29 @@ function renderSection(
     doc.setFontSize(fonts.product)
     doc.text(getDisplayPlu(item.plu), x + 1, y + layout.rowHeight / 2, { baseline: 'middle' })
 
+    // Namensspalte: zentrale Obst-Werbung (Hintergrund, nicht PLU-Spalte)
+    const nameX = x + pluColWidth
+    if (item.offer_name_highlight_kind === 'ordersatz_3day') {
+      doc.setFillColor(...COLORS.obstOfferName3dayBg)
+      doc.rect(nameX, y, nameColWidth, layout.rowHeight, 'F')
+    } else if (item.offer_name_highlight_kind) {
+      doc.setFillColor(...COLORS.obstOfferNameWeekBg)
+      doc.rect(nameX, y, nameColWidth, layout.rowHeight, 'F')
+    }
+
     // Artikelname – volle Namensspalte (Angebot: Megafon + Preis in der Preis-Spalte)
-    doc.setTextColor(0, 0, 0)
+    if (item.offer_name_highlight_kind === 'ordersatz_3day') {
+      doc.setTextColor(...COLORS.obstOfferName3dayText)
+    } else if (item.offer_name_highlight_kind) {
+      doc.setTextColor(...COLORS.obstOfferNameWeekText)
+    } else {
+      doc.setTextColor(0, 0, 0)
+    }
     const displayName = getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)
     const maxNameWidth = nameColWidth - 2
     const nameToDraw = truncateWithBinarySearch(doc, displayName, maxNameWidth)
     doc.text(nameToDraw, x + pluColWidth + 1, y + layout.rowHeight / 2, { baseline: 'middle' })
+    doc.setTextColor(0, 0, 0)
 
     // Preis-Spalte (Kasten wie PLU, gelbe Markierung bei neuem Produkt)
     const preisX = x + pluColWidth + nameColWidth
@@ -529,7 +629,8 @@ function renderSection(
   drawHeader()
   drawColumnHeaders()
 
-  const maxY = PAGE.height - PAGE.marginBottom - PAGE.footerHeight
+  const maxY =
+    PAGE.height - PAGE.marginBottom - PAGE.footerHeight - OBST_PDF_LEGEND_BOTTOM_RESERVED_MM
 
   if (flowDirection === 'ROW_BY_ROW') {
     // ROW_BY_ROW: Items paarweise (1→links, 2→rechts, 3→links...)
@@ -574,46 +675,93 @@ function renderSection(
       rowIndex++
     }
   } else {
-    // COLUMN_FIRST: Erste Hälfte links, zweite Hälfte rechts
-    // Items aufteilen (ohne Gruppen-Header)
-    const itemCount = pdfRows.filter((r) => r.type === 'item').length
-    const midPoint = Math.ceil(itemCount / 2)
+    // COLUMN_FIRST: Zeitungslayout – linke Spalte oben→unten, dann rechte Spalte, dann neue Seite
+    const itemGroups = pdfRowsToItemGroups(pdfRows)
+    const npHeights = computeObstNewspaperHeightsMm({
+      header: fonts.header,
+      column: fonts.column,
+      product: fonts.product,
+      group: fonts.group,
+    })
+    const newsPages = paginateNewspaperColumns(itemGroups, npHeights.heights)
 
-    // Gruppen für jede Spalte bestimmen
-    const leftRows = buildColumnRows(pdfRows, 0, midPoint)
-    const rightRows = buildColumnRows(pdfRows, midPoint, itemCount)
+    /** Spalten-Zeitung: gleiche Zeilenhöhe und Produkt-Schrift für Buchstaben-Header */
+    function drawGroupHeaderHalfColumnNewspaper(label: string, xCol: number, y: number) {
+      doc.setFillColor(...COLORS.groupBg)
+      doc.rect(xCol, y, colWidth, layout.rowHeight, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(fonts.product)
+      doc.setTextColor(...COLORS.groupText)
+      doc.text(label, xCol + colWidth / 2, y + layout.rowHeight / 2, {
+        align: 'center',
+        baseline: 'middle',
+      })
+    }
 
-    const maxRows = Math.max(leftRows.length, rightRows.length)
-    let rowIndex = 0
-
-    for (let j = 0; j < maxRows; j++) {
-      const leftRow = leftRows[j]
-      const rightRow = rightRows[j]
-
-      // Höhe für diese Zeile bestimmen
-      const isLeftGroup = leftRow?.type === 'group'
-      const isRightGroup = rightRow?.type === 'group'
-      const rowH = (isLeftGroup || isRightGroup) ? layout.groupHeaderH : layout.rowHeight
-
-      if (yPos + rowH > maxY) startNewPage()
-
+    function renderNewspaperObstPage(page: NewspaperPage<DisplayItem>, yStart: number): number {
       const leftX = PAGE.marginLeft
-      const rightX = rightColStart
+      let yL = yStart
+      let yR = yStart
+      let zebraL = 0
+      let zebraR = 0
+      const rh = layout.rowHeight
 
-      if (isLeftGroup || isRightGroup) {
-        drawGroupHeaderFullRow(yPos)
-        if (leftRow?.type === 'group') drawGroupHeaderLabel(leftRow.label ?? '', leftX, yPos, colWidth)
-        if (rightRow?.type === 'group') drawGroupHeaderLabel(rightRow.label ?? '', rightX, yPos, colWidth)
-      } else {
-        drawRowZebraBackground(yPos, rowH, rowIndex)
-        if (leftRow?.item) drawItem(leftRow.item, leftX, yPos)
-        if (rightRow?.item) drawItem(rightRow.item, rightX, yPos)
-        drawCenterDivider(yPos, yPos + rowH)
+      for (const row of page.left) {
+        if (row.type === 'group') {
+          drawGroupHeaderHalfColumnNewspaper(row.label, leftX, yL)
+        } else {
+          drawRowZebraBackground(yL, rh, zebraL, leftX, colWidth)
+          drawItem(row.item, leftX, yL)
+          zebraL++
+        }
+        doc.setDrawColor(...COLORS.border)
+        doc.setLineWidth(0.4)
+        doc.line(leftX, yL + rh, centerDividerX, yL + rh)
+        yL += rh
       }
 
-      drawRowLine(yPos + rowH)
-      yPos += rowH
-      if (!isLeftGroup && !isRightGroup) rowIndex++
+      for (const row of page.right) {
+        if (row.type === 'group') {
+          drawGroupHeaderHalfColumnNewspaper(row.label, rightColStart, yR)
+        } else {
+          drawRowZebraBackground(yR, rh, zebraR, rightColStart, colWidth)
+          drawItem(row.item, rightColStart, yR)
+          zebraR++
+        }
+        doc.setDrawColor(...COLORS.border)
+        doc.setLineWidth(0.4)
+        doc.line(centerDividerX, yR + rh, PAGE.marginLeft + usableWidth, yR + rh)
+        yR += rh
+      }
+
+      const bottom = Math.max(yL, yR)
+      while (yL < bottom) {
+        const h = Math.min(rh, bottom - yL)
+        drawRowZebraBackground(yL, h, zebraL, leftX, colWidth)
+        zebraL++
+        doc.setDrawColor(...COLORS.border)
+        doc.setLineWidth(0.4)
+        doc.line(leftX, yL + h, centerDividerX, yL + h)
+        yL += h
+      }
+      while (yR < bottom) {
+        const h = Math.min(rh, bottom - yR)
+        drawRowZebraBackground(yR, h, zebraR, rightColStart, colWidth)
+        zebraR++
+        doc.line(centerDividerX, yR + h, PAGE.marginLeft + usableWidth, yR + h)
+        yR += h
+      }
+
+      drawCenterDivider(yStart, bottom)
+      return bottom
+    }
+
+    for (let pi = 0; pi < newsPages.length; pi++) {
+      if (pi > 0) {
+        startNewPage()
+      }
+      const yStart = yPos
+      yPos = renderNewspaperObstPage(newsPages[pi], yStart)
     }
   }
 

@@ -44,8 +44,8 @@ export function ObstNotificationPanel({
 
   const hiddenPLUs = useMemo(
     () =>
-      effectiveHiddenPluSet(new Set(hiddenItems.map((h) => h.plu)), obstCampaign?.lines),
-    [hiddenItems, obstCampaign?.lines],
+      effectiveHiddenPluSet(new Set(hiddenItems.map((h) => h.plu)), obstCampaign),
+    [hiddenItems, obstCampaign],
   )
 
   const isEmpty = newProducts.length === 0 && changedProducts.length === 0

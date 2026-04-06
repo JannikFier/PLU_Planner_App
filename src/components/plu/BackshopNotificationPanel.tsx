@@ -43,8 +43,8 @@ export function BackshopNotificationPanel({
 
   const hiddenPLUs = useMemo(
     () =>
-      effectiveHiddenPluSet(new Set(hiddenItems.map((h) => h.plu)), backshopCampaign?.lines),
-    [hiddenItems, backshopCampaign?.lines],
+      effectiveHiddenPluSet(new Set(hiddenItems.map((h) => h.plu)), backshopCampaign),
+    [hiddenItems, backshopCampaign],
   )
 
   const isEmpty = newProducts.length === 0 && changedProducts.length === 0

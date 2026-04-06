@@ -1,6 +1,6 @@
-// EditCustomProductDialog: Eigenes Produkt bearbeiten (Name, Typ, Preis, Warengruppe)
+// EditCustomProductDialog: Eigenes Produkt bearbeiten (Name, Typ, Preis, Warengruppe) – Obst/Gemüse; Felder je Layout
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useUpdateCustomProduct } from '@/hooks/useCustomProducts'
+import { useLayoutSettings } from '@/hooks/useLayoutSettings'
+import {
+  obstCustomProductShowBlockField,
+  obstCustomProductShowItemTypeField,
+} from '@/lib/obst-custom-product-layout'
 import type { Block } from '@/types/database'
 import type { CustomProduct } from '@/types/database'
 
@@ -30,12 +35,20 @@ interface EditCustomProductDialogProps {
   blocks: Block[]
 }
 
-export function EditCustomProductDialog({
-  open,
-  onOpenChange,
+/** Nur bei open gemountet + key=product.id → Formularwerte aus product ohne setState im Effect. */
+function EditCustomProductDialogBody({
   product,
   blocks,
-}: EditCustomProductDialogProps) {
+  onOpenChange,
+  showItemTypeField,
+  showBlockField,
+}: {
+  product: CustomProduct
+  blocks: Block[]
+  onOpenChange: (open: boolean) => void
+  showItemTypeField: boolean
+  showBlockField: boolean
+}) {
   const updateProduct = useUpdateCustomProduct()
 
   const [name, setName] = useState(product.name)
@@ -55,27 +68,38 @@ export function EditCustomProductDialog({
       await updateProduct.mutateAsync({
         id: product.id,
         name: name.trim(),
-        item_type: itemType,
+        item_type: showItemTypeField ? itemType : product.item_type,
         preis: preisToSave,
-        block_id: blockId || null,
+        block_id: showBlockField ? blockId || null : product.block_id,
       })
       onOpenChange(false)
     } catch {
       // Fehler wird im Hook per Toast angezeigt
     }
-  }, [product.id, name, itemType, preisNum, blockId, updateProduct, onOpenChange])
+  }, [
+    product.id,
+    product.item_type,
+    product.block_id,
+    name,
+    showItemTypeField,
+    showBlockField,
+    itemType,
+    preisNum,
+    blockId,
+    updateProduct,
+    onOpenChange,
+  ])
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Eigenes Produkt bearbeiten</DialogTitle>
-          <DialogDescription>
-            Name, Typ, Preis und Warengruppe anpassen. PLU kann nicht geändert werden.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <DialogHeader>
+        <DialogTitle>Eigenes Produkt bearbeiten</DialogTitle>
+        <DialogDescription>
+          Name und Preis anpassen; weitere Felder je nach Layout-Einstellung. PLU kann nicht geändert werden.
+        </DialogDescription>
+      </DialogHeader>
 
-        <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
+      <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
         <div className="space-y-4 py-4">
           <div className="rounded-md bg-muted px-3 py-2 text-sm font-mono text-muted-foreground">
             PLU: {product.plu.startsWith('price-') ? 'Preis-only' : product.plu}
@@ -91,18 +115,20 @@ export function EditCustomProductDialog({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Typ</Label>
-            <Select value={itemType} onValueChange={(v) => setItemType(v as 'PIECE' | 'WEIGHT')}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="PIECE">Stück</SelectItem>
-                <SelectItem value="WEIGHT">Gewicht</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {showItemTypeField && (
+            <div className="space-y-2">
+              <Label>Typ</Label>
+              <Select value={itemType} onValueChange={(v) => setItemType(v as 'PIECE' | 'WEIGHT')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PIECE">Stück</SelectItem>
+                  <SelectItem value="WEIGHT">Gewicht</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="edit-preis">Preis (EUR)</Label>
@@ -116,24 +142,26 @@ export function EditCustomProductDialog({
             {!isValidPreis && <p className="text-sm text-destructive">Ungültiger Preis</p>}
           </div>
 
-          <div className="space-y-2">
-            <Label>Warengruppe</Label>
-            <Select value={blockId || '__none__'} onValueChange={(v) => setBlockId(v === '__none__' ? '' : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Keine Zuordnung" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Keine Zuordnung</SelectItem>
-                {blocks
-                  .sort((a, b) => a.order_index - b.order_index)
-                  .map((block) => (
-                    <SelectItem key={block.id} value={block.id}>
-                      {block.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {showBlockField && (
+            <div className="space-y-2">
+              <Label>Warengruppe</Label>
+              <Select value={blockId || '__none__'} onValueChange={(v) => setBlockId(v === '__none__' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Keine Zuordnung" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Keine Zuordnung</SelectItem>
+                  {blocks
+                    .sort((a, b) => a.order_index - b.order_index)
+                    .map((block) => (
+                      <SelectItem key={block.id} value={block.id}>
+                        {block.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
@@ -151,7 +179,40 @@ export function EditCustomProductDialog({
             {updateProduct.isPending ? 'Wird gespeichert...' : 'Speichern'}
           </Button>
         </DialogFooter>
-        </form>
+      </form>
+    </>
+  )
+}
+
+export function EditCustomProductDialog({
+  open,
+  onOpenChange,
+  product,
+  blocks,
+}: EditCustomProductDialogProps) {
+  const { data: layoutSettings } = useLayoutSettings()
+  const showItemTypeField = useMemo(
+    () => obstCustomProductShowItemTypeField(layoutSettings),
+    [layoutSettings],
+  )
+  const showBlockField = useMemo(
+    () => obstCustomProductShowBlockField(layoutSettings),
+    [layoutSettings],
+  )
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        {open ? (
+          <EditCustomProductDialogBody
+            key={product.id}
+            product={product}
+            blocks={blocks}
+            onOpenChange={onOpenChange}
+            showItemTypeField={showItemTypeField}
+            showBlockField={showBlockField}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   )

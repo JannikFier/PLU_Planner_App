@@ -20,6 +20,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 import { useBackshopLayoutSettings, useUpdateBackshopLayoutSettings } from '@/hooks/useBackshopLayoutSettings'
 import { BackshopLayoutPreview } from '@/components/plu/BackshopLayoutPreview'
+import {
+  clampUnifiedBodyPx,
+  LAYOUT_FONT_LABELS,
+  LAYOUT_UNIFIED_BODY_MAX_PX,
+  LAYOUT_UNIFIED_BODY_MIN_PX,
+} from '@/lib/layout-font-settings-ui'
 
 export function BackshopLayoutSettingsPage() {
   const { data: settings, isLoading } = useBackshopLayoutSettings()
@@ -48,13 +54,20 @@ export function BackshopLayoutSettingsPage() {
 
   useEffect(() => {
     if (settings) {
+      const flow = settings.flow_direction
+      let col = settings.font_column_px
+      let prod = settings.font_product_px
+      if (flow === 'COLUMN_FIRST') {
+        prod = clampUnifiedBodyPx(prod)
+        col = prod
+      }
       setForm({
         sort_mode: settings.sort_mode,
         display_mode: settings.display_mode,
-        flow_direction: settings.flow_direction,
+        flow_direction: flow,
         font_header_px: settings.font_header_px,
-        font_column_px: settings.font_column_px,
-        font_product_px: settings.font_product_px,
+        font_column_px: col,
+        font_product_px: prod,
         mark_red_kw_count: settings.mark_red_kw_count,
         mark_yellow_kw_count: settings.mark_yellow_kw_count,
         features_custom_products: settings.features_custom_products,
@@ -190,7 +203,14 @@ export function BackshopLayoutSettingsPage() {
               />
               <RadioCard
                 selected={form.flow_direction === 'COLUMN_FIRST'}
-                onClick={() => updateForm({ flow_direction: 'COLUMN_FIRST' })}
+                onClick={() => {
+                  const u = clampUnifiedBodyPx(form.font_product_px)
+                  updateForm({
+                    flow_direction: 'COLUMN_FIRST',
+                    font_column_px: u,
+                    font_product_px: u,
+                  })
+                }}
                 title="Spaltenweise"
                 description="Linke Spalte zuerst, dann rechte"
               />
@@ -225,61 +245,100 @@ export function BackshopLayoutSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Schriftgrößen</CardTitle>
-              <CardDescription>Größen in Pixel für Tabelle und PDF.</CardDescription>
+              <CardDescription>
+                Größen in Pixel für Tabelle und PDF.
+                {form.flow_direction === 'COLUMN_FIRST' && (
+                  <span className="mt-1 block text-foreground/90">
+                    Bei <strong>Spaltenweise</strong> steuert ein Wert die Schrift für Spaltenköpfe, Gruppen und
+                    Produktzeilen gemeinsam (bessere Ausrichtung in Tabelle und PDF).
+                  </span>
+                )}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-4">
+              <div
+                className={
+                  form.flow_direction === 'COLUMN_FIRST'
+                    ? 'grid grid-cols-1 gap-4 sm:grid-cols-2'
+                    : 'grid grid-cols-1 gap-4 sm:grid-cols-3'
+                }
+              >
                 <div className="space-y-2">
-                  <Label>Header (px)</Label>
+                  <Label>{LAYOUT_FONT_LABELS.listenHeader}</Label>
                   <Input
                     type="number"
                     min={10}
                     max={48}
                     value={form.font_header_px}
                     onChange={(e) => {
-                      const v = parseInt(e.target.value)
+                      const v = parseInt(e.target.value, 10)
                       if (!isNaN(v) && v > 0) updateForm({ font_header_px: v })
                     }}
                     onBlur={(e) => {
-                      const v = parseInt(e.target.value)
+                      const v = parseInt(e.target.value, 10)
                       if (isNaN(v) || v < 10) updateForm({ font_header_px: 32 })
                     }}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Spalte (px)</Label>
-                  <Input
-                    type="number"
-                    min={8}
-                    max={36}
-                    value={form.font_column_px}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value)
-                      if (!isNaN(v) && v > 0) updateForm({ font_column_px: v })
-                    }}
-                    onBlur={(e) => {
-                      const v = parseInt(e.target.value)
-                      if (isNaN(v) || v < 8) updateForm({ font_column_px: 18 })
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Produkt (px)</Label>
-                  <Input
-                    type="number"
-                    min={6}
-                    max={24}
-                    value={form.font_product_px}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value)
-                      if (!isNaN(v) && v > 0) updateForm({ font_product_px: v })
-                    }}
-                    onBlur={(e) => {
-                      const v = parseInt(e.target.value)
-                      if (isNaN(v) || v < 6) updateForm({ font_product_px: 18 })
-                    }}
-                  />
-                </div>
+                {form.flow_direction === 'COLUMN_FIRST' ? (
+                  <div className="space-y-2">
+                    <Label>{LAYOUT_FONT_LABELS.unifiedBody}</Label>
+                    <Input
+                      type="number"
+                      min={LAYOUT_UNIFIED_BODY_MIN_PX}
+                      max={LAYOUT_UNIFIED_BODY_MAX_PX}
+                      value={form.font_product_px}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10)
+                        if (!isNaN(v) && v > 0) {
+                          const n = clampUnifiedBodyPx(v)
+                          updateForm({ font_column_px: n, font_product_px: n })
+                        }
+                      }}
+                      onBlur={() => {
+                        const n = clampUnifiedBodyPx(form.font_product_px)
+                        updateForm({ font_column_px: n, font_product_px: n })
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label>{LAYOUT_FONT_LABELS.columnAndGroups}</Label>
+                      <Input
+                        type="number"
+                        min={8}
+                        max={36}
+                        value={form.font_column_px}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10)
+                          if (!isNaN(v) && v > 0) updateForm({ font_column_px: v })
+                        }}
+                        onBlur={(e) => {
+                          const v = parseInt(e.target.value, 10)
+                          if (isNaN(v) || v < 8) updateForm({ font_column_px: 18 })
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{LAYOUT_FONT_LABELS.productRows}</Label>
+                      <Input
+                        type="number"
+                        min={6}
+                        max={24}
+                        value={form.font_product_px}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10)
+                          if (!isNaN(v) && v > 0) updateForm({ font_product_px: v })
+                        }}
+                        onBlur={(e) => {
+                          const v = parseInt(e.target.value, 10)
+                          if (isNaN(v) || v < 6) updateForm({ font_product_px: 18 })
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>

@@ -104,10 +104,10 @@ export function HiddenProductsPage() {
     [currentKw, currentJahr, obstCampaign, obstStoreDisabled, offerItems, obstLocalOverrides],
   )
 
-  const centralCampaignPluSet = useMemo(
-    () => new Set((obstCampaign?.lines ?? []).map((l) => l.plu)),
-    [obstCampaign],
-  )
+  const centralCampaignPluSet = useMemo(() => {
+    if (obstCampaign?.allCentralPluUnion?.length) return new Set(obstCampaign.allCentralPluUnion)
+    return new Set((obstCampaign?.lines ?? []).map((l) => l.plu))
+  }, [obstCampaign])
 
   const canonicalListOrderPlu = useMemo(() => {
     const activeRegeln = regeln
@@ -159,6 +159,12 @@ export function HiddenProductsPage() {
   ])
 
   const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
+  const flowDirection = (layoutSettings?.flow_direction ?? 'COLUMN_FIRST') as 'ROW_BY_ROW' | 'COLUMN_FIRST'
+  const dialogFontSizes = {
+    header: layoutSettings?.font_header_px ?? 24,
+    column: layoutSettings?.font_column_px ?? 16,
+    product: layoutSettings?.font_product_px ?? 12,
+  }
   const hiddenPLUSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
   const searchableItems = useMemo(() => {
     const master = masterItems
@@ -357,6 +363,8 @@ export function HiddenProductsPage() {
             searchableItems={searchableItems}
             displayMode={displayMode}
             listLayout={hideDialogListLayout}
+            flowDirection={flowDirection}
+            fontSizes={dialogFontSizes}
           />
         )}
 

@@ -53,6 +53,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ObstCustomProductsList } from '@/components/plu/ObstCustomProductsList'
+import {
+  obstCustomProductExcelImportHint,
+  obstCustomProductItemTypeFromExcelRow,
+  obstCustomProductShowBlockField,
+  obstCustomProductShowItemTypeField,
+} from '@/lib/obst-custom-product-layout'
 import { parseBlockNameToItemType } from '@/lib/plu-helpers'
 
 export function CustomProductsPage() {
@@ -81,6 +87,11 @@ export function CustomProductsPage() {
   const unhideProduct = useUnhideProduct()
 
   const sortMode = layoutSettings?.sort_mode ?? 'ALPHABETICAL'
+  const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
+  const featuresBlocks = layoutSettings?.features_blocks ?? true
+  const featuresCustomProducts = layoutSettings?.features_custom_products ?? true
+  const showItemTypeField = obstCustomProductShowItemTypeField(layoutSettings)
+  const showBlockField = obstCustomProductShowBlockField(layoutSettings)
   const sortedBlocks = useMemo(() => [...blocks].sort((a, b) => a.order_index - b.order_index), [blocks])
 
   const hasAnyPrice = useMemo(
@@ -131,13 +142,13 @@ export function CustomProductsPage() {
   )
 
   const resolveItemTypeForRow = useCallback(
-    (row: ParsedCustomProductRow, index: number): 'PIECE' | 'WEIGHT' => {
-      const override = excelOverrides[index]?.item_type
-      if (override) return override
-      const parsed = parseBlockNameToItemType(row.blockNameOrType)
-      return parsed ?? 'PIECE'
-    },
-    [excelOverrides],
+    (row: ParsedCustomProductRow, index: number): 'PIECE' | 'WEIGHT' =>
+      obstCustomProductItemTypeFromExcelRow(row, {
+        showItemType: showItemTypeField,
+        showBlock: showBlockField,
+        override: excelOverrides[index]?.item_type ?? null,
+      }),
+    [excelOverrides, showItemTypeField, showBlockField],
   )
 
   const excelAddPreview = useMemo(() => {
@@ -168,14 +179,16 @@ export function CustomProductsPage() {
         skipped++
         continue
       }
-      const item_type = sortMode === 'BY_BLOCK' ? 'PIECE' : resolveItemTypeForRow(row, i)
-      const block_id = sortMode === 'BY_BLOCK' ? resolveBlockIdForRow(row, i) ?? sortedBlocks[0]?.id ?? null : excelOverrides[i]?.block_id ?? null
+      const item_type = resolveItemTypeForRow(row, i)
+      const block_id = showBlockField
+        ? resolveBlockIdForRow(row, i) ?? sortedBlocks[0]?.id ?? null
+        : null
       products.push({
         plu,
         name: row.name,
         item_type,
         preis: row.preis ?? null,
-        block_id: sortMode === 'BY_BLOCK' ? block_id ?? undefined : block_id ?? undefined,
+        block_id: block_id ?? undefined,
       })
     }
     if (products.length === 0) {
@@ -190,11 +203,40 @@ export function CustomProductsPage() {
     } catch {
       // Fehler wird im Hook per Toast angezeigt
     }
-  }, [excelParseResult, existingPLUs, sortMode, resolveItemTypeForRow, resolveBlockIdForRow, excelOverrides, addBatch, sortedBlocks])
+  }, [
+    excelParseResult,
+    existingPLUs,
+    resolveItemTypeForRow,
+    resolveBlockIdForRow,
+    addBatch,
+    sortedBlocks,
+    showBlockField,
+  ])
+
+  if (!featuresCustomProducts && !isSuperAdmin) {
+    return (
+      <DashboardLayout>
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-sm text-muted-foreground">
+              Eigene Produkte sind für diesen Markt in der Layout-Konfiguration deaktiviert. Bitte wende dich an eine
+              Administratorin oder einen Administrator.
+            </p>
+          </CardContent>
+        </Card>
+      </DashboardLayout>
+    )
+  }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {!featuresCustomProducts && isSuperAdmin && (
+          <p className="text-sm rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
+            Hinweis: „Eigene Produkte“ ist für User dieses Marktes ausgeschaltet; du siehst die Verwaltung als
+            Super-Admin.
+          </p>
+        )}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="rounded-lg p-2 bg-muted">
@@ -257,7 +299,9 @@ export function CustomProductsPage() {
                 blocks={blocks}
                 context="full"
                 currentUserId={currentUserId}
+                displayMode={displayMode}
                 sortMode={sortMode}
+                featuresBlocks={featuresBlocks}
                 hasAnyPrice={hasAnyPrice}
                 isHidden={(plu) => hiddenItems.some((h) => h.plu === plu)}
                 onEdit={(cp) => setEditingProduct(cp)}
@@ -329,7 +373,7 @@ export function CustomProductsPage() {
                 <p className="text-sm text-muted-foreground">
                   {excelParseResult.fileName}: {excelParseResult.totalRows} Zeile(n) gelesen
                   {excelParseResult.skippedRows > 0 && `, ${excelParseResult.skippedRows} beim Einlesen übersprungen`}.
-                  {sortMode === 'BY_BLOCK' ? ' Spalte 3 = Warengruppe.' : ' Spalte 3 = Stück/Gewicht.'}
+                  {obstCustomProductExcelImportHint(layoutSettings)}
                 </p>
                 {excelAddPreview.willSkip > 0 && (
                   <ExcelPreviewBox variant={excelAddPreview.willAdd === 0 ? 'error' : 'warning'}>
@@ -343,14 +387,25 @@ export function CustomProductsPage() {
                       <tr className="border-b border-border">
                         <th className="px-3 py-2 text-left font-semibold w-[100px]">PLU / Preis</th>
                         <th className="px-3 py-2 text-left font-semibold">Name</th>
-                        <th className="px-3 py-2 text-left font-semibold w-[140px]">{sortMode === 'BY_BLOCK' ? 'Warengruppe' : 'Typ'}</th>
+                        {showBlockField && (
+                          <th className="px-3 py-2 text-left font-semibold w-[140px]">Warengruppe</th>
+                        )}
+                        {showItemTypeField && (
+                          <th className="px-3 py-2 text-left font-semibold w-[120px]">Typ</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
                       {excelParseResult.rows.map((row, i) => {
-                        const blockId = sortMode === 'BY_BLOCK' ? resolveBlockIdForRow(row, i) : null
-                        const itemType = sortMode === 'ALPHABETICAL' ? resolveItemTypeForRow(row, i) : null
-                        const needsBlock = sortMode === 'BY_BLOCK' && !blockId && !row.blockNameOrType?.trim()
+                        const blockId = showBlockField ? resolveBlockIdForRow(row, i) : null
+                        const itemTypeResolved = showItemTypeField ? resolveItemTypeForRow(row, i) : null
+                        const needsBlock = showBlockField && !blockId && !row.blockNameOrType?.trim()
+                        const needsType =
+                          showItemTypeField &&
+                          !excelOverrides[i]?.item_type &&
+                          (showBlockField
+                            ? !parseBlockNameToItemType(row.typColumn ?? null)
+                            : !parseBlockNameToItemType(row.blockNameOrType))
                         const isDuplicate = excelAddPreview.skipIndices.has(i)
                         return (
                           <tr key={i} className={isDuplicate ? 'border-b border-border bg-amber-50/50' : 'border-b border-border'}>
@@ -359,8 +414,8 @@ export function CustomProductsPage() {
                               {isDuplicate && <Badge variant="secondary" className="ml-2 text-xs bg-amber-200 text-amber-900">PLU bereits vergeben</Badge>}
                             </td>
                             <td className="px-3 py-2">{row.name}</td>
-                            <td className="px-3 py-2">
-                              {sortMode === 'BY_BLOCK' ? (
+                            {showBlockField && (
+                              <td className="px-3 py-2">
                                 <Select value={blockId ?? excelOverrides[i]?.block_id ?? ''} onValueChange={(v) => setExcelOverride(i, 'block_id', v || null)}>
                                   <SelectTrigger className="h-8 w-full">
                                     <SelectValue placeholder={needsBlock ? 'Warengruppe wählen' : '–'} />
@@ -371,8 +426,17 @@ export function CustomProductsPage() {
                                     ))}
                                   </SelectContent>
                                 </Select>
-                              ) : (
-                                <Select value={itemType ?? excelOverrides[i]?.item_type ?? ''} onValueChange={(v) => setExcelOverride(i, 'item_type', v as 'PIECE' | 'WEIGHT')}>
+                              </td>
+                            )}
+                            {showItemTypeField && (
+                              <td className="px-3 py-2">
+                                {needsType && (
+                                  <Badge variant="secondary" className="mr-1 text-xs">Typ fehlt</Badge>
+                                )}
+                                <Select
+                                  value={(excelOverrides[i]?.item_type ?? itemTypeResolved) || ''}
+                                  onValueChange={(v) => setExcelOverride(i, 'item_type', v as 'PIECE' | 'WEIGHT')}
+                                >
                                   <SelectTrigger className="h-8 w-full">
                                     <SelectValue placeholder="Typ wählen" />
                                   </SelectTrigger>
@@ -381,8 +445,8 @@ export function CustomProductsPage() {
                                     <SelectItem value="WEIGHT">Gewicht</SelectItem>
                                   </SelectContent>
                                 </Select>
-                              )}
-                            </td>
+                              </td>
+                            )}
                           </tr>
                         )
                       })}

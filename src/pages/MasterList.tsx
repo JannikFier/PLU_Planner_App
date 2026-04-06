@@ -20,6 +20,7 @@ import {
   Pencil,
   Megaphone,
   Search,
+  LayoutGrid,
 } from 'lucide-react'
 
 // PLU-Komponenten
@@ -85,6 +86,7 @@ export function MasterList({ mode }: MasterListProps) {
   const { data: activeVersion, isLoading: versionLoading } = useActiveVersion()
   const { data: versions = [], isLoading: versionsLoading } = useVersions()
   const { data: layoutSettings } = useLayoutSettings()
+  const featuresCustomProducts = layoutSettings?.features_custom_products ?? true
   const { data: blocks = [] } = useBlocks()
   const { data: customProducts = [] } = useCustomProducts()
   const { data: hiddenItems = [] } = useHiddenItems()
@@ -107,9 +109,10 @@ export function MasterList({ mode }: MasterListProps) {
     [hiddenItems],
   )
   const effectiveHiddenPLUs = useMemo(
-    () => effectiveHiddenPluSet(rawHiddenPluSet, obstCampaign?.lines),
-    [rawHiddenPluSet, obstCampaign?.lines],
+    () => effectiveHiddenPluSet(rawHiddenPluSet, obstCampaign),
+    [rawHiddenPluSet, obstCampaign],
   )
+
   const offerDisplayByPlu = useMemo(
     () =>
       buildOfferDisplayMap(
@@ -290,12 +293,14 @@ export function MasterList({ mode }: MasterListProps) {
         separatorAfter: true,
       })
     }
-    items.push(
-      {
+    if (featuresCustomProducts) {
+      items.push({
         label: 'Eigene Produkte',
         icon: <Plus className="h-4 w-4" />,
         onClick: nav('/custom-products'),
-      },
+      })
+    }
+    items.push(
       {
         label: 'Ausgeblendete',
         icon: <EyeOff className="h-4 w-4" />,
@@ -311,14 +316,21 @@ export function MasterList({ mode }: MasterListProps) {
         icon: <Pencil className="h-4 w-4" />,
         onClick: nav('/renamed-products'),
       },
-      {
-        label: 'PDF exportieren',
-        icon: <FileDown className="h-4 w-4" />,
-        onClick: () => setShowPDFDialog(true),
-      },
     )
+    if (mode === 'admin' && sortMode === 'BY_BLOCK') {
+      items.push({
+        label: 'Warengruppen',
+        icon: <LayoutGrid className="h-4 w-4" />,
+        onClick: nav('/obst-warengruppen'),
+      })
+    }
+    items.push({
+      label: 'PDF exportieren',
+      icon: <FileDown className="h-4 w-4" />,
+      onClick: () => setShowPDFDialog(true),
+    })
     return items
-  }, [mode, location.pathname, location.search, rolePrefix, navigate])
+  }, [mode, location.pathname, location.search, rolePrefix, navigate, featuresCustomProducts, sortMode])
 
   return (
     <DashboardLayout>
@@ -384,10 +396,14 @@ export function MasterList({ mode }: MasterListProps) {
             >
               <Search className="h-4 w-4" />
             </Button>
-            {/* Anzeige-Infos: links (Nach Typ getrennt, KW, Aktiv) */}
+            {/* Anzeige-Infos: Sortierung, Darstellung (Stück/Gewicht), KW, Aktiv */}
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground sm:flex-initial sm:max-w-none">
               <ListFilter className="h-4 w-4 shrink-0" />
-              <span>
+              <span title="Layout-Sortierung">
+                {sortMode === 'BY_BLOCK' ? 'Nach Warengruppen' : 'Alphabetisch (A–Z)'}
+              </span>
+              <span className="text-border">|</span>
+              <span title="Layout-Anzeige Stück/Gewicht">
                 {displayMode === 'MIXED'
                   ? 'Stück + Gewicht gemischt'
                   : 'Nach Typ getrennt'}
@@ -410,6 +426,7 @@ export function MasterList({ mode }: MasterListProps) {
             <div className="hidden sm:flex sm:flex-wrap items-center gap-2">
               {mode !== 'viewer' && (
                 <>
+                  {featuresCustomProducts && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -421,6 +438,7 @@ export function MasterList({ mode }: MasterListProps) {
                     <Plus className="h-4 w-4 mr-1" />
                     Eigene Produkte
                   </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -456,6 +474,21 @@ export function MasterList({ mode }: MasterListProps) {
                 >
                   <Pencil className="h-4 w-4 mr-1" />
                   Umbenennen
+                </Button>
+              )}
+              {mode === 'admin' && sortMode === 'BY_BLOCK' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const backTo = location.pathname + location.search
+                    navigate(`${rolePrefix}/obst-warengruppen?backTo=${encodeURIComponent(backTo)}`, {
+                      state: { backTo },
+                    })
+                  }}
+                >
+                  <LayoutGrid className="h-4 w-4 mr-1" />
+                  Warengruppen
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={() => setShowPDFDialog(true)}>

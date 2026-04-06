@@ -47,6 +47,12 @@ import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
 import { canManageMarketHiddenItems } from '@/lib/permissions'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { EXCEL_READ_ERROR_FALLBACK, formatError } from '@/lib/error-messages'
+import {
+  obstCustomProductExcelImportHint,
+  obstCustomProductItemTypeFromExcelRow,
+  obstCustomProductShowBlockField,
+  obstCustomProductShowItemTypeField,
+} from '@/lib/obst-custom-product-layout'
 import { formatPreisEur, generatePriceOnlyPlu, getDisplayPlu, parseBlockNameToItemType } from '@/lib/plu-helpers'
 import { parseCustomProductsExcel, parseHiddenItemsExcel } from '@/lib/excel-parser'
 import { supabase } from '@/lib/supabase'
@@ -125,6 +131,11 @@ export function HiddenItems() {
   const hideProduct = useHideProduct()
   const sortMode = layoutSettings?.sort_mode ?? 'ALPHABETICAL'
   const sortedBlocks = useMemo(() => [...blocks].sort((a, b) => a.order_index - b.order_index), [blocks])
+  const featuresBlocks = layoutSettings?.features_blocks ?? true
+  const featuresCustomProducts = layoutSettings?.features_custom_products ?? true
+  const canUseCustomProducts = featuresCustomProducts || isSuperAdmin
+  const showItemTypeField = obstCustomProductShowItemTypeField(layoutSettings)
+  const showBlockField = obstCustomProductShowBlockField(layoutSettings)
 
   const hasAnyPriceCustom = useMemo(
     () => customProducts.some((c) => c.preis != null),
@@ -137,14 +148,20 @@ export function HiddenItems() {
     [masterItems, customProducts],
   )
 
-  const centralCampaignPluSet = useMemo(
-    () => new Set((obstCampaign?.lines ?? []).map((l) => l.plu)),
-    [obstCampaign],
-  )
+  const centralCampaignPluSet = useMemo(() => {
+    if (obstCampaign?.allCentralPluUnion?.length) return new Set(obstCampaign.allCentralPluUnion)
+    return new Set((obstCampaign?.lines ?? []).map((l) => l.plu))
+  }, [obstCampaign])
 
   // Suchbare Items: Master + Custom, noch nicht ausgeblendet
   const hiddenPLUSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
   const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
+  const flowDirection = (layoutSettings?.flow_direction ?? 'COLUMN_FIRST') as 'ROW_BY_ROW' | 'COLUMN_FIRST'
+  const dialogFontSizes = {
+    header: layoutSettings?.font_header_px ?? 24,
+    column: layoutSettings?.font_column_px ?? 16,
+    product: layoutSettings?.font_product_px ?? 12,
+  }
   const searchableItems = useMemo(() => {
     const master = masterItems
       .filter((m) => !hiddenPLUSet.has(m.plu))
@@ -352,13 +369,13 @@ export function HiddenItems() {
   )
 
   const resolveItemTypeForRow = useCallback(
-    (row: ParsedCustomProductRow, index: number): 'PIECE' | 'WEIGHT' => {
-      const override = excelOverrides[index]?.item_type
-      if (override) return override
-      const parsed = parseBlockNameToItemType(row.blockNameOrType)
-      return parsed ?? 'PIECE'
-    },
-    [excelOverrides],
+    (row: ParsedCustomProductRow, index: number): 'PIECE' | 'WEIGHT' =>
+      obstCustomProductItemTypeFromExcelRow(row, {
+        showItemType: showItemTypeField,
+        showBlock: showBlockField,
+        override: excelOverrides[index]?.item_type ?? null,
+      }),
+    [excelOverrides, showItemTypeField, showBlockField],
   )
 
   const handleExcelAddAll = useCallback(async () => {
@@ -372,17 +389,16 @@ export function HiddenItems() {
         skipped++
         continue
       }
-      const item_type = sortMode === 'BY_BLOCK' ? 'PIECE' : resolveItemTypeForRow(row, i)
-      const block_id =
-        sortMode === 'BY_BLOCK'
-          ? resolveBlockIdForRow(row, i) ?? sortedBlocks[0]?.id ?? null
-          : excelOverrides[i]?.block_id ?? null
+      const item_type = resolveItemTypeForRow(row, i)
+      const block_id = showBlockField
+        ? resolveBlockIdForRow(row, i) ?? sortedBlocks[0]?.id ?? null
+        : null
       products.push({
         plu,
         name: row.name,
         item_type,
         preis: row.preis ?? null,
-        block_id: sortMode === 'BY_BLOCK' ? block_id ?? undefined : block_id ?? undefined,
+        block_id: block_id ?? undefined,
       })
     }
     if (products.length === 0) {
@@ -397,7 +413,15 @@ export function HiddenItems() {
     } catch {
       // Fehler wird im Hook per Toast angezeigt
     }
-  }, [excelParseResult, existingPLUs, sortMode, resolveItemTypeForRow, resolveBlockIdForRow, excelOverrides, addBatch, sortedBlocks])
+  }, [
+    excelParseResult,
+    existingPLUs,
+    resolveItemTypeForRow,
+    resolveBlockIdForRow,
+    addBatch,
+    sortedBlocks,
+    showBlockField,
+  ])
 
   const closeExcelDialog = useCallback(() => {
     setExcelParseResult(null)
@@ -466,8 +490,23 @@ export function HiddenItems() {
         </div>
 
         {/* === Sektion 1: Eigene Produkte === */}
+        {!canUseCustomProducts ? (
+          <Card>
+            <CardContent className="p-4">
+              <h3 className="text-lg font-semibold mb-2">Eigene Produkte</h3>
+              <p className="text-sm text-muted-foreground">
+                Eigene Produkte sind für diesen Markt in der Layout-Konfiguration deaktiviert.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
         <Card>
           <CardContent className="p-4">
+            {!featuresCustomProducts && isSuperAdmin && (
+              <p className="text-sm rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900 mb-4">
+                Hinweis: „Eigene Produkte“ ist für User ausgeschaltet; du siehst die Verwaltung als Super-Admin.
+              </p>
+            )}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <h3 className="text-lg font-semibold">Eigene Produkte</h3>
               <div className="flex flex-wrap gap-2">
@@ -525,7 +564,9 @@ export function HiddenItems() {
                 blocks={blocks}
                 context="hidden-items"
                 currentUserId={currentUserId}
+                displayMode={displayMode}
                 sortMode={sortMode}
+                featuresBlocks={featuresBlocks}
                 hasAnyPrice={hasAnyPriceCustom}
                 isHidden={() => false}
                 onDelete={(cp) => setProductToDelete(cp)}
@@ -538,6 +579,7 @@ export function HiddenItems() {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* === Sektion 2: Ausgeblendete Produkte === */}
         <div className="flex flex-col gap-4 mt-8">
@@ -654,6 +696,8 @@ export function HiddenItems() {
             searchableItems={searchableItems}
             displayMode={displayMode}
             listLayout={hideDialogListLayout}
+            flowDirection={flowDirection}
+            fontSizes={dialogFontSizes}
           />
         )}
 
@@ -700,7 +744,7 @@ export function HiddenItems() {
                 <p className="text-sm text-muted-foreground">
                   {excelParseResult.fileName}: {excelParseResult.totalRows} Zeile(n) gelesen
                   {excelParseResult.skippedRows > 0 && `, ${excelParseResult.skippedRows} beim Einlesen übersprungen`}.
-                  {sortMode === 'BY_BLOCK' ? ' Spalte 3 = Warengruppe.' : ' Spalte 3 = Stück/Gewicht.'}
+                  {obstCustomProductExcelImportHint(layoutSettings)}
                 </p>
                 {excelAddPreview && excelAddPreview.willSkip > 0 && (
                   <ExcelPreviewBox variant={excelAddPreview.willAdd === 0 ? 'error' : 'warning'}>
@@ -718,17 +762,25 @@ export function HiddenItems() {
                       <tr className="border-b border-border">
                         <th className="px-3 py-2 text-left font-semibold w-[100px]">PLU / Preis</th>
                         <th className="px-3 py-2 text-left font-semibold">Name</th>
-                        <th className="px-3 py-2 text-left font-semibold w-[140px]">
-                          {sortMode === 'BY_BLOCK' ? 'Warengruppe' : 'Typ'}
-                        </th>
+                        {showBlockField && (
+                          <th className="px-3 py-2 text-left font-semibold w-[140px]">Warengruppe</th>
+                        )}
+                        {showItemTypeField && (
+                          <th className="px-3 py-2 text-left font-semibold w-[120px]">Typ</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
                       {excelParseResult.rows.map((row, i) => {
-                        const blockId = sortMode === 'BY_BLOCK' ? resolveBlockIdForRow(row, i) : null
-                        const itemType = sortMode === 'ALPHABETICAL' ? resolveItemTypeForRow(row, i) : null
-                        const needsBlock = sortMode === 'BY_BLOCK' && !blockId && !row.blockNameOrType?.trim()
-                        const needsType = sortMode === 'ALPHABETICAL' && !parseBlockNameToItemType(row.blockNameOrType)
+                        const blockId = showBlockField ? resolveBlockIdForRow(row, i) : null
+                        const itemTypeResolved = showItemTypeField ? resolveItemTypeForRow(row, i) : null
+                        const needsBlock = showBlockField && !blockId && !row.blockNameOrType?.trim()
+                        const needsType =
+                          showItemTypeField &&
+                          !excelOverrides[i]?.item_type &&
+                          (showBlockField
+                            ? !parseBlockNameToItemType(row.typColumn ?? null)
+                            : !parseBlockNameToItemType(row.blockNameOrType))
                         const isDuplicate = excelAddPreview?.skipIndices.has(i)
                         return (
                           <tr key={i} className={isDuplicate ? 'border-b border-border bg-amber-50/50' : 'border-b border-border'}>
@@ -741,52 +793,51 @@ export function HiddenItems() {
                               )}
                             </td>
                             <td className="px-3 py-2">{row.name}</td>
-                            <td className="px-3 py-2">
-                              {sortMode === 'BY_BLOCK' ? (
-                                <>
-                                  {row.blockNameOrType && !blockId && (
-                                    <Badge variant="secondary" className="mr-1 text-xs">
-                                      Unbekannt
-                                    </Badge>
-                                  )}
-                                  <Select
-                                    value={blockId ?? excelOverrides[i]?.block_id ?? ''}
-                                    onValueChange={(v) => setExcelOverride(i, 'block_id', v || null)}
-                                  >
-                                    <SelectTrigger className="h-8 w-full">
-                                      <SelectValue placeholder={needsBlock ? 'Warengruppe wählen' : '–'} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {sortedBlocks.map((b) => (
-                                        <SelectItem key={b.id} value={b.id}>
-                                          {b.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </>
-                              ) : (
-                                <>
-                                  {needsType && (
-                                    <Badge variant="secondary" className="mr-1 text-xs">
-                                      Typ fehlt
-                                    </Badge>
-                                  )}
-                                  <Select
-                                    value={itemType ?? excelOverrides[i]?.item_type ?? ''}
-                                    onValueChange={(v) => setExcelOverride(i, 'item_type', v as 'PIECE' | 'WEIGHT')}
-                                  >
-                                    <SelectTrigger className="h-8 w-full">
-                                      <SelectValue placeholder="Typ wählen" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="PIECE">Stück</SelectItem>
-                                      <SelectItem value="WEIGHT">Gewicht</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </>
-                              )}
-                            </td>
+                            {showBlockField && (
+                              <td className="px-3 py-2">
+                                {row.blockNameOrType && !blockId && (
+                                  <Badge variant="secondary" className="mr-1 text-xs">
+                                    Unbekannt
+                                  </Badge>
+                                )}
+                                <Select
+                                  value={blockId ?? excelOverrides[i]?.block_id ?? ''}
+                                  onValueChange={(v) => setExcelOverride(i, 'block_id', v || null)}
+                                >
+                                  <SelectTrigger className="h-8 w-full">
+                                    <SelectValue placeholder={needsBlock ? 'Warengruppe wählen' : '–'} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {sortedBlocks.map((b) => (
+                                      <SelectItem key={b.id} value={b.id}>
+                                        {b.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </td>
+                            )}
+                            {showItemTypeField && (
+                              <td className="px-3 py-2">
+                                {needsType && (
+                                  <Badge variant="secondary" className="mr-1 text-xs">
+                                    Typ fehlt
+                                  </Badge>
+                                )}
+                                <Select
+                                  value={(excelOverrides[i]?.item_type ?? itemTypeResolved) || ''}
+                                  onValueChange={(v) => setExcelOverride(i, 'item_type', v as 'PIECE' | 'WEIGHT')}
+                                >
+                                  <SelectTrigger className="h-8 w-full">
+                                    <SelectValue placeholder="Typ wählen" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="PIECE">Stück</SelectItem>
+                                    <SelectItem value="WEIGHT">Gewicht</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </td>
+                            )}
                           </tr>
                         )
                       })}

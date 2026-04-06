@@ -510,7 +510,8 @@ export function calculatePLUStats(items: PLUItemBase[], hidden?: number, customC
 export function getDisplayPreisForItem(item: DisplayItem): number | null {
   if (item.is_offer) {
     if (item.offer_promo_price != null && !Number.isNaN(Number(item.offer_promo_price))) {
-      return Number(item.offer_promo_price)
+      const p = Number(item.offer_promo_price)
+      if (p > 0) return p
     }
   }
   if (item.preis != null) return item.preis

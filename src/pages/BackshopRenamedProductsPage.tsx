@@ -79,6 +79,13 @@ export function BackshopRenamedProductsPage() {
     [layoutSettings?.sort_mode, blocks, storeBackshopBlockOrder, nameBlockOverrides],
   )
 
+  const flowDirection = (layoutSettings?.flow_direction ?? 'ROW_BY_ROW') as 'ROW_BY_ROW' | 'COLUMN_FIRST'
+  const dialogFontSizes = {
+    header: layoutSettings?.font_header_px ?? 32,
+    column: layoutSettings?.font_column_px ?? 18,
+    product: layoutSettings?.font_product_px ?? 18,
+  }
+
   const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
   const offerDisplayByPlu = useMemo(
     () =>
@@ -244,6 +251,8 @@ export function BackshopRenamedProductsPage() {
           displayMode={(layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'}
           renamedOverrides={globalRenamed.map((r) => ({ plu: r.plu, display_name: r.display_name }))}
           listLayout={renameDialogListLayout}
+          flowDirection={flowDirection}
+          fontSizes={dialogFontSizes}
         />
 
         <AlertDialog open={!!resetConfirmItem} onOpenChange={(open) => !open && setResetConfirmItem(null)}>

@@ -75,6 +75,12 @@ export function RenamedProductsPage() {
   const { overrideMap: obstLocalOverrides } = useObstOfferLocalPriceOverrides(obstCampaign ?? undefined)
   const resetName = useResetProductName()
   const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
+  const flowDirection = (layoutSettings?.flow_direction ?? 'COLUMN_FIRST') as 'ROW_BY_ROW' | 'COLUMN_FIRST'
+  const dialogFontSizes = {
+    header: layoutSettings?.font_header_px ?? 24,
+    column: layoutSettings?.font_column_px ?? 16,
+    product: layoutSettings?.font_product_px ?? 12,
+  }
 
   const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
   const offerDisplayByPlu = useMemo(
@@ -253,6 +259,8 @@ export function RenamedProductsPage() {
           displayMode={displayMode}
           renamedOverrides={storeRenamed.map((r) => ({ plu: r.plu, display_name: r.display_name }))}
           listLayout={renameDialogListLayout}
+          flowDirection={flowDirection}
+          fontSizes={dialogFontSizes}
         />
 
         <AlertDialog open={!!resetConfirmItem} onOpenChange={(open) => !open && setResetConfirmItem(null)}>

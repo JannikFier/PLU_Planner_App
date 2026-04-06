@@ -42,6 +42,8 @@ sequenceDiagram
 
    **Logout:** Beim Abmelden werden `PLU_PLANNER_QUERY_CACHE` (sessionStorage) und der **in-memory** TanStack-Query-Cache geleert (`queryClient.clear()` in [AuthContext.tsx](../src/contexts/AuthContext.tsx)), damit nach einem **Nutzerwechsel** (z. B. Admin → Super-Admin) keine mit der vorherigen Rolle/RLS gefilterten Daten stehen bleiben.
 
+   **Marktwechsel:** [StoreChangeQuerySync.tsx](../src/components/StoreChangeQuerySync.tsx) entfernt bei Wechsel des aktuellen Markts (`currentStoreId`) alle marktspezifischen Queries per `removeQueries` (nicht nur `invalidateQueries`). So bleiben keine gecachten „Ausgeblendete“ / „Eigene Produkte“ / Werbung eines **anderen** Markts im Speicher sichtbar; die Listen laden für den neuen Markt neu.
+
 3. **Routen:** Die meisten Seiten sind per `lazy()` geladen. Beim ersten Aufruf einer Route wird der zugehörige JS-Chunk nachgeladen → zusätzliche kurze Verzögerung.
 
 4. **Prefetch:** `AuthPrefetch` startet nach erfolgreicher Auth (inkl. Cache-Pfad) Prefetch für MasterList, Layout, ggf. Admin-Daten (`all-profiles`), und für **Super-Admin** zusätzlich die **Firmenliste** (`companies`, `runSuperAdminCompaniesPrefetch`) sowie den Chunk `SuperAdminCompaniesPage`. Nützt nur, wenn Auth schnell „fertig“ ist und der Nutzer nicht schon auf eine leere/loading-Seite starrt.

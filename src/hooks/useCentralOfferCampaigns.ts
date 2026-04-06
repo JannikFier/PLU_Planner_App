@@ -17,7 +17,13 @@ import type {
   BackshopOfferCampaignLine,
   BackshopOfferStoreDisabled,
 } from '@/types/database'
-import { normalizeStoreDisabledPluSet, type CampaignWithLines } from '@/lib/offer-display'
+import {
+  normalizeStoreDisabledPluSet,
+  obstCentralKindPriority,
+  type CampaignLineRow,
+  type CampaignWithLines,
+  type ObstCentralCampaignKind,
+} from '@/lib/offer-display'
 
 export type SaveCampaignLineInput = {
   plu: string
@@ -27,24 +33,25 @@ export type SaveCampaignLineInput = {
 
 /**
  * Lädt Kampagne für aktuelle ISO-KW; falls keine, für die nächste KW (Vorbereitung: Upload oft für „kommende Woche“).
+ * Backshop: genau eine Kampagne pro KW.
  */
 async function fetchCampaignWithLines(
-  table: 'obst_offer_campaigns' | 'backshop_offer_campaigns',
-  linesTable: 'obst_offer_campaign_lines' | 'backshop_offer_campaign_lines',
+  table: 'backshop_offer_campaigns',
+  linesTable: 'backshop_offer_campaign_lines',
 ): Promise<CampaignWithLines | null> {
   const now = new Date()
   const cur = getKWAndYearFromDate(now)
   const next = getKWAndYearFromDate(addWeeks(now, 1))
 
   for (const slot of [cur, next]) {
-    const campaigns = await queryRest<ObstOfferCampaign[] | BackshopOfferCampaign[]>(table, {
+    const campaigns = await queryRest<BackshopOfferCampaign[]>(table, {
       select: 'id,kw_nummer,jahr',
       kw_nummer: `eq.${slot.kw}`,
       jahr: `eq.${slot.year}`,
     })
     const c = campaigns?.[0]
     if (!c) continue
-    const lines = await queryRest<ObstOfferCampaignLine[] | BackshopOfferCampaignLine[]>(linesTable, {
+    const lines = await queryRest<BackshopOfferCampaignLine[]>(linesTable, {
       select: 'plu,promo_price',
       campaign_id: `eq.${c.id}`,
       order: 'sort_index.asc',
@@ -58,7 +65,77 @@ async function fetchCampaignWithLines(
   return null
 }
 
-/** Aktive Obst-Kampagne inkl. Zeilen (aktuelle KW, sonst nächste KW) */
+/** Obst: bis zu drei Kampagnen (exit, ordersatz_week, ordersatz_3day) pro KW mergen. */
+async function fetchObstCampaignsMerged(): Promise<CampaignWithLines | null> {
+  const now = new Date()
+  const cur = getKWAndYearFromDate(now)
+  const next = getKWAndYearFromDate(addWeeks(now, 1))
+
+  for (const slot of [cur, next]) {
+    const campaigns = await queryRest<ObstOfferCampaign[]>(`obst_offer_campaigns`, {
+      select: 'id,kw_nummer,jahr,campaign_kind',
+      kw_nummer: `eq.${slot.kw}`,
+      jahr: `eq.${slot.year}`,
+    })
+    if (!campaigns?.length) continue
+
+    const raw: Array<{
+      plu: string
+      promo_price: number
+      kind: ObstCentralCampaignKind
+    }> = []
+
+    for (const c of campaigns) {
+      const kind = c.campaign_kind as ObstCentralCampaignKind
+      const lines = await queryRest<ObstOfferCampaignLine[]>(`obst_offer_campaign_lines`, {
+        select: 'plu,promo_price',
+        campaign_id: `eq.${c.id}`,
+        order: 'sort_index.asc',
+      })
+      for (const l of lines ?? []) {
+        raw.push({
+          plu: l.plu,
+          promo_price: Number(l.promo_price),
+          kind,
+        })
+      }
+    }
+
+    const allCentralPluUnion = [...new Set(raw.map((r) => r.plu))]
+
+    const bestByPlu = new Map<string, { plu: string; promo_price: number; central_kind: ObstCentralCampaignKind }>()
+    for (const row of raw) {
+      const prev = bestByPlu.get(row.plu)
+      if (
+        !prev ||
+        obstCentralKindPriority(row.kind) > obstCentralKindPriority(prev.central_kind)
+      ) {
+        bestByPlu.set(row.plu, {
+          plu: row.plu,
+          promo_price: row.promo_price,
+          central_kind: row.kind,
+        })
+      }
+    }
+
+    const mergedLines: CampaignLineRow[] = [...bestByPlu.values()].map((r) => ({
+      plu: r.plu,
+      promo_price: r.promo_price,
+      central_kind: r.central_kind,
+    }))
+
+    const first = campaigns[0]
+    return {
+      kw_nummer: first.kw_nummer,
+      jahr: first.jahr,
+      lines: mergedLines,
+      allCentralPluUnion,
+    }
+  }
+  return null
+}
+
+/** Aktive Obst-Kampagne(n) inkl. Zeilen (aktuelle KW, sonst nächste KW); Merge mit Duplikat-Priorität */
 export function useObstOfferCampaignWithLines() {
   const { kw, year } = getKWAndYearFromDate(new Date())
 
@@ -66,7 +143,7 @@ export function useObstOfferCampaignWithLines() {
     queryKey: ['obst-offer-campaign', kw, year],
     staleTime: 60_000,
     queryFn: async (): Promise<CampaignWithLines | null> => {
-      return fetchCampaignWithLines('obst_offer_campaigns', 'obst_offer_campaign_lines')
+      return fetchObstCampaignsMerged()
     },
   })
 }
@@ -208,7 +285,7 @@ export function useToggleBackshopOfferDisabled() {
   })
 }
 
-/** Super-Admin: Obst-Kampagne für KW ersetzen */
+/** Super-Admin: Obst-Kampagne für KW + Kind ersetzen */
 export function useSaveObstOfferCampaign() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
@@ -217,6 +294,7 @@ export function useSaveObstOfferCampaign() {
     mutationFn: async (payload: {
       kwNummer: number
       jahr: number
+      campaignKind: ObstCentralCampaignKind
       fileName?: string | null
       lines: SaveCampaignLineInput[]
     }) => {
@@ -226,6 +304,7 @@ export function useSaveObstOfferCampaign() {
         .delete()
         .eq('kw_nummer', payload.kwNummer)
         .eq('jahr', payload.jahr)
+        .eq('campaign_kind', payload.campaignKind)
       if (delErr) throw delErr
 
       const { data: camp, error: insErr } = await supabase
@@ -233,6 +312,7 @@ export function useSaveObstOfferCampaign() {
         .insert({
           kw_nummer: payload.kwNummer,
           jahr: payload.jahr,
+          campaign_kind: payload.campaignKind,
           source_file_name: payload.fileName ?? null,
           created_by: user.id,
         } as never)

@@ -285,6 +285,8 @@ Marktspezifisch ausgeblendete PLUs. KW-unabhängig.
 | `hidden_by` | UUID (FK → profiles) | Wer hat ausgeblendet |
 | `created_at` | TIMESTAMPTZ | Ausgeblendet am |
 
+**Unique:** `(store_id, plu)` – Migration 054 (ersetzt das historische globale `UNIQUE(plu)` aus 006, damit jeder Markt dieselbe PLU unabhängig ausblenden kann).
+
 **RLS (Schreiben):** Insert/Update/Delete nur, wenn `store_id = get_current_store_id()` und `current_store_id` gesetzt (Migration 049; kein Super-Admin-Bypass mehr). Lesen: Zugriff über zugewiesene Märkte bzw. Super-Admin liest alle.
 
 ### renamed_items (Obst/Gemüse – Umbenennungen pro Markt)
@@ -321,7 +323,7 @@ Manuelle Werbung: Laufzeit in Wochen (1–4), Start = aktuelle KW beim Anlegen. 
 | `created_by` | UUID (FK → profiles) | Wer hat hinzugefügt |
 | `created_at` | TIMESTAMPTZ | Angelegt am |
 
-**Zentrale Werbung (global, nicht in dieser Tabelle dupliziert):** `obst_offer_campaigns` (eine Zeile pro KW/Jahr), `obst_offer_campaign_lines` (PLU + Aktionspreis), `obst_offer_store_disabled` (Megafon aus pro `store_id` + `plu`). Migration 050.
+**Zentrale Werbung (global, nicht in dieser Tabelle dupliziert):** `obst_offer_campaigns` mit `campaign_kind` (`exit` | `ordersatz_week` | `ordersatz_3day`), **UNIQUE (kw_nummer, jahr, campaign_kind)**; `obst_offer_campaign_lines` (PLU + Aktionspreis); `obst_offer_store_disabled` (Megafon aus pro `store_id` + `plu`). Migrationen 050, 053.
 
 **RLS:** Lesen für alle Auth-User; Einfügen/Löschen/Update nur für User, Admin, Super-Admin (nicht Viewer). Kampagnen: nur Super-Admin schreiben (siehe Migration 050).
 

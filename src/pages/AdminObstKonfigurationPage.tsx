@@ -33,6 +33,8 @@ export function AdminObstKonfigurationPage() {
     return <Navigate to="/admin" replace />
   }
 
+  const konfigBackTo = '/admin/obst/konfiguration'
+
   return (
     <DashboardLayout>
       <div className="space-y-8">
@@ -48,7 +50,7 @@ export function AdminObstKonfigurationPage() {
             title="Layout Obst/Gemüse"
             description="Sortierung, Schrift und Darstellung für diesen Markt"
             icon={LayoutGrid}
-            onClick={() => navigate('/admin/layout')}
+            onClick={() => navigate('/admin/layout', { state: { backTo: konfigBackTo } })}
             color="text-violet-700"
             bg="bg-violet-50"
           />
@@ -56,7 +58,7 @@ export function AdminObstKonfigurationPage() {
             title="Bezeichnungsregeln (Obst)"
             description="Keyword-Regeln für Namen in diesem Markt"
             icon={BookText}
-            onClick={() => navigate('/admin/rules')}
+            onClick={() => navigate('/admin/rules', { state: { backTo: konfigBackTo } })}
             color="text-violet-700"
             bg="bg-violet-50"
           />
@@ -64,7 +66,7 @@ export function AdminObstKonfigurationPage() {
             title="Warengruppen sortieren (Obst)"
             description="Drag & Drop: Reihenfolge und Zuordnung für diesen Markt"
             icon={GripVertical}
-            onClick={() => navigate('/admin/block-sort')}
+            onClick={() => navigate('/admin/block-sort', { state: { backTo: konfigBackTo } })}
             color="text-violet-700"
             bg="bg-violet-50"
           />

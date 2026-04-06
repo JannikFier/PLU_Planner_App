@@ -14,7 +14,17 @@ describe('buildOfferDisplayMap', () => {
       promoPrice: 1.99,
       source: 'central',
       centralReferencePrice: 1.99,
+      centralCampaignKind: undefined,
     })
+  })
+
+  it('setzt centralCampaignKind aus Kampagnenzeile (Obst)', () => {
+    const m = buildOfferDisplayMap(10, 2026, {
+      kw_nummer: 10,
+      jahr: 2026,
+      lines: [{ plu: '123', promo_price: 1.99, central_kind: 'ordersatz_3day' }],
+    }, new Set(), [])
+    expect(m.get('123')?.centralCampaignKind).toBe('ordersatz_3day')
   })
 
   it('zentrale Werbung unabhängig von aktueller KW in den Parametern (Merge nur über Kampagne-Objekt)', () => {
@@ -23,6 +33,7 @@ describe('buildOfferDisplayMap', () => {
       promoPrice: 1.99,
       source: 'central',
       centralReferencePrice: 1.99,
+      centralCampaignKind: undefined,
     })
   })
 

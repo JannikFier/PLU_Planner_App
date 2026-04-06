@@ -27,6 +27,10 @@ import { useTestMode } from '@/contexts/TestModeContext'
 import { UnifiedNotificationBell } from '@/components/plu/UnifiedNotificationBell'
 import { AppBrandLogo } from '@/components/layout/AppBrandLogo'
 import { APP_BRAND_NAME } from '@/lib/brand'
+import {
+  ADMIN_PATHS_WITH_OPTIONAL_BACK_TO,
+  isSafeAdminBackToTarget,
+} from '@/lib/admin-back-navigation'
 import { cn } from '@/lib/utils'
 
 /**
@@ -75,7 +79,7 @@ export function AppHeader() {
 
   // Obst/Gemüse-Unter-Seiten (eigene Produkte, ausgeblendet, Werbung, umbenannt) → Zurück zur Masterliste
   const USER_OBST_SUB = ['/user/custom-products', '/user/hidden-products', '/user/offer-products', '/user/renamed-products', '/user/hidden-items']
-  const ADMIN_OBST_SUB = ['/admin/custom-products', '/admin/hidden-products', '/admin/offer-products', '/admin/renamed-products', '/admin/hidden-items']
+  const ADMIN_OBST_SUB = ['/admin/custom-products', '/admin/hidden-products', '/admin/offer-products', '/admin/renamed-products', '/admin/hidden-items', '/admin/obst-warengruppen']
   // Backshop-Unter-Seiten → Zurück zur Backshop-Liste
   const USER_BACKSHOP_SUB = ['/user/backshop-custom-products', '/user/backshop-hidden-products', '/user/backshop-offer-products', '/user/backshop-renamed-products']
   const ADMIN_BACKSHOP_SUB = ['/admin/backshop-custom-products', '/admin/backshop-hidden-products', '/admin/backshop-offer-products', '/admin/backshop-renamed-products']
@@ -99,6 +103,17 @@ export function AppHeader() {
   /** Zurück-Ziel für Admin-Bereich – Hierarchie wie Super-Admin Markt: /admin → /admin/obst|backshop → Liste|Konfiguration */
   function getAdminAreaBackTarget(path: string): string | null {
     if (path === '/admin') return null
+
+    const adminStateBackTo = (location.state as { backTo?: string } | null)?.backTo
+    const adminQueryBackTo = new URLSearchParams(location.search).get('backTo')
+    const adminBackTo = adminStateBackTo || adminQueryBackTo
+    if (
+      adminBackTo
+      && (ADMIN_PATHS_WITH_OPTIONAL_BACK_TO as readonly string[]).includes(path)
+      && isSafeAdminBackToTarget(adminBackTo)
+    ) {
+      return adminBackTo
+    }
 
     if (path === '/admin/obst') return '/admin'
     if (path === '/admin/backshop') return '/admin'
@@ -181,7 +196,7 @@ export function AppHeader() {
     // Marktspezifische Listen-/Konfig-Seiten (masterlist, custom-products, etc.)
     // Wurden mit state.backTo navigiert → oben schon abgefangen.
     // Fallback: Obst-Unterseiten → /super-admin/obst, Backshop → /super-admin/backshop
-    const obstSub = ['/super-admin/masterlist', '/super-admin/custom-products', '/super-admin/hidden-products', '/super-admin/offer-products', '/super-admin/renamed-products', '/super-admin/hidden-items', '/super-admin/layout', '/super-admin/rules', '/super-admin/block-sort']
+    const obstSub = ['/super-admin/masterlist', '/super-admin/custom-products', '/super-admin/hidden-products', '/super-admin/offer-products', '/super-admin/renamed-products', '/super-admin/hidden-items', '/super-admin/layout', '/super-admin/rules', '/super-admin/block-sort', '/super-admin/obst-warengruppen']
     if (obstSub.includes(path)) return '/super-admin/obst'
 
     const backshopSub = ['/super-admin/backshop-list', '/super-admin/backshop-custom-products', '/super-admin/backshop-hidden-products', '/super-admin/backshop-offer-products', '/super-admin/backshop-renamed-products', '/super-admin/backshop-layout', '/super-admin/backshop-rules', '/super-admin/backshop-block-sort']

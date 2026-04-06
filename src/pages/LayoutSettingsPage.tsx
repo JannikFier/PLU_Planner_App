@@ -20,6 +20,12 @@ import { RadioCard } from '@/components/ui/radio-card'
 import { useLayoutSettings, useUpdateLayoutSettings } from '@/hooks/useLayoutSettings'
 import { LayoutPreview } from '@/components/plu/LayoutPreview'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  clampUnifiedBodyPx,
+  LAYOUT_FONT_LABELS,
+  LAYOUT_UNIFIED_BODY_MAX_PX,
+  LAYOUT_UNIFIED_BODY_MIN_PX,
+} from '@/lib/layout-font-settings-ui'
 
 // ============================================================
 // LayoutSettingsPage
@@ -67,13 +73,18 @@ export function LayoutSettingsPage() {
     if (settings && settingsSyncedId.current !== settings.id) {
       settingsSyncedId.current = settings.id
       const hdr = settings.font_header_px ?? 24
-      const col = settings.font_column_px ?? 16
-      const prod = settings.font_product_px ?? 12
+      const flow = settings.flow_direction ?? 'ROW_BY_ROW'
+      let col = settings.font_column_px ?? 16
+      let prod = settings.font_product_px ?? 12
+      if (flow === 'COLUMN_FIRST') {
+        prod = clampUnifiedBodyPx(prod)
+        col = prod
+      }
       queueMicrotask(() => {
         setForm({
           sort_mode: settings.sort_mode ?? 'ALPHABETICAL',
           display_mode: settings.display_mode ?? 'MIXED',
-          flow_direction: settings.flow_direction ?? 'ROW_BY_ROW',
+          flow_direction: flow,
           font_header_px: hdr,
           font_column_px: col,
           font_product_px: prod,
@@ -247,7 +258,7 @@ export function LayoutSettingsPage() {
                 />
                 <RadioCard
                   selected={form.sort_mode === 'BY_BLOCK'}
-                  onClick={() => updateForm({ sort_mode: 'BY_BLOCK' })}
+                  onClick={() => updateForm({ sort_mode: 'BY_BLOCK', features_blocks: true })}
                   title="Nach Warengruppen"
                   description="Gruppiert nach Kategorien (Obst, Gemüse, ...)"
                 />
@@ -269,7 +280,16 @@ export function LayoutSettingsPage() {
                 />
                 <RadioCard
                   selected={form.flow_direction === 'COLUMN_FIRST'}
-                  onClick={() => updateForm({ flow_direction: 'COLUMN_FIRST' })}
+                  onClick={() => {
+                    const u = clampUnifiedBodyPx(form.font_product_px)
+                    setColumnText(String(u))
+                    setProductText(String(u))
+                    updateForm({
+                      flow_direction: 'COLUMN_FIRST',
+                      font_column_px: u,
+                      font_product_px: u,
+                    })
+                  }}
                   title="Spaltenweise"
                   description="Linke Spalte wird zuerst gefüllt, dann die rechte"
                 />
@@ -280,12 +300,26 @@ export function LayoutSettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Schriftgrößen</CardTitle>
-                <CardDescription>Größen in Pixel für Tabelle und PDF.</CardDescription>
+                <CardDescription>
+                  Größen in Pixel für Tabelle und PDF.
+                  {form.flow_direction === 'COLUMN_FIRST' && (
+                    <span className="mt-1 block text-foreground/90">
+                      Bei <strong>Spaltenweise</strong> steuert ein Wert die Schrift für Spaltenköpfe, Gruppen und
+                      Produktzeilen gemeinsam (bessere Ausrichtung in Tabelle und PDF).
+                    </span>
+                  )}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4">
+                <div
+                  className={
+                    form.flow_direction === 'COLUMN_FIRST'
+                      ? 'grid grid-cols-1 gap-4 sm:grid-cols-2'
+                      : 'grid grid-cols-1 gap-4 sm:grid-cols-3'
+                  }
+                >
                   <div className="space-y-2">
-                    <Label>Header (px)</Label>
+                    <Label>{LAYOUT_FONT_LABELS.listenHeader}</Label>
                     <Input
                       type="number"
                       min={10}
@@ -301,40 +335,65 @@ export function LayoutSettingsPage() {
                       }}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Spalte (px)</Label>
-                    <Input
-                      type="number"
-                      min={8}
-                      max={48}
-                      placeholder="16"
-                      value={columnText}
-                      onChange={(e) => setColumnText(e.target.value)}
-                      onBlur={() => {
-                        const v = parseInt(columnText, 10)
-                        const normalized = isNaN(v) || v < 8 ? 16 : Math.min(48, v)
-                        setColumnText(String(normalized))
-                        updateForm({ font_column_px: normalized })
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Produkt (px)</Label>
-                    <Input
-                      type="number"
-                      min={6}
-                      max={24}
-                      placeholder="12"
-                      value={productText}
-                      onChange={(e) => setProductText(e.target.value)}
-                      onBlur={() => {
-                        const v = parseInt(productText, 10)
-                        const normalized = isNaN(v) || v < 6 ? 12 : Math.min(24, v)
-                        setProductText(String(normalized))
-                        updateForm({ font_product_px: normalized })
-                      }}
-                    />
-                  </div>
+                  {form.flow_direction === 'COLUMN_FIRST' ? (
+                    <div className="space-y-2">
+                      <Label>{LAYOUT_FONT_LABELS.unifiedBody}</Label>
+                      <Input
+                        type="number"
+                        min={LAYOUT_UNIFIED_BODY_MIN_PX}
+                        max={LAYOUT_UNIFIED_BODY_MAX_PX}
+                        placeholder="12"
+                        value={productText}
+                        onChange={(e) => setProductText(e.target.value)}
+                        onBlur={() => {
+                          const v = parseInt(productText, 10)
+                          const normalized = Number.isNaN(v)
+                            ? clampUnifiedBodyPx(form.font_product_px)
+                            : clampUnifiedBodyPx(v)
+                          setColumnText(String(normalized))
+                          setProductText(String(normalized))
+                          updateForm({ font_column_px: normalized, font_product_px: normalized })
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <Label>{LAYOUT_FONT_LABELS.columnAndGroups}</Label>
+                        <Input
+                          type="number"
+                          min={8}
+                          max={48}
+                          placeholder="16"
+                          value={columnText}
+                          onChange={(e) => setColumnText(e.target.value)}
+                          onBlur={() => {
+                            const v = parseInt(columnText, 10)
+                            const normalized = isNaN(v) || v < 8 ? 16 : Math.min(48, v)
+                            setColumnText(String(normalized))
+                            updateForm({ font_column_px: normalized })
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{LAYOUT_FONT_LABELS.productRows}</Label>
+                        <Input
+                          type="number"
+                          min={6}
+                          max={24}
+                          placeholder="12"
+                          value={productText}
+                          onChange={(e) => setProductText(e.target.value)}
+                          onBlur={() => {
+                            const v = parseInt(productText, 10)
+                            const normalized = isNaN(v) || v < 6 ? 12 : Math.min(24, v)
+                            setProductText(String(normalized))
+                            updateForm({ font_product_px: normalized })
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -391,6 +450,7 @@ export function LayoutSettingsPage() {
                 {[
                   { key: 'features_custom_products' as const, label: 'Eigene Produkte', desc: 'User können eigene Artikel hinzufügen' },
                   { key: 'features_hidden_items' as const, label: 'Produkte ausblenden', desc: 'User können Artikel aus ihrer Liste entfernen' },
+                  { key: 'features_blocks' as const, label: 'Warengruppen', desc: 'Zuordnung zu Warengruppen (Dialog, Liste, Block-Sortierung)' },
                 ].map((feature) => (
                   <div key={feature.key} className="flex items-center justify-between">
                     <div>

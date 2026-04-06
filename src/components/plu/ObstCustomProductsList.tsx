@@ -4,6 +4,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatPreisEur, getDisplayPlu } from '@/lib/plu-helpers'
+import {
+  obstCustomProductShowBlockField,
+  obstCustomProductShowItemTypeField,
+} from '@/lib/obst-custom-product-layout'
 import { cn } from '@/lib/utils'
 import type { CustomProduct } from '@/types/database'
 import { Eye, EyeOff, Pencil, Trash2 } from 'lucide-react'
@@ -15,7 +19,11 @@ export interface ObstCustomProductsListProps {
   blocks: Array<{ id: string; name: string }>
   context: ObstCustomProductsListContext
   currentUserId: string | null
+  /** Aus Layout: gemischt vs. Stück/Gewicht getrennt */
+  displayMode: 'MIXED' | 'SEPARATED'
   sortMode: 'ALPHABETICAL' | 'BY_BLOCK'
+  /** Layout-Feature „Warengruppen“ (default true) */
+  featuresBlocks?: boolean
   /** true wenn mindestens ein Produkt einen Preis hat (zweite Zeile Mobile / Spalte Desktop) */
   /** Für Mobile-Metazeile: Preis nur anzeigen wenn mindestens ein Eintrag einen Preis hat */
   hasAnyPrice: boolean
@@ -40,7 +48,9 @@ export function ObstCustomProductsList({
   blocks,
   context,
   currentUserId,
+  displayMode,
   sortMode,
+  featuresBlocks = true,
   hasAnyPrice,
   isHidden,
   onEdit,
@@ -52,7 +62,9 @@ export function ObstCustomProductsList({
   deletePending,
   allowHideUnhide = true,
 }: ObstCustomProductsListProps) {
-  const showWarengruppeMeta = sortMode === 'BY_BLOCK'
+  const layoutSlice = { display_mode: displayMode, sort_mode: sortMode, features_blocks: featuresBlocks }
+  const showTypeCol = obstCustomProductShowItemTypeField(layoutSlice)
+  const showBlockCol = obstCustomProductShowBlockField(layoutSlice)
   const isFull = context === 'full'
 
   const blockName = (blockId: string | null) => blocks.find((b) => b.id === blockId)?.name ?? '–'
@@ -64,10 +76,10 @@ export function ObstCustomProductsList({
         <table className="w-full min-w-0 table-fixed">
           <colgroup>
             <col className="w-[5.5rem]" />
-            <col className="w-[42%]" />
-            <col className="w-[6rem]" />
+            <col className={cn(showTypeCol && showBlockCol ? 'w-[32%]' : 'w-[42%]')} />
+            {showTypeCol && <col className="w-[6rem]" />}
             <col className="w-[5.5rem]" />
-            <col className="w-[15%]" />
+            {showBlockCol && <col className="w-[15%]" />}
             <col className={cn(isFull ? 'w-[11rem]' : 'w-[9.5rem]')} />
           </colgroup>
           <thead>
@@ -78,15 +90,19 @@ export function ObstCustomProductsList({
               <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-0">
                 Name
               </th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Typ
-              </th>
+              {showTypeCol && (
+                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Typ
+                </th>
+              )}
               <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Preis
               </th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Warengruppe
-              </th>
+              {showBlockCol && (
+                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Warengruppe
+                </th>
+              )}
               <th
                 className={cn(
                   'px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider',
@@ -112,15 +128,19 @@ export function ObstCustomProductsList({
                       )}
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-sm text-muted-foreground align-middle whitespace-nowrap">
-                    {cp.item_type === 'PIECE' ? 'Stück' : 'Gewicht'}
-                  </td>
+                  {showTypeCol && (
+                    <td className="px-3 py-3 text-sm text-muted-foreground align-middle whitespace-nowrap">
+                      {cp.item_type === 'PIECE' ? 'Stück' : 'Gewicht'}
+                    </td>
+                  )}
                   <td className="px-3 py-3 text-sm text-muted-foreground align-middle whitespace-nowrap">
                     {cp.preis != null ? formatPreisEur(cp.preis) : '–'}
                   </td>
-                  <td className="px-3 py-3 text-sm text-muted-foreground align-middle break-words">
-                    {blockName(cp.block_id)}
-                  </td>
+                  {showBlockCol && (
+                    <td className="px-3 py-3 text-sm text-muted-foreground align-middle break-words">
+                      {blockName(cp.block_id)}
+                    </td>
+                  )}
                   <td className="px-3 py-3 text-right align-middle">
                     {isFull ? (
                       <div className="flex justify-end gap-1">
@@ -135,7 +155,7 @@ export function ObstCustomProductsList({
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Name, Typ und Preis bearbeiten</TooltipContent>
+                          <TooltipContent>Name und Preis bearbeiten</TooltipContent>
                         </Tooltip>
                         {allowHideUnhide && (
                         <Tooltip>
@@ -211,9 +231,9 @@ export function ObstCustomProductsList({
         {products.map((cp) => {
           const rowHidden = isFull ? isHidden(cp.plu) : false
           const metaParts: string[] = []
-          metaParts.push(cp.item_type === 'PIECE' ? 'Stück' : 'Gewicht')
+          if (showTypeCol) metaParts.push(cp.item_type === 'PIECE' ? 'Stück' : 'Gewicht')
           if (hasAnyPrice && cp.preis != null) metaParts.push(formatPreisEur(cp.preis))
-          if (showWarengruppeMeta) metaParts.push(blockName(cp.block_id))
+          if (showBlockCol) metaParts.push(blockName(cp.block_id))
           const metaLine = metaParts.join(' · ')
 
           return (

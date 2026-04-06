@@ -17,6 +17,12 @@
   --color-plu-changed-bg: #fee2e2;
   --color-plu-changed-text: #991b1b;
 
+  /* Zentrale Obst-Werbung: Namenszelle (nicht PLU) */
+  --color-offer-week-name-bg: #fef9c3;
+  --color-offer-week-name-text: #854d0e;
+  --color-offer-3day-name-bg: #fffbeb;
+  --color-offer-3day-name-text: #a16207;
+
   /* Schriftart */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }

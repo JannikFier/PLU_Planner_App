@@ -58,8 +58,8 @@ export function SuperAdminObstBereichPage() {
             bg="bg-orange-50"
           />
           <DashboardCard
-            title="Zentrale Werbung (Exit)"
-            description="Wochenwerbung-Excel für alle Märkte, aktuelle KW"
+            title="Zentrale Werbung"
+            description="Exit- und Ordersatz-Excel, aktuelle KW"
             icon={Megaphone}
             onClick={() => navigate('/super-admin/central-werbung/obst')}
             color="text-emerald-700"

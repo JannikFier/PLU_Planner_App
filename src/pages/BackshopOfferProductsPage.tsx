@@ -102,8 +102,8 @@ export function BackshopOfferProductsPage() {
 
   const rawHiddenPluSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
   const effectiveHiddenPLUs = useMemo(
-    () => effectiveHiddenPluSet(rawHiddenPluSet, backshopCampaign?.lines),
-    [rawHiddenPluSet, backshopCampaign?.lines],
+    () => effectiveHiddenPluSet(rawHiddenPluSet, backshopCampaign),
+    [rawHiddenPluSet, backshopCampaign],
   )
 
   const offerDisplayByPlu = useMemo(

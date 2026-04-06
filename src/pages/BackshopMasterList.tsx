@@ -104,8 +104,8 @@ export function BackshopMasterList() {
     [hiddenItems],
   )
   const effectiveHiddenPLUs = useMemo(
-    () => effectiveHiddenPluSet(rawHiddenPluSet, backshopCampaign?.lines),
-    [rawHiddenPluSet, backshopCampaign?.lines],
+    () => effectiveHiddenPluSet(rawHiddenPluSet, backshopCampaign),
+    [rawHiddenPluSet, backshopCampaign],
   )
   const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
   const markYellowKwCount = layoutSettings?.mark_yellow_kw_count ?? 4

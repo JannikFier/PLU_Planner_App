@@ -25,7 +25,14 @@ import {
   getDisplayPreisForItem,
   itemMatchesSearch,
 } from '@/lib/plu-helpers'
+import {
+  paginateNewspaperColumns,
+  computeObstNewspaperHeightsPx,
+  newspaperRowsToFlatRows,
+  flattenNewspaperPagesToRows,
+} from '@/lib/newspaper-column-pages'
 import { cn } from '@/lib/utils'
+import { obstOfferNameInnerClass } from '@/lib/obst-offer-name-highlight'
 import { scrollToDataRowIndex } from '@/lib/find-in-page-scroll'
 import { useFindInPage } from '@/hooks/useFindInPage'
 import { Megaphone, Search, Tag } from 'lucide-react'
@@ -198,6 +205,8 @@ function PLUColumn({
   findInPageHighlightRowIndex,
   findInPageQuery,
   listType = 'obst',
+  /** Spalten-Zeitung Obst: Buchstaben-Header gleiche Schriftgröße wie Produktzeilen */
+  letterGroupHeaderFontPx,
 }: {
   rows: FlatRow[]
   fonts: FontSizes
@@ -209,7 +218,9 @@ function PLUColumn({
   /** Nur für aktuelle Trefferzeile: Teilstring-Markierung in PLU/Name */
   findInPageQuery?: string
   listType?: 'obst' | 'backshop'
+  letterGroupHeaderFontPx?: number
 }) {
+  const groupHeaderFontPx = letterGroupHeaderFontPx ?? fonts.column
   const hasAnyPrice = useMemo(
     () => rows.some((r) => r.type === 'item' && itemHasDisplayPreis(r.item)),
     [rows],
@@ -274,7 +285,11 @@ function PLUColumn({
                   <td
                     colSpan={colCount}
                     className="px-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50"
-                    style={{ fontSize: fonts.column + 'px', paddingTop: '0.35em', paddingBottom: '0.35em' }}
+                    style={{
+                      fontSize: groupHeaderFontPx + 'px',
+                      paddingTop: '0.35em',
+                      paddingBottom: '0.35em',
+                    }}
                   >
                     {row.label}
                   </td>
@@ -334,7 +349,12 @@ function PLUColumn({
                   style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}
                   title={getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
                 >
-                  <span className="inline-flex items-center gap-1.5 flex-wrap">
+                  <span
+                    className={obstOfferNameInnerClass(
+                      listType,
+                      item.offer_name_highlight_kind,
+                    )}
+                  >
                     {hq?.trim() ? (
                       <HighlightedSearchText
                         text={getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
@@ -615,7 +635,12 @@ function RowByRowTable({
                     style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}
                     title={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}
                   >
-                    <span className="inline-flex items-center gap-1.5 flex-wrap">
+                    <span
+                      className={obstOfferNameInnerClass(
+                        listType,
+                        row.left.offer_name_highlight_kind,
+                      )}
+                    >
                       {hqLeft?.trim() ? (
                         <HighlightedSearchText
                           text={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}
@@ -681,7 +706,12 @@ function RowByRowTable({
                     style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}
                     title={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}
                   >
-                    <span className="inline-flex items-center gap-1.5 flex-wrap">
+                    <span
+                      className={obstOfferNameInnerClass(
+                        listType,
+                        row.right.offer_name_highlight_kind,
+                      )}
+                    >
                       {hqRight?.trim() ? (
                         <HighlightedSearchText
                           text={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}
@@ -803,6 +833,22 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
         }
         return buildFlatRowsFromBlockGroups(grp as BlockGroup<DisplayItem>[])
       }
+      /** Gleiche Reihenfolge wie Desktop-Zeitung (links → rechts pro Seite) für data-row-index / Suche */
+      if (listType === 'obst') {
+        const heights = computeObstNewspaperHeightsPx(fonts)
+        const groupList =
+          sortMode === 'ALPHABETICAL'
+            ? (grp as LetterGroup<DisplayItem>[]).map((lg) => ({
+                label: `— ${lg.letter} —`,
+                items: lg.items,
+              }))
+            : (grp as BlockGroup<DisplayItem>[]).map((bg) => ({
+                label: bg.blockName,
+                items: bg.items,
+              }))
+        const pages = paginateNewspaperColumns(groupList, heights)
+        return newspaperRowsToFlatRows(flattenNewspaperPagesToRows(pages))
+      }
       if (sortMode === 'ALPHABETICAL') {
         const [leftGroups, rightGroups] = splitLetterGroupsIntoColumns(grp as LetterGroup<DisplayItem>[])
         return [
@@ -826,7 +872,7 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
     }
     const rows = buildForItems(items)
     return { searchableRows: rows, sectionOffsets: [0] }
-  }, [showFindInPage, items, effectiveDisplayMode, sortMode, flowDirection, blocks])
+  }, [showFindInPage, items, effectiveDisplayMode, sortMode, flowDirection, blocks, listType, fonts])
 
   const [searchText, setSearchText] = useState('')
   const deferredSearch = useDebouncedValue(searchText, 200)
@@ -1078,6 +1124,8 @@ function TwoColumnLayout({
 
   const [leftRows, rightRows] = useMemo(() => {
     if (flowDirection === 'ROW_BY_ROW') return [[], []]
+    /** Obst: Spalten-Zeitung – eigene Paginierung, nicht die alte Zwei-Spalten-Aufteilung */
+    if (listType === 'obst' && flowDirection === 'COLUMN_FIRST') return [[], []]
     if (sortMode === 'ALPHABETICAL') {
       const letterGroups = groups as LetterGroup<DisplayItem>[]
       const [leftGroups, rightGroups] = splitLetterGroupsIntoColumns(letterGroups)
@@ -1089,7 +1137,24 @@ function TwoColumnLayout({
     const allRows = buildFlatRowsFromBlockGroups(groups as BlockGroup<DisplayItem>[])
     const mid = Math.ceil(allRows.length / 2)
     return [allRows.slice(0, mid), allRows.slice(mid)]
-  }, [groups, flowDirection, sortMode])
+  }, [groups, flowDirection, sortMode, listType])
+
+  /** Obst, spaltenweise: gleiche Logik wie PDF (linke Spalte → rechte Spalte → Seitenwechsel) */
+  const obstNewspaper = useMemo(() => {
+    if (listType !== 'obst' || flowDirection !== 'COLUMN_FIRST') return null
+    const heights = computeObstNewspaperHeightsPx(fonts)
+    const groupList =
+      sortMode === 'ALPHABETICAL'
+        ? (groups as LetterGroup<DisplayItem>[]).map((lg) => ({
+            label: `— ${lg.letter} —`,
+            items: lg.items,
+          }))
+        : (groups as BlockGroup<DisplayItem>[]).map((bg) => ({
+            label: bg.blockName,
+            items: bg.items,
+          }))
+    return { pages: paginateNewspaperColumns(groupList, heights), heights }
+  }, [listType, flowDirection, sortMode, groups, fonts])
 
   const allFlatRows = useMemo(() => {
     if (sortMode === 'BY_BLOCK') return buildFlatRowsFromBlockGroups(groups as BlockGroup<DisplayItem>[])
@@ -1138,6 +1203,115 @@ function TwoColumnLayout({
               listType={listType}
             />
           )}
+        </div>
+      </div>
+    )
+  }
+
+  if (obstNewspaper) {
+    const mobileNewspaperRows = newspaperRowsToFlatRows(
+      flattenNewspaperPagesToRows(obstNewspaper.pages),
+    )
+    const baseRowOffset = findInPageRowOffset ?? 0
+    const newspaperDesktopPages = obstNewspaper.pages.reduce<{
+      offset: number
+      rows: Array<{
+        pageIdx: number
+        leftFlat: FlatRow[]
+        rightFlat: FlatRow[]
+        leftOff: number
+        rightOff: number
+      }>
+    }>(
+      (acc, page, pageIdx) => {
+        const leftFlat = newspaperRowsToFlatRows(page.left)
+        const rightFlat = newspaperRowsToFlatRows(page.right)
+        const leftOff = acc.offset
+        const afterLeft = acc.offset + leftFlat.length
+        const rightOff = afterLeft
+        const afterRight = afterLeft + rightFlat.length
+        return {
+          offset: afterRight,
+          rows: [
+            ...acc.rows,
+            {
+              pageIdx,
+              leftFlat,
+              rightFlat,
+              leftOff,
+              rightOff,
+            },
+          ],
+        }
+      },
+      { offset: baseRowOffset, rows: [] },
+    ).rows
+    return (
+      <div className="rounded-b-lg border border-t-0 border-border overflow-hidden">
+        <div className="hidden md:block">
+          {newspaperDesktopPages.map(
+            ({ pageIdx, leftFlat, rightFlat, leftOff, rightOff }) => {
+            const minH =
+              pageIdx === 0
+                ? obstNewspaper.heights.columnHeightFirstPage
+                : obstNewspaper.heights.columnHeightContinuationPage
+            return (
+              <div key={`np-${pageIdx}`}>
+                {pageIdx > 0 && (
+                  <div
+                    className="flex items-center gap-3 border-t border-dashed border-border bg-muted/25 px-4 py-2.5 text-sm font-medium text-muted-foreground"
+                    role="separator"
+                    aria-label={`Seite ${pageIdx + 1}`}
+                  >
+                    <span className="h-px min-w-[2rem] flex-1 bg-border" aria-hidden />
+                    Seite {pageIdx + 1}
+                    <span className="h-px min-w-[2rem] flex-1 bg-border" aria-hidden />
+                  </div>
+                )}
+                <div className="flex divide-x divide-border items-start" style={{ minHeight: minH }}>
+                  <PLUColumn
+                    rows={leftFlat}
+                    fonts={fonts}
+                    letterGroupHeaderFontPx={fonts.product}
+                    selectionMode={selectionMode}
+                    selectedPLUs={selectedPLUs}
+                    onToggleSelect={onToggleSelect}
+                    findInPageRowOffset={leftOff}
+                    findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+                    findInPageQuery={findInPageQuery}
+                    listType={listType}
+                  />
+                  <PLUColumn
+                    rows={rightFlat}
+                    fonts={fonts}
+                    letterGroupHeaderFontPx={fonts.product}
+                    selectionMode={selectionMode}
+                    selectedPLUs={selectedPLUs}
+                    onToggleSelect={onToggleSelect}
+                    findInPageRowOffset={rightOff}
+                    findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+                    findInPageQuery={findInPageQuery}
+                    listType={listType}
+                  />
+                </div>
+              </div>
+            )
+          },
+          )}
+        </div>
+        <div className="md:hidden">
+          <PLUColumn
+            rows={mobileNewspaperRows}
+            fonts={fonts}
+            letterGroupHeaderFontPx={fonts.product}
+            selectionMode={selectionMode}
+            selectedPLUs={selectedPLUs}
+            onToggleSelect={onToggleSelect}
+            findInPageRowOffset={findInPageRowOffset}
+            findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+            findInPageQuery={findInPageQuery}
+            listType={listType}
+          />
         </div>
       </div>
     )

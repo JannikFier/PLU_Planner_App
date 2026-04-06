@@ -102,8 +102,8 @@ export function OfferProductsPage() {
 
   const rawHiddenPluSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
   const effectiveHiddenPLUs = useMemo(
-    () => effectiveHiddenPluSet(rawHiddenPluSet, obstCampaign?.lines),
-    [rawHiddenPluSet, obstCampaign?.lines],
+    () => effectiveHiddenPluSet(rawHiddenPluSet, obstCampaign),
+    [rawHiddenPluSet, obstCampaign],
   )
 
   const offerDisplayByPlu = useMemo(

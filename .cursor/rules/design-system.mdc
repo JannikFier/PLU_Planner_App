@@ -16,6 +16,10 @@ alwaysApply: true
 - PLU geändert: bg-plu-changed-bg text-plu-changed-text – NUR auf PLU-Zelle
 - Unverändert: Keine besondere Farbe
 
+## Zentrale Obst-Werbung (Artikelname – nicht PLU-Spalte)
+- Wochenwerbung (Ordersatz; historisch auch Exit-Kampagne): `bg-offer-week-name-bg` `text-offer-week-name-text`
+- Ordersatz 3-Tage-Preis: `bg-offer-3day-name-bg` `text-offer-3day-name-text` (Token in `src/index.css` @theme)
+
 ## Tabellen
 - Zwei-Spalten-Layout (links PLU+Artikel, Lücke, rechts PLU+Artikel)
 - Zebra-Striping: even:bg-muted/50

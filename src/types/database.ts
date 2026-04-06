@@ -497,6 +497,7 @@ export interface Database {
           id: string
           kw_nummer: number
           jahr: number
+          campaign_kind: 'exit' | 'ordersatz_week' | 'ordersatz_3day'
           source_file_name: string | null
           created_at: string
           created_by: string
@@ -505,6 +506,7 @@ export interface Database {
           id?: string
           kw_nummer: number
           jahr: number
+          campaign_kind: 'exit' | 'ordersatz_week' | 'ordersatz_3day'
           source_file_name?: string | null
           created_at?: string
           created_by: string
@@ -512,6 +514,7 @@ export interface Database {
         Update: {
           kw_nummer?: number
           jahr?: number
+          campaign_kind?: 'exit' | 'ordersatz_week' | 'ordersatz_3day'
           source_file_name?: string | null
         }
       }

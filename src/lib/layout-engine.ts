@@ -139,6 +139,7 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
         offer_source_kind: o?.source,
         offer_central_reference_price:
           o?.source === 'central' ? (o.centralReferencePrice ?? null) : undefined,
+        offer_name_highlight_kind: o?.source === 'central' ? o.centralCampaignKind : undefined,
       }
     }
     const on = offerPLUs?.has(item.plu) ?? false
@@ -147,6 +148,7 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
       is_offer: on,
       offer_promo_price: null,
       offer_source_kind: on ? ('manual' as const) : undefined,
+      offer_name_highlight_kind: undefined,
     }
   })
 

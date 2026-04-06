@@ -171,7 +171,8 @@ function parsePriceFromCell(cell: string): number | null {
 
 /**
  * Parst eine Excel-Datei für den Upload eigener Produkte.
- * Format: Spalte 1 = PLU (4–5 Ziffern) ODER Preis (Dezimalzahl); Spalte 2 = Name; Spalte 3 = optional Warengruppe oder Stück/Gewicht.
+ * Format: Spalte 1 = PLU (4–5 Ziffern) ODER Preis; Spalte 2 = Name; Spalte 3 = optional Warengruppe oder Typ;
+ * optional Spalte 4 = Typ, wenn Spalte 3 die Warengruppe ist.
  */
 export async function parseCustomProductsExcel(file: File): Promise<CustomProductParseResult> {
   try {
@@ -187,6 +188,7 @@ export async function parseCustomProductsExcel(file: File): Promise<CustomProduc
       const col1 = cells[0] ?? ''
       const col2 = cells[1] ?? ''
       const col3 = (cells[2] ?? '').trim() || null
+      const col4 = cells.length > 3 ? ((cells[3] ?? '').trim() || null) : null
 
       if (col1.toUpperCase().includes('PLU') || col1.toUpperCase().includes('SPALTE')) {
         skippedRows++
@@ -204,6 +206,7 @@ export async function parseCustomProductsExcel(file: File): Promise<CustomProduc
           preis: null,
           name: col2,
           blockNameOrType: col3,
+          typColumn: col4,
         })
         continue
       }
@@ -215,6 +218,7 @@ export async function parseCustomProductsExcel(file: File): Promise<CustomProduc
           preis: price,
           name: col2,
           blockNameOrType: col3,
+          typColumn: col4,
         })
         continue
       }

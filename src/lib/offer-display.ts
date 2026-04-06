@@ -4,12 +4,24 @@ import type { OfferItem, BackshopOfferItem } from '@/types/database'
 
 export type OfferSourceKind = 'central' | 'manual'
 
+/** Obst: welche zentrale Kampagne gewinnt bei Duplikat-PLU (Namens-Hintergrund) */
+export type ObstCentralCampaignKind = 'exit' | 'ordersatz_week' | 'ordersatz_3day'
+
+/** Priorität bei gleicher PLU in mehreren Obst-Kampagnen: höher = gewinnt */
+export function obstCentralKindPriority(k: ObstCentralCampaignKind): number {
+  if (k === 'ordersatz_3day') return 3
+  if (k === 'ordersatz_week') return 2
+  return 1
+}
+
 /** Anzeige-Infos pro PLU (nur Einträge die als Werbung sichtbar sind) */
 export interface OfferDisplayInfo {
   promoPrice: number | null
   source: OfferSourceKind
   /** Nur zentral: Originalpreis aus Kampagne (Referenz, auch bei lokalem Preis) */
   centralReferencePrice?: number | null
+  /** Nur Obst, zentral: welche Kampagne liefert Preis/Namensfarbe */
+  centralCampaignKind?: ObstCentralCampaignKind
 }
 
 function isKwInRange(
@@ -25,10 +37,22 @@ function isKwInRange(
   return current >= start && current < end
 }
 
+export type CampaignLineRow = {
+  plu: string
+  promo_price: number
+  /** Nur Obst: für Namens-Hervorhebung (Exit / Woche / 3-Tage) */
+  central_kind?: ObstCentralCampaignKind
+}
+
 export type CampaignWithLines = {
   kw_nummer: number
   jahr: number
-  lines: { plu: string; promo_price: number }[]
+  lines: CampaignLineRow[]
+  /**
+   * Obst: alle PLUs aus exit + ordersatz_week + ordersatz_3day (Ausblend-Union).
+   * Backshop: nicht gesetzt – es gilt nur `lines`.
+   */
+  allCentralPluUnion?: string[]
 }
 
 /**
@@ -65,12 +89,18 @@ export function buildOfferDisplayMap(
       if (!disabled.has(ln.plu)) {
         const ref = Number(ln.promo_price)
         const local = localCentralPriceOverrides?.get(ln.plu)
+        // ref 0 = nur Werbe-Markierung ohne zentralen Aktionspreis (Listenpreis bleibt sichtbar)
         const effective =
-          local != null && Number.isFinite(local) && local > 0 ? local : ref
+          local != null && Number.isFinite(local) && local > 0
+            ? local
+            : Number.isFinite(ref) && ref > 0
+              ? ref
+              : null
         map.set(ln.plu, {
           promoPrice: effective,
           source: 'central',
-          centralReferencePrice: ref,
+          centralReferencePrice: Number.isFinite(ref) ? ref : null,
+          centralCampaignKind: ln.central_kind,
         })
       }
     }

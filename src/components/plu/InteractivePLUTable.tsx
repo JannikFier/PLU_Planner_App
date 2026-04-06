@@ -27,6 +27,7 @@ import { PreisBadge } from './PreisBadge'
 import { StatusBadge } from './StatusBadge'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
+import { useCustomProducts, useUpdateCustomProduct } from '@/hooks/useCustomProducts'
 import { useBlocks } from '@/hooks/useBlocks'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
 import {
@@ -41,13 +42,32 @@ import {
   sortBlocksWithStoreOrder,
 } from '@/lib/block-override-utils'
 import { getDisplayPlu, getDisplayNameForItem, groupItemsByBlock } from '@/lib/plu-helpers'
-import type { MasterPLUItem, Block } from '@/types/database'
+import type { CustomProduct, MasterPLUItem, Block } from '@/types/database'
 import type { DisplayItem } from '@/types/plu'
 import type { BlockGroup } from '@/lib/plu-helpers'
 
+/** Eigenes Obst-Produkt als Master-Zeile für die Block-Sortier-Ansicht (DnD). */
+function customProductToInteractiveMasterRow(cp: CustomProduct, versionId: string): MasterPLUItem {
+  return {
+    id: cp.id,
+    version_id: versionId,
+    plu: cp.plu,
+    system_name: cp.name,
+    display_name: cp.name,
+    item_type: cp.item_type,
+    status: 'UNCHANGED',
+    old_plu: null,
+    warengruppe: null,
+    block_id: cp.block_id,
+    is_admin_eigen: false,
+    is_manually_renamed: false,
+    preis: cp.preis,
+    created_at: cp.created_at,
+  }
+}
 
 /** Findet den Block-ID eines Items anhand seiner ID */
-function findBlockIdForItem(itemId: string, groups: BlockGroup[]): string | null {
+function findBlockIdForItem(itemId: string, groups: BlockGroup<MasterPLUItem>[]): string | null {
   for (const g of groups) {
     if (g.items.some((item) => item.id === itemId)) {
       return g.blockId
@@ -59,6 +79,8 @@ function findBlockIdForItem(itemId: string, groups: BlockGroup[]): string | null
 export function InteractivePLUTable() {
   const { data: activeVersion } = useActiveVersion()
   const { data: items = [] } = usePLUData(activeVersion?.id)
+  const { data: customProducts = [] } = useCustomProducts()
+  const updateCustomProduct = useUpdateCustomProduct()
   const { data: blocks = [] } = useBlocks()
   const { data: layoutSettings } = useLayoutSettings()
   const { data: storeBlockOrder = [] } = useStoreObstBlockOrder()
@@ -72,6 +94,18 @@ export function InteractivePLUTable() {
 
   const displayMode = layoutSettings?.display_mode ?? 'MIXED'
 
+  const mergedItems = useMemo(() => {
+    const vid = activeVersion?.id
+    if (!vid) return items
+    const masterPluSet = new Set(items.map((i) => i.plu))
+    const extras = customProducts
+      .filter((c) => !masterPluSet.has(c.plu))
+      .map((c) => customProductToInteractiveMasterRow(c, vid))
+    return [...items, ...extras]
+  }, [items, customProducts, activeVersion?.id])
+
+  const customById = useMemo(() => new Map(customProducts.map((c) => [c.id, c])), [customProducts])
+
   const sortedBlocks = useMemo(
     () => sortBlocksWithStoreOrder(blocks, storeBlockOrder),
     [blocks, storeBlockOrder],
@@ -79,12 +113,12 @@ export function InteractivePLUTable() {
 
   const groups = useMemo(
     () =>
-      groupItemsByBlock<MasterPLUItem>(items, sortedBlocks, {
+      groupItemsByBlock<MasterPLUItem>(mergedItems, sortedBlocks, {
         resolveBlockId: (item) =>
           effectiveBlockIdForStoreOverride(item.system_name, item.block_id, nameBlockOverrideMap),
         sortedBlocks,
       }),
-    [items, sortedBlocks, nameBlockOverrideMap],
+    [mergedItems, sortedBlocks, nameBlockOverrideMap],
   )
 
   // DnD
@@ -106,13 +140,13 @@ export function InteractivePLUTable() {
       }
     } else if (id.startsWith('drag-item-')) {
       const itemId = id.replace('drag-item-', '')
-      const item = items.find((i) => i.id === itemId)
+      const item = mergedItems.find((i) => i.id === itemId)
       if (item) {
         setDragType('item')
         setDragData({ item })
       }
     }
-  }, [sortedBlocks, items])
+  }, [sortedBlocks, mergedItems])
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event
@@ -154,16 +188,24 @@ export function InteractivePLUTable() {
       const itemId = activeId.replace('drag-item-', '')
       const targetBlockId = overId.replace('drop-block-', '')
       const blockId = targetBlockId === 'unassigned' ? null : targetBlockId
-      const item = items.find((i) => i.id === itemId)
+      const item = mergedItems.find((i) => i.id === itemId)
       if (!item) return
 
+      const custom = customById.get(itemId)
       try {
-        await assignOverrideMutation.mutateAsync({
-          systemName: item.system_name,
-          masterBlockId: item.block_id,
-          targetBlockId: blockId,
-        })
-        toast.success('Produkt verschoben')
+        if (custom) {
+          await updateCustomProduct.mutateAsync({
+            id: custom.id,
+            block_id: blockId,
+          })
+        } else {
+          await assignOverrideMutation.mutateAsync({
+            systemName: item.system_name,
+            masterBlockId: item.block_id,
+            targetBlockId: blockId,
+          })
+          toast.success('Produkt verschoben')
+        }
       } catch {
         toast.error('Fehler beim Verschieben')
       }
@@ -180,23 +222,40 @@ export function InteractivePLUTable() {
       const sourceBlockId = findBlockIdForItem(itemId, groups)
       if (targetBlockId === sourceBlockId) return // Gleicher Block
 
-      const item = items.find((i) => i.id === itemId)
+      const item = mergedItems.find((i) => i.id === itemId)
       if (!item) return
 
+      const custom = customById.get(itemId)
       try {
-        await assignOverrideMutation.mutateAsync({
-          systemName: item.system_name,
-          masterBlockId: item.block_id,
-          targetBlockId: targetBlockId,
-        })
-        toast.success('Produkt verschoben')
+        if (custom) {
+          await updateCustomProduct.mutateAsync({
+            id: custom.id,
+            block_id: targetBlockId,
+          })
+        } else {
+          await assignOverrideMutation.mutateAsync({
+            systemName: item.system_name,
+            masterBlockId: item.block_id,
+            targetBlockId: targetBlockId,
+          })
+          toast.success('Produkt verschoben')
+        }
       } catch {
         toast.error('Fehler beim Verschieben')
       }
     }
-  }, [dragType, sortedBlocks, groups, reorderStoreMutation, assignOverrideMutation, items])
+  }, [
+    dragType,
+    sortedBlocks,
+    groups,
+    reorderStoreMutation,
+    assignOverrideMutation,
+    mergedItems,
+    customById,
+    updateCustomProduct,
+  ])
 
-  if (items.length === 0) {
+  if (mergedItems.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
         Keine PLU-Daten vorhanden. Lade zuerst eine Excel-Datei hoch.
@@ -206,8 +265,8 @@ export function InteractivePLUTable() {
 
   // SEPARATED: Zwei Tabellen
   if (displayMode === 'SEPARATED') {
-    const pieceItems = items.filter((i) => i.item_type === 'PIECE')
-    const weightItems = items.filter((i) => i.item_type === 'WEIGHT')
+    const pieceItems = mergedItems.filter((i) => i.item_type === 'PIECE')
+    const weightItems = mergedItems.filter((i) => i.item_type === 'WEIGHT')
     const pieceGroups = groupItemsByBlock<MasterPLUItem>(pieceItems, sortedBlocks)
     const weightGroups = groupItemsByBlock<MasterPLUItem>(weightItems, sortedBlocks)
 

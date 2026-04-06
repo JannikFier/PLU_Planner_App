@@ -1,9 +1,8 @@
-// HideProductsDialog: Dialog zum Ausblenden von Produkten
-// Suchleiste (PLU/Name), Liste mit Scroll zu Treffern, Multi-Auswahl, Batch-Ausblenden
-// Layout wie Masterliste: Zeilenweise / Spaltenweise (Zeitung) inkl. Seiten-Hinweis
+// AssignProductsToBlockDialog: Produkte einer Warengruppe zuweisen (Layout wie „Produkte ausblenden“)
 
 import { useState, useMemo, useRef, useEffect, Fragment } from 'react'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { toast } from 'sonner'
 import {
   Dialog,
   DialogContent,
@@ -14,8 +13,8 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, EyeOff } from 'lucide-react'
-import { useHideProductsBatch } from '@/hooks/useHiddenItems'
+import { Search, UserPlus } from 'lucide-react'
+import { useAssignObstProductBlockOverride } from '@/hooks/useStoreObstBlockLayout'
 import {
   filterItemsBySearch,
   getDisplayPlu,
@@ -50,10 +49,14 @@ interface SearchableItem {
 
 const DEFAULT_FONT_SIZES: DialogPluFontSizes = { header: 24, column: 16, product: 12 }
 
-interface HideProductsDialogProps {
+interface AssignProductsToBlockDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** Produkte die noch ausgeblendet werden können (Master + Custom, nicht bereits ausgeblendet) */
+  /** Ziel-Warengruppe (Block-ID) */
+  blockId: string | null
+  /** Anzeigename der Warengruppe (Titel/Footer) */
+  blockName: string
+  /** Master-PLU-Zeilen mit system_name und block_id für Overrides */
   searchableItems: SearchableItem[]
   /** Anzeige-Modus: SEPARATED = nach Stück/Gewicht getrennt, MIXED = nur alphabetisch */
   displayMode?: 'MIXED' | 'SEPARATED'
@@ -143,19 +146,21 @@ function HideColumnTable({
   )
 }
 
-export function HideProductsDialog({
+export function AssignProductsToBlockDialog({
   open,
   onOpenChange,
+  blockId,
+  blockName,
   searchableItems,
   displayMode = 'MIXED',
   listLayout,
   flowDirection = 'COLUMN_FIRST',
   fontSizes = DEFAULT_FONT_SIZES,
-}: HideProductsDialogProps) {
+}: AssignProductsToBlockDialogProps) {
   const [searchText, setSearchText] = useState('')
   const deferredSearch = useDebouncedValue(searchText, 200)
   const [selectedPLUs, setSelectedPLUs] = useState<Set<string>>(new Set())
-  const hideBatch = useHideProductsBatch()
+  const assignOverride = useAssignObstProductBlockOverride()
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
 
   const filteredItems = useMemo(() => {
@@ -221,15 +226,26 @@ export function HideProductsDialog({
     }
   }
 
-  const handleHide = async () => {
-    if (selectedPLUs.size === 0) return
+  const handleAssign = async () => {
+    if (!blockId || selectedPLUs.size === 0) return
     try {
-      await hideBatch.mutateAsync([...selectedPLUs])
+      let n = 0
+      for (const plu of selectedPLUs) {
+        const item = searchableItems.find((i) => i.plu === plu)
+        if (!item?.system_name) continue
+        await assignOverride.mutateAsync({
+          systemName: item.system_name,
+          masterBlockId: item.block_id ?? null,
+          targetBlockId: blockId,
+        })
+        n++
+      }
+      toast.success(`${n} Produkt${n === 1 ? '' : 'e'} „${blockName}“ zugewiesen`)
       setSelectedPLUs(new Set())
       setSearchText('')
       onOpenChange(false)
     } catch {
-      // Fehler wird im Hook per Toast angezeigt
+      // Fehler-Toast kommt vom Mutation-Hook
     }
   }
 
@@ -248,9 +264,10 @@ export function HideProductsDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-6xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
         <DialogHeader className="shrink-0">
-          <DialogTitle>Produkte ausblenden</DialogTitle>
+          <DialogTitle>Produkte zur Warengruppe hinzufügen</DialogTitle>
           <DialogDescription>
-            Suche nach PLU oder Name und wähle die Produkte aus, die ausgeblendet werden sollen.
+            Warengruppe: <span className="font-medium text-foreground">{blockName}</span>. Suche nach PLU oder Name,
+            wähle Produkte aus und weise sie dieser Gruppe zu (Markt-Override, wie in der Listenansicht).
           </DialogDescription>
         </DialogHeader>
 
@@ -271,12 +288,12 @@ export function HideProductsDialog({
             {filteredItems.length === 0 ? (
               <div className="flex-1 flex items-center justify-center p-8">
                 <p className="text-sm text-muted-foreground text-center">
-                  {searchText.trim() ? 'Keine Treffer.' : 'Keine Produkte zum Ausblenden. Alle sind bereits ausgeblendet.'}
+                  {searchText.trim() ? 'Keine Treffer.' : 'Keine Produkte in der Liste.'}
                 </p>
               </div>
             ) : (
               <div ref={scrollContainerRef} className="overflow-auto flex-1 min-h-0">
-                <ul className="md:hidden divide-y divide-border" data-testid="hide-products-dialog-mobile-list">
+                <ul className="md:hidden divide-y divide-border" data-testid="assign-products-to-block-dialog-mobile-list">
                   {layout.mobileRows.map((row, i) => {
                     if (row.type === 'section') {
                       const stueck = row.title.includes('Stück')
@@ -590,11 +607,13 @@ export function HideProductsDialog({
             Abbrechen
           </Button>
           <Button
-            onClick={handleHide}
-            disabled={selectedPLUs.size === 0 || hideBatch.isPending}
+            onClick={handleAssign}
+            disabled={!blockId || selectedPLUs.size === 0 || assignOverride.isPending}
           >
-            <EyeOff className="h-4 w-4 mr-2" />
-            {hideBatch.isPending ? 'Wird ausgeblendet...' : `${selectedPLUs.size} Produkt${selectedPLUs.size === 1 ? '' : 'e'} ausblenden`}
+            <UserPlus className="h-4 w-4 mr-2" />
+            {assignOverride.isPending
+              ? 'Wird zugewiesen...'
+              : `${selectedPLUs.size} Produkt${selectedPLUs.size === 1 ? '' : 'e'} zuweisen`}
           </Button>
         </DialogFooter>
       </DialogContent>
