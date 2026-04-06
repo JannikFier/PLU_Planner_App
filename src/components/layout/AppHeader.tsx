@@ -25,6 +25,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { LogOut, Settings, User, Shield, Crown, ChevronLeft, Eye, Store, FlaskConical } from 'lucide-react'
 import { useTestMode } from '@/contexts/TestModeContext'
 import { UnifiedNotificationBell } from '@/components/plu/UnifiedNotificationBell'
+import { AppBrandLogo } from '@/components/layout/AppBrandLogo'
+import { APP_BRAND_NAME } from '@/lib/brand'
 import { cn } from '@/lib/utils'
 
 /**
@@ -227,6 +229,9 @@ export function AppHeader() {
     ?? (isSuperAdmin ? 'Super-Admin' : isAdmin ? 'Admin' : isViewer ? 'Viewer' : null)
   const RoleIcon = previewRoleLabel ? Eye : isSuperAdmin ? Crown : isAdmin ? Shield : Eye
 
+  /** Untertitel unter dem App-Namen – weniger Abstand zur Titelzeile (z. B. Fier Hub / Super-Administration) */
+  const brandSubtitleClass = 'text-xs text-muted-foreground leading-tight block -mt-0.5'
+
   const handleLogout = async () => {
     try {
       await logout()
@@ -257,39 +262,37 @@ export function AppHeader() {
             className="flex cursor-pointer items-center gap-2"
             onClick={() => navigate(effectiveHomePath)}
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
-              PLU
-            </div>
+            <AppBrandLogo />
             <div className="min-w-0">
-              <h1 className="text-lg font-semibold leading-tight">PLU Planner</h1>
+              <h1 className="text-lg font-semibold leading-none tracking-tight">{APP_BRAND_NAME}</h1>
               {/* Super-Admin: Dashboard/Global = kein Markt, Firma = Firmenname, Laden = Marktname */}
               {isSuperAdminGlobal && !inSuperAdminPreview && (
-                <span className="text-xs text-muted-foreground">Super-Administration</span>
+                <span className={brandSubtitleClass}>Super-Administration</span>
               )}
               {isSuperAdminStoreDetail && storeName && (
-                <span className="text-xs text-muted-foreground truncate block max-w-[150px] sm:max-w-none">{storeName}</span>
+                <span className={cn(brandSubtitleClass, 'truncate max-w-[150px] sm:max-w-none')}>{storeName}</span>
               )}
               {isSuperAdminCompanyDetail && headerCompany?.name && (
-                <span className="text-xs text-muted-foreground truncate block max-w-[150px] sm:max-w-none">{headerCompany.name}</span>
+                <span className={cn(brandSubtitleClass, 'truncate max-w-[150px] sm:max-w-none')}>{headerCompany.name}</span>
               )}
               {/* Marktname: auch in User-Vorschau (Super-Admin mit simuliertem Kontext) */}
               {(!isSuperAdmin || inSuperAdminPreview) && storeName && !isAdminDomain && (
-                <span className="text-xs text-muted-foreground truncate block max-w-[150px] sm:max-w-none">{storeName}</span>
+                <span className={cn(brandSubtitleClass, 'truncate max-w-[150px] sm:max-w-none')}>{storeName}</span>
               )}
               {!isSuperAdmin && isAdminDomain && isAdmin && (
-                <span className="text-xs text-muted-foreground">Administration</span>
+                <span className={brandSubtitleClass}>Administration</span>
               )}
               {inSuperAdminPreview && isAdminDomain && preview?.simulatedRole === 'admin' && (
-                <span className="text-xs text-muted-foreground">Administration</span>
+                <span className={brandSubtitleClass}>Administration</span>
               )}
               {!isSuperAdmin && !isAdminDomain && !storeName && isAdmin && (
-                <span className="text-xs text-muted-foreground">Administration</span>
+                <span className={brandSubtitleClass}>Administration</span>
               )}
               {!isSuperAdmin && !isAdminDomain && !storeName && isViewer && (
-                <span className="text-xs text-muted-foreground">Nur Ansicht</span>
+                <span className={brandSubtitleClass}>Nur Ansicht</span>
               )}
               {inSuperAdminPreview && !storeName && preview?.simulatedRole === 'viewer' && (
-                <span className="text-xs text-muted-foreground">Nur Ansicht</span>
+                <span className={brandSubtitleClass}>Nur Ansicht</span>
               )}
             </div>
           </div>

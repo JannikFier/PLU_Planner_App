@@ -6,9 +6,9 @@ import { test, expect } from '@playwright/test'
  * @smoke = Standard-Test (schnell, vor jedem Commit)
  */
 test.describe('Smoke', () => {
-  test('Login-Seite lädt und zeigt Titel PLU Planner @smoke', async ({ page }) => {
+  test('Login-Seite lädt und zeigt Titel Fier Hub @smoke', async ({ page }) => {
     await page.goto('/login')
-    await expect(page.getByRole('heading', { name: 'PLU Planner', level: 1 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Fier Hub', level: 1 })).toBeVisible()
     // Login-Formular sichtbar: Anmelden-Button (robuster als CardTitle/Text)
     await expect(page.getByRole('button', { name: 'Anmelden' })).toBeVisible()
   })

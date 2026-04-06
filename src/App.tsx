@@ -20,6 +20,8 @@ import { ListAreaGuard } from '@/components/layout/ListAreaGuard'
 import { RedirectRolePrefixed } from '@/components/RedirectRolePrefixed'
 import { CACHE_MAX_AGE_MS, queryClient } from '@/lib/query-client'
 import { shouldPersistQuery } from '@/lib/query-persist-allowlist'
+import { APP_BRAND_NAME } from '@/lib/brand'
+import { AppBrandLogo } from '@/components/layout/AppBrandLogo'
 
 // Seiten – lazy geladen
 const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })))
@@ -76,10 +78,8 @@ function PageLoadingFallback() {
     <div className="min-h-screen flex flex-col bg-background" aria-label="Seite wird geladen">
       <header className="h-16 border-b bg-card/80 flex items-center px-4 sm:px-6 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="h-9 w-9 flex items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
-            PLU
-          </div>
-          <span className="text-lg font-semibold">PLU Planner</span>
+          <AppBrandLogo />
+          <span className="text-lg font-semibold">{APP_BRAND_NAME}</span>
         </div>
       </header>
       <main className="flex-1 flex items-center justify-center mx-auto max-w-7xl w-full px-4 py-6">

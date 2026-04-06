@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, Eye, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
+import { APP_BRAND_NAME } from '@/lib/brand'
+import { AppBrandLogo } from '@/components/layout/AppBrandLogo'
 
 /**
  * Login-Seite mit einem einzigen Eingabefeld für Email ODER Personalnummer.
@@ -32,7 +34,7 @@ export function LoginPage() {
 
   const { storeName, storeLogo, companyLogo, isAdminDomain, error: storeError } = useCurrentStore()
   const brandLogo = storeLogo ?? companyLogo
-  const brandName = storeName ?? 'PLU Planner'
+  const brandName = storeName ?? APP_BRAND_NAME
 
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -110,12 +112,12 @@ export function LoginPage() {
               className="mx-auto mb-4 h-16 w-auto object-contain"
             />
           ) : (
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground font-bold text-2xl shadow-lg">
-              PLU
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl shadow-lg ring-1 ring-primary/15">
+              <AppBrandLogo className="h-16 w-16 rounded-2xl" />
             </div>
           )}
           <h1 className="text-3xl font-bold tracking-tight">
-            {isAdminDomain ? 'PLU Planner' : brandName}
+            {isAdminDomain ? APP_BRAND_NAME : brandName}
           </h1>
           <p className="mt-2 text-muted-foreground">
             Melde dich an, um auf deine PLU-Listen zuzugreifen
