@@ -157,7 +157,7 @@ Alle Rollen arbeiten an EINER gemeinsamen Liste. Änderungen gelten für alle.
 Produkte können in logische Gruppen eingeteilt werden (z.B. "Exotik", "Regional").
 
 ### WarengruppenPanel (Split-Panel)
-- **Links**: Liste aller Warengruppen mit Artikelanzahl, Erstellen/Umbenennen/Löschen
+- **Links**: Liste aller Warengruppen mit Artikelanzahl; **Erstellen/Umbenennen/Löschen** der globalen Gruppen für **Admin und Super-Admin** (RLS `is_admin()`; Migration 055)
 - **Rechts**: Alle Produkte mit Checkboxen, Suchfeld, Batch-Zuweisen an gewählte Gruppe; bei gewählter Gruppe **Produkte hinzufügen…** öffnet einen Dialog im gleichen Layout wie **Produkte ausblenden** (Suche, Mehrfachauswahl, Zuweisung an die Warengruppe per Markt-Override).
 - **Eigene Seite Obst:** dieselbe Panel-Logik auf **`/user/obst-warengruppen`**, **`/admin/obst-warengruppen`** und **`/super-admin/obst-warengruppen`** (weiterhin auch unter **Inhalt & Regeln** eingebettet).
 

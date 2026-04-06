@@ -11,19 +11,45 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
+const _nativeFetch = window.fetch.bind(window)
 
 /**
- * Globaler Testmodus-Flag. Wenn aktiv, werden alle Schreib-Operationen blockiert:
- * 1. invokeEdgeFunction / mutateRest → fruehzeitiger Return
- * 2. Direkte supabase.from().insert/update/delete → fetch-Interceptor
- *    blockiert POST/PATCH/DELETE an /rest/v1/ und gibt Fake-Erfolg zurueck.
- * GET/HEAD (Reads) und Auth/Storage bleiben unberuehrt.
+ * Globaler Testmodus-Flag (vor createClient: kein TDZ bei sofortigem fetch).
+ * Wenn aktiv: Schreib-Operationen an /rest/v1/ werden im Client-Fetch simuliert.
  */
 let _testModeActive = false
-export function isTestModeActive() { return _testModeActive }
 
-const _nativeFetch = window.fetch.bind(window)
+/** Supabase-Client-Fetch: Testmodus blockiert Schreib-Requests an /rest/v1/ ohne Backend. */
+function supabaseClientFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    const urlStr =
+      typeof input === 'string' ? input : input instanceof URL ? input.href : input instanceof Request ? input.url : ''
+    const method = (init?.method ?? (input instanceof Request ? input.method : undefined) ?? 'GET').toUpperCase()
+    const isSupabaseRest = urlStr.includes(supabaseUrl) && urlStr.includes('/rest/v1/')
+    const isWriteMethod = method === 'POST' || method === 'PATCH' || method === 'DELETE'
+    if (_testModeActive && isSupabaseRest && isWriteMethod) {
+      return Promise.resolve(
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    }
+  } catch {
+    /* weiter mit normalem Fetch */
+  }
+  return _nativeFetch(input, init)
+}
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  global: { fetch: supabaseClientFetch },
+})
+
+/**
+ * Testmodus: siehe _testModeActive oben; invokeEdgeFunction / mutateRest → fruehzeitiger Return;
+ * window.fetch-Interceptor fuer direkte Aufrufe; Supabase-Client nutzt supabaseClientFetch.
+ */
+export function isTestModeActive() { return _testModeActive }
 
 export function setTestModeFlag(active: boolean) {
   _testModeActive = active
@@ -142,7 +168,7 @@ export async function invokeEdgeFunction<T = Record<string, unknown>>(
     const timeoutId = setTimeout(() => controller.abort(), EDGE_FUNCTION_TIMEOUT_MS)
 
     try {
-      const resp = await window.fetch(
+      const resp = await supabaseClientFetch(
         `${supabaseUrl}/functions/v1/${functionName}`,
         {
           method: 'POST',
@@ -207,7 +233,7 @@ export async function queryRest<T = unknown[]>(
       url.searchParams.set(k, v)
     }
 
-    return window.fetch(url.toString(), {
+    return supabaseClientFetch(url.toString(), {
       headers: {
         'apikey': supabaseAnonKey,
         'Authorization': `Bearer ${jwt}`,
@@ -260,7 +286,7 @@ export async function queryRestCount(
       url.searchParams.set(k, v)
     }
 
-    return window.fetch(url.toString(), {
+    return supabaseClientFetch(url.toString(), {
       headers: {
         'apikey': supabaseAnonKey,
         'Authorization': `Bearer ${jwt}`,
@@ -319,7 +345,7 @@ export async function mutateRest(
     }
     if (options.body) headers['Content-Type'] = 'application/json'
 
-    return window.fetch(url.toString(), {
+    return supabaseClientFetch(url.toString(), {
       method,
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,

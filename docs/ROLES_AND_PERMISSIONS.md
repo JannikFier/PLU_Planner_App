@@ -27,8 +27,8 @@ Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
 | **Excel Upload / KW-Vergleich** | ✅ | ❌ | ❌ | ❌ |
 | **Layout konfigurieren** (marktspezifisch) | ✅ | ✅ (eigener Markt) | ❌ | ❌ |
 | **Bezeichnungsregeln verwalten** (marktspezifisch) | ✅ | ✅ (eigener Markt) | ❌ | ❌ |
-| **Warengruppen/Bloecke verwalten** (global: Namen, Upload-Referenz) | ✅ | ❌ | ❌ | ❌ |
-| **Warengruppen sortieren / PLU-Zuordnung** (nur Markt, Overrides) | ✅ | ✅ (eigener Markt) | ❌ | ❌ |
+| **Warengruppen/Bloecke verwalten** (global: Namen, Regeln, Reihenfolge) | ✅ | ✅ | ❌ | ❌ |
+| **Warengruppen sortieren / PLU-Zuordnung** (Markt-Overrides, Zuweisung) | ✅ | ✅ (eigener Markt) | ❌ | ❌ |
 | **KW-Versionen verwalten** | ✅ | ❌ | ❌ | ❌ |
 | **Firmen/Maerkte anlegen** | ✅ | ❌ | ❌ | ❌ |
 | **Firmen/Maerkte pausieren/loeschen** | ✅ | ❌ | ❌ | ❌ |

@@ -370,7 +370,11 @@ Getrennte Tabellen für die zweite PLU-Liste „Backshop“. Keine Änderung an 
 
 **Funktion:** `get_active_backshop_version()` – gibt die aktive Backshop-Version zurück (analog `get_active_version()`).
 
-**RLS:** Lesen für alle authentifizierten User; Schreiben für versions/items/blocks/regeln/layout/bezeichnungsregeln nur Super-Admin; `backshop_custom_products` wie `custom_products`; `backshop_hidden_items` wie `hidden_items` (Schreiben nur aktueller Markt, Migration 049).
+**RLS:** Lesen für alle authentifizierten User; Schreiben für `blocks`, `block_rules`, `backshop_blocks`, `backshop_block_rules` für **Admin + Super-Admin** (`is_admin()`, Migration 055). Falls im Projekt eine Tabelle **`product_groups`** existiert (z. B. älterer Name oder Parallel-Schema): Migration **056** setzt dort dieselbe Logik (Lesen bei Login, Schreiben `is_admin()`); ohne diese Tabelle wird 056 übersprungen.
+
+**Hinweis:** Die App im Repo nutzt die Tabelle **`blocks`**. Wenn die Browser-Konsole **`/rest/v1/product_groups`** zeigt, muss entweder Migration 056 auf Supabase laufen **oder** der Client-Code auf `blocks` vereinheitlicht werden.
+
+**RLS (Fortsetzung):** Schreiben für versions/items/layout/bezeichnungsregeln weiterhin nur Super-Admin wo zutreffend; `backshop_custom_products` wie `custom_products`; `backshop_hidden_items` wie `hidden_items` (Schreiben nur aktueller Markt, Migration 049).
 
 ## Supabase Storage (Backshop-Bilder)
 

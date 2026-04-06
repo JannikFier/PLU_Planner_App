@@ -39,6 +39,7 @@ import {
   useAssignBackshopProducts,
   useCreateBackshopBlock,
 } from '@/hooks/useBackshopBlocks'
+import { useAuth } from '@/hooks/useAuth'
 import { BackshopSchlagwortManager } from '@/components/plu/BackshopSchlagwortManager'
 import { BackshopWarengruppenPanel } from '@/components/plu/BackshopWarengruppenPanel'
 import { applyBackshopBlockRules } from '@/lib/apply-backshop-block-rules'
@@ -61,6 +62,7 @@ interface ExcelImportSummary {
 
 export function BackshopRulesPage() {
   const navigate = useNavigate()
+  const { isAdmin } = useAuth()
   const { data: regeln = [] } = useBackshopBezeichnungsregeln()
   const { data: layoutSettings } = useBackshopLayoutSettings()
   const { data: activeVersion } = useActiveBackshopVersion()
@@ -201,6 +203,12 @@ export function BackshopRulesPage() {
     }
     setIsApplyingExcel(true)
     try {
+      const needsNewBlocks = excelSummary.assignments.some((a) => a.isNewBlock)
+      if (needsNewBlocks && !isAdmin) {
+        toast.error('Keine Berechtigung: Neue Warengruppen anlegen nur als Admin oder Super-Admin.')
+        return
+      }
+
       const blockIdByNameNorm = new Map(existingBlockByNameNorm)
 
       // Fehlende Warengruppen aus Excel anlegen
@@ -237,7 +245,7 @@ export function BackshopRulesPage() {
     } finally {
       setIsApplyingExcel(false)
     }
-  }, [excelSummary, existingBlockByNameNorm, createBackshopBlock, blocks.length, assignProducts])
+  }, [excelSummary, existingBlockByNameNorm, createBackshopBlock, blocks.length, assignProducts, isAdmin])
 
 
   const handleAddBlockRule = useCallback(async () => {
@@ -354,9 +362,11 @@ export function BackshopRulesPage() {
                 Regeln: Wenn der Produktname ein Schlagwort enthält, wird die Warengruppe automatisch zugewiesen. Mit &quot;Regeln jetzt anwenden&quot; ausführen.
               </CardDescription>
             </div>
-            <Button size="sm" onClick={() => { setNewRuleKeyword(''); setNewRuleBlockId(sortedBlocks[0]?.id ?? ''); setShowAddBlockRuleDialog(true) }}>
-              <Plus className="h-4 w-4 mr-1" /> Regel
-            </Button>
+            {isAdmin ? (
+              <Button size="sm" onClick={() => { setNewRuleKeyword(''); setNewRuleBlockId(sortedBlocks[0]?.id ?? ''); setShowAddBlockRuleDialog(true) }}>
+                <Plus className="h-4 w-4 mr-1" /> Regel
+              </Button>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-4">
             {nameContainsRules.length === 0 ? (
@@ -374,14 +384,16 @@ export function BackshopRulesPage() {
                       <span className="font-medium">&quot;{rule.value}&quot;</span>
                       <ArrowRight className="h-3 w-3" />
                       <span className="text-xs">{block?.name ?? '?'}</span>
-                      <button
-                        type="button"
-                        className="ml-1 rounded hover:bg-muted p-0.5"
-                        onClick={() => handleDeleteBlockRule(rule.id)}
-                        aria-label="Regel löschen"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      {isAdmin ? (
+                        <button
+                          type="button"
+                          className="ml-1 rounded hover:bg-muted p-0.5"
+                          onClick={() => handleDeleteBlockRule(rule.id)}
+                          aria-label="Regel löschen"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      ) : null}
                     </Badge>
                   )
                 })}

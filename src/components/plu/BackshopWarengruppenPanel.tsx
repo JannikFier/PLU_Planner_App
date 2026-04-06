@@ -62,9 +62,11 @@ import {
   effectiveBlockIdForStoreOverride,
   sortBlocksWithStoreOrder,
 } from '@/lib/block-override-utils'
+import { useAuth } from '@/hooks/useAuth'
 import type { BackshopMasterPLUItem } from '@/types/database'
 
 export function BackshopWarengruppenPanel() {
+  const { isAdmin } = useAuth()
   const { data: activeVersion } = useActiveBackshopVersion()
   const { data: items = [] } = useBackshopPLUData(activeVersion?.id)
   const { data: blocks = [] } = useBackshopBlocks()
@@ -275,9 +277,11 @@ export function BackshopWarengruppenPanel() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <CardTitle className="text-sm">Warengruppen (Backshop)</CardTitle>
-              <Button size="sm" variant="outline" onClick={() => { setBlockName(''); setShowAddBlock(true) }}>
-                <Plus className="h-3 w-3 mr-1" /> Neue Gruppe
-              </Button>
+              {isAdmin ? (
+                <Button size="sm" variant="outline" onClick={() => { setBlockName(''); setShowAddBlock(true) }}>
+                  <Plus className="h-3 w-3 mr-1" /> Neue Gruppe
+                </Button>
+              ) : null}
             </CardHeader>
             <CardContent className="space-y-2">
               <ScrollArea className="h-[300px]">
@@ -299,7 +303,7 @@ export function BackshopWarengruppenPanel() {
                   </div>
                 </div>
               </ScrollArea>
-              {selectedBlock && (
+              {selectedBlock && isAdmin && (
                 <div className="flex min-w-0 flex-col gap-2 pt-2 border-t border-border sm:flex-row sm:flex-wrap">
                   <Button
                     size="sm"

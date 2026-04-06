@@ -63,8 +63,10 @@ import {
   effectiveBlockIdForStoreOverride,
   sortBlocksWithStoreOrder,
 } from '@/lib/block-override-utils'
+import { useAuth } from '@/hooks/useAuth'
 import type { MasterPLUItem } from '@/types/database'
 export function WarengruppenPanel() {
+  const { isAdmin } = useAuth()
   const { data: activeVersion } = useActiveVersion()
   const { data: items = [] } = usePLUData(activeVersion?.id)
   const { data: layoutSettings } = useLayoutSettings()
@@ -299,9 +301,11 @@ export function WarengruppenPanel() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <CardTitle className="text-sm">Warengruppen</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => { setBlockName(''); setShowAddBlock(true) }}>
-            <Plus className="h-3 w-3 mr-1" /> Neue Gruppe
-          </Button>
+          {isAdmin ? (
+            <Button size="sm" variant="outline" onClick={() => { setBlockName(''); setShowAddBlock(true) }}>
+              <Plus className="h-3 w-3 mr-1" /> Neue Gruppe
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-2">
           <ScrollArea className="h-[300px]">
@@ -326,7 +330,7 @@ export function WarengruppenPanel() {
           </ScrollArea>
 
           {/* Aktionen für ausgewählte Gruppe */}
-          {selectedBlock && (
+          {selectedBlock && isAdmin && (
             <div className="flex min-w-0 flex-col gap-2 pt-2 border-t border-border sm:flex-row sm:flex-wrap">
               <Button
                 size="sm"

@@ -1,7 +1,7 @@
 // Backshop: Dialog zum Anlegen eines eigenen Produkts (PLU, Name, Bild Pflicht).
 // Warengruppe layoutabhängig: bei BY_BLOCK Pflicht inkl. „Neue Warengruppe erstellen“, bei ALPHABETICAL entfällt sie.
 
-import { useState, useCallback, useRef, useMemo } from 'react'
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -44,7 +44,7 @@ export function BackshopCustomProductDialog({
   existingPLUs,
   blocks,
 }: BackshopCustomProductDialogProps) {
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const addProduct = useAddBackshopCustomProduct()
   const { data: layoutSettings } = useBackshopLayoutSettings()
   const createBlock = useCreateBackshopBlock()
@@ -69,6 +69,13 @@ export function BackshopCustomProductDialog({
   const [newBlockName, setNewBlockName] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [errorPopup, setErrorPopup] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isAdmin && showNewBlockInput) {
+      setShowNewBlockInput(false)
+      setNewBlockName('')
+    }
+  }, [isAdmin, showNewBlockInput])
 
   const resetForm = useCallback(() => {
     setPlu('')
@@ -362,15 +369,17 @@ export function BackshopCustomProductDialog({
                         ))}
                     </SelectContent>
                   </Select>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="mt-1"
-                    onClick={() => setShowNewBlockInput(true)}
-                  >
-                    Neue Warengruppe erstellen
-                  </Button>
+                  {isAdmin ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="mt-1"
+                      onClick={() => setShowNewBlockInput(true)}
+                    >
+                      Neue Warengruppe erstellen
+                    </Button>
+                  ) : null}
                   {errors.block_id && (
                     <p className="text-sm text-destructive">{errors.block_id}</p>
                   )}

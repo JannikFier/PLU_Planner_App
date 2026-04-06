@@ -1,7 +1,7 @@
 // CustomProductDialog: Dialog zum Hinzufügen eigener Produkte (Obst/Gemüse).
 // Pflichtfelder: SEPARATED → Typ; BY_BLOCK + features_blocks → Warengruppe.
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { z } from 'zod'
 import {
   AlertDialog,
@@ -40,6 +40,7 @@ import {
   obstCustomProductShowItemTypeField,
 } from '@/lib/obst-custom-product-layout'
 import { toast } from 'sonner'
+import { useAuth } from '@/hooks/useAuth'
 import type { Block } from '@/types/database'
 
 // PLU optional, 4–5 Ziffern wenn ausgefüllt; Preis optional, Dezimalzahl
@@ -83,6 +84,7 @@ export function CustomProductDialog({
   existingPLUs,
   blocks,
 }: CustomProductDialogProps) {
+  const { isAdmin } = useAuth()
   const addProduct = useAddCustomProduct()
   const { data: layoutSettings } = useLayoutSettings()
   const createBlock = useCreateBlock()
@@ -104,6 +106,13 @@ export function CustomProductDialog({
   const [showNewBlockInput, setShowNewBlockInput] = useState(false)
   const [newBlockName, setNewBlockName] = useState('')
   const [errorPopupMessage, setErrorPopupMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isAdmin && showNewBlockInput) {
+      setShowNewBlockInput(false)
+      setNewBlockName('')
+    }
+  }, [isAdmin, showNewBlockInput])
 
   const resetForm = useCallback(() => {
     setPlu('')
@@ -358,15 +367,17 @@ export function CustomProductDialog({
                         ))}
                     </SelectContent>
                   </Select>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="mt-1"
-                    onClick={() => setShowNewBlockInput(true)}
-                  >
-                    Neue Warengruppe anlegen
-                  </Button>
+                  {isAdmin ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="mt-1"
+                      onClick={() => setShowNewBlockInput(true)}
+                    >
+                      Neue Warengruppe anlegen
+                    </Button>
+                  ) : null}
                   {errors.block_id && (
                     <p className="text-sm text-destructive">{errors.block_id}</p>
                   )}
