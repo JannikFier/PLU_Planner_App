@@ -98,7 +98,7 @@ Von der **Masterliste** aus führt der Button „Neuer Upload“ zur PLU-Upload-
 Alle Rollen arbeiten an EINER gemeinsamen Liste. Änderungen gelten für alle.
 
 ### Masterliste – KW in der Toolbar
-- **Obst/Gemüse:** Seitenüberschrift **„PLU Obst und Gemüse“** (`*/masterlist`). In der Infozeile (Lupen-Bereich) stehen **Sortierung** (Alphabetisch vs. Nach Warengruppen), **Stück/Gewicht-Darstellung** und die **KW der zuletzt eingespielten Liste** (`Liste …` = `kw_label` der aktiven Version). Ist die Sortierung **Nach Warengruppen**, zeigen **Admin und Super-Admin** in der Toolbar (vor **PDF**) den Button **Warengruppen** → Seite **`/admin/obst-warengruppen`** bzw. **`/super-admin/obst-warengruppen`** (Zurück zur Masterliste per `backTo`, wie bei Ausgeblendete/Werbung).
+- **Obst/Gemüse:** Seitenüberschrift **„PLU Obst und Gemüse“** (`*/masterlist`). In der Infozeile (Lupen-Bereich) stehen **Sortierung** (Alphabetisch vs. Nach Warengruppen), **Stück/Gewicht-Darstellung** und die **KW der zuletzt eingespielten Liste** (`Liste …` = `kw_label` der aktiven Version). Ist die Sortierung **Nach Warengruppen**, zeigen **User, Admin und Super-Admin** (nicht Viewer) in der Toolbar (vor **PDF**) den Button **Warengruppen** → Seite **`/user/obst-warengruppen`**, **`/admin/obst-warengruppen`** bzw. **`/super-admin/obst-warengruppen`** je nach Rolle (Zurück zur Masterliste per `backTo`, wie bei Ausgeblendete/Werbung).
 - **Backshop:** Eine Zeile für den **Zeitraum der aktuellen Liste** (Einspiel-KW bis heute, ISO-8601): in der **ersten Woche** nach dem Upload nur `KW 10 · 2026` oder `KW 21 · 2026`; danach **Bereich** z. B. `KW 10 – KW 14 · 2026` (die zweite Zahl steigt wöchentlich, bis eine neue Liste eingespielt wird). Am **Jahreswechsel** z. B. `KW 52 · 2026 – KW 2 · 2027`.
 - Kalenderwochen werden **einheitlich nach ISO-8601** berechnet (`getISOWeek` / ISO-Kalenderjahr), damit die Anzeige mit der üblichen deutschen KW-Zählung übereinstimmt.
 
@@ -159,7 +159,7 @@ Produkte können in logische Gruppen eingeteilt werden (z.B. "Exotik", "Regional
 ### WarengruppenPanel (Split-Panel)
 - **Links**: Liste aller Warengruppen mit Artikelanzahl, Erstellen/Umbenennen/Löschen
 - **Rechts**: Alle Produkte mit Checkboxen, Suchfeld, Batch-Zuweisen an gewählte Gruppe; bei gewählter Gruppe **Produkte hinzufügen…** öffnet einen Dialog im gleichen Layout wie **Produkte ausblenden** (Suche, Mehrfachauswahl, Zuweisung an die Warengruppe per Markt-Override).
-- **Eigene Seite Obst:** dieselbe Panel-Logik auf **`/admin/obst-warengruppen`** und **`/super-admin/obst-warengruppen`** (weiterhin auch unter **Inhalt & Regeln** eingebettet).
+- **Eigene Seite Obst:** dieselbe Panel-Logik auf **`/user/obst-warengruppen`**, **`/admin/obst-warengruppen`** und **`/super-admin/obst-warengruppen`** (weiterhin auch unter **Inhalt & Regeln** eingebettet).
 
 ### WarengruppenSortierung
 - Drag & Drop (`@dnd-kit`) + Pfeil-Buttons für Reihenfolge

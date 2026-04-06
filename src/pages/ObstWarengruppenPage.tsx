@@ -12,7 +12,11 @@ export function ObstWarengruppenPage() {
   const { data: layoutSettings } = useLayoutSettings()
   const isByBlock = layoutSettings?.sort_mode === 'BY_BLOCK'
   const location = useLocation()
-  const rolePrefix = location.pathname.startsWith('/super-admin') ? '/super-admin' : '/admin'
+  const rolePrefix = location.pathname.startsWith('/super-admin')
+    ? '/super-admin'
+    : location.pathname.startsWith('/admin')
+      ? '/admin'
+      : '/user'
 
   return (
     <DashboardLayout>
@@ -40,12 +44,19 @@ export function ObstWarengruppenPage() {
                     Warengruppen sind nur aktiv, wenn im Layout die Sortierung{' '}
                     <strong>Nach Warengruppen</strong> gewählt ist.
                   </p>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to={`${rolePrefix}/layout`}>
-                      <Settings className="mr-2 h-4 w-4" />
-                      Zu den Layout-Einstellungen
-                    </Link>
-                  </Button>
+                  {rolePrefix === '/user' ? (
+                    <p className="text-sm text-muted-foreground">
+                      Die Layout-Sortierung kann nur ein <strong>Marktleiter (Admin)</strong> in den
+                      Layout-Einstellungen des Marktes ändern.
+                    </p>
+                  ) : (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`${rolePrefix}/layout`}>
+                        <Settings className="mr-2 h-4 w-4" />
+                        Zu den Layout-Einstellungen
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>

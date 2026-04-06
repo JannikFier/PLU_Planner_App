@@ -264,6 +264,16 @@ function App() {
               }
             />
             <Route
+              path="/user/obst-warengruppen"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="obst_gemuese">
+                    <ObstWarengruppenPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/user/backshop-list"
               element={
                 <ProtectedRoute>

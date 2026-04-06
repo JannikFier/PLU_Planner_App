@@ -317,7 +317,7 @@ export function MasterList({ mode }: MasterListProps) {
         onClick: nav('/renamed-products'),
       },
     )
-    if (mode === 'admin' && sortMode === 'BY_BLOCK') {
+    if (sortMode === 'BY_BLOCK') {
       items.push({
         label: 'Warengruppen',
         icon: <LayoutGrid className="h-4 w-4" />,
@@ -476,7 +476,7 @@ export function MasterList({ mode }: MasterListProps) {
                   Umbenennen
                 </Button>
               )}
-              {mode === 'admin' && sortMode === 'BY_BLOCK' && (
+              {sortMode === 'BY_BLOCK' && (
                 <Button
                   variant="outline"
                   size="sm"
