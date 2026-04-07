@@ -384,46 +384,47 @@ export function MasterList({ mode }: MasterListProps) {
 
         {/* === Toolbar === */}
         {currentVersion && !isLoading && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="shrink-0"
-              onClick={() => pluTableRef.current?.openFindInPage()}
-              aria-label="In Liste suchen"
-              title="In Liste suchen (PLU oder Name)"
-            >
-              <Search className="h-4 w-4" />
-            </Button>
-            {/* Anzeige-Infos: Sortierung, Darstellung (Stück/Gewicht), KW, Aktiv */}
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground sm:flex-initial sm:max-w-none">
-              <ListFilter className="h-4 w-4 shrink-0" />
-              <span title="Layout-Sortierung">
-                {sortMode === 'BY_BLOCK' ? 'Nach Warengruppen' : 'Alphabetisch (A–Z)'}
-              </span>
-              <span className="text-border">|</span>
-              <span title="Layout-Anzeige Stück/Gewicht">
-                {displayMode === 'MIXED'
-                  ? 'Stück + Gewicht gemischt'
-                  : 'Nach Typ getrennt'}
-              </span>
-              <span className="text-border">|</span>
-              <span className="text-foreground font-medium" title="Stammdaten aus zuletzt eingespielter Liste (wechselt nur bei neuem Upload)">
-                Liste {currentVersion.kw_label}
-              </span>
-              {currentVersion.status === 'active' && (
-                <Badge variant="default" className="text-xs">Aktiv</Badge>
-              )}
-              {currentVersion.status === 'frozen' && (
-                <Badge variant="outline" className="text-xs">Archiv</Badge>
-              )}
+          <div className="flex w-full flex-wrap items-center gap-2 sm:flex-nowrap sm:justify-between">
+            {/* Links: Suche + Infos (min-w-0 damit Text schrumpft statt Aktionen zu verdrängen) */}
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                onClick={() => pluTableRef.current?.openFindInPage()}
+                aria-label="In Liste suchen"
+                title="In Liste suchen (PLU oder Name)"
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+              {/* Anzeige-Infos: Sortierung, Darstellung (Stück/Gewicht), KW, Aktiv */}
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground sm:max-w-none">
+                <ListFilter className="h-4 w-4 shrink-0" />
+                <span title="Layout-Sortierung">
+                  {sortMode === 'BY_BLOCK' ? 'Nach Warengruppen' : 'Alphabetisch (A–Z)'}
+                </span>
+                <span className="text-border">|</span>
+                <span title="Layout-Anzeige Stück/Gewicht">
+                  {displayMode === 'MIXED'
+                    ? 'Stück + Gewicht gemischt'
+                    : 'Nach Typ getrennt'}
+                </span>
+                <span className="text-border">|</span>
+                <span className="text-foreground font-medium" title="Stammdaten aus zuletzt eingespielter Liste (wechselt nur bei neuem Upload)">
+                  Liste {currentVersion.kw_label}
+                </span>
+                {currentVersion.status === 'active' && (
+                  <Badge variant="default" className="text-xs">Aktiv</Badge>
+                )}
+                {currentVersion.status === 'frozen' && (
+                  <Badge variant="outline" className="text-xs">Archiv</Badge>
+                )}
+              </div>
             </div>
 
-            <div className="hidden sm:block sm:flex-1" />
-
-            {/* Aktionen: Desktop ab sm; auf dem Handy ⋮ im Seitenkopf */}
-            <div className="hidden sm:flex sm:flex-wrap items-center gap-2">
+            {/* Rechts: Aktionen Desktop (eine Zeile, rechtsbündig durch justify-between auf dem Parent) */}
+            <div className="hidden sm:flex shrink-0 flex-nowrap items-center gap-2">
               {mode !== 'viewer' && (
                 <>
                   {featuresCustomProducts && (

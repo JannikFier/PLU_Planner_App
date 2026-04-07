@@ -300,40 +300,41 @@ export function BackshopMasterList() {
 
         {/* === Toolbar (wie MasterList: Infos links, Aktionen rechts) === */}
         {currentVersion && !isLoading && !hasNoVersion && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="shrink-0"
-              onClick={() => pluTableRef.current?.openFindInPage()}
-              aria-label="In Liste suchen"
-              title="In Liste suchen (PLU oder Name)"
-            >
-              <Search className="h-4 w-4" />
-            </Button>
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground sm:flex-initial sm:max-w-none">
-              <ListFilter className="h-4 w-4 shrink-0" />
-              <span
-                className="text-foreground font-medium"
-                title="Zeitraum der aktuellen Backshop-Liste: Einspiel-KW bis heute (ISO-8601). Nach neuem Upload beginnt die Anzeige wieder mit einer einzelnen KW."
+          <div className="flex w-full flex-wrap items-center gap-2 sm:flex-nowrap sm:justify-between">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                onClick={() => pluTableRef.current?.openFindInPage()}
+                aria-label="In Liste suchen"
+                title="In Liste suchen (PLU oder Name)"
               >
-                {formatBackshopActiveListToolbarRange(
-                  currentVersion.kw_nummer,
-                  currentVersion.jahr,
-                  currentKw,
-                  currentJahr,
+                <Search className="h-4 w-4" />
+              </Button>
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground sm:max-w-none">
+                <ListFilter className="h-4 w-4 shrink-0" />
+                <span
+                  className="text-foreground font-medium"
+                  title="Zeitraum der aktuellen Backshop-Liste: Einspiel-KW bis heute (ISO-8601). Nach neuem Upload beginnt die Anzeige wieder mit einer einzelnen KW."
+                >
+                  {formatBackshopActiveListToolbarRange(
+                    currentVersion.kw_nummer,
+                    currentVersion.jahr,
+                    currentKw,
+                    currentJahr,
+                  )}
+                </span>
+                {currentVersion.status === 'active' && (
+                  <Badge variant="default" className="text-xs">Aktiv</Badge>
                 )}
-              </span>
-              {currentVersion.status === 'active' && (
-                <Badge variant="default" className="text-xs">Aktiv</Badge>
-              )}
-              {currentVersion.status === 'frozen' && (
-                <Badge variant="outline" className="text-xs">Archiv</Badge>
-              )}
+                {currentVersion.status === 'frozen' && (
+                  <Badge variant="outline" className="text-xs">Archiv</Badge>
+                )}
+              </div>
             </div>
-            <div className="hidden sm:block sm:flex-1" />
-            <div className="hidden sm:flex sm:flex-wrap items-center gap-2">
+            <div className="hidden sm:flex shrink-0 flex-nowrap items-center gap-2">
               {!isViewer && (
                 <>
                   <Button
