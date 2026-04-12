@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useMemo } from 'react'
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { supabase, invokeEdgeFunction } from '@/lib/supabase'
 import { createUserSchema, createUserResponseSchema, validateEdgeFunctionResponse } from '@/lib/validation'
 import { useAuth } from '@/hooks/useAuth'
@@ -49,6 +49,7 @@ import { toast } from 'sonner'
 import type { Profile } from '@/types/database'
 import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer, roleBadgeLabel, generateOneTimePassword } from '@/lib/profile-helpers'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
+import { useCompanyProfiles } from '@/hooks/useCompanyProfiles'
 import { useAllStores } from '@/hooks/useStores'
 import { useStoreAccessByUser, useAddUserToStore, useRemoveUserFromStore } from '@/hooks/useStoreAccess'
 import {
@@ -65,14 +66,19 @@ import { Switch } from '@/components/ui/switch'
  * - Admin: Kann User, Admin und Viewer anlegen; Rollen ändern (außer sich selbst); Märkte zuweisen
  * Beide können Passwörter zurücksetzen (Einmalpasswort).
  */
+function invalidateProfileLists(queryClient: QueryClient) {
+  queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
+  queryClient.invalidateQueries({ queryKey: ['company-profiles'] })
+}
+
 export function UserManagement() {
   const { isSuperAdmin, isAdmin, user: currentUser } = useAuth()
-  const { currentStoreId, storeName } = useCurrentStore()
+  const { currentStoreId, currentCompanyId, storeName, isLoading: storeContextLoading } = useCurrentStore()
   const currentUserId = currentUser?.id ?? null
   const queryClient = useQueryClient()
 
-  // User-Liste laden
-  const { data: users, isLoading, isError } = useQuery({
+  // Admin: RLS liefert nur Profile der eigenen Firma. Super-Admin: firmenspezifisch über Marktkontext.
+  const { data: adminUsers, isLoading: adminUsersLoading, isError: adminUsersError } = useQuery({
     queryKey: ['all-profiles'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -83,7 +89,35 @@ export function UserManagement() {
       if (error) throw error
       return data as Profile[]
     },
+    enabled: !isSuperAdmin,
   })
+
+  const {
+    data: companyUsers,
+    isLoading: companyUsersLoading,
+    isError: companyUsersError,
+  } = useCompanyProfiles(isSuperAdmin ? currentCompanyId : null)
+
+  const isLoading = isSuperAdmin
+    ? (storeContextLoading || (!!currentCompanyId && companyUsersLoading))
+    : adminUsersLoading
+
+  const isError = isSuperAdmin ? companyUsersError : adminUsersError
+
+  const needsCompanyHint = isSuperAdmin && !storeContextLoading && !currentCompanyId
+
+  const filteredUsers = useMemo(() => {
+    const withoutSa = (list: Profile[] | undefined) =>
+      list?.filter(u => u.role !== 'super_admin') ?? []
+
+    if (isSuperAdmin) {
+      if (!currentCompanyId) return []
+      return [...withoutSa(companyUsers)].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
+    }
+    return withoutSa(adminUsers)
+  }, [isSuperAdmin, currentCompanyId, companyUsers, adminUsers])
 
   // Heimatmarkt des aktuellen Users laden (fuer User-Erstellung)
   const { data: homeStoreId } = useQuery({
@@ -103,30 +137,9 @@ export function UserManagement() {
     enabled: !!currentUserId && !isSuperAdmin,
   })
 
-  // Fuer Super-Admin: Ersten aktiven Store laden (SA hat kein user_store_access)
-  const { data: firstStoreId } = useQuery({
-    queryKey: ['first-active-store'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('stores' as never)
-        .select('id')
-        .eq('is_active', true)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .single()
-
-      if (error) throw error
-      return (data as { id: string } | null)?.id ?? null
-    },
-    enabled: isSuperAdmin,
-  })
-
-  // Neuer User wird dem aktuell ausgewaehlten Markt zugewiesen (nicht Heimatmarkt/erster Store)
-  const effectiveStoreId = currentStoreId ?? (isSuperAdmin ? firstStoreId : homeStoreId)
+  // Neuer User wird dem aktuell ausgewaehlten Markt zugewiesen (Super-Admin: nur bei gewähltem Markt im Kontext)
+  const effectiveStoreId = isSuperAdmin ? currentStoreId : (currentStoreId ?? homeStoreId)
   const defaultStoreId = effectiveStoreId ?? undefined
-
-  // Super-Admin wird nie angezeigt (verwaltet global, gehoert keinem Markt)
-  const filteredUsers = users?.filter(u => u.role !== 'super_admin')
 
   // Dialog States
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -152,7 +165,9 @@ export function UserManagement() {
   )
   const targetCompanyIds = userCompanyIds.size > 0
     ? userCompanyIds
-    : new Set(allStores?.map(s => s.company_id) ?? [])
+    : isSuperAdmin && currentCompanyId
+      ? new Set([currentCompanyId])
+      : new Set(allStores?.map(s => s.company_id) ?? [])
   const companyFilteredStores = (allStores ?? []).filter(s => targetCompanyIds.has(s.company_id))
 
   // Bereiche-Dialog State
@@ -207,7 +222,7 @@ export function UserManagement() {
       setGeneratedPassword(result.oneTimePassword)
       setShowCreateDialog(false)
       setShowPasswordDialog(true)
-      queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
+      invalidateProfileLists(queryClient)
       toast.success('Benutzer erfolgreich angelegt!')
 
       // Formular zurücksetzen
@@ -232,7 +247,7 @@ export function UserManagement() {
       setShowResetConfirmDialog(false)
       setGeneratedPassword(password)
       setShowPasswordDialog(true)
-      queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
+      invalidateProfileLists(queryClient)
       toast.success('Passwort wurde zurückgesetzt!')
     },
     onError: (error: Error) => {
@@ -248,7 +263,7 @@ export function UserManagement() {
     onSuccess: () => {
       setShowDeleteConfirmDialog(false)
       setUserToDelete(null)
-      queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
+      invalidateProfileLists(queryClient)
       toast.success('Benutzer wurde gelöscht.')
     },
     onError: (error: Error) => {
@@ -296,7 +311,7 @@ export function UserManagement() {
       await invokeEdgeFunction('update-user-role', { userId, newRole })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
+      invalidateProfileLists(queryClient)
       toast.success('Rolle wurde geändert.')
     },
     onError: (e: Error) => {
@@ -552,7 +567,11 @@ export function UserManagement() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {needsCompanyHint ? (
+              <p className="text-muted-foreground text-center py-8 text-sm">
+                Bitte wähle oben eine Firma und einen Markt. Anschließend werden nur Benutzer dieser Firma angezeigt.
+              </p>
+            ) : isLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((i) => (
                   <Skeleton key={i} className="h-12 w-full" />

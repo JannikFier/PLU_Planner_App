@@ -229,7 +229,7 @@ export function runBackshopStorePrefetch(queryClient: QueryClient, storeId: stri
   })
 }
 
-/** Prefetch für Benutzerverwaltung (Admin/Super-Admin). Damit der "Alle Benutzer"-Kasten nach Reload schnell gefüllt ist. */
+/** Prefetch für Benutzerverwaltung (nur Admin). RLS liefert nur Firmenkollegen; Super-Admin nutzt firmenbezogenen Prefetch in AuthPrefetch. */
 export function runAdminPrefetch(queryClient: QueryClient): void {
   void queryClient.prefetchQuery({
     queryKey: ['all-profiles'],

@@ -87,6 +87,7 @@ export function useUpdateUserStoreAccess() {
       queryClient.invalidateQueries({ queryKey: ['store-access'] })
       queryClient.invalidateQueries({ queryKey: ['store-user-profiles'] })
       queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
+      queryClient.invalidateQueries({ queryKey: ['company-profiles'] })
       toast.success('Marktzuweisung wurde aktualisiert.')
     },
     onError: (e: Error) => toast.error(e.message),
@@ -109,6 +110,7 @@ export function useAddUserToStore() {
       queryClient.invalidateQueries({ queryKey: ['store-access'] })
       queryClient.invalidateQueries({ queryKey: ['store-user-profiles'] })
       queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
+      queryClient.invalidateQueries({ queryKey: ['company-profiles'] })
       toast.success('Benutzer wurde dem Markt zugewiesen.')
     },
     onError: (e: Error) => toast.error(translateStoreAccessError(e.message)),
@@ -130,6 +132,7 @@ export function useRemoveUserFromStore() {
       queryClient.invalidateQueries({ queryKey: ['store-access'] })
       queryClient.invalidateQueries({ queryKey: ['store-user-profiles'] })
       queryClient.invalidateQueries({ queryKey: ['all-profiles'] })
+      queryClient.invalidateQueries({ queryKey: ['company-profiles'] })
       toast.success('Benutzer wurde vom Markt entfernt.')
     },
     onError: (e: Error) => toast.error(translateStoreAccessError(e.message)),

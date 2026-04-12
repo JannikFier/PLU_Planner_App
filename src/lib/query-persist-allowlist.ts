@@ -50,7 +50,6 @@ export const PERSIST_QUERY_KEY_PREFIXES: readonly string[] = [
   'user-list-visibility',
   'store-user-profiles',
   'home-store-id',
-  'first-active-store',
   // Backshop
   'backshop-layout-settings',
   'backshop-blocks',

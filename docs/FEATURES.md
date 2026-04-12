@@ -53,6 +53,8 @@ Der PLU Planner verwaltet wöchentliche Preis-Look-Up (PLU) Listen für Obst- un
 
 Super-Admins können über das Profil-Menü **„User-Vorschau (Firma & Markt)“** einen Dialog öffnen, **Firma**, **Markt** und eine simulierte Rolle (**User**, **Viewer** oder **Admin**) wählen und landen anschließend im jeweiligen Bereich (`/user`, `/viewer`, `/admin`) mit gesetztem Markt-Kontext. **Zur Super-Admin-Ansicht** beendet die Vorschau und stellt den vorherigen Marktzustand wieder her (ohne `current_store_id` während der Vorschau zu überschreiben). Die Vorschau steuert **Oberfläche und Navigation**; sie ersetzt **keine** echte Identitäts-Impersonation – datenbankseitig gilt weiterhin die Super-Admin-Session (siehe [SECURITY_LIVING.md](SECURITY_LIVING.md)).
 
+In der **Benutzerverwaltung** sieht der Super-Admin nur Nutzer, die mindestens einem Markt der **im Kopfbereich gewählten Firma** zugeordnet sind. Ohne gewählte Firma/Markt erscheint ein Hinweis statt der Liste. **Admins** sind weiterhin über die Datenbankregeln (RLS) auf die eigene Firma beschränkt.
+
 ## Farbcodes
 
 | Farbe | Code | Bedeutung | Wo sichtbar |

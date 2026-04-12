@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase, invokeEdgeFunction } from '@/lib/supabase'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { invokeEdgeFunction } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { BereichsauswahlCard } from '@/components/layout/BereichsauswahlCard'
@@ -15,6 +15,7 @@ import {
   useStoreListAreaEnabled,
 } from '@/hooks/useStoreListVisibility'
 import { useStoreUserProfiles, useAddUserToStore, useRemoveUserFromStore } from '@/hooks/useStoreAccess'
+import { useCompanyProfiles } from '@/hooks/useCompanyProfiles'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -123,37 +124,8 @@ export function SuperAdminStoreDetailPage() {
   const addUserToStore = useAddUserToStore()
   const removeUserFromStore = useRemoveUserFromStore()
 
-  // Firmeninterne Profile laden (für "Benutzer hinzufügen" Dialog)
-  const { data: companyProfiles } = useQuery({
-    queryKey: ['company-profiles', companyId],
-    queryFn: async () => {
-      if (!companyId) throw new Error('Keine Firma angegeben.')
-      const { data: companyStores, error: storesErr } = await supabase
-        .from('stores' as never)
-        .select('id')
-        .eq('company_id', companyId)
-      if (storesErr) throw storesErr
-      const storeIds = (companyStores as unknown as { id: string }[]).map(s => s.id)
-      if (storeIds.length === 0) return []
-
-      const { data: access, error: accessErr } = await supabase
-        .from('user_store_access' as never)
-        .select('user_id')
-        .in('store_id', storeIds)
-      if (accessErr) throw accessErr
-      const userIds = [...new Set((access as unknown as { user_id: string }[]).map(a => a.user_id))]
-      if (userIds.length === 0) return []
-
-      const { data: profiles, error: profilesErr } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', userIds)
-        .order('display_name')
-      if (profilesErr) throw profilesErr
-      return profiles as Profile[]
-    },
-    enabled: !!companyId,
-  })
+  // Firmeninterne Profile laden (für "Benutzer hinzufügen" Dialog; gleicher Cache wie Benutzerverwaltung)
+  const { data: companyProfiles } = useCompanyProfiles(companyId)
 
   // Settings-Dialoge
   const [showEditName, setShowEditName] = useState(false)

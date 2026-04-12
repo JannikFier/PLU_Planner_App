@@ -17,12 +17,13 @@ import {
   runBackshopStorePrefetch,
   runSuperAdminCompaniesPrefetch,
 } from '@/hooks/usePrefetchForNavigation'
+import { fetchProfilesForCompany } from '@/lib/fetchProfilesForCompany'
 import { supabase } from '@/lib/supabase'
 import type { Store } from '@/types/database'
 
 export function AuthPrefetch() {
   const { user, isLoading: authLoading, mustChangePassword, profile } = useAuth()
-  const { currentStoreId } = useCurrentStore()
+  const { currentStoreId, currentCompanyId } = useCurrentStore()
   const queryClient = useQueryClient()
   const location = useLocation()
 
@@ -34,7 +35,7 @@ export function AuthPrefetch() {
       if (cancelled) return
       runMasterListPrefetch(queryClient)
       runBackshopPrefetch(queryClient)
-      if (profile?.role === 'admin' || profile?.role === 'super_admin') {
+      if (profile?.role === 'admin') {
         runAdminPrefetch(queryClient)
       }
       if (profile?.role === 'super_admin') {
@@ -50,6 +51,17 @@ export function AuthPrefetch() {
     runStorePrefetch(queryClient, currentStoreId)
     runBackshopStorePrefetch(queryClient, currentStoreId)
   }, [currentStoreId, authLoading, user, mustChangePassword, queryClient])
+
+  // Super-Admin: Benutzer der aktuellen Firma (gleiche Query wie Benutzerverwaltung)
+  useEffect(() => {
+    if (!currentCompanyId || authLoading || !user || mustChangePassword) return
+    if (profile?.role !== 'super_admin') return
+    void queryClient.prefetchQuery({
+      queryKey: ['company-profiles', currentCompanyId],
+      queryFn: () => fetchProfilesForCompany(currentCompanyId),
+      staleTime: 5 * 60 * 1000,
+    })
+  }, [currentCompanyId, authLoading, user, mustChangePassword, queryClient, profile?.role])
 
   // Store-Detail aus URL prefetchen (Reload auf /super-admin/companies/.../stores/:storeId)
   const storeIdFromPath = location.pathname.match(/\/stores\/([a-f0-9-]+)/)?.[1]
