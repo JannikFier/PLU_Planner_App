@@ -162,14 +162,22 @@ Produkte können in logische Gruppen eingeteilt werden (z.B. "Exotik", "Regional
 - **Links**: Liste aller Warengruppen mit Artikelanzahl; **Erstellen/Umbenennen/Löschen** der globalen Gruppen für **Admin und Super-Admin** (RLS `is_admin()`; Migration 055)
 - **Rechts**: Alle Produkte mit Checkboxen, Suchfeld, Batch-Zuweisen an gewählte Gruppe; bei gewählter Gruppe **Produkte hinzufügen…** öffnet einen Dialog im gleichen Layout wie **Produkte ausblenden** (Suche, Mehrfachauswahl, Zuweisung an die Warengruppe per Markt-Override).
 - **Eigene Seite Obst:** dieselbe Panel-Logik auf **`/user/obst-warengruppen`**, **`/admin/obst-warengruppen`** und **`/super-admin/obst-warengruppen`** (weiterhin auch unter **Inhalt & Regeln** eingebettet).
+- Beim Zuweisen per Drag & Drop folgt das **Drag-Overlay** der Maus (`snapCenterToCursor`, wie bei Backshop).
 
 ### WarengruppenSortierung
 - Drag & Drop (`@dnd-kit`) + Pfeil-Buttons für Reihenfolge
 - "Ohne Zuordnung" als letzte Zeile (nicht verschiebbar)
 
 ### PLU-Liste bearbeiten (Obst, `/admin/block-sort` / Super-Admin)
+- **Zwei Griffe:** am **Warengruppenkopf** (graue Überschrift) die **ganze Gruppe** verschieben; in der **Produktzeile** (links neben der PLU) nur **dieses Produkt** einer anderen Warengruppe zuordnen. Visuell: **horizontaler Strich-Griff** am Kopf vs. **vertikaler Strich-Griff** in der Zeile; Seitentext und `title`/Screenreader-Labels ergänzen das.
 - **Nur sinnvoll**, wenn im Layout für den Markt **Sortierung: Nach Warengruppen** gewählt ist; sonst Hinweistext statt interaktiver Tabelle (beim Umschalten auf „Nach Warengruppen“ wird der Warengruppen-Schalter mit aktiviert).
 - Zeigt Master-PLUs und **eigene Produkte** (PLUs, die nicht schon in der Masterliste vorkommen) gemeinsam; Ziehen auf eine Warengruppe speichert bei Eigenprodukten `custom_products.block_id`, bei Stammdaten die bestehende Override-Logik.
+- **Warengruppen ziehen:** Während des Zugs **eine Spalte** nur mit **Gruppenköpfen** in **globaler Reihenfolge** (keine Zwei-Spalten-Aufteilung der Liste); **Produktzeilen ausgeblendet**. **Drag-Overlay** mit größerer, umbrechender Vorschau und **`snapCenterToCursor`**. **Einfügemarkierung:** **dezente, dünne blaue Linie** (`fixed` im Viewport) liegt auf der **tatsächlichen Einfüge-Slot-Grenze** (obere/untere Kante eines fremden Gruppenkopfs), die dieselbe Logik wie der Drop wählt – **nicht** an der Mausmitte. Kollisionserkennung nur auf **Gruppen-Köpfe** (`drop-block-*`). Anzeige per `onDragMove`/`onDragOver`, mit Puffer bei kurz fehlendem DOM. Warengruppenköpfe beim Produkt-Zug: **nur leichter Ring**, keine große hellblaue Fläche (die Linie ist das Hauptfeedback). Neue Reihenfolge per `computeBlockOrderAfterDrop` (Einfügen vor/nach Ziel).
+- **Produkte ziehen:** Kompakte Vorschau-Zeile (PLU, Artikel mit Zeilenumbruch, Preis) mit `snapCenterToCursor`; Kollision **`closestCorners`** mit Fallback **`closestCenter`**; die **eigene Zeilen-ID** wird aus den Kandidaten entfernt, sonst würde oft die eigene Droppable gewinnen. Zusätzlich **`useDroppable`** auf derselben Zeile (`<tr>`) mit **derselben ID** wie `useDraggable` (nur Draggable erzeugt in dnd-kit keine Kollisions-Rechtecke für andere Zeilen). **Zum Ziehen:** nur der **Griff-Button** in der ersten Spalte (nicht die ganze Zeile). Beim Ziehen: dieselbe **dünne feste Einfügelinie** wie bei Warengruppen – Position aus **Ober-/Unterkante der Zielzeile** bzw. **Oberkante des Gruppenkopfs** bei Ziel „auf Gruppe“ (keine zweite dicke Tabellenzeile). **Loslassen / Ziel:** Priorität `onDragEnd.over` → zuletzt gültiges **`onDragOver`** (`lastOverIdRef`) → letzte **Einfügemarkierung** (`itemDropIndicatorRef`), damit kurz fehlendes `over` beim Drop nicht zum stummen Abbruch führt. Wenn danach kein Ziel erkannt wird: **Toast-Hinweis** (kein stiller Abbruch). **Hinweis:** Zuordnung zur **Warengruppe der Zielzeile**; Reihenfolge innerhalb der Gruppe weiter nach Listenregeln (z. B. alphabetisch). Bereits gleiche Warengruppe: Hinweis-Toast.
+- **Mobil (unter `md`):** Pro Warengruppe eine **Karte** (`bg-card`, Rahmen, Abstand), darin weiterhin Tabellenzeilen mit gleichen DnD-IDs; **Griff-Buttons** größer (~40×40 px), ab **`md`** kompakt wie auf dem Desktop. Beim **Warengruppen-Zug** (nur Köpfe): auf Mobil **eine Karte pro Gruppe** mit nur der Kopfzeile. Listen-Container für E2E: `data-testid="interactive-plu-scroll-root"`.
+
+### PLU-Liste bearbeiten (Backshop, `/admin/backshop-block-sort` / Super-Admin)
+- Split-Layout: **Warengruppen** links (Drop-Zonen, Drag der Gruppe), **noch nicht zugeordnet** rechts; auf schmalen Viewports **untereinander** (`flex-col`). **Griff-Buttons** analog andere Backshop-Listen größer auf Mobil, kompakt ab `md`; Container: `data-testid="interactive-backshop-block-sort-root"`.
 
 ### Block-Regeln
 Automatische Zuweisung basierend auf:
@@ -205,6 +213,7 @@ Die Layout-Seite zeigt eine **Live-Vorschau** mit echten PLU-Daten, die sich sof
 | Flussrichtung | Zeilenweise (→↓) oder Spaltenweise (↓→) | Radio-Cards |
 | Schriftgrößen | **Zeilenweise:** drei Felder – Listen-Überschrift (Listenkopf), Spaltenköpfe & Gruppen, Produktname & Zeilen (px). **Spaltenweise:** zwei Felder – Listen-Überschrift + ein gemeinsamer Wert für Spaltenköpfe, Gruppen und Produktzeilen (speichert `font_column_px` und `font_product_px` identisch, 8–24 px). Steuern Schriftgröße, Zellen-/Zeilenhöhe und Mindestabstände proportional. | Number-Inputs |
 | Markierungs-Dauer | Rot: 1-4 KWs, Gelb: 1-4 KWs | Selects |
+| Kalenderwoche | Optional **Woche mit Datum (Mo–Sa)** zur ISO-KW: In Masterliste, Backshop-Toolbar (Einspiel-KW) und PDF erscheint z. B. `KW07/2026 · 09.02.2026–14.02.2026` (getrennt für Obst/Gemüse und Backshop in den jeweiligen Layout-Einstellungen). | Switch |
 | Features Ein/Aus (Obst) | Eigene Produkte, Ausblenden, Warengruppen (wird bei Sortierung „Nach Warengruppen“ automatisch mit eingeschaltet) | Switches |
 
 ### Layout: Zwei-Spalten (Settings + Preview)

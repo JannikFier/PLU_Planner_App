@@ -41,6 +41,8 @@ interface ExportPDFDialogProps {
   onVersionChange?: (versionId: string) => void
   /** Schriftgrößen aus Layout-Einstellungen (Überschrift, PLU-Artikel, Produkte) */
   fontSizes?: { header: number; column: number; product: number }
+  /** KW-Dropdown: Mo–Sa zur ISO-KW (Layout-Einstellung). */
+  showWeekMonSat?: boolean
 }
 
 /**
@@ -60,6 +62,7 @@ export function ExportPDFDialog({
   selectedVersionId,
   onVersionChange,
   fontSizes,
+  showWeekMonSat = false,
 }: ExportPDFDialogProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [primaryExport, setPrimaryExport] = useState<'full' | 'offers_only'>('full')
@@ -194,6 +197,7 @@ export function ExportPDFDialog({
                 selectedId={selectedVersionId}
                 onSelect={onVersionChange}
                 disabled={isGenerating}
+                showWeekMonSat={showWeekMonSat}
               />
             </div>
           )}

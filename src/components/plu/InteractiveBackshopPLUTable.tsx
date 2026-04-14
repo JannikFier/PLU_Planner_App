@@ -39,6 +39,14 @@ import { getDisplayPlu, getDisplayNameForItem, groupItemsByBlock } from '@/lib/p
 import type { BackshopBlock, BackshopMasterPLUItem } from '@/types/database'
 import type { BlockGroup } from '@/lib/plu-helpers'
 
+/** Touch-Ziele wie BackshopCustomProductsList: groß auf Mobil, kompakt ab md */
+const BACKSHOP_DND_GRIP_BTN_CLASS =
+  'inline-flex shrink-0 cursor-grab items-center justify-center rounded-md active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground h-10 w-10 md:h-8 md:w-8'
+const BACKSHOP_DND_GRIP_ICON_CLASS = 'h-5 w-5 md:h-4 md:w-4'
+const BACKSHOP_DND_GRIP_BTN_SUBTLE_CLASS =
+  'inline-flex shrink-0 cursor-grab items-center justify-center rounded-md active:cursor-grabbing touch-none text-muted-foreground/50 hover:text-muted-foreground h-10 w-10 md:h-8 md:w-8'
+const BACKSHOP_DND_GRIP_ICON_SUBTLE_CLASS = 'h-5 w-5 md:h-3.5 md:w-3.5'
+
 /** Backshop-Item mit item_type für groupItemsByBlock (PLUItemBase) */
 type BackshopItemForGroup = BackshopMasterPLUItem & { item_type: 'PIECE' }
 
@@ -238,7 +246,10 @@ function BackshopCategoriesLeftUnassignedRight({
   unassignedItems: BackshopMasterPLUItem[]
 }) {
   return (
-    <div className="rounded-b-lg border border-t-0 border-border overflow-hidden">
+    <div
+      data-testid="interactive-backshop-block-sort-root"
+      className="rounded-b-lg border border-t-0 border-border overflow-hidden"
+    >
       <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border min-h-[400px]">
         {/* Links: „Ohne Zuordnung“ + Kategorien, jede als Drop-Zone */}
         <div className="flex-1 min-w-0 flex flex-col bg-muted/20">
@@ -313,7 +324,7 @@ function BackshopUnassignedDropZone() {
     <div
       ref={setNodeRef}
       className={cn(
-        'rounded-lg border-2 border-dashed p-3 transition-colors',
+        'rounded-lg border-2 border-dashed p-4 transition-colors md:p-3',
         isOver ? 'border-primary bg-primary/10' : 'border-border bg-muted/30',
       )}
     >
@@ -343,7 +354,7 @@ function BackshopBlockDropZone({
     <div
       ref={setNodeRef}
       className={cn(
-        'rounded-lg border-2 border-dashed p-3 transition-colors',
+        'rounded-lg border-2 border-dashed p-4 transition-colors md:p-3',
         isOver ? 'border-primary bg-primary/10' : 'border-border bg-card',
         draggable.isDragging && 'opacity-40',
       )}
@@ -351,11 +362,12 @@ function BackshopBlockDropZone({
       <div className="flex items-center gap-2">
         <button
           ref={draggable.setNodeRef}
-          className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground shrink-0"
+          type="button"
+          className={BACKSHOP_DND_GRIP_BTN_CLASS}
           {...draggable.attributes}
           {...draggable.listeners}
         >
-          <GripVertical className="h-4 w-4" />
+          <GripVertical className={BACKSHOP_DND_GRIP_ICON_CLASS} aria-hidden />
         </button>
         <span className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">{blockName}</span>
       </div>
@@ -379,17 +391,17 @@ function BackshopDraggableProductChip({ item }: { item: BackshopMasterPLUItem })
     <div
       ref={setNodeRef}
       className={cn(
-        'flex items-center gap-2 rounded border border-border bg-background px-2 py-1.5 text-xs',
+        'flex items-center gap-2 rounded border border-border bg-background px-2 py-2 text-xs md:py-1.5',
         isDragging && 'opacity-30',
       )}
     >
       <button
         type="button"
-        className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground shrink-0"
+        className={BACKSHOP_DND_GRIP_BTN_SUBTLE_CLASS}
         {...attributes}
         {...listeners}
       >
-        <GripVertical className="h-3 w-3" />
+        <GripVertical className={BACKSHOP_DND_GRIP_ICON_SUBTLE_CLASS} aria-hidden />
       </button>
       <BackshopThumbnail src={item.image_url} size="sm" />
       <span className="font-mono text-muted-foreground shrink-0">{getDisplayPlu(item.plu)}</span>
@@ -404,14 +416,15 @@ function BackshopProductRow({ item }: { item: BackshopMasterPLUItem }) {
 
   return (
     <tr className={cn('border-b border-border last:border-b-0', isDragging ? 'opacity-20' : '')}>
-      <td className="px-1 py-1 text-center align-top">
+      <td className="px-1 py-1 text-center align-middle">
         <button
           ref={setNodeRef}
-          className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground/50 hover:text-muted-foreground"
+          type="button"
+          className={BACKSHOP_DND_GRIP_BTN_SUBTLE_CLASS}
           {...attributes}
           {...listeners}
         >
-          <GripVertical className="h-3 w-3" />
+          <GripVertical className={BACKSHOP_DND_GRIP_ICON_SUBTLE_CLASS} aria-hidden />
         </button>
       </td>
       <td className="px-1 py-1 align-top">

@@ -1,15 +1,18 @@
 // Kalenderwochen- und Jahr-Helfer für Upload und Versionen
 
 import {
+  addDays,
   addWeeks,
   compareAsc,
   differenceInCalendarWeeks,
+  format,
   getISOWeek,
   getISOWeekYear,
   setISOWeek,
   setISOWeekYear,
   startOfISOWeek,
 } from 'date-fns'
+import { de } from 'date-fns/locale'
 
 /** Anzahl KWs vor/nach aktueller KW in der Upload-Auswahl */
 const KW_RANGE = 3
@@ -140,6 +143,30 @@ export function getDefaultCampaignTargetWeek(): { kw: number; year: number } {
 export function getCalendarKwLabel(date: Date = new Date()): string {
   const { kw, year } = getKWAndYearFromDate(date)
   return formatKwDotYear(kw, year)
+}
+
+/**
+ * Montag bis Samstag der ISO-Kalenderwoche, deutsch (dd.MM.yyyy–dd.MM.yyyy).
+ * Verkaufswoche Mo–Sa, konsistent mit ISO-Wochenbeginn (Montag).
+ */
+export function formatIsoWeekMondayToSaturdayDe(kw: number, isoYear: number): string {
+  const monday = startOfISOWeek(setISOWeek(setISOWeekYear(new Date(), isoYear), kw))
+  const saturday = addDays(monday, 5)
+  const fmt = (d: Date) => format(d, 'dd.MM.yyyy', { locale: de })
+  return `${fmt(monday)}–${fmt(saturday)}`
+}
+
+/**
+ * Datenbank-`kw_label` optional um Mo–Sa-Datumsspanne ergänzen (mittlerer Punkt als Trenner).
+ */
+export function formatKwLabelWithOptionalMonSatRange(
+  kwLabel: string,
+  kw: number,
+  isoYear: number,
+  showMonSat: boolean,
+): string {
+  if (!showMonSat) return kwLabel
+  return `${kwLabel} · ${formatIsoWeekMondayToSaturdayDe(kw, isoYear)}`
 }
 
 /**

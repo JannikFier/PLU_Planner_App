@@ -320,6 +320,7 @@ export interface Database {
           features_keyword_rules: boolean
           allow_mixed_mode: boolean
           allow_separated_mode: boolean
+          show_week_mon_sat_in_labels: boolean
           updated_at: string
           updated_by: string | null
         }
@@ -340,6 +341,7 @@ export interface Database {
           features_keyword_rules?: boolean
           allow_mixed_mode?: boolean
           allow_separated_mode?: boolean
+          show_week_mon_sat_in_labels?: boolean
         }
         Update: {
           sort_mode?: 'ALPHABETICAL' | 'BY_BLOCK'
@@ -356,6 +358,7 @@ export interface Database {
           features_keyword_rules?: boolean
           allow_mixed_mode?: boolean
           allow_separated_mode?: boolean
+          show_week_mon_sat_in_labels?: boolean
         }
       }
       bezeichnungsregeln: {
@@ -989,6 +992,7 @@ export interface Database {
           allow_mixed_mode: boolean
           allow_separated_mode: boolean
           page_break_per_block: boolean
+          show_week_mon_sat_in_labels: boolean
           updated_at: string
           updated_by: string | null
         }
@@ -1010,6 +1014,7 @@ export interface Database {
           allow_mixed_mode?: boolean
           allow_separated_mode?: boolean
           page_break_per_block?: boolean
+          show_week_mon_sat_in_labels?: boolean
         }
         Update: {
           sort_mode?: 'ALPHABETICAL' | 'BY_BLOCK'
@@ -1027,6 +1032,7 @@ export interface Database {
           allow_mixed_mode?: boolean
           allow_separated_mode?: boolean
           page_break_per_block?: boolean
+          show_week_mon_sat_in_labels?: boolean
         }
       }
       backshop_bezeichnungsregeln: {

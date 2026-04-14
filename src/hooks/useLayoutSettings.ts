@@ -1,7 +1,8 @@
 // Hook: Layout-Einstellungen laden + aktualisieren (pro Markt)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase, queryRest } from '@/lib/supabase'
+import { queryRest } from '@/lib/supabase'
+import { updateLayoutSettingsTableWithWeekColumnFallback } from '@/lib/supabase-layout-settings-update'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import type { LayoutSettings } from '@/types/database'
 import type { Database } from '@/types/database'
@@ -47,6 +48,7 @@ const DEFAULT_LAYOUT: LayoutSettings = {
   features_keyword_rules: true,
   allow_mixed_mode: true,
   allow_separated_mode: true,
+  show_week_mon_sat_in_labels: false,
   updated_at: '',
   updated_by: null,
 }
@@ -85,7 +87,7 @@ export function useUpdateLayoutSettings() {
   const { currentStoreId } = useCurrentStore()
 
   return useMutation({
-    mutationFn: async (updates: LayoutSettingsUpdate) => {
+    mutationFn: async (updates: LayoutSettingsUpdate): Promise<{ omittedWeekColumnDueToSchema: boolean }> => {
       const clamped = clampFontUpdates(updates)
 
       if (!currentStoreId) {
@@ -112,13 +114,14 @@ export function useUpdateLayoutSettings() {
       const timeoutId = setTimeout(() => controller.abort(), UPDATE_TIMEOUT_MS)
 
       try {
-        const { error } = await supabase
-          .from('layout_settings')
-          .update((clamped as LayoutSettingsUpdate) as never)
-          .eq('id', settingsId)
-          .eq('store_id', currentStoreId)
-          .abortSignal(controller.signal)
-        if (error) throw error
+        const { omittedWeekColumnDueToSchema } = await updateLayoutSettingsTableWithWeekColumnFallback({
+          table: 'layout_settings',
+          updates: clamped as Record<string, unknown>,
+          rowId: settingsId,
+          storeId: currentStoreId,
+          abortSignal: controller.signal,
+        })
+        return { omittedWeekColumnDueToSchema }
       } catch (err) {
         if ((err as Error)?.name === 'AbortError') {
           throw new Error('Speichern hat zu lange gedauert. Bitte Seite neu laden und erneut versuchen.')
@@ -141,15 +144,19 @@ export function useUpdateLayoutSettings() {
       }
       return { previous }
     },
-    onSuccess: (_data, updates) => {
+    onSuccess: (result, updates) => {
       const clamped = clampFontUpdates(updates)
       const current = queryClient.getQueryData<LayoutSettings>(['layout-settings', currentStoreId])
       if (current && clamped && currentStoreId) {
-        queryClient.setQueryData<LayoutSettings>(['layout-settings', currentStoreId], {
+        let next: LayoutSettings = {
           ...current,
           ...clamped,
           updated_at: new Date().toISOString(),
-        })
+        }
+        if (result.omittedWeekColumnDueToSchema) {
+          next = { ...next, show_week_mon_sat_in_labels: false }
+        }
+        queryClient.setQueryData<LayoutSettings>(['layout-settings', currentStoreId], next)
       }
     },
     onError: (_err, _updates, context) => {

@@ -1,7 +1,7 @@
 // Backshop: Dialog zum Anlegen eines eigenen Produkts (PLU, Name, Bild Pflicht).
 // Warengruppe layoutabhängig: bei BY_BLOCK Pflicht inkl. „Neue Warengruppe erstellen“, bei ALPHABETICAL entfällt sie.
 
-import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
+import { useState, useCallback, useRef, useMemo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -70,12 +70,8 @@ export function BackshopCustomProductDialog({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [errorPopup, setErrorPopup] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!isAdmin && showNewBlockInput) {
-      setShowNewBlockInput(false)
-      setNewBlockName('')
-    }
-  }, [isAdmin, showNewBlockInput])
+  /** Nur für Admins: „Neue Warengruppe“-Eingabe; ohne Effect (kein setState in useEffect). */
+  const showNewBlockSection = isAdmin && showNewBlockInput
 
   const resetForm = useCallback(() => {
     setPlu('')
@@ -346,7 +342,7 @@ export function BackshopCustomProductDialog({
           {sortMode === 'BY_BLOCK' && (
             <div className="space-y-2">
               <Label>Warengruppe</Label>
-              {!showNewBlockInput ? (
+              {!showNewBlockSection ? (
                 <>
                   <Select
                     value={blockId}

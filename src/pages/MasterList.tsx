@@ -48,7 +48,7 @@ import { buildDisplayList } from '@/lib/layout-engine'
 import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
 import { useStoreObstBlockOrder, useStoreObstNameBlockOverrides } from '@/hooks/useStoreObstBlockLayout'
 import type { PLUStats } from '@/lib/plu-helpers'
-import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
+import { formatKwLabelWithOptionalMonSatRange, getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import { buildOfferDisplayMap } from '@/lib/offer-display'
 import { effectiveHiddenPluSet } from '@/lib/hidden-visibility'
 import {
@@ -203,6 +203,17 @@ export function MasterList({ mode }: MasterListProps) {
   }, [rawItems, customProducts, effectiveHiddenPLUs, offerDisplayByPlu, renamedItems, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion, currentKw, currentJahr, nameBlockOverrides, storeObstBlockOrder])
 
   const currentVersion = activeVersion
+
+  const showWeekMonSat = layoutSettings?.show_week_mon_sat_in_labels ?? false
+  const versionDisplayKwLabel = useMemo(() => {
+    if (!activeVersion) return ''
+    return formatKwLabelWithOptionalMonSatRange(
+      activeVersion.kw_label,
+      activeVersion.kw_nummer,
+      activeVersion.jahr,
+      showWeekMonSat,
+    )
+  }, [activeVersion, showWeekMonSat])
 
   const { displayItems: pdfDisplayItems, stats: pdfStats } = useMemo(() => {
     if (!pdfRawItems.length && !customProducts.length) {
@@ -412,7 +423,7 @@ export function MasterList({ mode }: MasterListProps) {
                 </span>
                 <span className="text-border">|</span>
                 <span className="text-foreground font-medium" title="Stammdaten aus zuletzt eingespielter Liste (wechselt nur bei neuem Upload)">
-                  Liste {currentVersion.kw_label}
+                  Liste {versionDisplayKwLabel}
                 </span>
                 {currentVersion.status === 'active' && (
                   <Badge variant="default" className="text-xs">Aktiv</Badge>
@@ -612,7 +623,7 @@ export function MasterList({ mode }: MasterListProps) {
             onOpenChange={setShowPDFDialog}
             items={pdfDisplayItems}
             stats={pdfStats}
-            kwLabel={activeVersion?.kw_label ?? ''}
+            kwLabel={versionDisplayKwLabel}
             displayMode={displayMode}
             sortMode={sortMode}
             flowDirection={flowDirection}
@@ -621,6 +632,7 @@ export function MasterList({ mode }: MasterListProps) {
             selectedVersionId={undefined}
             onVersionChange={undefined}
             fontSizes={fontSizes}
+            showWeekMonSat={showWeekMonSat}
           />
         </Suspense>
       )}

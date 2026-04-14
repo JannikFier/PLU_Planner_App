@@ -1,7 +1,8 @@
 // Hook: Backshop-Layout-Einstellungen laden + aktualisieren (pro Markt)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase, queryRest } from '@/lib/supabase'
+import { queryRest } from '@/lib/supabase'
+import { updateLayoutSettingsTableWithWeekColumnFallback } from '@/lib/supabase-layout-settings-update'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import type { BackshopLayoutSettings } from '@/types/database'
 import type { Database } from '@/types/database'
@@ -27,6 +28,7 @@ const DEFAULT_BACKSHOP_LAYOUT: BackshopLayoutSettings = {
   allow_mixed_mode: true,
   allow_separated_mode: true,
   page_break_per_block: false,
+  show_week_mon_sat_in_labels: false,
   updated_at: '',
   updated_by: null,
 }
@@ -65,7 +67,9 @@ export function useUpdateBackshopLayoutSettings() {
   const { currentStoreId } = useCurrentStore()
 
   return useMutation({
-    mutationFn: async (updates: BackshopLayoutSettingsUpdate) => {
+    mutationFn: async (
+      updates: BackshopLayoutSettingsUpdate,
+    ): Promise<{ omittedWeekColumnDueToSchema: boolean }> => {
       if (!currentStoreId) {
         throw new Error('Kein Markt ausgewählt.')
       }
@@ -78,16 +82,24 @@ export function useUpdateBackshopLayoutSettings() {
       }
 
       const UPDATE_TIMEOUT_MS = 12_000
-      const updatePromise = supabase
-        .from('backshop_layout_settings')
-        .update((updates as BackshopLayoutSettingsUpdate) as never)
-        .eq('id', settingsId)
-        .eq('store_id', currentStoreId)
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Speichern hat zu lange gedauert. Bitte Seite neu laden und erneut versuchen.')), UPDATE_TIMEOUT_MS),
-      )
-      const { error } = await Promise.race([updatePromise, timeoutPromise])
-      if (error) throw error
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), UPDATE_TIMEOUT_MS)
+      try {
+        return await updateLayoutSettingsTableWithWeekColumnFallback({
+          table: 'backshop_layout_settings',
+          updates: updates as Record<string, unknown>,
+          rowId: settingsId,
+          storeId: currentStoreId,
+          abortSignal: controller.signal,
+        })
+      } catch (err) {
+        if ((err as Error)?.name === 'AbortError') {
+          throw new Error('Speichern hat zu lange gedauert. Bitte Seite neu laden und erneut versuchen.')
+        }
+        throw err
+      } finally {
+        clearTimeout(timeoutId)
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['backshop-layout-settings', currentStoreId] })

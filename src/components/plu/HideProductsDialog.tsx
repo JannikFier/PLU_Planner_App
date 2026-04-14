@@ -29,13 +29,13 @@ import {
   buildDialogPluLayout,
   newspaperPageMinHeightPx,
   type DialogPluFontSizes,
-  type DialogFlatRow,
 } from '@/lib/dialog-plu-layout'
 import { newspaperRowsToFlatRows } from '@/lib/newspaper-column-pages'
 import { PLU_TABLE_HEADER_GEWICHT_CLASS, PLU_TABLE_HEADER_STUECK_CLASS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { DialogPluHideColumnTable } from '@/components/plu/DialogPluHideColumnTable'
 
 type TableRow = { type: 'header'; label: string } | { type: 'row'; left?: SearchableItem; right?: SearchableItem }
 
@@ -67,80 +67,6 @@ interface HideProductsDialogProps {
   /** Wie Masterliste / Layout-Einstellungen */
   flowDirection?: 'ROW_BY_ROW' | 'COLUMN_FIRST'
   fontSizes?: DialogPluFontSizes
-}
-
-/** Eine Spalte (Zeitung): Checkbox | PLU | Artikel */
-function HideColumnTable({
-  rows,
-  deferredSearch,
-  selectedPLUs,
-  toggleSelect,
-}: {
-  rows: DialogFlatRow<SearchableItem>[]
-  deferredSearch: string
-  selectedPLUs: Set<string>
-  toggleSelect: (plu: string) => void
-}) {
-  return (
-    <table className="w-full table-fixed flex-1 min-w-0">
-      <tbody>
-        {rows.map((row, i) => {
-          if (row.type === 'header') {
-            return (
-              <tr key={`hc-${i}`} className="border-b border-border">
-                <td
-                  colSpan={3}
-                  className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm"
-                >
-                  {row.label}
-                </td>
-              </tr>
-            )
-          }
-          const item = row.item
-          const match = itemMatchesSearch(item, deferredSearch)
-          const sel = selectedPLUs.has(item.plu)
-          return (
-            <tr
-              key={item.id}
-              data-highlight={match ? 'true' : undefined}
-              className={cn('border-b border-border', match && 'bg-primary/10')}
-            >
-              <td className="px-1 py-1 text-center w-[36px]">
-                <Checkbox
-                  checked={sel}
-                  onCheckedChange={() => toggleSelect(item.plu)}
-                  onClick={(e) => e.stopPropagation()}
-                  aria-label={`Auswahl PLU ${getDisplayPlu(item.plu)}`}
-                />
-              </td>
-              <td
-                className={cn(
-                  'px-2 py-1 text-sm font-mono w-[80px]',
-                  'cursor-pointer hover:bg-muted/30',
-                  match && 'bg-primary/10',
-                )}
-                onClick={() => toggleSelect(item.plu)}
-              >
-                {getDisplayPlu(item.plu)}
-              </td>
-              <td
-                className={cn(
-                  'px-2 py-1 text-sm break-words min-w-0 border-l border-border',
-                  'cursor-pointer hover:bg-muted/30',
-                  match && 'bg-primary/10',
-                )}
-                title={item.display_name}
-                onClick={() => toggleSelect(item.plu)}
-              >
-                {item.display_name}
-              </td>
-            </tr>
-          )
-        })}
-      </tbody>
-    </table>
-  )
 }
 
 export function HideProductsDialog({
@@ -246,7 +172,7 @@ export function HideProductsDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-6xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
+      <DialogContent className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-7xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
         <DialogHeader className="shrink-0">
           <DialogTitle>Produkte ausblenden</DialogTitle>
           <DialogDescription>
@@ -557,13 +483,13 @@ export function HideProductsDialog({
                                         minHeight: newspaperPageMinHeightPx(pageIdx, sec.heights),
                                       }}
                                     >
-                                      <HideColumnTable
+                                      <DialogPluHideColumnTable
                                         rows={newspaperRowsToFlatRows(page.left)}
                                         deferredSearch={deferredSearch}
                                         selectedPLUs={selectedPLUs}
                                         toggleSelect={toggleSelect}
                                       />
-                                      <HideColumnTable
+                                      <DialogPluHideColumnTable
                                         rows={newspaperRowsToFlatRows(page.right)}
                                         deferredSearch={deferredSearch}
                                         selectedPLUs={selectedPLUs}

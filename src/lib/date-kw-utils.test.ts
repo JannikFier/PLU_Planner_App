@@ -9,6 +9,8 @@ import {
   getCampaignWeekSelectOptions,
   getDefaultCampaignTargetWeek,
   formatBackshopActiveListToolbarRange,
+  formatIsoWeekMondayToSaturdayDe,
+  formatKwLabelWithOptionalMonSatRange,
 } from './date-kw-utils'
 
 describe('date-kw-utils', () => {
@@ -29,6 +31,18 @@ describe('date-kw-utils', () => {
       expect(year).toBe(2025)
       expect(kw).toBeGreaterThanOrEqual(1)
       expect(kw).toBeLessThanOrEqual(53)
+    })
+  })
+
+  describe('formatIsoWeekMondayToSaturdayDe / formatKwLabelWithOptionalMonSatRange', () => {
+    it('formatiert Mo–Sa für ISO-KW 7/2026', () => {
+      expect(formatIsoWeekMondayToSaturdayDe(7, 2026)).toBe('09.02.2026–14.02.2026')
+    })
+    it('ergänzt kw_label nur wenn aktiviert', () => {
+      expect(formatKwLabelWithOptionalMonSatRange('KW07/2026', 7, 2026, false)).toBe('KW07/2026')
+      expect(formatKwLabelWithOptionalMonSatRange('KW07/2026', 7, 2026, true)).toBe(
+        'KW07/2026 · 09.02.2026–14.02.2026',
+      )
     })
   })
 

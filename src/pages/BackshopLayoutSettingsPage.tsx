@@ -45,6 +45,7 @@ export function BackshopLayoutSettingsPage() {
     features_blocks: true,
     features_keyword_rules: true,
     page_break_per_block: false,
+    show_week_mon_sat_in_labels: false,
   })
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
@@ -75,6 +76,7 @@ export function BackshopLayoutSettingsPage() {
         features_blocks: settings.features_blocks,
         features_keyword_rules: settings.features_keyword_rules,
         page_break_per_block: settings.page_break_per_block ?? false,
+        show_week_mon_sat_in_labels: settings.show_week_mon_sat_in_labels ?? false,
       })
       const timeoutId = setTimeout(() => {
         isInitialized.current = true
@@ -378,6 +380,29 @@ export function BackshopLayoutSettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Kalenderwoche</CardTitle>
+              <CardDescription>
+                In Listen und PDF zusätzlich Montag bis Samstag zur jeweiligen ISO-KW anzeigen (Backshop).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="font-medium text-sm">Woche mit Datum (Mo–Sa)</div>
+                  <div className="text-xs text-muted-foreground">
+                    Neben „KW07/2026“ erscheint der Datumsbereich dieser Kalenderwoche.
+                  </div>
+                </div>
+                <Switch
+                  checked={form.show_week_mon_sat_in_labels}
+                  onCheckedChange={(checked) => updateForm({ show_week_mon_sat_in_labels: checked })}
+                />
               </div>
             </CardContent>
           </Card>

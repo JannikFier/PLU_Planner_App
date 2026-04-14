@@ -227,7 +227,7 @@ test.describe('Mobile Layout @mobile @extended', () => {
   })
 })
 
-test.describe('Mobile Layout Super-Admin hidden-products @mobile @extended', () => {
+test.describe('Mobile Layout Super-Admin @mobile @extended', () => {
   test.beforeEach(async ({ page }) => {
     const email = process.env.E2E_SUPER_ADMIN_EMAIL
     const password = process.env.E2E_SUPER_ADMIN_PASSWORD
@@ -252,6 +252,32 @@ test.describe('Mobile Layout Super-Admin hidden-products @mobile @extended', () 
     const hiddenRoot = page.locator('[data-testid="hidden-products-scroll-root"]')
     if ((await hiddenRoot.count()) > 0) {
       await expectNoHorizontalOverflowInLocator(hiddenRoot.first(), 'hidden-products-scroll-root (Super-Admin)')
+    }
+  })
+
+  test('Super-Admin PLU-Liste bearbeiten (Obst): keine horizontale Scrollbreite', async ({ page }) => {
+    await page.goto('/super-admin/block-sort')
+    await expect(page).toHaveURL(/\/super-admin\/block-sort/)
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('heading', { name: 'PLU-Liste bearbeiten' })).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalOverflow(page)
+    const pluRoot = page.locator('[data-testid="interactive-plu-scroll-root"]')
+    if ((await pluRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(pluRoot.first(), 'interactive-plu-scroll-root (Obst Block-Sort)')
+    }
+  })
+
+  test('Super-Admin PLU-Liste bearbeiten (Backshop): keine horizontale Scrollbreite', async ({ page }) => {
+    await page.goto('/super-admin/backshop-block-sort')
+    await expect(page).toHaveURL(/\/super-admin\/backshop-block-sort/)
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('heading', { name: 'PLU-Liste Backshop bearbeiten' })).toBeVisible({
+      timeout: 15_000,
+    })
+    await expectNoHorizontalOverflow(page)
+    const bsRoot = page.locator('[data-testid="interactive-backshop-block-sort-root"]')
+    if ((await bsRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(bsRoot.first(), 'interactive-backshop-block-sort-root')
     }
   })
 })

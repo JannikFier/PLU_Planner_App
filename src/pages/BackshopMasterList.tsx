@@ -42,7 +42,12 @@ import {
   useStoreBackshopNameBlockOverrides,
 } from '@/hooks/useStoreBackshopBlockLayout'
 import type { PLUStats } from '@/lib/plu-helpers'
-import { formatBackshopActiveListToolbarRange, getKWAndYearFromDate } from '@/lib/date-kw-utils'
+import {
+  formatBackshopActiveListToolbarRange,
+  formatIsoWeekMondayToSaturdayDe,
+  formatKwLabelWithOptionalMonSatRange,
+  getKWAndYearFromDate,
+} from '@/lib/date-kw-utils'
 import { buildOfferDisplayMap } from '@/lib/offer-display'
 import { effectiveHiddenPluSet } from '@/lib/hidden-visibility'
 import {
@@ -165,6 +170,30 @@ export function BackshopMasterList() {
   }, [rawItems, effectiveHiddenPLUs, offerDisplayByPlu, sortMode, blocks, customProducts, bezeichnungsregeln, renamedItems, markYellowKwCount, currentKw, currentJahr, nameBlockOverrides, storeBackshopBlockOrder])
 
   const currentVersion = activeVersion
+
+  const showWeekMonSat = layoutSettings?.show_week_mon_sat_in_labels ?? false
+
+  const backshopToolbarWeekLabel = useMemo(() => {
+    if (!currentVersion) return ''
+    const base = formatBackshopActiveListToolbarRange(
+      currentVersion.kw_nummer,
+      currentVersion.jahr,
+      currentKw,
+      currentJahr,
+    )
+    if (!showWeekMonSat) return base
+    return `${base} · ${formatIsoWeekMondayToSaturdayDe(currentVersion.kw_nummer, currentVersion.jahr)}`
+  }, [currentVersion, currentKw, currentJahr, showWeekMonSat])
+
+  const versionDisplayKwLabelForPdf = useMemo(() => {
+    if (!activeVersion) return 'Backshop'
+    return formatKwLabelWithOptionalMonSatRange(
+      activeVersion.kw_label,
+      activeVersion.kw_nummer,
+      activeVersion.jahr,
+      showWeekMonSat,
+    )
+  }, [activeVersion, showWeekMonSat])
 
   const pdfDisplayResult = useMemo(() => {
     if (!showPdfDialog) return { items: [], stats: { total: 0, newCount: 0, changedCount: 0, hidden: 0, customCount: 0 } }
@@ -319,12 +348,7 @@ export function BackshopMasterList() {
                   className="text-foreground font-medium"
                   title="Zeitraum der aktuellen Backshop-Liste: Einspiel-KW bis heute (ISO-8601). Nach neuem Upload beginnt die Anzeige wieder mit einer einzelnen KW."
                 >
-                  {formatBackshopActiveListToolbarRange(
-                    currentVersion.kw_nummer,
-                    currentVersion.jahr,
-                    currentKw,
-                    currentJahr,
-                  )}
+                  {backshopToolbarWeekLabel}
                 </span>
                 {currentVersion.status === 'active' && (
                   <Badge variant="default" className="text-xs">Aktiv</Badge>
@@ -508,7 +532,7 @@ export function BackshopMasterList() {
             onOpenChange={setShowPdfDialog}
             items={pdfDisplayResult.items}
             stats={pdfStats}
-            kwLabel={activeVersion?.kw_label ?? 'Backshop'}
+            kwLabel={versionDisplayKwLabelForPdf}
             sortMode={sortMode}
             flowDirection={flowDirection}
             blocks={blocks}
@@ -516,6 +540,7 @@ export function BackshopMasterList() {
             selectedVersionId={undefined}
             onVersionChange={undefined}
             fontSizes={fontSizes}
+            showWeekMonSat={showWeekMonSat}
           />
           </Suspense>
         )}

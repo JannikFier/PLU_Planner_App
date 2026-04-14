@@ -38,6 +38,8 @@ interface ExportBackshopPDFDialogProps {
   selectedVersionId?: string
   onVersionChange?: (versionId: string) => void
   fontSizes?: { header: number; column: number; product: number }
+  /** KW-Dropdown: Mo–Sa zur ISO-KW (Layout-Einstellung). */
+  showWeekMonSat?: boolean
 }
 
 /**
@@ -56,6 +58,7 @@ export function ExportBackshopPDFDialog({
   selectedVersionId,
   onVersionChange,
   fontSizes,
+  showWeekMonSat = false,
 }: ExportBackshopPDFDialogProps) {
   const [isDownloading, setIsDownloading] = useState(false)
   const [isPrinting, setIsPrinting] = useState(false)
@@ -181,10 +184,11 @@ export function ExportBackshopPDFDialog({
             <div className="space-y-1 sm:space-y-2">
               <label className="text-xs font-medium sm:text-sm">Kalenderwoche für PDF</label>
               <KWSelector
-                versions={versions as import('@/types/database').Version[]}
+                versions={versions}
                 selectedId={selectedVersionId}
                 onSelect={onVersionChange}
                 disabled={isGenerating}
+                showWeekMonSat={showWeekMonSat}
               />
             </div>
           )}

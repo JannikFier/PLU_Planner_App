@@ -14,6 +14,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
+import { snapCenterToCursor } from '@dnd-kit/modifiers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -438,7 +439,7 @@ export function WarengruppenPanel() {
       </Card>
 
       {/* DragOverlay */}
-      <DragOverlay>
+      <DragOverlay modifiers={[snapCenterToCursor]}>
         {draggingItem && (
           <div className="flex items-center gap-2 px-2 py-1 rounded text-sm bg-background border border-border shadow-lg">
             <GripVertical className="h-3 w-3 text-muted-foreground" />

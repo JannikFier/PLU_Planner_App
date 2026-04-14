@@ -63,6 +63,10 @@ function RenameColumnTable({
 }) {
   return (
     <table className="w-full table-fixed flex-1 min-w-0">
+      <colgroup>
+        <col className="w-[80px]" />
+        <col />
+      </colgroup>
       <tbody>
         {rows.map((row, i) => {
           if (row.type === 'header') {
@@ -81,7 +85,7 @@ function RenameColumnTable({
           const match = itemMatchesSearch(item, deferredSearch)
           return (
             <tr key={item.id} data-highlight={match ? 'true' : undefined} className={cn('border-b border-border', match && 'bg-primary/10')}>
-              <td className={cn('px-2 py-1 text-sm font-mono w-[80px]', match && 'bg-primary/10')}>{getDisplayPlu(item.plu)}</td>
+              <td className={cn('px-2 py-1 text-sm font-mono', match && 'bg-primary/10')}>{getDisplayPlu(item.plu)}</td>
               <td className={cn('px-2 py-1 text-sm border-l border-border', match && 'bg-primary/10')}>
                 <div className="flex items-center gap-1 min-w-0">
                   <span className="flex-1 min-w-0 break-words" title={item.display_name}>
@@ -296,7 +300,7 @@ export function RenameProductsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-6xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-7xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
           <DialogHeader className="shrink-0">
             <DialogTitle>Produkte umbenennen</DialogTitle>
             <DialogDescription>

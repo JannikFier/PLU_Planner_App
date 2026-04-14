@@ -9,11 +9,15 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { formatKwLabelWithOptionalMonSatRange } from '@/lib/date-kw-utils'
 import type { Version } from '@/types/database'
+
+/** Minimalfelder für KW-Dropdown (Obst- und Backshop-Version). */
+export type KwSelectableVersion = Pick<Version, 'id' | 'kw_label' | 'kw_nummer' | 'jahr' | 'status'>
 
 interface KWSelectorProps {
   /** Alle verfügbaren Versionen */
-  versions: Version[]
+  versions: KwSelectableVersion[]
   /** Aktuell ausgewählte Version-ID */
   selectedId: string | undefined
   /** Callback wenn eine andere Version gewählt wird */
@@ -22,6 +26,8 @@ interface KWSelectorProps {
   disabled?: boolean
   /** Zusätzliche Klassen für den Trigger (z. B. schmalere Breite auf dem Handy) */
   triggerClassName?: string
+  /** KW-Label um Mo–Sa-Datumsspanne ergänzen (Layout-Einstellung pro Markt). */
+  showWeekMonSat?: boolean
 }
 
 /** Status-Label für die Version */
@@ -42,7 +48,14 @@ function getStatusLabel(status: Version['status']) {
  * Dropdown zur Auswahl einer Kalenderwoche (Version).
  * Zeigt das KW-Label und den Status als Badge.
  */
-export function KWSelector({ versions, selectedId, onSelect, disabled, triggerClassName }: KWSelectorProps) {
+export function KWSelector({
+  versions,
+  selectedId,
+  onSelect,
+  disabled,
+  triggerClassName,
+  showWeekMonSat = false,
+}: KWSelectorProps) {
   if (versions.length === 0) {
     return (
       <div className="text-sm text-muted-foreground">
@@ -53,14 +66,19 @@ export function KWSelector({ versions, selectedId, onSelect, disabled, triggerCl
 
   return (
     <Select value={selectedId ?? ''} onValueChange={onSelect} disabled={disabled}>
-      <SelectTrigger className={cn('w-[200px]', triggerClassName)}>
+      <SelectTrigger className={cn('min-w-[200px] max-w-[min(100%,28rem)]', triggerClassName)}>
         <SelectValue placeholder="KW auswählen..." />
       </SelectTrigger>
       <SelectContent>
         {versions.map((version) => (
           <SelectItem key={version.id} value={version.id}>
             <span className="flex items-center">
-              {version.kw_label}
+              {formatKwLabelWithOptionalMonSatRange(
+                version.kw_label,
+                version.kw_nummer,
+                version.jahr,
+                showWeekMonSat,
+              )}
               {getStatusLabel(version.status)}
             </span>
           </SelectItem>

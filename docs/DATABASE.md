@@ -238,6 +238,7 @@ Eine Zeile pro Markt (`store_id` UNIQUE). Kanonische PLU-Zuordnung bleibt in `ma
 | `font_product_px` | INT | 12 | Schriftgröße Produkte (beeinflusst auch Zeilenhöhen im PDF) |
 | `mark_red_kw_count` | INT | 2 | Wie viele KWs rot markiert |
 | `mark_yellow_kw_count` | INT | 3 | Wie viele KWs gelb markiert |
+| `show_week_mon_sat_in_labels` | BOOLEAN | false | KW-Anzeige um Montag–Samstag (ISO-Woche) ergänzen |
 | `features_*` | BOOLEAN | true | Feature-Toggles |
 
 ### bezeichnungsregeln
@@ -365,7 +366,7 @@ Getrennte Tabellen für die zweite PLU-Liste „Backshop“. Keine Änderung an 
 | `backshop_custom_products` | Eigene Produkte Backshop; **image_url NOT NULL** (Bild Pflicht) |
 | `backshop_hidden_items` | Ausgeblendete PLUs Backshop |
 | `backshop_version_notifications` | Benachrichtigungen pro Backshop-Version |
-| `backshop_layout_settings` | Singleton Layout für Backshop (sort_mode, Schriftgrößen, Markierungs-Dauer) |
+| `backshop_layout_settings` | Singleton Layout für Backshop (sort_mode, Schriftgrößen, Markierungs-Dauer, `show_week_mon_sat_in_labels` wie bei Obst) |
 | `backshop_bezeichnungsregeln` | Bezeichnungsregeln nur für Backshop |
 
 **Funktion:** `get_active_backshop_version()` – gibt die aktive Backshop-Version zurück (analog `get_active_version()`).

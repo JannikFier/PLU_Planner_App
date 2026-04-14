@@ -49,6 +49,7 @@ export function LayoutSettingsPage() {
     features_hidden_items: true,
     features_blocks: true,
     features_keyword_rules: true,
+    show_week_mon_sat_in_labels: false,
   })
 
   // Separater visueller State fuer Font-Inputs (String, damit Feld frei editierbar ist)
@@ -94,6 +95,7 @@ export function LayoutSettingsPage() {
           features_hidden_items: settings.features_hidden_items ?? true,
           features_blocks: settings.features_blocks ?? true,
           features_keyword_rules: settings.features_keyword_rules ?? true,
+          show_week_mon_sat_in_labels: settings.show_week_mon_sat_in_labels ?? false,
         })
         setHeaderText(String(hdr))
         setColumnText(String(col))
@@ -436,6 +438,30 @@ export function LayoutSettingsPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Kalenderwoche: optional Mo–Sa zur KW */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Kalenderwoche</CardTitle>
+                <CardDescription>
+                  In Listen und PDF zusätzlich Montag bis Samstag zur jeweiligen ISO-KW anzeigen.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="font-medium text-sm">Woche mit Datum (Mo–Sa)</div>
+                    <div className="text-xs text-muted-foreground">
+                      Neben „KW07/2026“ erscheint der Datumsbereich dieser Kalenderwoche.
+                    </div>
+                  </div>
+                  <Switch
+                    checked={form.show_week_mon_sat_in_labels}
+                    onCheckedChange={(checked) => updateForm({ show_week_mon_sat_in_labels: checked })}
+                  />
                 </div>
               </CardContent>
             </Card>

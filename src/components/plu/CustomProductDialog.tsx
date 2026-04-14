@@ -1,7 +1,7 @@
 // CustomProductDialog: Dialog zum Hinzufügen eigener Produkte (Obst/Gemüse).
 // Pflichtfelder: SEPARATED → Typ; BY_BLOCK + features_blocks → Warengruppe.
 
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { z } from 'zod'
 import {
   AlertDialog,
@@ -107,12 +107,8 @@ export function CustomProductDialog({
   const [newBlockName, setNewBlockName] = useState('')
   const [errorPopupMessage, setErrorPopupMessage] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!isAdmin && showNewBlockInput) {
-      setShowNewBlockInput(false)
-      setNewBlockName('')
-    }
-  }, [isAdmin, showNewBlockInput])
+  /** Nur für Admins: „Neue Warengruppe“-Eingabe; ohne Effect (kein setState in useEffect). */
+  const showNewBlockSection = isAdmin && showNewBlockInput
 
   const resetForm = useCallback(() => {
     setPlu('')
@@ -345,7 +341,7 @@ export function CustomProductDialog({
           {showBlockField && (
             <div className="space-y-2">
               <Label>Warengruppe</Label>
-              {!showNewBlockInput ? (
+              {!showNewBlockSection ? (
                 <>
                   <Select
                     value={blockId}
