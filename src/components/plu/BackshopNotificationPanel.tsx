@@ -13,7 +13,10 @@ import {
 import { useLocation } from 'react-router-dom'
 import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
 import { useBackshopHiddenItems, useBackshopHideProduct, useBackshopUnhideProduct } from '@/hooks/useBackshopHiddenItems'
-import { useBackshopOfferCampaignWithLines } from '@/hooks/useCentralOfferCampaigns'
+import {
+  useBackshopOfferCampaignWithLines,
+  useBackshopOfferStoreDisabled,
+} from '@/hooks/useCentralOfferCampaigns'
 import { effectiveHiddenPluSet } from '@/lib/hidden-visibility'
 import { canManageMarketHiddenItems } from '@/lib/permissions'
 import { getDisplayPlu } from '@/lib/plu-helpers'
@@ -154,6 +157,7 @@ export function BackshopNotificationPanel({
 
   const { data: hiddenItems = [] } = useBackshopHiddenItems()
   const { data: backshopCampaign } = useBackshopOfferCampaignWithLines()
+  const { data: backshopStoreDisabled = new Set() } = useBackshopOfferStoreDisabled()
   const hideProduct = useBackshopHideProduct()
   const unhideProduct = useBackshopUnhideProduct()
   const markRead = useBackshopMarkNotificationRead()
@@ -162,8 +166,8 @@ export function BackshopNotificationPanel({
 
   const hiddenPLUs = useMemo(
     () =>
-      effectiveHiddenPluSet(new Set(hiddenItems.map((h) => h.plu)), backshopCampaign),
-    [hiddenItems, backshopCampaign],
+      effectiveHiddenPluSet(new Set(hiddenItems.map((h) => h.plu)), backshopCampaign, backshopStoreDisabled),
+    [hiddenItems, backshopCampaign, backshopStoreDisabled],
   )
 
   const rawHiddenSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])

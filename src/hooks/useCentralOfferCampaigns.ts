@@ -196,7 +196,8 @@ export function useToggleObstOfferDisabled() {
   const { currentStoreId } = useCurrentStore()
 
   return useMutation({
-    mutationFn: async ({ plu, disabled }: { plu: string; disabled: boolean }) => {
+    mutationFn: async (vars: { plu: string; disabled: boolean; silentToast?: boolean }) => {
+      const { plu, disabled } = vars
       if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       if (isTestModeActive()) return
 
@@ -219,9 +220,9 @@ export function useToggleObstOfferDisabled() {
         if (error) throw error
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['obst-offer-store-disabled', currentStoreId] })
-      toast.success('Werbung aktualisiert')
+      if (!variables.silentToast) toast.success('Werbung aktualisiert')
     },
     onError: (err) => {
       toast.error(`Fehler: ${formatError(err)}`)
@@ -318,7 +319,8 @@ export function useToggleBackshopOfferDisabled() {
   const { currentStoreId } = useCurrentStore()
 
   return useMutation({
-    mutationFn: async ({ plu, disabled }: { plu: string; disabled: boolean }) => {
+    mutationFn: async (vars: { plu: string; disabled: boolean; silentToast?: boolean }) => {
+      const { plu, disabled } = vars
       if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       if (isTestModeActive()) return
 
@@ -341,9 +343,9 @@ export function useToggleBackshopOfferDisabled() {
         if (error) throw error
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['backshop-offer-store-disabled', currentStoreId] })
-      toast.success('Werbung aktualisiert')
+      if (!variables.silentToast) toast.success('Werbung aktualisiert')
     },
     onError: (err) => {
       toast.error(`Fehler: ${formatError(err)}`)

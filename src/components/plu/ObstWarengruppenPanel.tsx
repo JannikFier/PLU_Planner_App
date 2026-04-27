@@ -70,27 +70,21 @@ import {
 } from '@/lib/obst-warengruppen-dnd'
 import { useAuth } from '@/hooks/useAuth'
 import { useHiddenItems } from '@/hooks/useHiddenItems'
-import { useObstOfferCampaignForKwYear } from '@/hooks/useCentralOfferCampaigns'
+import { useObstOfferCampaignForKwYear, useObstOfferStoreDisabled } from '@/hooks/useCentralOfferCampaigns'
 import { useMediaMinWidth, WARENGRUPPEN_WORKBENCH_DESKTOP_MIN_PX } from '@/hooks/useMediaMinWidth'
 import { effectiveHiddenPluSet } from '@/lib/hidden-visibility'
 import type { CustomProduct, MasterPLUItem, Block } from '@/types/database'
+import type { WarengruppeRecentBatch, WarengruppeRecentLine } from '@/types/warengruppen-workbench-recent'
+import {
+  prependRecentBatch,
+  randomRecentLineId,
+  removeBatchById,
+  removeLineFromBatchesByLineId,
+} from '@/lib/warengruppen-recent-batches'
+import { WarengruppenRecentBatchesList } from '@/components/plu/WarengruppenRecentBatchesList'
 import { StatusBadge } from '@/components/plu/StatusBadge'
 
 const UNASSIGNED_KEY = '__unassigned__'
-
-type RecentChange = {
-  id: string
-  at: number
-  itemId: string
-  plu: string
-  name: string
-  fromLabel: string
-  toLabel: string
-}
-
-function randomId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-}
 
 /** Sichtbare Einfüge-Linie zwischen Warengruppen-Zeilen (Reihenfolge ändern). */
 function ObstBlockReorderInsertionLine() {
@@ -161,14 +155,15 @@ export function ObstWarengruppenPanel() {
     activeVersion?.jahr,
     Boolean(activeVersion?.id),
   )
+  const { data: obstStoreDisabled = new Set() } = useObstOfferStoreDisabled()
   const rawHiddenPluSet = useMemo(
     () => new Set(hiddenItems.map((h) => h.plu)),
     [hiddenItems],
   )
   /** Wie Masterliste/PDF: ausgeblendet + zentrale Werbung (temporär sichtbar) */
   const effectiveHiddenPLUsOnMaster = useMemo(
-    () => effectiveHiddenPluSet(rawHiddenPluSet, obstCampaign),
-    [rawHiddenPluSet, obstCampaign],
+    () => effectiveHiddenPluSet(rawHiddenPluSet, obstCampaign, obstStoreDisabled),
+    [rawHiddenPluSet, obstCampaign, obstStoreDisabled],
   )
   const isItemHiddenOnMasterList = useCallback(
     (item: MasterPLUItem) => effectiveHiddenPLUsOnMaster.has(item.plu),
@@ -229,7 +224,7 @@ export function ObstWarengruppenPanel() {
   const deferredSearch = useDebouncedValue(globalSearch, 200)
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
   const [bulkSelectActive, setBulkSelectActive] = useState(false)
-  const [recentChanges, setRecentChanges] = useState<RecentChange[]>([])
+  const [recentBatches, setRecentBatches] = useState<WarengruppeRecentBatch[]>([])
   const [assignPickerItem, setAssignPickerItem] = useState<MasterPLUItem | null>(null)
   const [blockName, setBlockName] = useState('')
   const [showAddBlock, setShowAddBlock] = useState(false)
@@ -295,22 +290,9 @@ export function ObstWarengruppenPanel() {
     [scheduleBlockReorderIndicator],
   )
 
-  const pushRecent = useCallback((item: MasterPLUItem, fromLabel: string, toLabel: string) => {
-    setRecentChanges((prev) => {
-      const next: RecentChange[] = [
-        {
-          id: randomId(),
-          at: Date.now(),
-          itemId: item.id,
-          plu: item.plu,
-          name: item.display_name ?? item.system_name,
-          fromLabel,
-          toLabel,
-        },
-        ...prev.filter((r) => r.itemId !== item.id),
-      ]
-      return next.slice(0, 12)
-    })
+  const pushRecentBatchLines = useCallback((lines: WarengruppeRecentLine[]) => {
+    if (lines.length === 0) return
+    setRecentBatches((prev) => prependRecentBatch(prev, lines))
   }, [])
 
   const selectedBlock =
@@ -412,9 +394,19 @@ export function ObstWarengruppenPanel() {
     })
   }, [])
 
-  const assignItemToBlock = useCallback(
-    async (item: MasterPLUItem, targetBlockId: string | null) => {
-      const from = blockLabel(effBlock(item))
+  const applyAssignment = useCallback(
+    async (
+      item: MasterPLUItem,
+      targetBlockId: string | null,
+      options?: { record?: boolean },
+    ): Promise<WarengruppeRecentLine | null> => {
+      const record = options?.record !== false
+      const beforeEff = effBlock(item)
+      const from = blockLabel(beforeEff)
+      const to =
+        targetBlockId === null ? blockLabel(item.block_id) : blockLabel(targetBlockId)
+      if (beforeEff === targetBlockId) return null
+
       const custom = customById.get(item.id)
       if (custom) {
         await updateCustomProduct.mutateAsync({ id: custom.id, block_id: targetBlockId })
@@ -425,10 +417,19 @@ export function ObstWarengruppenPanel() {
           targetBlockId,
         })
       }
-      const to = targetBlockId === null ? blockLabel(item.block_id) : blockLabel(targetBlockId)
-      pushRecent(item, from, to)
+
+      if (!record) return null
+      return {
+        id: randomRecentLineId(),
+        beforeEffectiveBlockId: beforeEff,
+        itemId: item.id,
+        plu: item.plu,
+        name: item.display_name ?? item.system_name,
+        fromLabel: from,
+        toLabel: to,
+      }
     },
-    [assignOverride, blockLabel, effBlock, pushRecent, customById, updateCustomProduct],
+    [assignOverride, blockLabel, effBlock, customById, updateCustomProduct],
   )
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
@@ -543,17 +544,25 @@ export function ObstWarengruppenPanel() {
       }
 
       // ——— Produkt zuordnen ———
-      const item = mergedItems.find((i) => i.id === activeId)
-      if (!item || !overId?.startsWith('drop-block-')) return
+      if (!overId?.startsWith('drop-block-')) return
 
       const raw = overId.replace('drop-block-', '')
       const targetBlockId = raw === 'unassigned' ? null : raw
-      const before = effBlock(item)
-      if (before === targetBlockId) return
 
+      const idsToMove =
+        checkedIds.size > 0 && checkedIds.has(activeId) ? [...checkedIds] : [activeId]
+
+      const lines: WarengruppeRecentLine[] = []
       try {
-        await assignItemToBlock(item, targetBlockId)
-        toast.success('Produkt verschoben')
+        for (const uid of idsToMove) {
+          const row = mergedItems.find((i) => i.id === uid)
+          if (!row) continue
+          const line = await applyAssignment(row, targetBlockId)
+          if (line) lines.push(line)
+        }
+        if (lines.length === 0) return
+        pushRecentBatchLines(lines)
+        toast.success(lines.length === 1 ? 'Produkt verschoben' : `${lines.length} Artikel verschoben`)
       } catch {
         toast.error('Fehler beim Verschieben')
       }
@@ -563,29 +572,55 @@ export function ObstWarengruppenPanel() {
       sortedBlocks,
       reorderStoreMutation,
       mergedItems,
-      effBlock,
-      assignItemToBlock,
+      checkedIds,
+      applyAssignment,
+      pushRecentBatchLines,
       clearBlockReorderIndicator,
     ],
   )
 
   const handlePickAssignTarget = useCallback(
     async (targetBlockId: string | null) => {
-      if (!assignPickerItem) return
-      const item = assignPickerItem
-      if (effBlock(item) === targetBlockId) {
-        setAssignPickerItem(null)
-        return
-      }
+      const toAssign: MasterPLUItem[] =
+        bulkSelectActive && checkedIds.size > 0
+          ? [...checkedIds]
+              .map((id) => mergedItems.find((i) => i.id === id))
+              .filter((x): x is MasterPLUItem => x != null)
+          : assignPickerItem
+            ? [assignPickerItem]
+            : []
+
+      if (toAssign.length === 0) return
+
       try {
-        await assignItemToBlock(item, targetBlockId)
-        toast.success('Zuordnung aktualisiert')
+        const lines: WarengruppeRecentLine[] = []
+        for (const item of toAssign) {
+          if (effBlock(item) === targetBlockId) continue
+          const line = await applyAssignment(item, targetBlockId)
+          if (line) lines.push(line)
+        }
+        if (lines.length === 0) {
+          setAssignPickerItem(null)
+          return
+        }
+        pushRecentBatchLines(lines)
+        toast.success(
+          lines.length === 1 ? 'Zuordnung aktualisiert' : `${lines.length} Artikel zugewiesen`,
+        )
         setAssignPickerItem(null)
       } catch {
         toast.error('Fehler beim Zuweisen')
       }
     },
-    [assignPickerItem, effBlock, assignItemToBlock],
+    [
+      assignPickerItem,
+      bulkSelectActive,
+      checkedIds,
+      mergedItems,
+      effBlock,
+      applyAssignment,
+      pushRecentBatchLines,
+    ],
   )
 
   const handleBulkAssignToSelectedGroup = async () => {
@@ -596,11 +631,14 @@ export function ObstWarengruppenPanel() {
     }
     const targetId = selectedKey
     try {
+      const lines: WarengruppeRecentLine[] = []
       for (const id of checkedIds) {
         const item = mergedItems.find((i) => i.id === id)
         if (!item) continue
-        await assignItemToBlock(item, targetId)
+        const line = await applyAssignment(item, targetId)
+        if (line) lines.push(line)
       }
+      if (lines.length > 0) pushRecentBatchLines(lines)
       toast.success(`${checkedIds.size} Artikel zugewiesen`)
       setCheckedIds(new Set())
     } catch {
@@ -611,11 +649,14 @@ export function ObstWarengruppenPanel() {
   const handleBulkMoveToOhne = async () => {
     if (checkedIds.size === 0) return
     try {
+      const lines: WarengruppeRecentLine[] = []
       for (const id of checkedIds) {
         const item = mergedItems.find((i) => i.id === id)
         if (!item) continue
-        await assignItemToBlock(item, null)
+        const line = await applyAssignment(item, null)
+        if (line) lines.push(line)
       }
+      if (lines.length > 0) pushRecentBatchLines(lines)
       toast.success(`${checkedIds.size} Artikel zu „Ohne Zuordnung“ verschoben`)
       setCheckedIds(new Set())
     } catch {
@@ -625,18 +666,45 @@ export function ObstWarengruppenPanel() {
 
   const handleRemoveOverrideForItem = async (item: MasterPLUItem) => {
     try {
-      const from = blockLabel(effBlock(item))
-      await assignOverride.mutateAsync({
-        systemName: item.system_name,
-        masterBlockId: item.block_id,
-        targetBlockId: null,
-      })
-      pushRecent(item, from, blockLabel(item.block_id))
+      const line = await applyAssignment(item, null)
+      if (line) pushRecentBatchLines([line])
       toast.success('Markt-Override entfernt')
     } catch {
       toast.error('Fehler beim Entfernen')
     }
   }
+
+  const handleRevertRecentLine = useCallback(
+    async (line: WarengruppeRecentLine) => {
+      const item = mergedItems.find((i) => i.id === line.itemId)
+      if (!item) return
+      try {
+        await applyAssignment(item, line.beforeEffectiveBlockId, { record: false })
+        setRecentBatches((prev) => removeLineFromBatchesByLineId(prev, line.id))
+      } catch {
+        toast.error('Fehler beim Zurücknehmen')
+      }
+    },
+    [mergedItems, applyAssignment],
+  )
+
+  const handleRevertRecentBatch = useCallback(
+    async (batchId: string) => {
+      const batch = recentBatches.find((b) => b.id === batchId)
+      if (!batch) return
+      try {
+        for (const line of batch.lines) {
+          const item = mergedItems.find((i) => i.id === line.itemId)
+          if (!item) continue
+          await applyAssignment(item, line.beforeEffectiveBlockId, { record: false })
+        }
+        setRecentBatches((prev) => removeBatchById(prev, batchId))
+      } catch {
+        toast.error('Fehler beim Zurücknehmen')
+      }
+    },
+    [recentBatches, mergedItems, applyAssignment],
+  )
 
   const handleCreateBlock = async () => {
     if (!blockName.trim()) return
@@ -714,6 +782,21 @@ export function ObstWarengruppenPanel() {
       : searchActive
         ? 'Keine Treffer'
         : ''
+
+  const assignPickerBulkCount =
+    bulkSelectActive && checkedIds.size > 0 ? checkedIds.size : 1
+
+  const assignPickerUniformEff = useMemo(() => {
+    if (!bulkSelectActive || checkedIds.size === 0) {
+      return assignPickerItem ? effBlock(assignPickerItem) : undefined
+    }
+    const sel = [...checkedIds]
+      .map((id) => mergedItems.find((i) => i.id === id))
+      .filter((x): x is MasterPLUItem => x != null)
+    if (sel.length === 0) return undefined
+    const first = effBlock(sel[0])
+    return sel.every((i) => effBlock(i) === first) ? first : ('mixed' as const)
+  }, [bulkSelectActive, checkedIds, assignPickerItem, mergedItems, effBlock])
 
   return (
     <>
@@ -895,19 +978,32 @@ export function ObstWarengruppenPanel() {
                             : 'Links eine Warengruppe wählen oder oben suchen.'}
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      variant={bulkSelectActive ? 'default' : 'outline'}
-                      size="sm"
-                      className="h-10 min-h-[44px] shrink-0"
-                      onClick={() => {
-                        setBulkSelectActive((v) => !v)
-                        if (bulkSelectActive) setCheckedIds(new Set())
-                      }}
-                    >
-                      <CheckSquare className="h-4 w-4 mr-2" />
-                      Mehrfachauswahl
-                    </Button>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant={bulkSelectActive ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-10 min-h-[44px] shrink-0"
+                        onClick={() => {
+                          setBulkSelectActive((v) => !v)
+                          if (bulkSelectActive) setCheckedIds(new Set())
+                        }}
+                      >
+                        <CheckSquare className="h-4 w-4 mr-2" />
+                        Mehrfachauswahl
+                      </Button>
+                      {bulkSelectActive && centerItems.length > 0 ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-10 shrink-0"
+                          onClick={() => setCheckedIds(new Set(centerItems.map((i) => i.id)))}
+                        >
+                          Alle auswählen
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                     {centerItems.length === 0 ? (
@@ -990,43 +1086,30 @@ export function ObstWarengruppenPanel() {
                       Zuletzt geändert
                     </p>
                     <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                      {recentChanges.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">Noch keine Änderungen in dieser Sitzung.</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {recentChanges.map((r) => {
-                            const row = mergedItems.find((i) => i.id === r.itemId)
-                            const canRemoveOverride = Boolean(row && hasMarktOverride(row))
-                            return (
-                              <div
-                                key={r.id}
-                                className="space-y-1 rounded-lg border border-border bg-muted/20 p-3 text-sm"
-                              >
-                                <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                                  {getDisplayPlu(r.plu)}
-                                </span>
-                                <p className="font-medium leading-snug line-clamp-2">{r.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {r.fromLabel} → {r.toLabel}
-                                </p>
-                                {canRemoveOverride ? (
-                                  <Button
-                                    type="button"
-                                    variant="link"
-                                    size="sm"
-                                    className="h-auto p-0 text-xs"
-                                    onClick={() => row && handleRemoveOverrideForItem(row)}
-                                    disabled={assignOverride.isPending}
-                                  >
-                                    <Undo2 className="mr-1 inline h-3 w-3" />
-                                    Override entfernen
-                                  </Button>
-                                ) : null}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
+                      <WarengruppenRecentBatchesList
+                        batches={recentBatches}
+                        emptyLabel="Noch keine Änderungen in dieser Sitzung."
+                        disabled={assignOverride.isPending || updateCustomProduct.isPending}
+                        onRevertLine={(line) => void handleRevertRecentLine(line)}
+                        onRevertBatch={(id) => void handleRevertRecentBatch(id)}
+                        lineExtra={(line) => {
+                          const row = mergedItems.find((i) => i.id === line.itemId)
+                          if (!row || !hasMarktOverride(row)) return null
+                          return (
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs"
+                              onClick={() => void handleRemoveOverrideForItem(row)}
+                              disabled={assignOverride.isPending}
+                            >
+                              <Undo2 className="mr-1 inline h-3 w-3" />
+                              Override entfernen
+                            </Button>
+                          )
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1068,7 +1151,7 @@ export function ObstWarengruppenPanel() {
                   onClick={() => setCheckedIds(new Set())}
                   data-tour="obst-konfig-warengruppen-products-deselect-button"
                 >
-                  Auswahl leeren
+                  Alles abwählen
                 </Button>
               </div>
             </CardContent>
@@ -1083,6 +1166,11 @@ export function ObstWarengruppenPanel() {
                   <p className="line-clamp-2 text-left text-xs font-semibold leading-snug">
                     {draggingItem.display_name ?? draggingItem.system_name}
                   </p>
+                  {checkedIds.size > 1 && checkedIds.has(draggingItem.id) ? (
+                    <Badge variant="secondary" className="mt-1 text-[10px]">
+                      {checkedIds.size} Artikel
+                    </Badge>
+                  ) : null}
                 </div>
               </div>
             ) : draggingBlockLabel ? (
@@ -1316,19 +1404,32 @@ export function ObstWarengruppenPanel() {
                         : 'Oben eine Warengruppe wählen oder suchen.'}
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant={bulkSelectActive ? 'default' : 'outline'}
-                  size="sm"
-                  className="h-10 min-h-[44px] shrink-0"
-                  onClick={() => {
-                    setBulkSelectActive((v) => !v)
-                    if (bulkSelectActive) setCheckedIds(new Set())
-                  }}
-                >
-                  <CheckSquare className="mr-2 h-4 w-4" />
-                  Mehrfachauswahl
-                </Button>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant={bulkSelectActive ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-10 min-h-[44px] shrink-0"
+                    onClick={() => {
+                      setBulkSelectActive((v) => !v)
+                      if (bulkSelectActive) setCheckedIds(new Set())
+                    }}
+                  >
+                    <CheckSquare className="mr-2 h-4 w-4" />
+                    Mehrfachauswahl
+                  </Button>
+                  {bulkSelectActive && centerItems.length > 0 ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-10 shrink-0"
+                      onClick={() => setCheckedIds(new Set(centerItems.map((i) => i.id)))}
+                    >
+                      Alle auswählen
+                    </Button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="min-h-0 min-w-0 flex-1 overflow-y-auto pr-1">
@@ -1377,43 +1478,30 @@ export function ObstWarengruppenPanel() {
                     Zuletzt geändert
                   </summary>
                   <div className="mt-2 max-h-48 overflow-y-auto pr-1">
-                    {recentChanges.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">Noch keine Änderungen in dieser Sitzung.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {recentChanges.map((r) => {
-                          const row = mergedItems.find((i) => i.id === r.itemId)
-                          const canRemoveOverride = Boolean(row && hasMarktOverride(row))
-                          return (
-                            <div
-                              key={r.id}
-                              className="space-y-1 rounded-lg border border-border bg-muted/20 p-3 text-sm"
-                            >
-                              <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                                {getDisplayPlu(r.plu)}
-                              </span>
-                              <p className="line-clamp-2 font-medium leading-snug">{r.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {r.fromLabel} → {r.toLabel}
-                              </p>
-                              {canRemoveOverride ? (
-                                <Button
-                                  type="button"
-                                  variant="link"
-                                  size="sm"
-                                  className="h-auto p-0 text-xs"
-                                  onClick={() => row && handleRemoveOverrideForItem(row)}
-                                  disabled={assignOverride.isPending}
-                                >
-                                  <Undo2 className="mr-1 inline h-3 w-3" />
-                                  Override entfernen
-                                </Button>
-                              ) : null}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
+                    <WarengruppenRecentBatchesList
+                      batches={recentBatches}
+                      emptyLabel="Noch keine Änderungen in dieser Sitzung."
+                      disabled={assignOverride.isPending || updateCustomProduct.isPending}
+                      onRevertLine={(line) => void handleRevertRecentLine(line)}
+                      onRevertBatch={(id) => void handleRevertRecentBatch(id)}
+                      lineExtra={(line) => {
+                        const row = mergedItems.find((i) => i.id === line.itemId)
+                        if (!row || !hasMarktOverride(row)) return null
+                        return (
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs"
+                            onClick={() => void handleRemoveOverrideForItem(row)}
+                            disabled={assignOverride.isPending}
+                          >
+                            <Undo2 className="mr-1 inline h-3 w-3" />
+                            Override entfernen
+                          </Button>
+                        )
+                      }}
+                    />
                   </div>
                 </details>
               </div>
@@ -1453,7 +1541,7 @@ export function ObstWarengruppenPanel() {
                   onClick={() => setCheckedIds(new Set())}
                   data-tour="obst-konfig-warengruppen-products-deselect-button"
                 >
-                  Auswahl leeren
+                  Alles abwählen
                 </Button>
               </div>
             </div>
@@ -1542,11 +1630,24 @@ export function ObstWarengruppenPanel() {
           data-tour="obst-konfig-warengruppen-pick-card"
         >
           <DialogHeader className="shrink-0 space-y-2 border-b border-border px-6 py-4 pr-14 text-left">
-            <DialogTitle>Warengruppe wählen</DialogTitle>
+            <DialogTitle>
+              {assignPickerBulkCount > 1 ? `${assignPickerBulkCount} Artikel zuordnen` : 'Warengruppe wählen'}
+            </DialogTitle>
             <DialogDescription>
-              Wähle eine Gruppe – der Artikel wird dem Markt so zugeordnet (wie per Ziehen).
+              {assignPickerBulkCount > 1
+                ? 'Alle ausgewählten Artikel werden der gewählten Gruppe zugeordnet (wie per Ziehen).'
+                : 'Wähle eine Gruppe – der Artikel wird dem Markt so zugeordnet (wie per Ziehen).'}
             </DialogDescription>
-            {assignPickerItem ? (
+            {assignPickerBulkCount > 1 ? (
+              <div className="space-y-1 border-t border-border pt-3">
+                <p className="text-sm font-medium">{assignPickerBulkCount} Artikel ausgewählt</p>
+                {assignPickerUniformEff === 'mixed' ? (
+                  <p className="text-xs text-muted-foreground">
+                    Unterschiedliche aktuelle Zuordnung – keine „aktuell“-Markierung.
+                  </p>
+                ) : null}
+              </div>
+            ) : assignPickerItem ? (
               <div className="space-y-1 border-t border-border pt-3">
                 <p className="font-mono text-xs tabular-nums">{getDisplayPlu(assignPickerItem.plu)}</p>
                 <p className="line-clamp-3 text-sm font-medium leading-snug">
@@ -1561,12 +1662,12 @@ export function ObstWarengruppenPanel() {
                 type="button"
                 variant="outline"
                 className="h-auto min-h-11 w-full justify-between gap-3 px-3 py-3 text-left font-normal"
-                disabled={assignOverride.isPending}
+                disabled={assignOverride.isPending || updateCustomProduct.isPending}
                 onClick={() => handlePickAssignTarget(null)}
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <span className="min-w-0 font-medium">Ohne Zuordnung</span>
-                  {assignPickerItem != null && effBlock(assignPickerItem) == null ? (
+                  {assignPickerUniformEff !== 'mixed' && assignPickerUniformEff === null ? (
                     <Badge variant="secondary" className="shrink-0 text-[10px]">
                       aktuell
                     </Badge>
@@ -1575,7 +1676,8 @@ export function ObstWarengruppenPanel() {
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{unassignedCount}</span>
               </Button>
               {sortedBlocks.map((b) => {
-                const isCurrent = assignPickerItem != null && effBlock(assignPickerItem) === b.id
+                const isCurrent =
+                  assignPickerUniformEff !== 'mixed' && assignPickerUniformEff === b.id
                 const n = blockItemCounts.get(b.id) ?? 0
                 return (
                   <Button
@@ -1583,7 +1685,7 @@ export function ObstWarengruppenPanel() {
                     type="button"
                     variant="outline"
                     className="h-auto min-h-11 w-full justify-between gap-3 px-3 py-3 text-left font-normal"
-                    disabled={assignOverride.isPending}
+                    disabled={assignOverride.isPending || updateCustomProduct.isPending}
                     onClick={() => handlePickAssignTarget(b.id)}
                   >
                     <span className="flex min-w-0 items-center gap-2">
@@ -1777,7 +1879,7 @@ function ObstWorkbenchProductCard({
   dragDisabled?: boolean
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id, disabled: dragDisabled })
-  const tapToPickGroup = Boolean(onOpenAssignPicker && !bulkSelectActive)
+  const tapToPickGroup = Boolean(onOpenAssignPicker)
   const display = getDisplayNameForItem(item.display_name, item.system_name, isCustom)
 
   return (
@@ -1863,8 +1965,16 @@ function ObstWorkbenchProductCard({
         </p>
       </div>
       {bulkSelectActive ? (
-        <div className="absolute bottom-2 left-2 flex min-h-[44px] min-w-[44px] items-center justify-center">
-          <Checkbox checked={isChecked} onCheckedChange={() => onToggle()} className="min-h-[44px] min-w-[44px]" />
+        <div
+          className="absolute bottom-1.5 left-1.5 z-10 flex min-h-9 min-w-9 items-center justify-center p-1.5"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <Checkbox
+            checked={isChecked}
+            onCheckedChange={() => onToggle()}
+            className="size-3.5 rounded-[3px] border-muted-foreground/35 shadow-none data-[state=checked]:border-primary data-[state=checked]:bg-primary [&_svg]:size-2.5"
+          />
         </div>
       ) : null}
       {!dragDisabled ? (

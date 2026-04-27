@@ -74,7 +74,7 @@ test.describe('Tutorial Smoke @extended', () => {
     await expect(page.getByRole('dialog').filter({ hasText: 'Hi, ich bin Fier' })).not.toBeVisible()
   })
 
-  test('Tour starten führt in Basics und anschließenden TrackPick', async ({ page }) => {
+  test('Tour starten: Basics inkl. Bereich wählen, dann Einstieg ins gewählte Modul', async ({ page }) => {
     test.setTimeout(60_000)
     await page.locator('[data-tour="profile-menu"]').click()
     await page.getByRole('menuitem', { name: 'Einführung wiederholen' }).click()
@@ -85,11 +85,29 @@ test.describe('Tutorial Smoke @extended', () => {
 
     // Basics: Admin/Non-Viewer = interaktiver Coach (TutorialCoachPanel, „Weiter“); sonst driver.js.
     // Max. Iterationen hoch – Basics inkl. Header-Hints + Pick-Area sind viele Schritte.
+    // Nach dem Pick-Schritt („Wähle einen Bereich“) muss eine Kachel geklickt werden; sonst bleibt
+    // runBasicsSegment hängen. TrackPick nach Basics entfällt, sobald die Route ein Modul erkennt
+    // (siehe inferTutorialModuleFromPath) – daher Ziel-URL statt TrackPick-Dialog.
+    let pickedModule = false
     for (let i = 0; i < 45; i += 1) {
       const trackPick = page.getByRole('dialog').filter({
         hasText: /Womit möchtest du starten|Weiter mit einem nächsten Bereich/,
       })
       if (await trackPick.isVisible().catch(() => false)) break
+
+      const pickAreaCoach = page.getByRole('status').filter({ hasText: 'Wähle einen Bereich' })
+      if (await pickAreaCoach.isVisible().catch(() => false)) {
+        const obst = page.locator('[data-tour="dashboard-card-obst"]')
+        const backshop = page.locator('[data-tour="dashboard-card-backshop"]')
+        const users = page.locator('[data-tour="dashboard-card-users"]')
+        if (await obst.isVisible().catch(() => false)) await obst.click()
+        else if (await backshop.isVisible().catch(() => false)) await backshop.click()
+        else if (await users.isVisible().catch(() => false)) await users.click()
+        await page.waitForTimeout(400)
+        pickedModule = true
+        break
+      }
+
       const coachWeiter = page.locator('[data-testid="tutorial-coach-panel"]').getByRole('button', { name: 'Weiter' })
       if (await coachWeiter.isVisible().catch(() => false)) {
         await coachWeiter.click()
@@ -116,9 +134,9 @@ test.describe('Tutorial Smoke @extended', () => {
       }
     }
 
-    // Zwischen-/Start-Trackpick sollte irgendwann erscheinen (nach vielen Coach-Acks)
-    await expect(
-      page.getByRole('dialog').filter({ hasText: /Womit möchtest du starten|Weiter mit einem nächsten Bereich/ }),
-    ).toBeVisible({ timeout: 30_000 })
+    expect(pickedModule).toBe(true)
+
+    // Orchestrator startet nach Kachelwahl das passende Modul (z. B. Masterliste).
+    await expect(page).toHaveURL(/\/admin\/(masterlist|backshop-list|users)/, { timeout: 30_000 })
   })
 })

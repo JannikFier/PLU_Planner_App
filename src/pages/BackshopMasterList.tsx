@@ -334,8 +334,8 @@ export function BackshopMasterList() {
     [hiddenItems],
   )
   const effectiveHiddenPLUs = useMemo(
-    () => effectiveHiddenPluSet(rawHiddenPluSet, backshopCampaign),
-    [rawHiddenPluSet, backshopCampaign],
+    () => effectiveHiddenPluSet(rawHiddenPluSet, backshopCampaign, backshopDisabled),
+    [rawHiddenPluSet, backshopCampaign, backshopDisabled],
   )
   const { kw: calendarKw, year: calendarJahr } = getBackshopWerbungKwYearFromDate(new Date())
   /** Gewählte bzw. aktuelle Werbungs-KW (wie Toolbar-Ende); für Angebots-Matching und PDF-Kontext. */

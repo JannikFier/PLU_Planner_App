@@ -21,7 +21,11 @@ import {
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
 import { useBackshopCustomProducts } from '@/hooks/useBackshopCustomProducts'
-import { useBackshopHiddenItems } from '@/hooks/useBackshopHiddenItems'
+import {
+  useBackshopHiddenItems,
+  useBackshopHideProduct,
+  useBackshopUnhideProduct,
+} from '@/hooks/useBackshopHiddenItems'
 import { useBackshopLayoutSettings } from '@/hooks/useBackshopLayoutSettings'
 import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
 import { useBackshopRenamedItems } from '@/hooks/useBackshopRenamedItems'
@@ -57,6 +61,11 @@ import {
   type CentralOfferCampaignRow,
   type LocalOwnOfferRow,
 } from '@/components/plu/OfferAdvertisingResponsiveSections'
+import {
+  CentralOfferMegaphoneDialog,
+  type CentralOfferMegaphoneAction,
+  type CentralOfferMegaphonePhase,
+} from '@/components/plu/CentralOfferMegaphoneDialog'
 import { toast } from 'sonner'
 import type { BackshopOfferItem, BackshopSource } from '@/types/database'
 import type { OfferItemsParseResult } from '@/types/plu'
@@ -82,12 +91,15 @@ export function BackshopOfferProductsPage() {
   // Per Excel nur in Super-Admin-URL; in User-/Admin-Ansicht nur manuell hinzufügen
   const showExcelUpload = location.pathname.startsWith('/super-admin/')
   const [excelResult, setExcelResult] = useState<OfferItemsParseResult | null>(null)
+  const [megaphoneDialogPlu, setMegaphoneDialogPlu] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data: offerItems = [], isLoading: offerLoading } = useBackshopOfferItems()
   const { data: backshopCampaign } = useBackshopOfferCampaignWithLines()
   const { data: backshopStoreDisabled = new Set() } = useBackshopOfferStoreDisabled()
   const toggleCentralBackshop = useToggleBackshopOfferDisabled()
+  const hideBackshopProduct = useBackshopHideProduct()
+  const unhideBackshopProduct = useBackshopUnhideProduct()
   const { data: activeVersion } = useActiveBackshopVersion()
   const { data: masterItems = [] } = useBackshopPLUData(activeVersion?.id)
   const { data: customProducts = [] } = useBackshopCustomProducts()
@@ -113,8 +125,8 @@ export function BackshopOfferProductsPage() {
 
   const rawHiddenPluSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
   const effectiveHiddenPLUs = useMemo(
-    () => effectiveHiddenPluSet(rawHiddenPluSet, backshopCampaign),
-    [rawHiddenPluSet, backshopCampaign],
+    () => effectiveHiddenPluSet(rawHiddenPluSet, backshopCampaign, backshopStoreDisabled),
+    [rawHiddenPluSet, backshopCampaign, backshopStoreDisabled],
   )
 
   const offerDisplayByPlu = useMemo(
@@ -295,6 +307,7 @@ export function BackshopOfferProductsPage() {
           ?? customProducts.find((c) => c.plu === line.plu)?.name
           ?? `PLU ${getDisplayPlu(line.plu)}`
         const hiddenForStore = backshopStoreDisabled.has(line.plu)
+        const hiddenFromList = rawHiddenPluSet.has(line.plu)
         const central = Number(line.promo_price)
         const localOverride = backshopLocalOverrides.get(line.plu) ?? null
         const effective = localOverride ?? central
@@ -304,13 +317,68 @@ export function BackshopOfferProductsPage() {
           plu: line.plu,
           name,
           hiddenForStore,
+          hiddenFromList,
           central,
           effective,
           localOverride,
           thumbUrl,
         }
       }),
-    [sortedCampaignLines, masterItems, customProducts, backshopStoreDisabled, backshopLocalOverrides],
+    [sortedCampaignLines, masterItems, customProducts, backshopStoreDisabled, backshopLocalOverrides, rawHiddenPluSet],
+  )
+
+  const megaphoneDialogRow = useMemo(
+    () => (megaphoneDialogPlu ? centralCampaignRows.find((r) => r.plu === megaphoneDialogPlu) ?? null : null),
+    [megaphoneDialogPlu, centralCampaignRows],
+  )
+
+  const megaphonePhase: CentralOfferMegaphonePhase | null = useMemo(() => {
+    if (!megaphoneDialogRow) return null
+    if (!megaphoneDialogRow.hiddenForStore) return 'promo_on'
+    if (megaphoneDialogRow.hiddenFromList) return 'promo_off_hidden'
+    return 'promo_off_visible'
+  }, [megaphoneDialogRow])
+
+  const megaphoneBusy =
+    toggleCentralBackshop.isPending || hideBackshopProduct.isPending || unhideBackshopProduct.isPending
+
+  const handleCentralMegaphoneAction = useCallback(
+    async (action: CentralOfferMegaphoneAction) => {
+      const plu = megaphoneDialogRow?.plu
+      if (!plu) return
+      try {
+        switch (action) {
+          case 'promo_off_keep_in_list':
+            await toggleCentralBackshop.mutateAsync({ plu, disabled: true, silentToast: true })
+            toast.success('Werbung aus, Produkt bleibt in der Liste')
+            break
+          case 'promo_off_hide_from_list':
+            await toggleCentralBackshop.mutateAsync({ plu, disabled: true, silentToast: true })
+            await hideBackshopProduct.mutateAsync(plu)
+            toast.success('Werbung aus und aus Liste/PDF entfernt')
+            break
+          case 'promo_on_restore_central':
+            await unhideBackshopProduct.mutateAsync({ plu, silentToast: true })
+            await toggleCentralBackshop.mutateAsync({ plu, disabled: false, silentToast: true })
+            toast.success('Zentrale Werbung wieder aktiv')
+            break
+          case 'promo_off_add_hide':
+            await hideBackshopProduct.mutateAsync(plu)
+            toast.success('Aus Liste und PDF entfernt')
+            break
+          case 'unhide_keep_promo_off':
+            await unhideBackshopProduct.mutateAsync({ plu, silentToast: true })
+            toast.success('Zeile wieder sichtbar (ohne Werbung)')
+            break
+          default:
+            break
+        }
+        setMegaphoneDialogPlu(null)
+      } catch {
+        // Fehler-Toasts in den Hooks
+      }
+    },
+    [megaphoneDialogRow, toggleCentralBackshop, hideBackshopProduct, unhideBackshopProduct],
   )
 
   const localOfferRows: LocalOwnOfferRow[] = useMemo(
@@ -483,18 +551,16 @@ export function BackshopOfferProductsPage() {
             <CardContent className="p-0">
               <CentralOfferCampaignSection
                 title="Zentrale Werbung"
-                description="Megafon: Angebot für diesen Markt ein/aus."
+                description="Megafon neben dem Stift: Klick fragt, ob nur die Werbung aus soll oder die Zeile aus Liste/PDF."
                 dataTestId="backshop-offer-central-campaign-scroll-root"
                 domain="backshop"
                 currentKw={currentKw}
                 currentJahr={currentJahr}
                 rows={centralCampaignRows}
                 isViewer={isViewer}
-                togglePending={toggleCentralBackshop.isPending}
+                megaphonePending={megaphoneBusy}
                 firstItemDataTour="backshop-offer-zentral-first-item"
-                onToggleMegaphone={(plu, hiddenForStore) =>
-                  toggleCentralBackshop.mutate({ plu, disabled: !hiddenForStore })
-                }
+                onMegaphoneClick={(row) => setMegaphoneDialogPlu(row.plu)}
                 onOpenLocalPrice={(row) => {
                   const camp = backshopCampaign!
                   setLocalPriceTarget({
@@ -553,6 +619,19 @@ export function BackshopOfferProductsPage() {
             kw_nummer={localPriceTarget.kw}
             jahr={localPriceTarget.jahr}
             dataTour="backshop-offer-local-price-dialog"
+          />
+        )}
+
+        {megaphoneDialogRow && megaphonePhase && (
+          <CentralOfferMegaphoneDialog
+            open={megaphoneDialogPlu != null}
+            onOpenChange={(o) => {
+              if (!o) setMegaphoneDialogPlu(null)
+            }}
+            productLabel={`${megaphoneDialogRow.name} (${getDisplayPlu(megaphoneDialogRow.plu)})`}
+            phase={megaphonePhase}
+            isBusy={megaphoneBusy}
+            onAction={handleCentralMegaphoneAction}
           />
         )}
       </div>

@@ -9,7 +9,7 @@ import { useNewProducts, useChangedProducts, useMarkNotificationRead } from '@/h
 import { useLocation } from 'react-router-dom'
 import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
 import { useHiddenItems, useHideProduct, useUnhideProduct } from '@/hooks/useHiddenItems'
-import { useObstOfferCampaignForKwYear } from '@/hooks/useCentralOfferCampaigns'
+import { useObstOfferCampaignForKwYear, useObstOfferStoreDisabled } from '@/hooks/useCentralOfferCampaigns'
 import { effectiveHiddenPluSet } from '@/lib/hidden-visibility'
 import { canManageMarketHiddenItems } from '@/lib/permissions'
 import { getDisplayPlu } from '@/lib/plu-helpers'
@@ -134,6 +134,7 @@ export function ObstNotificationPanel({
     notificationVersion?.jahr,
     !!notificationVersion,
   )
+  const { data: obstStoreDisabled = new Set() } = useObstOfferStoreDisabled()
   const hideProduct = useHideProduct()
   const unhideProduct = useUnhideProduct()
   const markRead = useMarkNotificationRead()
@@ -141,8 +142,8 @@ export function ObstNotificationPanel({
 
   const hiddenPLUs = useMemo(
     () =>
-      effectiveHiddenPluSet(new Set(hiddenItems.map((h) => h.plu)), obstCampaign),
-    [hiddenItems, obstCampaign],
+      effectiveHiddenPluSet(new Set(hiddenItems.map((h) => h.plu)), obstCampaign, obstStoreDisabled),
+    [hiddenItems, obstCampaign, obstStoreDisabled],
   )
 
   const rawHiddenSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])

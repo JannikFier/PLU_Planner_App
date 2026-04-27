@@ -108,12 +108,9 @@ export function useBackshopUnhideProduct() {
       )
       return { prev }
     },
-    onError: (err, input, ctx) => {
-      const { silentToast } = normalizeUnhideInput(input)
+    onError: (err, _input, ctx) => {
       if (ctx?.prev != null) queryClient.setQueryData(['backshop-hidden-items', currentStoreId], ctx.prev)
-      if (!silentToast) {
-        toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
-      }
+      toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
     },
     onSuccess: (_d, input) => {
       const { silentToast } = normalizeUnhideInput(input)

@@ -25,7 +25,7 @@ import { useObstOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalPrice
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
 import { useCustomProducts } from '@/hooks/useCustomProducts'
-import { useHiddenItems } from '@/hooks/useHiddenItems'
+import { useHiddenItems, useHideProduct, useUnhideProduct } from '@/hooks/useHiddenItems'
 import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
 import { useStoreObstBlockOrder, useStoreObstNameBlockOverrides } from '@/hooks/useStoreObstBlockLayout'
 import { EXCEL_READ_ERROR_FALLBACK, formatError } from '@/lib/error-messages'
@@ -42,6 +42,11 @@ import {
   type CentralOfferCampaignRow,
   type LocalOwnOfferRow,
 } from '@/components/plu/OfferAdvertisingResponsiveSections'
+import {
+  CentralOfferMegaphoneDialog,
+  type CentralOfferMegaphoneAction,
+  type CentralOfferMegaphonePhase,
+} from '@/components/plu/CentralOfferMegaphoneDialog'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
 import type { OfferItem } from '@/types/database'
@@ -68,6 +73,7 @@ export function OfferProductsPage() {
   // Per Excel nur in Super-Admin-URL; in User-/Admin-Ansicht nur manuell hinzufügen
   const showExcelUpload = location.pathname.startsWith('/super-admin/')
   const [excelResult, setExcelResult] = useState<OfferItemsParseResult | null>(null)
+  const [megaphoneDialogPlu, setMegaphoneDialogPlu] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data: offerItems = [], isLoading: offerLoading } = useOfferItems()
@@ -79,6 +85,8 @@ export function OfferProductsPage() {
   )
   const { data: obstStoreDisabled = new Set() } = useObstOfferStoreDisabled()
   const toggleCentralObst = useToggleObstOfferDisabled()
+  const hideProduct = useHideProduct()
+  const unhideProduct = useUnhideProduct()
   const { data: masterItems = [] } = usePLUData(activeVersion?.id)
   const { data: customProducts = [] } = useCustomProducts()
   const { data: hiddenItems = [] } = useHiddenItems()
@@ -108,8 +116,8 @@ export function OfferProductsPage() {
 
   const rawHiddenPluSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
   const effectiveHiddenPLUs = useMemo(
-    () => effectiveHiddenPluSet(rawHiddenPluSet, obstCampaign),
-    [rawHiddenPluSet, obstCampaign],
+    () => effectiveHiddenPluSet(rawHiddenPluSet, obstCampaign, obstStoreDisabled),
+    [rawHiddenPluSet, obstCampaign, obstStoreDisabled],
   )
 
   const offerDisplayByPlu = useMemo(
@@ -227,6 +235,7 @@ export function OfferProductsPage() {
           ?? customProducts.find((c) => c.plu === line.plu)?.name
           ?? `PLU ${getDisplayPlu(line.plu)}`
         const hiddenForStore = obstStoreDisabled.has(line.plu)
+        const hiddenFromList = rawHiddenPluSet.has(line.plu)
         const central = Number(line.promo_price)
         const localOverride = obstLocalOverrides.get(line.plu) ?? null
         const effective = localOverride ?? central
@@ -234,12 +243,67 @@ export function OfferProductsPage() {
           plu: line.plu,
           name,
           hiddenForStore,
+          hiddenFromList,
           central,
           effective,
           localOverride,
         }
       }),
-    [sortedCampaignLines, masterItems, customProducts, obstStoreDisabled, obstLocalOverrides],
+    [sortedCampaignLines, masterItems, customProducts, obstStoreDisabled, obstLocalOverrides, rawHiddenPluSet],
+  )
+
+  const megaphoneDialogRow = useMemo(
+    () => (megaphoneDialogPlu ? centralCampaignRows.find((r) => r.plu === megaphoneDialogPlu) ?? null : null),
+    [megaphoneDialogPlu, centralCampaignRows],
+  )
+
+  const megaphonePhase: CentralOfferMegaphonePhase | null = useMemo(() => {
+    if (!megaphoneDialogRow) return null
+    if (!megaphoneDialogRow.hiddenForStore) return 'promo_on'
+    if (megaphoneDialogRow.hiddenFromList) return 'promo_off_hidden'
+    return 'promo_off_visible'
+  }, [megaphoneDialogRow])
+
+  const megaphoneBusy =
+    toggleCentralObst.isPending || hideProduct.isPending || unhideProduct.isPending
+
+  const handleCentralMegaphoneAction = useCallback(
+    async (action: CentralOfferMegaphoneAction) => {
+      const plu = megaphoneDialogRow?.plu
+      if (!plu) return
+      try {
+        switch (action) {
+          case 'promo_off_keep_in_list':
+            await toggleCentralObst.mutateAsync({ plu, disabled: true, silentToast: true })
+            toast.success('Werbung aus, Produkt bleibt in der Liste')
+            break
+          case 'promo_off_hide_from_list':
+            await toggleCentralObst.mutateAsync({ plu, disabled: true, silentToast: true })
+            await hideProduct.mutateAsync(plu)
+            toast.success('Werbung aus und aus Liste/PDF entfernt')
+            break
+          case 'promo_on_restore_central':
+            await unhideProduct.mutateAsync({ plu, silentToast: true })
+            await toggleCentralObst.mutateAsync({ plu, disabled: false, silentToast: true })
+            toast.success('Zentrale Werbung wieder aktiv')
+            break
+          case 'promo_off_add_hide':
+            await hideProduct.mutateAsync(plu)
+            toast.success('Aus Liste und PDF entfernt')
+            break
+          case 'unhide_keep_promo_off':
+            await unhideProduct.mutateAsync({ plu, silentToast: true })
+            toast.success('Zeile wieder sichtbar (ohne Werbung)')
+            break
+          default:
+            break
+        }
+        setMegaphoneDialogPlu(null)
+      } catch {
+        // Fehler-Toasts in den Hooks
+      }
+    },
+    [megaphoneDialogRow, toggleCentralObst, hideProduct, unhideProduct],
   )
 
   const localOfferRows: LocalOwnOfferRow[] = useMemo(
@@ -429,17 +493,15 @@ export function OfferProductsPage() {
             <CardContent className="p-0">
               <CentralOfferCampaignSection
                 title="Zentrale Werbung"
-                description="Megafon: Angebot für diesen Markt ein/aus (aus = nicht in Liste/PDF)."
+                description="Megafon neben dem Stift: Klick fragt, ob nur die Werbung aus soll oder die Zeile aus Liste/PDF."
                 dataTestId="offer-central-campaign-scroll-root"
                 domain="obst"
                 currentKw={listKw}
                 currentJahr={listJahr}
                 rows={centralCampaignRows}
                 isViewer={isViewer}
-                togglePending={toggleCentralObst.isPending}
-                onToggleMegaphone={(plu, hiddenForStore) =>
-                  toggleCentralObst.mutate({ plu, disabled: !hiddenForStore })
-                }
+                megaphonePending={megaphoneBusy}
+                onMegaphoneClick={(row) => setMegaphoneDialogPlu(row.plu)}
                 onOpenLocalPrice={(row) => {
                   const camp = obstCampaign!
                   setLocalPriceTarget({
@@ -500,6 +562,19 @@ export function OfferProductsPage() {
             jahr={localPriceTarget.jahr}
             dataTour="obst-offer-central-local-price-dialog"
             submitDataTour="obst-offer-central-local-price-dialog-submit"
+          />
+        )}
+
+        {megaphoneDialogRow && megaphonePhase && (
+          <CentralOfferMegaphoneDialog
+            open={megaphoneDialogPlu != null}
+            onOpenChange={(o) => {
+              if (!o) setMegaphoneDialogPlu(null)
+            }}
+            productLabel={`${megaphoneDialogRow.name} (${getDisplayPlu(megaphoneDialogRow.plu)})`}
+            phase={megaphonePhase}
+            isBusy={megaphoneBusy}
+            onAction={handleCentralMegaphoneAction}
           />
         )}
       </div>

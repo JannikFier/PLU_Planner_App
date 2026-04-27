@@ -275,8 +275,8 @@ export function BackshopHiddenProductsPage() {
     [hiddenItems],
   )
   const effectiveHiddenPLUs = useMemo(
-    () => effectiveHiddenPluSet(rawHiddenPluSet, backshopCampaign),
-    [rawHiddenPluSet, backshopCampaign],
+    () => effectiveHiddenPluSet(rawHiddenPluSet, backshopCampaign, backshopStoreDisabled),
+    [rawHiddenPluSet, backshopCampaign, backshopStoreDisabled],
   )
 
   const markYellow = layoutSettings?.mark_yellow_kw_count ?? 4

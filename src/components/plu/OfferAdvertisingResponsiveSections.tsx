@@ -20,6 +20,8 @@ export type CentralOfferCampaignRow = {
   plu: string
   name: string
   hiddenForStore: boolean
+  /** Eintrag in hidden_items / backshop_hidden_items (Rohdaten) */
+  hiddenFromList: boolean
   central: number
   effective: number
   localOverride: number | null
@@ -111,14 +113,39 @@ export interface CentralOfferCampaignSectionProps {
   currentJahr: number
   rows: CentralOfferCampaignRow[]
   isViewer: boolean
-  togglePending: boolean
-  /** Megaphon: hiddenForStore = aktuell für Markt deaktiviert */
-  onToggleMegaphone: (plu: string, hiddenForStore: boolean) => void
+  megaphonePending: boolean
+  /** Megafon-Klick: Parent öffnet Entscheidungsdialog */
+  onMegaphoneClick: (row: CentralOfferCampaignRow) => void
   onOpenLocalPrice: (row: CentralOfferCampaignRow) => void
   /** Backshop: Bildspalte + kompaktere Mobile-Zeilen */
   domain?: 'obst' | 'backshop'
   /** Optional: Tutorial-Anker am ersten Eintrag (Desktop-Zeile + Mobile-Karte) */
   firstItemDataTour?: string
+}
+
+function CentralOfferMegaphoneButton({
+  row,
+  disabled,
+  onClick,
+}: {
+  row: CentralOfferCampaignRow
+  disabled: boolean
+  onClick: () => void
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="h-9 w-9 shrink-0"
+      title="Werbung für diesen Markt anpassen"
+      aria-label="Werbung für diesen Markt anpassen"
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <Megaphone className={cn('h-4 w-4', row.hiddenForStore && 'opacity-40')} />
+    </Button>
+  )
 }
 
 export function CentralOfferCampaignSection({
@@ -129,8 +156,8 @@ export function CentralOfferCampaignSection({
   currentJahr,
   rows,
   isViewer,
-  togglePending,
-  onToggleMegaphone,
+  megaphonePending,
+  onMegaphoneClick,
   onOpenLocalPrice,
   domain = 'obst',
   firstItemDataTour,
@@ -143,7 +170,6 @@ export function CentralOfferCampaignSection({
         <div className="hidden md:block min-w-0 overflow-x-auto">
           <table className="w-full table-fixed">
             <colgroup>
-              <col className="w-12" />
               {isBackshop && <col className="w-28" />}
               <col className="w-[5.5rem]" />
               <col className={isBackshop ? 'w-[34%]' : 'w-[40%]'} />
@@ -151,7 +177,6 @@ export function CentralOfferCampaignSection({
             </colgroup>
             <thead>
               <tr className="border-b-2 border-border">
-                <th className="px-3 py-3 w-12" aria-label="Megafon" />
                 {isBackshop && (
                   <th
                     className="w-28 px-2 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider"
@@ -165,7 +190,7 @@ export function CentralOfferCampaignSection({
                   Artikel
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-0">
-                  Preis
+                  Preis & Werbung
                 </th>
               </tr>
             </thead>
@@ -181,23 +206,6 @@ export function CentralOfferCampaignSection({
                     ? { 'data-tour': firstItemDataTour }
                     : {})}
                 >
-                  <td className="px-3 py-2 align-middle">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9"
-                      title={
-                        row.hiddenForStore
-                          ? 'Werbung für diesen Markt aktivieren'
-                          : 'Werbung für diesen Markt ausblenden'
-                      }
-                      onClick={() => onToggleMegaphone(row.plu, row.hiddenForStore)}
-                      disabled={togglePending}
-                    >
-                      <Megaphone className={cn('h-4 w-4', row.hiddenForStore && 'opacity-40')} />
-                    </Button>
-                  </td>
                   {isBackshop && (
                     <td className="px-2 py-2 align-middle w-28">
                       <BackshopThumbnail src={row.thumbUrl} size="2xl" />
@@ -206,12 +214,21 @@ export function CentralOfferCampaignSection({
                   <td className="px-3 py-2 font-mono text-sm align-middle whitespace-nowrap">{getDisplayPlu(row.plu)}</td>
                   <td className="px-3 py-2 text-sm align-middle break-words min-w-0">{row.name}</td>
                   <td className="px-3 py-2 text-sm align-middle min-w-0">
-                    <PreisBearbeitenBlock
-                      row={row}
-                      isViewer={isViewer}
-                      variant="desktop"
-                      onOpen={() => onOpenLocalPrice(row)}
-                    />
+                    <div className="flex items-start gap-1 min-w-0">
+                      <div className="min-w-0 flex-1">
+                        <PreisBearbeitenBlock
+                          row={row}
+                          isViewer={isViewer}
+                          variant="desktop"
+                          onOpen={() => onOpenLocalPrice(row)}
+                        />
+                      </div>
+                      <CentralOfferMegaphoneButton
+                        row={row}
+                        disabled={isViewer || megaphonePending}
+                        onClick={() => onMegaphoneClick(row)}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -229,21 +246,6 @@ export function CentralOfferCampaignSection({
                 : {})}
             >
               <div className="flex gap-2 items-start">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 shrink-0"
-                  title={
-                    row.hiddenForStore
-                      ? 'Werbung für diesen Markt aktivieren'
-                      : 'Werbung für diesen Markt ausblenden'
-                  }
-                  onClick={() => onToggleMegaphone(row.plu, row.hiddenForStore)}
-                  disabled={togglePending}
-                >
-                  <Megaphone className={cn('h-4 w-4', row.hiddenForStore && 'opacity-40')} />
-                </Button>
                 {isBackshop && (
                   <div className="shrink-0 pt-0.5">
                     <BackshopThumbnail src={row.thumbUrl} size="2xl" />
@@ -252,12 +254,21 @@ export function CentralOfferCampaignSection({
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <p className="font-mono text-sm">{getDisplayPlu(row.plu)}</p>
                   <p className="text-sm font-medium break-words leading-snug">{row.name}</p>
-                  <PreisBearbeitenBlock
-                    row={row}
-                    isViewer={isViewer}
-                    variant={isBackshop ? 'mobile-backshop' : 'mobile-obst'}
-                    onOpen={() => onOpenLocalPrice(row)}
-                  />
+                  <div className="flex items-end gap-1 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <PreisBearbeitenBlock
+                        row={row}
+                        isViewer={isViewer}
+                        variant={isBackshop ? 'mobile-backshop' : 'mobile-obst'}
+                        onOpen={() => onOpenLocalPrice(row)}
+                      />
+                    </div>
+                    <CentralOfferMegaphoneButton
+                      row={row}
+                      disabled={isViewer || megaphonePending}
+                      onClick={() => onMegaphoneClick(row)}
+                    />
+                  </div>
                 </div>
               </div>
             </li>

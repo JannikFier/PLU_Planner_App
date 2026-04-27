@@ -126,13 +126,21 @@ export function useHideProductsBatch() {
   })
 }
 
+export type UnhideProductInput = string | { plu: string; silentToast?: boolean }
+
+function normalizeUnhideProductInput(input: UnhideProductInput): { plu: string; silentToast: boolean } {
+  if (typeof input === 'string') return { plu: input, silentToast: false }
+  return { plu: input.plu, silentToast: Boolean(input.silentToast) }
+}
+
 /** PLU wieder einblenden (delete from hidden_items) – mit Optimistic Update */
 export function useUnhideProduct() {
   const queryClient = useQueryClient()
   const { currentStoreId } = useCurrentStore()
 
   return useMutation({
-    mutationFn: async (plu: string) => {
+    mutationFn: async (input: UnhideProductInput) => {
+      const { plu } = normalizeUnhideProductInput(input)
       if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       if (isTestModeActive()) return
 
@@ -144,7 +152,8 @@ export function useUnhideProduct() {
 
       if (error) throw error
     },
-    onMutate: async (plu) => {
+    onMutate: async (input) => {
+      const { plu } = normalizeUnhideProductInput(input)
       await queryClient.cancelQueries({ queryKey: ['hidden-items', currentStoreId] })
       const prev = queryClient.getQueryData<HiddenItem[]>(['hidden-items', currentStoreId])
       queryClient.setQueryData<HiddenItem[]>(['hidden-items', currentStoreId], (old = []) =>
@@ -152,12 +161,13 @@ export function useUnhideProduct() {
       )
       return { prev }
     },
-    onError: (err, _plu, ctx) => {
+    onError: (err, _input, ctx) => {
       if (ctx?.prev != null) queryClient.setQueryData(['hidden-items', currentStoreId], ctx.prev)
       toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
     },
-    onSuccess: () => {
-      toast.success('Produkt wieder eingeblendet')
+    onSuccess: (_data, input) => {
+      const { silentToast } = normalizeUnhideProductInput(input)
+      if (!silentToast) toast.success('Produkt wieder eingeblendet')
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['hidden-items', currentStoreId] })

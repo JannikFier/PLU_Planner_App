@@ -157,8 +157,8 @@ export function MasterList({ mode }: MasterListProps) {
     [hiddenItems],
   )
   const effectiveHiddenPLUs = useMemo(
-    () => effectiveHiddenPluSet(rawHiddenPluSet, obstCampaign),
-    [rawHiddenPluSet, obstCampaign],
+    () => effectiveHiddenPluSet(rawHiddenPluSet, obstCampaign, obstDisabled),
+    [rawHiddenPluSet, obstCampaign, obstDisabled],
   )
 
   const offerDisplayByPlu = useMemo(
