@@ -75,17 +75,27 @@ test.describe('Tutorial Smoke @extended', () => {
   })
 
   test('Tour starten führt in Basics und anschließenden TrackPick', async ({ page }) => {
+    test.setTimeout(60_000)
     await page.locator('[data-tour="profile-menu"]').click()
     await page.getByRole('menuitem', { name: 'Einführung wiederholen' }).click()
     const welcome = page.getByRole('dialog').filter({ hasText: 'Hi, ich bin Fier' })
     await expect(welcome).toBeVisible({ timeout: 10_000 })
     await welcome.getByRole('button', { name: 'Tour starten' }).click()
+    await expect(welcome).toBeHidden({ timeout: 15_000 })
 
-    // Basics: Driver-Popover erscheint; wir klicken „Weiter", bis wir am letzten Basics-Schritt ankommen
-    // oder bis der Coach/TrackPick auftaucht. Wir brechen nach max. 20 Klicks ab, um nicht zu hängen.
-    for (let i = 0; i < 20; i += 1) {
-      const trackPick = page.getByRole('dialog').filter({ hasText: 'Womit möchtest du starten?' })
+    // Basics: Admin/Non-Viewer = interaktiver Coach (TutorialCoachPanel, „Weiter“); sonst driver.js.
+    // Max. Iterationen hoch – Basics inkl. Header-Hints + Pick-Area sind viele Schritte.
+    for (let i = 0; i < 45; i += 1) {
+      const trackPick = page.getByRole('dialog').filter({
+        hasText: /Womit möchtest du starten|Weiter mit einem nächsten Bereich/,
+      })
       if (await trackPick.isVisible().catch(() => false)) break
+      const coachWeiter = page.locator('[data-testid="tutorial-coach-panel"]').getByRole('button', { name: 'Weiter' })
+      if (await coachWeiter.isVisible().catch(() => false)) {
+        await coachWeiter.click()
+        await page.waitForTimeout(250)
+        continue
+      }
       const next = page.locator('.driver-popover-next-btn, .driver-popover-btn-next')
       if (await next.isVisible().catch(() => false)) {
         await next.click()
@@ -106,9 +116,9 @@ test.describe('Tutorial Smoke @extended', () => {
       }
     }
 
-    // Zwischen-/Start-Trackpick sollte irgendwann erscheinen
+    // Zwischen-/Start-Trackpick sollte irgendwann erscheinen (nach vielen Coach-Acks)
     await expect(
       page.getByRole('dialog').filter({ hasText: /Womit möchtest du starten|Weiter mit einem nächsten Bereich/ }),
-    ).toBeVisible({ timeout: 20_000 })
+    ).toBeVisible({ timeout: 30_000 })
   })
 })

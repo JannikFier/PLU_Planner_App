@@ -24,12 +24,8 @@ import {
 } from '@/lib/plu-helpers'
 import type { Block } from '@/types/database'
 import type { StoreBlockOrderRow } from '@/lib/block-override-utils'
-import {
-  buildDialogPluLayout,
-  newspaperPageMinHeightPx,
-  type DialogPluFontSizes,
-} from '@/lib/dialog-plu-layout'
-import { newspaperRowsToFlatRows } from '@/lib/newspaper-column-pages'
+import { buildDialogPluLayout, type DialogPluFontSizes } from '@/lib/dialog-plu-layout'
+import { newspaperPageMinHeightPx, newspaperRowsToFlatRows } from '@/lib/newspaper-column-pages'
 import { PLU_TABLE_HEADER_GEWICHT_CLASS, PLU_TABLE_HEADER_STUECK_CLASS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'

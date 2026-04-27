@@ -23,6 +23,7 @@ export function FindInPageFixedPortal({ children }: { children: ReactNode }) {
   if (typeof document === 'undefined') return null
   return createPortal(
     <div
+      data-plu-find-in-page-root
       data-tour="plu-find-in-page-bar"
       className="fixed left-0 right-0 z-[45] pointer-events-none"
       style={{ top: topPx }}

@@ -28,13 +28,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import type { MasterPLUItem, BackshopMasterPLUItem } from '@/types/database'
 import type { DisplayItem } from '@/types/plu'
-import {
-  buildDialogPluLayout,
-  newspaperPageMinHeightPx,
-  type DialogPluFontSizes,
-  type DialogFlatRow,
-} from '@/lib/dialog-plu-layout'
-import { newspaperRowsToFlatRows } from '@/lib/newspaper-column-pages'
+import { buildDialogPluLayout, type DialogPluFontSizes, type DialogFlatRow } from '@/lib/dialog-plu-layout'
+import { newspaperPageMinHeightPx, newspaperRowsToFlatRows } from '@/lib/newspaper-column-pages'
 import { PLU_TABLE_HEADER_GEWICHT_CLASS, PLU_TABLE_HEADER_STUECK_CLASS } from '@/lib/constants'
 
 interface SearchableItem {

@@ -221,12 +221,21 @@ export function BackshopOfferProductsPage() {
       lineForceShowKeys,
       lineForceHideKeys,
     })
-    return items.map((i) => ({
-      id: i.id,
-      plu: i.plu,
-      display_name: i.display_name,
-      system_name: i.system_name,
-    }))
+    const customByPlu = new Map(customProducts.map((c) => [c.plu, c]))
+    return items.map((i) => {
+      const cp = customByPlu.get(i.plu)
+      const collisionOwnProduct = cp != null && !i.is_custom
+      return {
+        id: i.id,
+        plu: i.plu,
+        display_name: i.display_name ?? i.system_name ?? '',
+        system_name: i.system_name,
+        ...(collisionOwnProduct
+          ? { searchHaystack: cp.name, ownProductLabel: cp.name }
+          : {}),
+        ...(collisionOwnProduct || i.is_custom ? { searchFuzzyName: true as const } : {}),
+      }
+    })
   }, [
     masterItems,
     customProducts,
@@ -318,7 +327,7 @@ export function BackshopOfferProductsPage() {
   )
 
   const handleAddFromDialog = useCallback(
-    (plu: string, durationWeeks: number, promoPrice: number) => {
+    (plu: string, durationWeeks: number, promoPrice: number | null) => {
       addOffer.mutate(
         { plu, durationWeeks, promoPrice },
         { onSuccess: () => {} },

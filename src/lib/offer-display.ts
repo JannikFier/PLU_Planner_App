@@ -7,6 +7,9 @@ export type OfferSourceKind = 'central' | 'manual'
 /** Obst: welche zentrale Kampagne gewinnt bei Duplikat-PLU (Namens-Hintergrund) */
 export type ObstCentralCampaignKind = 'exit' | 'ordersatz_week' | 'ordersatz_3day'
 
+/** Namens-Hervorhebung in Liste/PDF: zentrale Kampagne oder manuelle Werbung (letztere wie Wochenwerbung, gelb) */
+export type ObstOfferNameHighlightKind = ObstCentralCampaignKind | 'manual'
+
 /** Priorität bei gleicher PLU in mehreren Obst-Kampagnen: höher = gewinnt */
 export function obstCentralKindPriority(k: ObstCentralCampaignKind): number {
   if (k === 'ordersatz_3day') return 3

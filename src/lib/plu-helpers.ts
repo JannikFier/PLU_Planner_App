@@ -92,9 +92,69 @@ export function splitTextForHighlight(
   return parts.length > 0 ? parts : [{ text, match: false }]
 }
 
+/** Levenshtein ≤ max mit frühem Abbruch (für kurze Namen/Tippfehler). */
+function editDistanceAtMost(a: string, b: string, max: number): boolean {
+  const m = a.length
+  const n = b.length
+  if (m === 0) return n <= max
+  if (n === 0) return m <= max
+  if (Math.abs(m - n) > max) return false
+  let prev = new Array<number>(n + 1)
+  for (let j = 0; j <= n; j++) prev[j] = j
+  for (let i = 1; i <= m; i++) {
+    const cur = new Array<number>(n + 1)
+    cur[0] = i
+    let rowMin = cur[0]
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+      if (cur[j] < rowMin) rowMin = cur[j]
+    }
+    if (rowMin > max) return false
+    prev = cur
+  }
+  return prev[n] <= max
+}
+
+/** Max. erlaubte Edit-Distanz für Fuzzy-Namenssuche (eigene Produkte / Kollision). */
+function fuzzyMaxDistForQueryLen(qLen: number): number {
+  if (qLen <= 4) return 1
+  if (qLen <= 6) return 3
+  return Math.min(4, Math.ceil(qLen * 0.35))
+}
+
+/**
+ * Für „eigene Produkte“: Treffer, wenn der Suchbegriff zu einem Wort im Namen
+ * passt (Levenshtein mit kleinem Schwellwert) – z. B. „sparge“ vs. „Spagel“.
+ */
+export function fuzzyOwnProductNameMatches(blob: string, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (q.length < 4) return false
+  const maxDist = fuzzyMaxDistForQueryLen(q.length)
+  const words = blob
+    .toLowerCase()
+    .split(/[\s/|,.()+–\-]+/)
+    .map((w) => w.replace(/^[★\s]+/, '').trim())
+    .filter((w) => w.length >= 3)
+  for (const w of words) {
+    if (Math.abs(w.length - q.length) > maxDist + 1) continue
+    if (w.includes(q)) return true
+    if (editDistanceAtMost(w, q, maxDist)) return true
+  }
+  return false
+}
+
 /** Prüft, ob ein Item den Suchtext in PLU oder Name enthält (case-insensitive). Für Find-in-Page und Filter. */
 export function itemMatchesSearch(
-  item: { plu: string; display_name?: string | null; system_name?: string | null },
+  item: {
+    plu: string
+    display_name?: string | null
+    system_name?: string | null
+    /** Zusätzlicher Suchtext (z. B. eigenes Produkt bei gleicher PLU wie Master) */
+    searchHaystack?: string | null
+    /** Wenn true: bei fehlendem exakten Treffer approx. Wortabgleich (Tippfehler), nur sinnvoll für eigene Produkte */
+    searchFuzzyName?: boolean
+  },
   searchText: string,
 ): boolean {
   const q = searchText.trim().toLowerCase()
@@ -102,14 +162,25 @@ export function itemMatchesSearch(
   const pluMatch = item.plu.toLowerCase().includes(q)
   const name = (item.display_name ?? item.system_name ?? '').toLowerCase()
   const sys = (item.system_name ?? '').toLowerCase()
-  return pluMatch || name.includes(q) || sys.includes(q)
+  const hay = (item.searchHaystack ?? '').toLowerCase()
+  if (pluMatch || name.includes(q) || sys.includes(q) || hay.includes(q)) return true
+  if (item.searchFuzzyName) {
+    const blob = `${name} ${sys} ${hay}`.trim()
+    if (fuzzyOwnProductNameMatches(blob, q)) return true
+  }
+  return false
 }
 
 /** Filtert Items nach Suchtext (PLU oder Anzeigename/Systemname, case-insensitive). Leere Suche = alle Items. */
-export function filterItemsBySearch<T extends { plu: string; display_name: string; system_name?: string | null }>(
-  items: T[],
-  searchText: string,
-): T[] {
+export function filterItemsBySearch<
+  T extends {
+    plu: string
+    display_name: string
+    system_name?: string | null
+    searchHaystack?: string | null
+    searchFuzzyName?: boolean
+  },
+>(items: T[], searchText: string): T[] {
   const q = searchText.trim().toLowerCase()
   if (!q) return items
   return items.filter((item) => itemMatchesSearch(item, searchText))

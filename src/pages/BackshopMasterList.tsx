@@ -596,11 +596,16 @@ export function BackshopMasterList() {
     [pdfDisplayResult.stats],
   )
 
-  const openPdfDialog = () => {
-    setShowPdfDialog(true)
-  }
-
   const pluTableRef = useRef<PLUTableHandle>(null)
+
+  const closeBackshopListSearch = useCallback(() => {
+    pluTableRef.current?.closeFindInPage()
+  }, [])
+
+  const openPdfDialog = useCallback(() => {
+    closeBackshopListSearch()
+    setShowPdfDialog(true)
+  }, [closeBackshopListSearch])
 
   const backshopMarkenTinderHrefForGroup = useCallback(
     (groupId: string) => {
@@ -633,14 +638,16 @@ export function BackshopMasterList() {
         {
           label: 'PDF exportieren',
           icon: <FileDown className="h-4 w-4" />,
-          onClick: () => setShowPdfDialog(true),
+          onClick: openPdfDialog,
           disabled: pdfDisabled,
         },
       ]
     }
     const backTo = location.pathname + location.search
-    const nav = (path: string) => () =>
+    const nav = (path: string) => () => {
+      closeBackshopListSearch()
       navigate(`${rolePrefix}${path}?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+    }
     const items: PLUListPageActionMenuItem[] = []
     if (!isSuperAdminCentralBackshopMasterView) {
       items.push({
@@ -682,7 +689,7 @@ export function BackshopMasterList() {
       {
         label: 'PDF exportieren',
         icon: <FileDown className="h-4 w-4" />,
-        onClick: () => setShowPdfDialog(true),
+        onClick: openPdfDialog,
         disabled: pdfDisabled,
       },
     )
@@ -699,6 +706,8 @@ export function BackshopMasterList() {
     rolePrefix,
     navigate,
     pdfDisabled,
+    closeBackshopListSearch,
+    openPdfDialog,
   ])
 
   return (
@@ -756,7 +765,13 @@ export function BackshopMasterList() {
                   Diese Backshop-Version gibt es nicht oder wurde gelöscht.
                 </p>
               </div>
-              <Button variant="outline" onClick={() => navigate('/super-admin/backshop-versions')}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  closeBackshopListSearch()
+                  navigate('/super-admin/backshop-versions')
+                }}
+              >
                 Zurück zu Backshop-Versionen
               </Button>
             </CardContent>
@@ -774,6 +789,7 @@ export function BackshopMasterList() {
                 size="icon"
                 className="shrink-0"
                 data-tour="backshop-master-find-trigger"
+                data-plu-find-in-page-trigger
                 onClick={() => pluTableRef.current?.openFindInPage()}
                 aria-label="In Liste suchen"
                 title="In Liste suchen (PLU oder Name)"
@@ -815,6 +831,7 @@ export function BackshopMasterList() {
                         size="sm"
                         data-tour="backshop-master-quick-custom"
                         onClick={() => {
+                          closeBackshopListSearch()
                           const backTo = location.pathname + location.search
                           navigate(`${rolePrefix}/backshop-custom-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
                         }}
@@ -828,6 +845,7 @@ export function BackshopMasterList() {
                       size="sm"
                       data-tour="backshop-master-quick-hidden"
                       onClick={() => {
+                        closeBackshopListSearch()
                         const backTo = location.pathname + location.search
                         navigate(`${rolePrefix}/backshop-hidden-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
                       }}
@@ -840,6 +858,7 @@ export function BackshopMasterList() {
                       size="sm"
                       data-tour="backshop-master-quick-offer"
                       onClick={() => {
+                        closeBackshopListSearch()
                         const backTo = location.pathname + location.search
                         navigate(`${rolePrefix}/backshop-offer-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
                       }}
@@ -852,6 +871,7 @@ export function BackshopMasterList() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
+                          closeBackshopListSearch()
                           const backTo = location.pathname + location.search
                           navigate(`${rolePrefix}/backshop-warengruppen?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
                         }}
@@ -866,6 +886,7 @@ export function BackshopMasterList() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
+                        closeBackshopListSearch()
                         const backTo = location.pathname + location.search
                         navigate(`${rolePrefix}/marken-auswahl?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
                       }}
@@ -877,6 +898,7 @@ export function BackshopMasterList() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
+                        closeBackshopListSearch()
                         const backTo = location.pathname + location.search
                         navigate(`${rolePrefix}/backshop-renamed-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
                       }}
@@ -959,7 +981,9 @@ export function BackshopMasterList() {
                 </span>
                 {(rolePrefix === '/admin' || rolePrefix === '/super-admin') && !snapshotReadOnly ? (
                   <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-center" asChild>
-                    <Link to={`${rolePrefix}/backshop-layout`}>Layout-Einstellungen (Backshop)</Link>
+                    <Link to={`${rolePrefix}/backshop-layout`} onClick={() => closeBackshopListSearch()}>
+                      Layout-Einstellungen (Backshop)
+                    </Link>
                   </Button>
                 ) : (
                   <span className="text-sm text-muted-foreground shrink-0">
@@ -997,6 +1021,7 @@ export function BackshopMasterList() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
+                  closeBackshopListSearch()
                   setSearchParams(
                     (prev) => {
                       const next = new URLSearchParams(prev)

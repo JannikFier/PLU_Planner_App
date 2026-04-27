@@ -396,6 +396,7 @@ export function TutorialCoachPanel(props: {
   return (
     <div
       ref={setPanelRef}
+      data-testid="tutorial-coach-panel"
       className={cn(
         'pointer-events-auto fixed max-w-sm rounded-xl border border-border bg-card shadow-lg transition-[top,left,opacity] duration-200',
         profileCoach ? 'z-40' : 'z-[105]',

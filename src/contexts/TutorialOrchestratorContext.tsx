@@ -896,6 +896,8 @@ function TutorialOrchestratorProviderImpl({ children }: { children: ReactNode })
 
   /** Startet die Tour ab Basics. Nach Kachel-Klick (Route) wird das passende Modul direkt gestartet. */
   const startTourFromBeginning = useCallback(async () => {
+    // Nach handleWelcomeStart: sessionGateRef war true bis hier — jetzt running, Gate wieder frei.
+    sessionGateRef.current = false
     setRunning(true)
     completedInThisRunRef.current = []
     tourStoppedByTestModeRef.current = false
@@ -972,6 +974,9 @@ function TutorialOrchestratorProviderImpl({ children }: { children: ReactNode })
 
   const handleWelcomeNeverAgain = useCallback(async () => {
     welcomeProgrammaticCloseRef.current = true
+    // Nach „Einführung wiederholen“ ist sessionGateRef false – ohne dieses Gate
+    // feuert der Welcome-useEffect sofort wieder (payload.dismissedForever erst nach save).
+    sessionGateRef.current = true
     setWelcomeOpen(false)
     try {
       const base = payloadRef.current ?? defaultTutorialState()
@@ -980,12 +985,16 @@ function TutorialOrchestratorProviderImpl({ children }: { children: ReactNode })
     } finally {
       queueMicrotask(() => {
         welcomeProgrammaticCloseRef.current = false
+        sessionGateRef.current = false
       })
     }
   }, [save])
 
   const handleWelcomeStart = useCallback(async () => {
     welcomeProgrammaticCloseRef.current = true
+    // Während save + rAF ist running noch false — der Welcome-useEffect würde sonst den Dialog
+    // erneut öffnen (shouldOfferWelcome oft noch true). Radix-Overlay blockiert dann Profil-Klicks.
+    sessionGateRef.current = true
     setWelcomeOpen(false)
     try {
       const base = payloadRef.current ?? defaultTutorialState()
@@ -1003,6 +1012,8 @@ function TutorialOrchestratorProviderImpl({ children }: { children: ReactNode })
         })
       })
       void startTourFromBeginning()
+    } catch {
+      sessionGateRef.current = false
     } finally {
       queueMicrotask(() => {
         welcomeProgrammaticCloseRef.current = false

@@ -9,6 +9,8 @@ import {
   isPriceOnlyPlu,
   getDisplayPlu,
   filterItemsBySearch,
+  fuzzyOwnProductNameMatches,
+  itemMatchesSearch,
   splitTextForHighlight,
   groupItemsByLetter,
   groupItemsByBlock,
@@ -149,6 +151,42 @@ describe('plu-helpers', () => {
     })
     it('Teilstring-Treffer', () => {
       expect(filterItemsBySearch(items, 'apf')).toHaveLength(1)
+    })
+    it('fuzzyOwnProductNameMatches: sparge trifft Spagel (Tippfehler)', () => {
+      expect(fuzzyOwnProductNameMatches('spagel weiß kallen', 'sparge')).toBe(true)
+      expect(fuzzyOwnProductNameMatches('banane', 'sparge')).toBe(false)
+    })
+    it('itemMatchesSearch mit searchFuzzyName für eigenes Produkt', () => {
+      expect(
+        itemMatchesSearch(
+          {
+            plu: '41844',
+            display_name: 'Spagel weiß Kallen',
+            system_name: 'Spagel weiß Kallen',
+            searchFuzzyName: true,
+          },
+          'sparge',
+        ),
+      ).toBe(true)
+      expect(
+        itemMatchesSearch(
+          { plu: '41844', display_name: 'Spagel weiß Kallen', searchFuzzyName: false },
+          'sparge',
+        ),
+      ).toBe(false)
+    })
+    it('findet Treffer über searchHaystack wenn nicht in Namen', () => {
+      const withHay = [
+        {
+          plu: '41511',
+          display_name: 'Spargel weiß Edeka',
+          system_name: 'Spargel weiß Edeka',
+          searchHaystack: 'Regionale Spargeln vom Hof',
+        },
+      ]
+      expect(filterItemsBySearch(withHay, 'Regionale')).toHaveLength(1)
+      expect(filterItemsBySearch(withHay, 'spargeln')).toHaveLength(1)
+      expect(filterItemsBySearch(withHay, 'unbekanntxyz')).toHaveLength(0)
     })
   })
 

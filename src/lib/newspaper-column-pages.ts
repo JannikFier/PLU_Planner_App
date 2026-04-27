@@ -213,3 +213,23 @@ export function newspaperRowsToFlatRows<T>(
     r.type === 'group' ? { type: 'header' as const, label: r.label } : { type: 'item' as const, item: r.item },
   )
 }
+
+/**
+ * Startindex in der flachen Zeitungs-Reihenfolge (pro Seite: links, dann rechts)
+ * für die linke Spalte der Seite `pageIndex` – gleiche Logik wie flattenNewspaperPagesToRows.
+ */
+export function newspaperPageStartFlatRowIndex<T>(pages: NewspaperPage<T>[], pageIndex: number): number {
+  let sum = 0
+  for (let i = 0; i < pageIndex; i++) {
+    sum += pages[i].left.length + pages[i].right.length
+  }
+  return sum
+}
+
+/** Mindesthöhe einer logischen „Seite“ (CSS px), Web + Dialoge, analog PDF-Spaltenbudget */
+export function newspaperPageMinHeightPx(
+  pageIndex: number,
+  heights: NewspaperPaginateHeights,
+): number {
+  return pageIndex === 0 ? heights.columnHeightFirstPage : heights.columnHeightContinuationPage
+}

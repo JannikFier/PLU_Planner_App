@@ -3,6 +3,8 @@ import {
   paginateNewspaperColumns,
   flattenNewspaperPagesToRows,
   newspaperRowsToFlatRows,
+  newspaperPageMinHeightPx,
+  newspaperPageStartFlatRowIndex,
 } from '@/lib/newspaper-column-pages'
 
 describe('paginateNewspaperColumns', () => {
@@ -86,5 +88,29 @@ describe('flattenNewspaperPagesToRows', () => {
     const flat = flattenNewspaperPagesToRows(pages)
     expect(flat).toHaveLength(3)
     expect(newspaperRowsToFlatRows(flat).map((r) => r.type)).toEqual(['header', 'item', 'item'])
+  })
+})
+
+describe('newspaperPageMinHeightPx', () => {
+  it('erste Seite nutzt columnHeightFirstPage', () => {
+    const h = {
+      itemRow: 10,
+      groupHeader: 10,
+      columnHeightFirstPage: 100,
+      columnHeightContinuationPage: 200,
+    }
+    expect(newspaperPageMinHeightPx(0, h)).toBe(100)
+    expect(newspaperPageMinHeightPx(1, h)).toBe(200)
+  })
+})
+
+describe('newspaperPageStartFlatRowIndex', () => {
+  it('summiert links+rechts der vorherigen Seiten', () => {
+    const pages = [
+      { left: [{ type: 'group' as const, label: 'A' }], right: [{ type: 'item' as const, item: 1 }] },
+      { left: [{ type: 'item' as const, item: 2 }], right: [] },
+    ]
+    expect(newspaperPageStartFlatRowIndex(pages, 0)).toBe(0)
+    expect(newspaperPageStartFlatRowIndex(pages, 1)).toBe(2)
   })
 })

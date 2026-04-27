@@ -16,9 +16,10 @@ alwaysApply: true
 - PLU geändert: bg-plu-changed-bg text-plu-changed-text – NUR auf PLU-Zelle
 - Unverändert: Keine besondere Farbe
 
-## Zentrale Obst-Werbung (Artikelname – nicht PLU-Spalte)
-- Wochenwerbung (Ordersatz; historisch auch Exit-Kampagne): `bg-offer-week-name-bg` `text-offer-week-name-text`
-- Ordersatz 3-Tage-Preis: `bg-offer-3day-name-bg` `text-offer-3day-name-text` (Token in `src/index.css` @theme)
+## Obst-Werbung am Artikelnamen (nicht PLU-Spalte)
+- Zentrale Wochenwerbung (Ordersatz; historisch auch Exit-Kampagne): `bg-offer-week-name-bg` `text-offer-week-name-text`
+- Zentrale Ordersatz 3-Tage-Preis: `bg-offer-3day-name-bg` `text-offer-3day-name-text` (Token in `src/index.css` @theme)
+- Eigene (manuelle) Werbung: gleiche Namens-Hervorhebung wie Wochenwerbung (`bg-offer-week-name-bg` / `text-offer-week-name-text`); Badge bleibt „eigenes Angebot“ (Preisschild)
 
 ## Tabellen
 - Zwei-Spalten-Layout (links PLU+Artikel, Lücke, rechts PLU+Artikel)

@@ -32,11 +32,32 @@ function normalizeLetterForGrouping(char: string): string {
   return upper
 }
 
-interface SearchableItem {
+/** Eintrag für die Werbungs-Suche (Masterzeile ggf. mit eigenem Namen bei gleicher PLU) */
+export interface SearchableItem {
   id: string
   plu: string
   display_name: string
   system_name?: string
+  /** Zusätzlich durchsuchbar (z. B. Name aus custom_products bei PLU-Kollision) */
+  searchHaystack?: string | null
+  /** Wenn gesetzt: zweite Zeile „Eigenes Produkt: …“ unter dem Listennamen */
+  ownProductLabel?: string | null
+  /** Eigene Produkte: Tippfehler-tolerante Namenssuche (Levenshtein, begrenzt) */
+  searchFuzzyName?: boolean
+}
+
+function OfferRowArticleBlock({ item }: { item: SearchableItem }) {
+  const main = item.display_name ?? item.system_name ?? ''
+  return (
+    <div className="min-w-0">
+      <p className="text-sm break-words">{main}</p>
+      {item.ownProductLabel ? (
+        <p className="text-xs text-muted-foreground mt-0.5 break-words">
+          Eigenes Produkt: {item.ownProductLabel}
+        </p>
+      ) : null}
+    </div>
+  )
 }
 
 function groupByLetter(items: SearchableItem[]): { letter: string; items: SearchableItem[] }[] {
@@ -88,8 +109,8 @@ export interface AddToOfferDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   searchableItems: SearchableItem[]
-  /** Klick: Aktionspreis + Laufzeit; mode: kw = gewählte Wochen, billing = 4 Wochen (Abrechnungsperiode) */
-  onAdd: (plu: string, durationWeeks: number, promoPrice: number) => void
+  /** Klick: optionaler Aktionspreis + Laufzeit; mode: kw = gewählte Wochen, billing = 4 Wochen (Abrechnungsperiode) */
+  onAdd: (plu: string, durationWeeks: number, promoPrice: number | null) => void
   isAdding?: boolean
   /** PLUs die bereits in der zentralen Werbung sind (nicht erneut manuell) */
   blockedPlus?: Set<string>
@@ -137,10 +158,15 @@ export function AddToOfferDialog({
 
   const submitAdd = (weeks: number, mode: 'kw' | 'billing') => {
     if (!selected) return
-    const promo = parseFloat(promoPriceInput.replace(',', '.'))
-    if (!Number.isFinite(promo) || promo <= 0) {
-      toast.error('Bitte einen Aktionspreis größer 0 eingeben.')
-      return
+    const raw = promoPriceInput.trim().replace(',', '.')
+    let promo: number | null = null
+    if (raw !== '') {
+      const p = parseFloat(raw)
+      if (!Number.isFinite(p) || p < 0) {
+        toast.error('Bitte einen gültigen Aktionspreis (≥ 0) eingeben oder das Feld leer lassen.')
+        return
+      }
+      promo = p > 0 ? p : null
     }
     const w = mode === 'billing' ? 4 : weeks
     onAdd(selected.plu, w, promo)
@@ -168,8 +194,8 @@ export function AddToOfferDialog({
           </DialogTitle>
           <DialogDescription>
             {selected
-              ? 'Aktionspreis und Laufzeit festlegen, dann zur Aktion hinzufügen.'
-              : 'Liste wie in der PLU-Liste sortiert. Auf das Megafon tippen, um Preis und Laufzeit einzugeben.'}
+              ? 'Aktionspreis optional; Laufzeit festlegen, dann zur Aktion hinzufügen.'
+              : 'Liste wie in der PLU-Liste sortiert. Auf das Megafon tippen, um optional Preis und Laufzeit einzugeben.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -188,18 +214,23 @@ export function AddToOfferDialog({
             <div className="rounded-lg border p-4 space-y-1">
               <p className="text-sm text-muted-foreground">Artikel</p>
               <p className="font-medium">{selected.display_name ?? selected.system_name}</p>
+              {selected.ownProductLabel ? (
+                <p className="text-sm text-muted-foreground">
+                  Eigenes Produkt: {selected.ownProductLabel}
+                </p>
+              ) : null}
               <p className="font-mono text-sm text-muted-foreground">PLU {getDisplayPlu(selected.plu)}</p>
             </div>
             <div className="space-y-2">
-              <span className="text-sm font-medium">Aktionspreis (€)</span>
+              <span className="text-sm font-medium">Aktionspreis (€), optional</span>
               <Input
                 type="text"
                 inputMode="decimal"
-                placeholder="z. B. 1,99"
+                placeholder="Leer = nur Werbung ohne Aktionspreis"
                 value={promoPriceInput}
                 onChange={(e) => setPromoPriceInput(e.target.value)}
                 className="max-w-[200px]"
-                aria-label="Aktionspreis in Euro"
+                aria-label="Aktionspreis in Euro, optional"
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -279,9 +310,9 @@ export function AddToOfferDialog({
                         <li key={item.id} className="flex items-center gap-2 px-3 py-2 min-w-0">
                           <div className="min-w-0 flex-1">
                             <p className="font-mono text-sm">{getDisplayPlu(item.plu)}</p>
-                            <p className="text-sm break-words mt-0.5">
-                              {item.display_name ?? item.system_name ?? ''}
-                            </p>
+                            <div className="mt-0.5">
+                              <OfferRowArticleBlock item={item} />
+                            </div>
                           </div>
                           <Button
                             type="button"
@@ -363,8 +394,8 @@ export function AddToOfferDialog({
                             <td className="px-1.5 py-1 font-mono text-sm min-w-0 overflow-hidden">
                               {row.left ? getDisplayPlu(row.left.plu) : ''}
                             </td>
-                            <td className="px-1.5 py-1 text-sm break-words min-w-0 overflow-hidden border-l border-border">
-                              {row.left?.display_name ?? row.left?.system_name ?? ''}
+                            <td className="px-1.5 py-1 text-sm min-w-0 overflow-hidden border-l border-border align-top">
+                              {row.left ? <OfferRowArticleBlock item={row.left} /> : ''}
                             </td>
                             <td className="px-1 py-1 text-center border-l border-border w-[58px]">
                               {row.left ? (
@@ -392,8 +423,8 @@ export function AddToOfferDialog({
                             <td className="px-1.5 py-1 font-mono text-sm border-l-2 border-border min-w-0 overflow-hidden">
                               {row.right ? getDisplayPlu(row.right.plu) : ''}
                             </td>
-                            <td className="px-1.5 py-1 text-sm break-words min-w-0 overflow-hidden border-l border-border">
-                              {row.right?.display_name ?? row.right?.system_name ?? ''}
+                            <td className="px-1.5 py-1 text-sm min-w-0 overflow-hidden border-l border-border align-top">
+                              {row.right ? <OfferRowArticleBlock item={row.right} /> : ''}
                             </td>
                             <td className="px-1 py-1 text-center border-l border-border w-[58px]">
                               {row.right ? (

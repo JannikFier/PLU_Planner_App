@@ -1,7 +1,7 @@
 // PLU-spezifische Types für Business-Logik
 
 import type { MasterPLUItem, Block, CustomProduct, BackshopSource } from './database'
-import type { OfferDisplayInfo, ObstCentralCampaignKind } from '@/lib/offer-display'
+import type { OfferDisplayInfo, ObstOfferNameHighlightKind } from '@/lib/offer-display'
 
 /** Status eines PLU-Eintrags */
 export type PLUStatus = 'UNCHANGED' | 'NEW_PRODUCT_YELLOW' | 'PLU_CHANGED_RED'
@@ -36,10 +36,11 @@ export interface DisplayItem {
   /** Nur bei zentraler Werbung: Original-Kampagnenpreis (wenn eigener VK abweicht) */
   offer_central_reference_price?: number | null
   /**
-   * Nur Obst/Gemüse, zentrale Werbung: Namenszelle hervorheben (nicht PLU-Spalte).
+   * Nur Obst/Gemüse: Namenszelle hervorheben (nicht PLU-Spalte).
+   * Zentrale Kampagne (exit / Woche / 3-Tage) oder manuelle Werbung (wie Wochen-Gelb).
    * Neu/PLU geändert bleiben an der PLU-Zelle.
    */
-  offer_name_highlight_kind?: ObstCentralCampaignKind
+  offer_name_highlight_kind?: ObstOfferNameHighlightKind
   /** Backshop: Quelle des Artikels (edeka | harry | aryzta). Nur digital, nicht im PDF anzeigen. */
   backshop_source?: BackshopSource | null
   /** Backshop: Wenn Gruppe mehrere Sources liefert, Sammelzeile „Mehrere Marken“ (deprecated; Platzhalter werden nicht mehr erzeugt). */

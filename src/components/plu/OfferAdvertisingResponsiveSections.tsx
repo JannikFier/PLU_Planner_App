@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Megaphone, Pencil, Undo2 } from 'lucide-react'
+import { EyeOff, Megaphone, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPreisEur, getDisplayPlu } from '@/lib/plu-helpers'
 import { BackshopThumbnail } from '@/components/plu/BackshopThumbnail'
@@ -336,11 +336,11 @@ export function LocalOwnOfferSection({
           <table className="w-full table-fixed">
             <colgroup>
               <col className="w-[5.5rem]" />
-              <col className="w-[38%]" />
-              <col className="w-[7rem]" />
-              <col className="w-[9rem]" />
-              <col className="w-[6rem]" />
-              <col className="w-[12rem]" />
+              <col className="min-w-0" />
+              <col className="w-[6.5rem]" />
+              <col className="w-[8.5rem]" />
+              <col className="w-[5.5rem]" />
+              <col className="w-11 shrink-0" />
             </colgroup>
             <thead>
               <tr className="border-b-2 border-border">
@@ -359,7 +359,9 @@ export function LocalOwnOfferSection({
                 <th className="px-3 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-3 py-3 text-right w-[12rem]" />
+                <th className="px-2 py-3 text-right w-11" scope="col">
+                  <span className="sr-only">Aktion</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -404,15 +406,18 @@ export function LocalOwnOfferSection({
                       </Badge>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-right align-middle">
+                  <td className="px-2 py-3 text-right align-middle w-11">
                     <Button
+                      type="button"
                       variant="ghost"
-                      size="sm"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
                       onClick={() => onRemove(row.plu)}
                       disabled={removePending}
+                      title="Aus Werbung entfernen"
+                      aria-label="Aus Werbung entfernen"
                     >
-                      <Undo2 className="h-4 w-4 mr-1" />
-                      Aus Werbung entfernen
+                      <EyeOff className="h-4 w-4" aria-hidden />
                     </Button>
                   </td>
                 </tr>
@@ -469,14 +474,16 @@ export function LocalOwnOfferSection({
                   </Badge>
                 )}
                 <Button
+                  type="button"
                   variant="outline"
-                  size="sm"
-                  className="shrink-0"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 text-muted-foreground"
                   onClick={() => onRemove(row.plu)}
                   disabled={removePending}
+                  title="Aus Werbung entfernen"
+                  aria-label="Aus Werbung entfernen"
                 >
-                  <Undo2 className="h-4 w-4 mr-1" />
-                  Entfernen
+                  <EyeOff className="h-4 w-4" aria-hidden />
                 </Button>
               </div>
             </li>

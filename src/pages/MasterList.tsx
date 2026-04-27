@@ -1,6 +1,6 @@
 // MasterList – Haupt-PLU-Tabelle mit Layout-Engine, Toolbar und globaler Liste
 
-import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { useNavigate, useLocation, useParams, Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -423,6 +423,11 @@ export function MasterList({ mode }: MasterListProps) {
   // damit bereits geladene Daten sofort angezeigt werden (sonst erst nach Klick).
   const pluTableRef = useRef<PLUTableHandle>(null)
 
+  /** Find-in-Page-Leiste schließen (z. B. vor Navigation oder PDF), Ref kann null sein. */
+  const closeObstListSearch = useCallback(() => {
+    pluTableRef.current?.closeFindInPage()
+  }, [])
+
   const [, setVisibilityTick] = useState(0)
   useEffect(() => {
     const handler = () => {
@@ -440,19 +445,27 @@ export function MasterList({ mode }: MasterListProps) {
         {
           label: 'PDF exportieren',
           icon: <FileDown className="h-4 w-4" />,
-          onClick: () => setShowPDFDialog(true),
+          onClick: () => {
+            closeObstListSearch()
+            setShowPDFDialog(true)
+          },
         },
       ]
     }
     const backTo = location.pathname + location.search
-    const nav = (path: string) => () =>
+    const nav = (path: string) => () => {
+      closeObstListSearch()
       navigate(`${rolePrefix}${path}?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
+    }
     const items: PLUListPageActionMenuItem[] = []
     if (mode === 'admin') {
       items.push({
         label: 'Neuer Upload',
         icon: <Upload className="h-4 w-4" />,
-        onClick: () => navigate('/super-admin/plu-upload'),
+        onClick: () => {
+          closeObstListSearch()
+          navigate('/super-admin/plu-upload')
+        },
         separatorAfter: true,
       })
     }
@@ -490,7 +503,10 @@ export function MasterList({ mode }: MasterListProps) {
     items.push({
       label: 'PDF exportieren',
       icon: <FileDown className="h-4 w-4" />,
-      onClick: () => setShowPDFDialog(true),
+      onClick: () => {
+        closeObstListSearch()
+        setShowPDFDialog(true)
+      },
     })
     return items
   }, [
@@ -502,6 +518,7 @@ export function MasterList({ mode }: MasterListProps) {
     navigate,
     featuresCustomProducts,
     sortMode,
+    closeObstListSearch,
   ])
 
   return (
@@ -549,7 +566,13 @@ export function MasterList({ mode }: MasterListProps) {
 
           {mode === 'admin' && !snapshotReadOnly && (
             <div className="flex shrink-0 items-center gap-2">
-              <Button onClick={() => navigate('/super-admin/plu-upload')} size="sm">
+              <Button
+                onClick={() => {
+                  closeObstListSearch()
+                  navigate('/super-admin/plu-upload')
+                }}
+                size="sm"
+              >
                 <Upload className="h-4 w-4 mr-2" />
                 Neuer Upload
               </Button>
@@ -579,7 +602,13 @@ export function MasterList({ mode }: MasterListProps) {
                   Diese Version gibt es nicht oder wurde gelöscht.
                 </p>
               </div>
-              <Button variant="outline" onClick={() => navigate('/super-admin/versions')}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  closeObstListSearch()
+                  navigate('/super-admin/versions')
+                }}
+              >
                 Zurück zu Versionen
               </Button>
             </CardContent>
@@ -600,6 +629,7 @@ export function MasterList({ mode }: MasterListProps) {
                 size="icon"
                 className="shrink-0"
                 data-tour="masterlist-search"
+                data-plu-find-in-page-trigger
                 onClick={() => pluTableRef.current?.openFindInPage()}
                 aria-label="In Liste suchen"
                 title="In Liste suchen (PLU oder Name)"
@@ -644,6 +674,7 @@ export function MasterList({ mode }: MasterListProps) {
                     size="sm"
                     data-tour="masterlist-toolbar-eigene-produkte"
                     onClick={() => {
+                      closeObstListSearch()
                       const backTo = location.pathname + location.search
                       navigate(`${rolePrefix}/custom-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
                     }}
@@ -657,6 +688,7 @@ export function MasterList({ mode }: MasterListProps) {
                     size="sm"
                     data-tour="masterlist-toolbar-ausgeblendete"
                     onClick={() => {
+                      closeObstListSearch()
                       const backTo = location.pathname + location.search
                       navigate(`${rolePrefix}/hidden-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
                     }}
@@ -669,6 +701,7 @@ export function MasterList({ mode }: MasterListProps) {
                     size="sm"
                     data-tour="masterlist-toolbar-werbung"
                     onClick={() => {
+                      closeObstListSearch()
                       const backTo = location.pathname + location.search
                       navigate(`${rolePrefix}/offer-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
                     }}
@@ -684,6 +717,7 @@ export function MasterList({ mode }: MasterListProps) {
                   size="sm"
                   data-tour="masterlist-toolbar-umbenennen"
                   onClick={() => {
+                    closeObstListSearch()
                     const backTo = location.pathname + location.search
                     navigate(`${rolePrefix}/renamed-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
                   }}
@@ -697,12 +731,13 @@ export function MasterList({ mode }: MasterListProps) {
                   variant="outline"
                   size="sm"
                   data-tour="masterlist-toolbar-warengruppen"
-                  onClick={() => {
-                    const backTo = location.pathname + location.search
-                    navigate(`${rolePrefix}/obst-warengruppen?backTo=${encodeURIComponent(backTo)}`, {
-                      state: { backTo },
-                    })
-                  }}
+                    onClick={() => {
+                      closeObstListSearch()
+                      const backTo = location.pathname + location.search
+                      navigate(`${rolePrefix}/obst-warengruppen?backTo=${encodeURIComponent(backTo)}`, {
+                        state: { backTo },
+                      })
+                    }}
                 >
                   <LayoutGrid className="h-4 w-4 mr-1" />
                   Warengruppen
@@ -712,7 +747,10 @@ export function MasterList({ mode }: MasterListProps) {
                 variant="outline"
                 size="sm"
                 data-tour="masterlist-toolbar-pdf"
-                onClick={() => setShowPDFDialog(true)}
+                onClick={() => {
+                  closeObstListSearch()
+                  setShowPDFDialog(true)
+                }}
               >
                 <FileDown className="h-4 w-4 mr-1" />
                 PDF
@@ -724,7 +762,10 @@ export function MasterList({ mode }: MasterListProps) {
                 variant="outline"
                 size="sm"
                 className="shrink-0 lg:hidden"
-                onClick={() => setShowPDFDialog(true)}
+                onClick={() => {
+                  closeObstListSearch()
+                  setShowPDFDialog(true)
+                }}
               >
                 <FileDown className="h-4 w-4 mr-1" />
                 PDF
@@ -751,7 +792,9 @@ export function MasterList({ mode }: MasterListProps) {
                 </span>
                 {(rolePrefix === '/admin' || rolePrefix === '/super-admin') && !snapshotReadOnly ? (
                   <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-center" asChild>
-                    <Link to={`${rolePrefix}/layout`}>Layout-Einstellungen (Obst)</Link>
+                    <Link to={`${rolePrefix}/layout`} onClick={() => closeObstListSearch()}>
+                      Layout-Einstellungen (Obst)
+                    </Link>
                   </Button>
                 ) : (
                   <span className="text-sm text-muted-foreground shrink-0">
@@ -772,7 +815,12 @@ export function MasterList({ mode }: MasterListProps) {
                 Es wurde noch keine PLU-Liste hochgeladen. Lade zuerst eine Excel-Datei über PLU Upload hoch.
               </p>
               {mode === 'admin' && (
-                <Button onClick={() => navigate('/super-admin/plu-upload')}>
+                <Button
+                  onClick={() => {
+                    closeObstListSearch()
+                    navigate('/super-admin/plu-upload')
+                  }}
+                >
                   <Upload className="h-4 w-4 mr-2" />
                   Zum PLU Upload
                 </Button>

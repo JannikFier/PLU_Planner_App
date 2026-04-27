@@ -42,15 +42,14 @@ export function useAddOfferItem() {
     }: {
       plu: string
       durationWeeks: number
-      promoPrice: number
+      promoPrice: number | null
     }) => {
       if (!user) throw new Error('Nicht eingeloggt')
       if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       const { kw, year } = getKWAndYearFromDate(new Date())
       const weeks = Math.max(1, Math.min(4, durationWeeks))
-      if (promoPrice <= 0 || Number.isNaN(promoPrice)) {
-        throw new Error('Bitte einen gültigen Aktionspreis größer 0 eingeben.')
-      }
+      const storedPrice =
+        promoPrice != null && Number.isFinite(promoPrice) && promoPrice > 0 ? promoPrice : null
 
       if (isTestModeActive()) {
         queryClient.setQueryData<OfferItem[]>(
@@ -66,7 +65,7 @@ export function useAddOfferItem() {
               created_by: user.id,
               store_id: currentStoreId,
               created_at: new Date().toISOString(),
-              promo_price: promoPrice,
+              promo_price: storedPrice,
               offer_source: 'manual',
             } as OfferItem]
           },
@@ -81,7 +80,7 @@ export function useAddOfferItem() {
         duration_weeks: weeks,
         created_by: user.id,
         store_id: currentStoreId,
-        promo_price: promoPrice,
+        promo_price: storedPrice,
         offer_source: 'manual',
       }
 

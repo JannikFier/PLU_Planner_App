@@ -243,11 +243,3 @@ export function buildDialogPluLayout<T extends DialogItemBase>(
     mobileRows: groupsToMobileRows(groups),
   }
 }
-
-/** Mindesthöhe einer logischen „Seite“ im Dialog (CSS px), analog PLUTable TwoColumnLayout */
-export function newspaperPageMinHeightPx(
-  pageIndex: number,
-  heights: NewspaperPaginateHeights,
-): number {
-  return pageIndex === 0 ? heights.columnHeightFirstPage : heights.columnHeightContinuationPage
-}

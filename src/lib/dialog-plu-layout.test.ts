@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildDialogPluLayout, newspaperPageMinHeightPx } from '@/lib/dialog-plu-layout'
+import { buildDialogPluLayout } from '@/lib/dialog-plu-layout'
 import type { DialogItemBase } from '@/lib/plu-helpers'
 
 type Item = DialogItemBase & { id: string; plu: string }
@@ -75,18 +75,5 @@ describe('buildDialogPluLayout', () => {
     if (r.mode !== 'split_columns') return
     expect(r.leftFlat.length).toBeGreaterThan(0)
     expect(r.rightFlat.length).toBeGreaterThan(0)
-  })
-})
-
-describe('newspaperPageMinHeightPx', () => {
-  it('erste Seite nutzt columnHeightFirstPage', () => {
-    const h = {
-      itemRow: 10,
-      groupHeader: 10,
-      columnHeightFirstPage: 100,
-      columnHeightContinuationPage: 200,
-    }
-    expect(newspaperPageMinHeightPx(0, h)).toBe(100)
-    expect(newspaperPageMinHeightPx(1, h)).toBe(200)
   })
 })

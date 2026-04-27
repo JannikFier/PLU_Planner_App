@@ -8,6 +8,7 @@ import {
   useCallback,
   forwardRef,
   useImperativeHandle,
+  Fragment,
 } from 'react'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
@@ -30,6 +31,8 @@ import {
   computeObstNewspaperHeightsPx,
   newspaperRowsToFlatRows,
   flattenNewspaperPagesToRows,
+  newspaperPageMinHeightPx,
+  newspaperPageStartFlatRowIndex,
 } from '@/lib/newspaper-column-pages'
 import { cn } from '@/lib/utils'
 import { obstOfferNameInnerClass } from '@/lib/obst-offer-name-highlight'
@@ -133,7 +136,7 @@ const BACKSHOP_IMAGE_SIZE = 'h-14 w-14 sm:h-20 sm:w-20 md:h-24 md:w-24'
 /** object-contain = nichts abschneiden; crisp-edges = schärfere Skalierung */
 const BACKSHOP_IMAGE_CLASS = 'object-contain rounded border border-border [image-rendering:crisp-edges]'
 
-/** Mobile Kartenliste (nur md:hidden): größeres Bild zur besseren Erkennbarkeit */
+/** Mobile Backshop-Kartenliste (lg:hidden wenn breite Tabelle erst ab lg): größeres Bild ab sm/md */
 const BACKSHOP_IMAGE_SIZE_LIST = 'h-24 w-24'
 
 /** Zeigt Backshop-Bild oder Platzhalter; bei Lade fehler (kaputte URL) ebenfalls Platzhalter statt Broken-Icon. */
@@ -1058,6 +1061,20 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
     return () => window.removeEventListener('keydown', onKey)
   }, [findInPageExternalTrigger, showSearchBar, closeFindInPage])
 
+  /** Toolbar-Lupe (data-plu-find-in-page-trigger) und Portal-Inhalt ausschließen – sonst Suche bei Klick in die Liste beenden. */
+  useEffect(() => {
+    if (!findInPageExternalTrigger || !showSearchBar) return
+    const onPointerDown = (e: PointerEvent) => {
+      const el = e.target
+      if (!(el instanceof Element)) return
+      if (el.closest('[data-plu-find-in-page-root]')) return
+      if (el.closest('[data-plu-find-in-page-trigger]')) return
+      closeFindInPage()
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [findInPageExternalTrigger, showSearchBar, closeFindInPage])
+
   const findInPageBarEl =
     showFindInPage && showSearchBar ? (
       <FindInPageBar
@@ -1314,7 +1331,10 @@ function TwoColumnLayout({
             label: bg.blockName,
             items: bg.items,
           }))
-    return { pages: paginateNewspaperColumns(groupList, heights) }
+    return {
+      pages: paginateNewspaperColumns(groupList, heights),
+      heights,
+    }
   }, [listType, flowDirection, sortMode, groups, fonts])
 
   const allFlatRows = useMemo(() => {
@@ -1322,10 +1342,13 @@ function TwoColumnLayout({
     return buildFlatRowsFromLetterGroups(groups as LetterGroup<DisplayItem>[])
   }, [groups, sortMode])
 
+  /** Backshop: breite Zwei-Spalten-Ansicht erst ab lg — Tablet (z. B. iPad ~834px) bleibt ohne horizontales Übermaß (E2E mobile-layout). */
+  const backshopWideFromLg = listType === 'backshop'
+
   if (flowDirection === 'ROW_BY_ROW' && rowByRowData) {
     return (
       <div className="rounded-b-lg border border-t-0 border-border">
-        <div className="hidden md:block">
+        <div className={cn('hidden', backshopWideFromLg ? 'lg:block' : 'md:block')}>
           <RowByRowTable
             tableRows={rowByRowData}
             flatRows={allFlatRows}
@@ -1340,7 +1363,7 @@ function TwoColumnLayout({
             backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
           />
         </div>
-        <div className="md:hidden">
+        <div className={backshopWideFromLg ? 'lg:hidden' : 'md:hidden'}>
           {listType === 'backshop' ? (
             <BackshopPLUMobileList
               rows={allFlatRows}
@@ -1373,27 +1396,74 @@ function TwoColumnLayout({
   }
 
   if (obstNewspaper) {
-    // Eine durchgehende Tabelle (wie Suche / Mobil): PDF-ähnliche Paginierung nur für die Zeilenfolge,
-    // nicht mehr zwei getrennte Spalten auf Desktop — sonst wirken Artikel unter dem linken Gruppenkopf „weg“
-    // (sie stehen in der rechten Spalte / auf Folgeseiten).
-    const obstNewspaperFlatRows = newspaperRowsToFlatRows(
-      flattenNewspaperPagesToRows(obstNewspaper.pages),
-    )
+    const { pages, heights } = obstNewspaper
+    const obstNewspaperFlatRows = newspaperRowsToFlatRows(flattenNewspaperPagesToRows(pages))
+
+    const pluColumnCommon = {
+      fonts,
+      letterGroupHeaderFontPx: fonts.product,
+      selectionMode,
+      selectedPLUs,
+      onToggleSelect,
+      findInPageHighlightRowIndex,
+      findInPageQuery,
+      listType,
+      backshopMarkenTinderHrefForGroup,
+    }
+
     return (
       <div className="rounded-b-lg border border-t-0 border-border">
-        <PLUColumn
-          rows={obstNewspaperFlatRows}
-          fonts={fonts}
-          letterGroupHeaderFontPx={fonts.product}
-          selectionMode={selectionMode}
-          selectedPLUs={selectedPLUs}
-          onToggleSelect={onToggleSelect}
-          findInPageRowOffset={findInPageRowOffset}
-          findInPageHighlightRowIndex={findInPageHighlightRowIndex}
-          findInPageQuery={findInPageQuery}
-          listType={listType}
-          backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
-        />
+        {/* Schmal: eine Spalte, gleiche Zeilenfolge wie Suche / data-row-index */}
+        <div className="md:hidden">
+          <PLUColumn
+            rows={obstNewspaperFlatRows}
+            {...pluColumnCommon}
+            findInPageRowOffset={findInPageRowOffset}
+          />
+        </div>
+        {/* Desktop: zwei Spalten pro PDF-Seite, Seitentrenner; Find-in-Page-Indizes links → rechts pro Seite */}
+        <div className="hidden md:block">
+          {pages.map((page, pageIdx) => (
+            <Fragment key={`obst-np-${pageIdx}`}>
+              {pageIdx > 0 && (
+                <div
+                  className="flex items-center gap-3 border-t border-dashed border-border bg-muted/25 px-4 py-2.5 text-sm font-medium text-muted-foreground"
+                  role="separator"
+                  aria-label={`Seite ${pageIdx + 1}`}
+                >
+                  <span className="h-px min-w-[2rem] flex-1 bg-border" aria-hidden />
+                  Seite {pageIdx + 1}
+                  <span className="h-px min-w-[2rem] flex-1 bg-border" aria-hidden />
+                </div>
+              )}
+              <div
+                className="flex w-full divide-x divide-border items-start border-b border-border"
+                style={{ minHeight: newspaperPageMinHeightPx(pageIdx, heights) }}
+              >
+                <PLUColumn
+                  rows={newspaperRowsToFlatRows(page.left)}
+                  {...pluColumnCommon}
+                  findInPageRowOffset={
+                    findInPageRowOffset !== undefined
+                      ? findInPageRowOffset + newspaperPageStartFlatRowIndex(pages, pageIdx)
+                      : undefined
+                  }
+                />
+                <PLUColumn
+                  rows={newspaperRowsToFlatRows(page.right)}
+                  {...pluColumnCommon}
+                  findInPageRowOffset={
+                    findInPageRowOffset !== undefined
+                      ? findInPageRowOffset +
+                        newspaperPageStartFlatRowIndex(pages, pageIdx) +
+                        page.left.length
+                      : undefined
+                  }
+                />
+              </div>
+            </Fragment>
+          ))}
+        </div>
       </div>
     )
   }
@@ -1401,7 +1471,7 @@ function TwoColumnLayout({
   const leftRowCount = leftRows.length
   return (
     <div className="rounded-b-lg border border-t-0 border-border">
-      <div className="hidden md:flex divide-x divide-border">
+      <div className={cn('hidden divide-x divide-border', backshopWideFromLg ? 'lg:flex' : 'md:flex')}>
         <PLUColumn
           rows={leftRows}
           fonts={fonts}
@@ -1427,7 +1497,7 @@ function TwoColumnLayout({
           backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
         />
       </div>
-      <div className="md:hidden">
+      <div className={backshopWideFromLg ? 'lg:hidden' : 'md:hidden'}>
         {listType === 'backshop' ? (
           <BackshopPLUMobileList
             rows={allFlatRows}
