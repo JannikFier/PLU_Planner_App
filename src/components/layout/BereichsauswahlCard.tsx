@@ -14,6 +14,7 @@ export const BereichsauswahlCard = React.memo(function BereichsauswahlCard({
   onClick,
   variant = 'obst',
   compact = false,
+  dataTour,
 }: {
   title: string
   description?: string
@@ -22,6 +23,8 @@ export const BereichsauswahlCard = React.memo(function BereichsauswahlCard({
   /** Obst = emerald, Backshop = slate, Benutzer = sky */
   variant?: 'obst' | 'backshop' | 'benutzer'
   compact?: boolean
+  /** Optional: Tutorial-Spotlight (data-tour) */
+  dataTour?: string
 }) {
   const variantStyles = {
     obst: {
@@ -54,6 +57,7 @@ export const BereichsauswahlCard = React.memo(function BereichsauswahlCard({
         styles.card,
       )}
       onClick={onClick}
+      {...(dataTour ? { 'data-tour': dataTour } : {})}
     >
       <CardContent className={cn(compact ? 'p-3' : 'p-4 sm:p-5')}>
         <div className={cn('flex items-start gap-3', compact && 'gap-2')}>

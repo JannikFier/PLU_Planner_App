@@ -8,6 +8,7 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import { queryRest, supabase } from '@/lib/supabase'
+import { fetchBackshopOfferCampaignSlots } from '@/hooks/useCentralOfferCampaigns'
 import type {
   Profile,
   Version,
@@ -172,6 +173,11 @@ export function runBackshopPrefetch(queryClient: QueryClient): void {
         })
       }
     })
+
+  void queryClient.prefetchQuery({
+    queryKey: ['backshop-offer-campaign-slots'],
+    queryFn: fetchBackshopOfferCampaignSlots,
+  })
 
   void import('@/pages/BackshopMasterList')
 }

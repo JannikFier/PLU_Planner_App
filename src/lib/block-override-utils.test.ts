@@ -4,6 +4,7 @@ import {
   effectiveBlockIdForStoreOverride,
   sortBlocksWithStoreOrder,
   buildNameBlockOverrideMap,
+  sanitizeEffectiveBlockId,
 } from '@/lib/block-override-utils'
 
 describe('block-override-utils', () => {
@@ -33,6 +34,14 @@ describe('block-override-utils', () => {
     ]
     const sorted = sortBlocksWithStoreOrder(blocks, [])
     expect(sorted.map((x) => x.id)).toEqual(['b', 'a'])
+  })
+
+  it('sanitizeEffectiveBlockId: unbekannte UUID → null', () => {
+    const valid = new Set(['a', 'b'])
+    expect(sanitizeEffectiveBlockId('a', valid)).toBe('a')
+    expect(sanitizeEffectiveBlockId('ghost', valid)).toBe(null)
+    expect(sanitizeEffectiveBlockId(null, valid)).toBe(null)
+    expect(sanitizeEffectiveBlockId('', valid)).toBe(null)
   })
 
   it('sortBlocksWithStoreOrder: Markt überschreibt', () => {

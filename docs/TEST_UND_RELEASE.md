@@ -70,7 +70,8 @@ Welche Rolle darf welche Route nutzen? Super-Admin hat Zugriff auf alle Bereiche
 | `/super-admin/backshop-upload` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/layout` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/rules` | ❌ | ❌ | ❌ | ✅ |
-| `/super-admin/block-sort` | ❌ | ❌ | ❌ | ✅ |
+| `/super-admin/block-sort` (→ `/super-admin/obst-warengruppen`) | ❌ | ❌ | ❌ | ✅ |
+| `/super-admin/obst-warengruppen` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/backshop-layout` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/backshop-rules` | ❌ | ❌ | ❌ | ✅ |
 | `/super-admin/backshop-block-sort` | ❌ | ❌ | ❌ | ✅ |

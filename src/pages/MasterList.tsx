@@ -1,16 +1,18 @@
 // MasterList – Haupt-PLU-Tabelle mit Layout-Engine, Toolbar und globaler Liste
 
 import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, useParams, Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   AlertCircle,
+  Archive,
   RefreshCw,
   ListFilter,
   Upload,
@@ -21,6 +23,7 @@ import {
   Megaphone,
   Search,
   LayoutGrid,
+  Info,
 } from 'lucide-react'
 
 // PLU-Komponenten
@@ -52,11 +55,14 @@ import { formatKwLabelWithOptionalMonSatRange, getKWAndYearFromDate } from '@/li
 import { buildOfferDisplayMap } from '@/lib/offer-display'
 import { effectiveHiddenPluSet } from '@/lib/hidden-visibility'
 import {
-  useObstOfferCampaignWithLines,
+  useObstOfferCampaignForKwYear,
   useObstOfferStoreDisabled,
 } from '@/hooks/useCentralOfferCampaigns'
 import { useObstOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalPrices'
 import { ensureActiveVersion } from '@/lib/ensure-active-version'
+import { useStoreListCarryoverRows } from '@/hooks/useStoreListCarryover'
+import { carryoverObstRowToMasterItem } from '@/lib/carryover-master-snapshot'
+import { useObstPrevManualSupplementPluSet } from '@/hooks/usePrevManualSupplementPluSet'
 
 interface MasterListProps {
   mode: 'user' | 'admin' | 'viewer'
@@ -74,6 +80,8 @@ interface MasterListProps {
 export function MasterList({ mode }: MasterListProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { versionId: snapshotVersionId } = useParams<{ versionId?: string }>()
+  const isSnapshot = Boolean(snapshotVersionId)
   const queryClient = useQueryClient()
   // Prefix aus aktueller URL (nicht aus Rolle), damit Super-Admin in User-Ansicht dort bleibt
   const rolePrefix =
@@ -85,13 +93,39 @@ export function MasterList({ mode }: MasterListProps) {
   // Daten laden
   const { data: activeVersion, isLoading: versionLoading } = useActiveVersion()
   const { data: versions = [], isLoading: versionsLoading } = useVersions()
+
+  const resolvedVersion = useMemo(
+    () => (snapshotVersionId ? versions.find((v) => v.id === snapshotVersionId) : undefined),
+    [versions, snapshotVersionId],
+  )
+  const snapshotInvalid = isSnapshot && !versionsLoading && !resolvedVersion
+
+  /** Live-Liste: aktiv; Archiv: gewählte Version aus URL. */
+  const effectiveVersionId = snapshotInvalid
+    ? undefined
+    : isSnapshot
+      ? snapshotVersionId
+      : activeVersion?.id
+
+  const listVersion = isSnapshot ? resolvedVersion : (resolvedVersion ?? activeVersion)
+  const { data: obstPrevManualPluSetData, isSuccess: obstPrevManualLoaded } =
+    useObstPrevManualSupplementPluSet(effectiveVersionId)
+  const obstPrevManualPluSetForLayout = obstPrevManualLoaded ? (obstPrevManualPluSetData ?? null) : undefined
   const { data: layoutSettings } = useLayoutSettings()
   const featuresCustomProducts = layoutSettings?.features_custom_products ?? true
   const { data: blocks = [] } = useBlocks()
   const { data: customProducts = [] } = useCustomProducts()
   const { data: hiddenItems = [] } = useHiddenItems()
   const { data: offerItems = [] } = useOfferItems()
-  const { data: obstCampaign } = useObstOfferCampaignWithLines()
+  const versionForObstCampaign = isSnapshot ? resolvedVersion : activeVersion
+  const obstCampaignKwEnabled =
+    !snapshotInvalid &&
+    (isSnapshot ? Boolean(resolvedVersion) : Boolean(activeVersion))
+  const { data: obstCampaign } = useObstOfferCampaignForKwYear(
+    versionForObstCampaign?.kw_nummer,
+    versionForObstCampaign?.jahr,
+    obstCampaignKwEnabled,
+  )
   const { data: obstDisabled = new Set() } = useObstOfferStoreDisabled()
   const { overrideMap: obstLocalPriceOverrides } = useObstOfferLocalPriceOverrides(obstCampaign ?? undefined)
   const { data: renamedItems = [] } = useRenamedItems()
@@ -103,7 +137,21 @@ export function MasterList({ mode }: MasterListProps) {
     [storeObstNameOverrides],
   )
 
-  const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
+  const { kw: calendarKw, year: calendarJahr } = getKWAndYearFromDate(new Date())
+  const offerKw =
+    isSnapshot && resolvedVersion
+      ? resolvedVersion.kw_nummer
+      : !isSnapshot && activeVersion
+        ? activeVersion.kw_nummer
+        : calendarKw
+  const offerJahr =
+    isSnapshot && resolvedVersion
+      ? resolvedVersion.jahr
+      : !isSnapshot && activeVersion
+        ? activeVersion.jahr
+        : calendarJahr
+  const currentKw = offerKw
+  const currentJahr = offerJahr
   const rawHiddenPluSet = useMemo(
     () => new Set(hiddenItems.map((h) => h.plu)),
     [hiddenItems],
@@ -116,21 +164,33 @@ export function MasterList({ mode }: MasterListProps) {
   const offerDisplayByPlu = useMemo(
     () =>
       buildOfferDisplayMap(
-        currentKw,
-        currentJahr,
+        offerKw,
+        offerJahr,
         obstCampaign ?? null,
         obstDisabled,
         offerItems,
         obstLocalPriceOverrides,
       ),
-    [currentKw, currentJahr, obstCampaign, obstDisabled, offerItems, obstLocalPriceOverrides],
+    [offerKw, offerJahr, obstCampaign, obstDisabled, offerItems, obstLocalPriceOverrides],
   )
 
   // Dialoge
   const [showPDFDialog, setShowPDFDialog] = useState(false)
+  const [pdfExportVersionId, setPdfExportVersionId] = useState<string | undefined>(undefined)
 
-  /** Immer die aktive eingespielte Liste (keine KW-Umschaltung auf der Seite). */
-  const effectiveVersionId = activeVersion?.id
+  useEffect(() => {
+    if (!showPDFDialog) {
+      setPdfExportVersionId(undefined)
+      return
+    }
+    if (isSnapshot && resolvedVersion?.id) {
+      setPdfExportVersionId((prev) => prev ?? resolvedVersion.id)
+      return
+    }
+    if (activeVersion?.id) {
+      setPdfExportVersionId((prev) => prev ?? activeVersion.id)
+    }
+  }, [showPDFDialog, isSnapshot, resolvedVersion?.id, activeVersion?.id])
 
   // PLU-Items für die gewählte Version laden
   const {
@@ -141,10 +201,36 @@ export function MasterList({ mode }: MasterListProps) {
     refetch: refetchItems,
   } = usePLUData(effectiveVersionId)
 
-  // PLU-Items für PDF-Export (aktive Version, kein KW-Wechsel im Dialog)
-  const { data: pdfRawItems = [] } = usePLUData(effectiveVersionId ?? '', {
-    enabled: showPDFDialog && !!effectiveVersionId,
+  // PLU-Items für PDF-Export: gewählte KW im PDF-Dialog
+  const { data: pdfRawItems = [] } = usePLUData(pdfExportVersionId, {
+    enabled: showPDFDialog && !!pdfExportVersionId,
   })
+
+  const { data: pdfCarryoverRows = [] } = useStoreListCarryoverRows('obst', pdfExportVersionId)
+
+  const pdfVersion = useMemo(
+    () =>
+      (pdfExportVersionId ? versions.find((v) => v.id === pdfExportVersionId) : undefined)
+      ?? (isSnapshot ? listVersion : activeVersion)
+      ?? undefined,
+    [pdfExportVersionId, versions, isSnapshot, listVersion, activeVersion],
+  )
+
+  const carryoverMasterForPdf = useMemo(() => {
+    if (!pdfExportVersionId) return []
+    return pdfCarryoverRows
+      .filter((r) => r.market_include)
+      .map((r) => carryoverObstRowToMasterItem(r, pdfExportVersionId))
+  }, [pdfCarryoverRows, pdfExportVersionId])
+
+  const { data: obstCarryoverRows = [] } = useStoreListCarryoverRows('obst', effectiveVersionId)
+
+  const carryoverMasterForActive = useMemo(() => {
+    if (!listVersion?.id) return []
+    return obstCarryoverRows
+      .filter((r) => r.market_include)
+      .map((r) => carryoverObstRowToMasterItem(r, listVersion.id))
+  }, [obstCarryoverRows, listVersion?.id])
 
   // Layout-Settings auslesen
   const displayMode = layoutSettings?.display_mode ?? 'MIXED'
@@ -167,10 +253,11 @@ export function MasterList({ mode }: MasterListProps) {
         case_sensitive: r.case_sensitive,
       }))
 
-    const version = activeVersion
+    const version = listVersion
     const now = new Date()
     const result = buildDisplayList({
       masterItems: rawItems,
+      carryoverMasterItems: carryoverMasterForActive,
       customProducts,
       hiddenPLUs: effectiveHiddenPLUs,
       offerDisplayByPlu,
@@ -187,6 +274,7 @@ export function MasterList({ mode }: MasterListProps) {
       currentJahr,
       nameBlockOverrides,
       storeBlockOrder: storeObstBlockOrder,
+      obstPrevManualPluSet: obstPrevManualPluSetForLayout,
     })
 
     // Layout-Engine stats → PLUStats konvertieren
@@ -200,20 +288,38 @@ export function MasterList({ mode }: MasterListProps) {
     }
 
     return { displayItems: result.items, stats: pluStats }
-  }, [rawItems, customProducts, effectiveHiddenPLUs, offerDisplayByPlu, renamedItems, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion, currentKw, currentJahr, nameBlockOverrides, storeObstBlockOrder])
+  }, [
+    rawItems,
+    carryoverMasterForActive,
+    customProducts,
+    effectiveHiddenPLUs,
+    offerDisplayByPlu,
+    renamedItems,
+    regeln,
+    blocks,
+    layoutSettings,
+    sortMode,
+    displayMode,
+    listVersion,
+    currentKw,
+    currentJahr,
+    nameBlockOverrides,
+    storeObstBlockOrder,
+    obstPrevManualPluSetForLayout,
+  ])
 
-  const currentVersion = activeVersion
+  const currentVersion = listVersion
 
   const showWeekMonSat = layoutSettings?.show_week_mon_sat_in_labels ?? false
   const versionDisplayKwLabel = useMemo(() => {
-    if (!activeVersion) return ''
+    if (!listVersion) return ''
     return formatKwLabelWithOptionalMonSatRange(
-      activeVersion.kw_label,
-      activeVersion.kw_nummer,
-      activeVersion.jahr,
+      listVersion.kw_label,
+      listVersion.kw_nummer,
+      listVersion.jahr,
       showWeekMonSat,
     )
-  }, [activeVersion, showWeekMonSat])
+  }, [listVersion, showWeekMonSat])
 
   const { displayItems: pdfDisplayItems, stats: pdfStats } = useMemo(() => {
     if (!pdfRawItems.length && !customProducts.length) {
@@ -225,6 +331,7 @@ export function MasterList({ mode }: MasterListProps) {
     const now = new Date()
     const result = buildDisplayList({
       masterItems: pdfRawItems,
+      carryoverMasterItems: carryoverMasterForPdf,
       customProducts,
       hiddenPLUs: effectiveHiddenPLUs,
       offerDisplayByPlu,
@@ -235,12 +342,13 @@ export function MasterList({ mode }: MasterListProps) {
       displayMode,
       markRedKwCount: layoutSettings?.mark_red_kw_count ?? 0,
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
-      versionKwNummer: activeVersion?.kw_nummer ?? 0,
-      versionJahr: activeVersion?.jahr ?? now.getFullYear(),
+      versionKwNummer: pdfVersion?.kw_nummer ?? 0,
+      versionJahr: pdfVersion?.jahr ?? now.getFullYear(),
       currentKwNummer: currentKw,
       currentJahr,
       nameBlockOverrides,
       storeBlockOrder: storeObstBlockOrder,
+      obstPrevManualPluSet: obstPrevManualPluSetForLayout,
     })
     return {
       displayItems: result.items,
@@ -253,16 +361,51 @@ export function MasterList({ mode }: MasterListProps) {
         customCount: result.stats.customCount,
       } as PLUStats,
     }
-  }, [pdfRawItems, customProducts, effectiveHiddenPLUs, offerDisplayByPlu, renamedItems, regeln, blocks, layoutSettings, sortMode, displayMode, activeVersion, currentKw, currentJahr, nameBlockOverrides, storeObstBlockOrder])
+  }, [
+    pdfRawItems,
+    carryoverMasterForPdf,
+    customProducts,
+    effectiveHiddenPLUs,
+    offerDisplayByPlu,
+    renamedItems,
+    regeln,
+    blocks,
+    layoutSettings,
+    sortMode,
+    displayMode,
+    pdfVersion,
+    currentKw,
+    currentJahr,
+    nameBlockOverrides,
+    storeObstBlockOrder,
+    obstPrevManualPluSetForLayout,
+  ])
+
+  const pdfExportKwLabel = useMemo(() => {
+    if (!pdfVersion) return ''
+    return formatKwLabelWithOptionalMonSatRange(
+      pdfVersion.kw_label,
+      pdfVersion.kw_nummer,
+      pdfVersion.jahr,
+      showWeekMonSat,
+    )
+  }, [pdfVersion, showWeekMonSat])
+
+  const snapshotReadOnly = isSnapshot && mode === 'admin'
 
   // Loading-State
-  const isLoading = versionLoading || versionsLoading || itemsLoading
+  const isLoading =
+    (!isSnapshot && (versionLoading || versionsLoading)) ||
+    (isSnapshot && versionsLoading) ||
+    itemsLoading
 
-  // Keine Version? Kurz-Hinweis statt endlos warten
-  const hasNoVersion = !versionLoading && !versionsLoading && !activeVersion && versions.length === 0
+  // Keine Version? Kurz-Hinweis statt endlos warten (nur Live-Liste)
+  const hasNoVersion =
+    !isSnapshot && !versionLoading && !versionsLoading && !activeVersion && versions.length === 0
 
   // Wenn Versionen existieren, aber keine aktive: neueste automatisch auf active setzen
   useEffect(() => {
+    if (isSnapshot) return
     if (versionLoading || versionsLoading || versions.length === 0) return
     const hasActive = versions.some((v) => v.status === 'active')
     if (hasActive) return
@@ -292,6 +435,15 @@ export function MasterList({ mode }: MasterListProps) {
   /** Mobile (max-sm): Aktionen im ⋮-Menü – gleiche Ziele wie die Desktop-Buttons */
   const obstMobileMenuItems = useMemo((): PLUListPageActionMenuItem[] => {
     if (mode === 'viewer') return []
+    if (snapshotReadOnly) {
+      return [
+        {
+          label: 'PDF exportieren',
+          icon: <FileDown className="h-4 w-4" />,
+          onClick: () => setShowPDFDialog(true),
+        },
+      ]
+    }
     const backTo = location.pathname + location.search
     const nav = (path: string) => () =>
       navigate(`${rolePrefix}${path}?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
@@ -341,13 +493,22 @@ export function MasterList({ mode }: MasterListProps) {
       onClick: () => setShowPDFDialog(true),
     })
     return items
-  }, [mode, location.pathname, location.search, rolePrefix, navigate, featuresCustomProducts, sortMode])
+  }, [
+    mode,
+    snapshotReadOnly,
+    location.pathname,
+    location.search,
+    rolePrefix,
+    navigate,
+    featuresCustomProducts,
+    sortMode,
+  ])
 
   return (
     <DashboardLayout>
       <div className="space-y-4">
-        {/* === Header: Mobile kompakt (Titel | ⋮) === */}
-        <div className="sm:hidden flex items-center justify-between gap-3 min-w-0">
+        {/* === Header: Schmal – kompakt (Titel | Aktionen-Menü) === */}
+        <div className="lg:hidden flex items-center justify-between gap-3 min-w-0">
           <h2
             className="text-[15px] font-bold leading-snug tracking-tight min-w-0"
             title="PLU Obst und Gemüse"
@@ -355,35 +516,38 @@ export function MasterList({ mode }: MasterListProps) {
             PLU Obst und Gemüse
             {mode === 'admin' && (
               <Badge variant="outline" className="ml-1.5 text-[10px] font-normal align-middle shrink-0">
-                Admin
+                {snapshotReadOnly ? 'Archiv' : 'Admin'}
               </Badge>
             )}
           </h2>
-          {currentVersion && !isLoading && !hasNoVersion && (
+          {currentVersion && !isLoading && !hasNoVersion && !snapshotInvalid && (
             <PLUListPageActionsMenu ariaLabel="Listen-Aktionen" items={obstMobileMenuItems} />
           )}
         </div>
 
-        {/* === Header: Desktop === */}
-        <div className="hidden sm:flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        {/* === Header: Ab lg (breit) === */}
+        <div className="hidden lg:flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
               PLU Obst und Gemüse
               {mode === 'admin' && (
                 <Badge variant="outline" className="ml-2 text-xs font-normal align-middle">
-                  Admin
+                  {snapshotReadOnly ? 'Archiv' : 'Admin'}
                 </Badge>
               )}
             </h2>
             <p className="text-sm text-muted-foreground">
-              Aktuelle eingespielte Liste –{' '}
-              {mode === 'admin'
-                ? 'verwalten und bearbeiten.'
-                : 'deine PLU-Übersicht für Obst & Gemüse.'}
+              {snapshotReadOnly
+                ? 'Eingespielter Listenstand dieser Kalenderwoche (nur Lesen).'
+                : `Aktuelle eingespielte Liste – ${
+                    mode === 'admin'
+                      ? 'verwalten und bearbeiten.'
+                      : 'deine PLU-Übersicht für Obst & Gemüse.'
+                  }`}
             </p>
           </div>
 
-          {mode === 'admin' && (
+          {mode === 'admin' && !snapshotReadOnly && (
             <div className="flex shrink-0 items-center gap-2">
               <Button onClick={() => navigate('/super-admin/plu-upload')} size="sm">
                 <Upload className="h-4 w-4 mr-2" />
@@ -393,9 +557,41 @@ export function MasterList({ mode }: MasterListProps) {
           )}
         </div>
 
+        {isSnapshot && resolvedVersion && (
+          <Alert>
+            <Archive className="h-4 w-4" />
+            <AlertTitle>Archivansicht</AlertTitle>
+            <AlertDescription>
+              Liste und Werbung beziehen sich auf{' '}
+              <span className="font-medium text-foreground">{versionDisplayKwLabel}</span>. Bearbeiten ist hier
+              deaktiviert.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {snapshotInvalid && (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center gap-4">
+              <AlertCircle className="h-10 w-10 text-muted-foreground" />
+              <div>
+                <h3 className="text-lg font-medium mb-1">Version nicht gefunden</h3>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  Diese Version gibt es nicht oder wurde gelöscht.
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => navigate('/super-admin/versions')}>
+                Zurück zu Versionen
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* === Toolbar === */}
-        {currentVersion && !isLoading && (
-          <div className="flex w-full flex-wrap items-center gap-2 sm:flex-nowrap sm:justify-between">
+        {currentVersion && !isLoading && !snapshotInvalid && (
+          <div
+            className="flex w-full flex-wrap items-center gap-2 lg:flex-nowrap lg:justify-between"
+            data-tour="obst-master-toolbar"
+          >
             {/* Links: Suche + Infos (min-w-0 damit Text schrumpft statt Aktionen zu verdrängen) */}
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <Button
@@ -403,6 +599,7 @@ export function MasterList({ mode }: MasterListProps) {
                 variant="outline"
                 size="icon"
                 className="shrink-0"
+                data-tour="masterlist-search"
                 onClick={() => pluTableRef.current?.openFindInPage()}
                 aria-label="In Liste suchen"
                 title="In Liste suchen (PLU oder Name)"
@@ -410,7 +607,10 @@ export function MasterList({ mode }: MasterListProps) {
                 <Search className="h-4 w-4" />
               </Button>
               {/* Anzeige-Infos: Sortierung, Darstellung (Stück/Gewicht), KW, Aktiv */}
-              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground sm:max-w-none">
+              <div
+                className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground lg:max-w-none"
+                data-tour="masterlist-context-line"
+              >
                 <ListFilter className="h-4 w-4 shrink-0" />
                 <span title="Layout-Sortierung">
                   {sortMode === 'BY_BLOCK' ? 'Nach Warengruppen' : 'Alphabetisch (A–Z)'}
@@ -434,14 +634,15 @@ export function MasterList({ mode }: MasterListProps) {
               </div>
             </div>
 
-            {/* Rechts: Aktionen Desktop (eine Zeile, rechtsbündig durch justify-between auf dem Parent) */}
-            <div className="hidden sm:flex shrink-0 flex-nowrap items-center gap-2">
-              {mode !== 'viewer' && (
+            {/* Rechts: Aktionen ab lg (eine Zeile, rechtsbündig) */}
+            <div className="hidden lg:flex shrink-0 flex-nowrap items-center gap-2" data-tour="masterlist-toolbar-actions">
+              {mode !== 'viewer' && !snapshotReadOnly && (
                 <>
                   {featuresCustomProducts && (
                   <Button
                     variant="outline"
                     size="sm"
+                    data-tour="masterlist-toolbar-eigene-produkte"
                     onClick={() => {
                       const backTo = location.pathname + location.search
                       navigate(`${rolePrefix}/custom-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
@@ -454,6 +655,7 @@ export function MasterList({ mode }: MasterListProps) {
                   <Button
                     variant="outline"
                     size="sm"
+                    data-tour="masterlist-toolbar-ausgeblendete"
                     onClick={() => {
                       const backTo = location.pathname + location.search
                       navigate(`${rolePrefix}/hidden-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
@@ -465,6 +667,7 @@ export function MasterList({ mode }: MasterListProps) {
                   <Button
                     variant="outline"
                     size="sm"
+                    data-tour="masterlist-toolbar-werbung"
                     onClick={() => {
                       const backTo = location.pathname + location.search
                       navigate(`${rolePrefix}/offer-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
@@ -475,10 +678,11 @@ export function MasterList({ mode }: MasterListProps) {
                   </Button>
                 </>
               )}
-              {mode !== 'viewer' && (
+              {mode !== 'viewer' && !snapshotReadOnly && (
                 <Button
                   variant="outline"
                   size="sm"
+                  data-tour="masterlist-toolbar-umbenennen"
                   onClick={() => {
                     const backTo = location.pathname + location.search
                     navigate(`${rolePrefix}/renamed-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
@@ -488,10 +692,11 @@ export function MasterList({ mode }: MasterListProps) {
                   Umbenennen
                 </Button>
               )}
-              {sortMode === 'BY_BLOCK' && (
+              {sortMode === 'BY_BLOCK' && !snapshotReadOnly && (
                 <Button
                   variant="outline"
                   size="sm"
+                  data-tour="masterlist-toolbar-warengruppen"
                   onClick={() => {
                     const backTo = location.pathname + location.search
                     navigate(`${rolePrefix}/obst-warengruppen?backTo=${encodeURIComponent(backTo)}`, {
@@ -503,7 +708,12 @@ export function MasterList({ mode }: MasterListProps) {
                   Warengruppen
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={() => setShowPDFDialog(true)}>
+              <Button
+                variant="outline"
+                size="sm"
+                data-tour="masterlist-toolbar-pdf"
+                onClick={() => setShowPDFDialog(true)}
+              >
                 <FileDown className="h-4 w-4 mr-1" />
                 PDF
               </Button>
@@ -513,7 +723,7 @@ export function MasterList({ mode }: MasterListProps) {
               <Button
                 variant="outline"
                 size="sm"
-                className="shrink-0 sm:hidden"
+                className="shrink-0 lg:hidden"
                 onClick={() => setShowPDFDialog(true)}
               >
                 <FileDown className="h-4 w-4 mr-1" />
@@ -522,6 +732,35 @@ export function MasterList({ mode }: MasterListProps) {
             )}
           </div>
         )}
+
+        {currentVersion &&
+          !isLoading &&
+          !snapshotInvalid &&
+          !hasNoVersion &&
+          storeObstNameOverrides.length > 0 &&
+          sortMode === 'ALPHABETICAL' && (
+            <Alert data-testid="masterlist-wg-sort-hint">
+              <Info className="h-4 w-4" />
+              <AlertTitle>Markt-Zuordnungen zu Warengruppen</AlertTitle>
+              <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span>
+                  Für diesen Markt gibt es Zuordnungen aus der Warengruppen-Workbench. Bei Sortierung{' '}
+                  <strong>Alphabetisch (A–Z)</strong> erscheinen keine Warengruppen-Abschnitte – Artikel stehen nur
+                  alphabetisch. Stellen Sie in den Layout-Einstellungen (Obst) die Sortierung auf{' '}
+                  <strong>Nach Warengruppen</strong>, um Gruppen und Zuordnungen wie in der Workbench zu sehen.
+                </span>
+                {(rolePrefix === '/admin' || rolePrefix === '/super-admin') && !snapshotReadOnly ? (
+                  <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-center" asChild>
+                    <Link to={`${rolePrefix}/layout`}>Layout-Einstellungen (Obst)</Link>
+                  </Button>
+                ) : (
+                  <span className="text-sm text-muted-foreground shrink-0">
+                    Bitte eine Person mit Admin-Rechten: Sortierung „Nach Warengruppen“ im Layout (Obst) setzen.
+                  </span>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
 
         {/* === Keine Version vorhanden === */}
         {hasNoVersion && (
@@ -543,7 +782,7 @@ export function MasterList({ mode }: MasterListProps) {
         )}
 
         {/* === Loading State (inkl. Refetch nach transientem Fehler) === */}
-        {(isLoading || (itemsError && itemsRefetching)) && !hasNoVersion && (
+        {(isLoading || (itemsError && itemsRefetching)) && !hasNoVersion && !snapshotInvalid && (
           <Card>
             <CardContent className="p-6 space-y-3">
               <div className="flex gap-4">
@@ -561,7 +800,7 @@ export function MasterList({ mode }: MasterListProps) {
         )}
 
         {/* === Error State – nur wenn nicht gerade Refetch (verhindert kurzes Aufblitzen bei transientem Fehler) === */}
-        {itemsError && !isLoading && !itemsRefetching && !hasNoVersion && (
+        {itemsError && !isLoading && !itemsRefetching && !hasNoVersion && !snapshotInvalid && (
           <Card>
             <CardContent className="flex items-center gap-4 p-6">
               <AlertCircle className="h-8 w-8 text-destructive shrink-0" />
@@ -580,7 +819,7 @@ export function MasterList({ mode }: MasterListProps) {
         )}
 
         {/* === Leerer Zustand === */}
-        {!isLoading && !itemsError && !hasNoVersion && displayItems.length === 0 && rawItems.length === 0 && (
+        {!isLoading && !itemsError && !hasNoVersion && !snapshotInvalid && displayItems.length === 0 && rawItems.length === 0 && (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <ListFilter className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -595,7 +834,7 @@ export function MasterList({ mode }: MasterListProps) {
         )}
 
         {/* === PLU-Tabelle === */}
-        {!isLoading && !itemsError && !hasNoVersion && (displayItems.length > 0 || rawItems.length > 0) && (
+        {!isLoading && !itemsError && !hasNoVersion && !snapshotInvalid && (displayItems.length > 0 || rawItems.length > 0) && (
           <>
             <PLUTable
               ref={pluTableRef}
@@ -604,6 +843,7 @@ export function MasterList({ mode }: MasterListProps) {
               sortMode={sortMode}
               flowDirection={flowDirection}
               blocks={blocks}
+              obstStoreBlockOrder={storeObstBlockOrder}
               fontSizes={fontSizes}
               showFindInPage
               findInPageExternalTrigger
@@ -623,14 +863,15 @@ export function MasterList({ mode }: MasterListProps) {
             onOpenChange={setShowPDFDialog}
             items={pdfDisplayItems}
             stats={pdfStats}
-            kwLabel={versionDisplayKwLabel}
+            kwLabel={pdfExportKwLabel || versionDisplayKwLabel}
             displayMode={displayMode}
             sortMode={sortMode}
             flowDirection={flowDirection}
             blocks={blocks}
-            versions={[]}
-            selectedVersionId={undefined}
-            onVersionChange={undefined}
+            obstStoreBlockOrder={storeObstBlockOrder}
+            versions={versions}
+            selectedVersionId={pdfExportVersionId}
+            onVersionChange={snapshotReadOnly ? undefined : setPdfExportVersionId}
             fontSizes={fontSizes}
             showWeekMonSat={showWeekMonSat}
           />

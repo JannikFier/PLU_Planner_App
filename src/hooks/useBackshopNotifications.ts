@@ -1,13 +1,26 @@
 // Backshop-Benachrichtigungen: backshop_version_notifications, neue/geänderte Backshop-Items
 
+import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase, queryRest, queryRestCount } from '@/lib/supabase'
+import { supabase, queryRest, queryRestCount, isTestModeActive } from '@/lib/supabase'
+import {
+  getVersionNotificationsUpsertMode,
+  isLegacyOnConflictConstraintError,
+  setVersionNotificationsUpsertMode,
+} from '@/lib/supabase-upsert-on-conflict-fallback'
+import { ensureProfileCurrentStoreId } from '@/lib/ensure-profile-current-store'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { toast } from 'sonner'
 import type { Database, BackshopMasterPLUItem, BackshopVersionNotification } from '@/types/database'
+import { useBackshopVersions } from '@/hooks/useBackshopVersions'
+import { getPreviousVersionId } from '@/lib/version-plu-diff'
+import {
+  filterDirectManualBackshopSupplements,
+  mergeBackshopNotificationNeuRows,
+} from '@/lib/notification-neu-tab-merge'
 
 /** Anzahl neuer + geänderter Produkte in der aktiven Backshop-Version (für Badge) */
 export function useBackshopActiveVersionChangeCount() {
@@ -85,42 +98,124 @@ export function useBackshopMarkNotificationRead() {
     mutationFn: async (versionId: string) => {
       if (!user) throw new Error('Nicht eingeloggt')
       if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
-      const { error } = await supabase
-        .from('backshop_version_notifications')
-        .update(
-        ({
-          is_read: true,
-          read_at: new Date().toISOString(),
-        } as Database['public']['Tables']['backshop_version_notifications']['Update']) as never
+
+      if (isTestModeActive()) {
+        const readAt = new Date().toISOString()
+        queryClient.setQueryData<BackshopVersionNotification | null>(
+          ['backshop-version-notification', versionId, currentStoreId],
+          (old) => {
+            if (old) return { ...old, is_read: true, read_at: readAt }
+            return {
+              id: crypto.randomUUID(),
+              user_id: user.id,
+              version_id: versionId,
+              is_read: true,
+              read_at: readAt,
+              created_at: readAt,
+              store_id: currentStoreId,
+            }
+          },
         )
-        .eq('user_id', user.id)
-        .eq('version_id', versionId)
-        .eq('store_id', currentStoreId)
+        queryClient.setQueryData<number>(['backshop-notification-count', currentStoreId], (n) =>
+          typeof n === 'number' ? Math.max(0, n - 1) : 0,
+        )
+        return
+      }
+
+      await ensureProfileCurrentStoreId(user.id, currentStoreId)
+
+      const readAt = new Date().toISOString()
+      const row = {
+        user_id: user.id,
+        version_id: versionId,
+        store_id: currentStoreId,
+        is_read: true,
+        read_at: readAt,
+      } as Database['public']['Tables']['backshop_version_notifications']['Insert'] as never
+
+      const mode = getVersionNotificationsUpsertMode()
+      let error: { message: string; code?: string } | null = null
+
+      if (mode === 'legacy') {
+        let r = await supabase
+          .from('backshop_version_notifications')
+          .upsert(row, { onConflict: 'user_id,version_id' })
+        if (r.error && isLegacyOnConflictConstraintError(r.error)) {
+          setVersionNotificationsUpsertMode('triple')
+          r = await supabase
+            .from('backshop_version_notifications')
+            .upsert(row, { onConflict: 'user_id,version_id,store_id' })
+        }
+        error = r.error
+      } else {
+        let r = await supabase
+          .from('backshop_version_notifications')
+          .upsert(row, { onConflict: 'user_id,version_id,store_id' })
+        if (r.error && isLegacyOnConflictConstraintError(r.error)) {
+          setVersionNotificationsUpsertMode('legacy')
+          r = await supabase
+            .from('backshop_version_notifications')
+            .upsert(row, { onConflict: 'user_id,version_id' })
+        }
+        error = r.error
+      }
+
       if (error) throw error
     },
     onSuccess: (_, versionId) => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-notification-count', currentStoreId] })
-      queryClient.invalidateQueries({ queryKey: ['backshop-version-notification', versionId, currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['backshop-notification-count', currentStoreId] })
+        queryClient.invalidateQueries({ queryKey: ['backshop-version-notification', versionId, currentStoreId] })
+        queryClient.invalidateQueries({ queryKey: ['unread-notifications', currentStoreId] })
+      }
     },
     onError: (err) => {
-      toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
+      const em = err as { message?: string }
+      toast.error(`Fehler: ${err instanceof Error ? err.message : em.message?.trim() || 'Unbekannt'}`)
     },
   })
 }
 
-/** Neue Produkte einer Backshop-Version (NEW_PRODUCT_YELLOW) */
+/**
+ * Tab „Neu“ (Backshop): alle `NEW_PRODUCT_YELLOW` plus direkt angelegte manuelle Nachbesserungen
+ * mit `UNCHANGED`, ohne Carryover (PLU war in Vorversion schon `source=manual`).
+ */
 export function useBackshopNewProducts(versionId: string | undefined) {
+  const { data: versions = [] } = useBackshopVersions()
+  const previousId = useMemo(
+    () => getPreviousVersionId(versions, versionId),
+    [versions, versionId],
+  )
+
   return useQuery({
-    queryKey: ['backshop-new-products', versionId],
+    queryKey: ['backshop-notification-neu-tab', versionId, previousId],
     queryFn: async () => {
       if (!versionId) return []
-      const data = await queryRest<BackshopMasterPLUItem[]>('backshop_master_plu_items', {
-        select: '*',
-        version_id: `eq.${versionId}`,
-        status: 'eq.NEW_PRODUCT_YELLOW',
-        order: 'system_name.asc',
-      })
-      return data ?? []
+
+      const [yellow, manual, prevManualRows] = await Promise.all([
+        queryRest<BackshopMasterPLUItem[]>('backshop_master_plu_items', {
+          select: '*',
+          version_id: `eq.${versionId}`,
+          status: 'eq.NEW_PRODUCT_YELLOW',
+        }),
+        queryRest<BackshopMasterPLUItem[]>('backshop_master_plu_items', {
+          select: '*',
+          version_id: `eq.${versionId}`,
+          source: 'eq.manual',
+          status: 'eq.UNCHANGED',
+        }),
+        previousId
+          ? queryRest<{ plu: string }[]>('backshop_master_plu_items', {
+              select: 'plu',
+              version_id: `eq.${previousId}`,
+              source: 'eq.manual',
+            })
+          : Promise.resolve([] as { plu: string }[]),
+      ])
+
+      const prevSet = previousId ? new Set((prevManualRows ?? []).map((r) => r.plu)) : null
+      const directManual = filterDirectManualBackshopSupplements(manual ?? [], prevSet)
+      return mergeBackshopNotificationNeuRows(yellow ?? [], directManual)
     },
     enabled: !!versionId,
     staleTime: 30 * 1000,

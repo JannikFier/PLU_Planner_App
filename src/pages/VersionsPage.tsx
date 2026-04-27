@@ -29,8 +29,10 @@ import {
 import { Eye, Trash2, Loader2 } from 'lucide-react'
 
 import { useVersions } from '@/hooks/useVersions'
+import { useObstOfferCampaignsAdminList } from '@/hooks/useCentralOfferCampaigns'
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/types/database'
+import { formatKWLabel } from '@/lib/plu-helpers'
 
 /** Hook: Version löschen (inkl. aktive – dann wird die nächste zur aktiven) */
 function useDeleteVersion() {
@@ -174,7 +176,7 @@ export function VersionsPage() {
                             size="icon"
                             title="Ansehen"
                             aria-label="Ansehen"
-                            onClick={() => navigate('/super-admin/masterlist')}
+                            onClick={() => navigate(`/super-admin/masterlist/version/${version.id}`)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -198,6 +200,8 @@ export function VersionsPage() {
           </CardContent>
         </Card>
 
+        <ObstCampaignsCard />
+
         <AlertDialog open={!!versionToDelete} onOpenChange={(open) => !open && setVersionToDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -219,5 +223,129 @@ export function VersionsPage() {
         </AlertDialog>
       </div>
     </DashboardLayout>
+  )
+}
+
+/**
+ * Karte "Alle Werbungen" – pro KW je eine Zeile mit Buttons fuer Wochenwerbung
+ * und 3-Tagespreis. Fuehrt auf die Edit-Seite der jeweiligen Kampagne.
+ */
+function ObstCampaignsCard() {
+  const navigate = useNavigate()
+  const { data: campaigns = [], isLoading } = useObstOfferCampaignsAdminList()
+
+  type Row = {
+    key: string
+    kw: number
+    jahr: number
+    week?: { assigned: number; total: number; updated: string }
+    threeDay?: { assigned: number; total: number; updated: string }
+  }
+
+  const rowsMap = new Map<string, Row>()
+  for (const c of campaigns) {
+    const k = `${c.jahr}-${c.kw_nummer}`
+    if (!rowsMap.has(k)) {
+      rowsMap.set(k, { key: k, kw: c.kw_nummer, jahr: c.jahr })
+    }
+    const r = rowsMap.get(k)!
+    if (c.campaign_kind === 'ordersatz_week') {
+      r.week = { assigned: c.assigned_lines, total: c.total_lines, updated: c.created_at }
+    } else if (c.campaign_kind === 'ordersatz_3day') {
+      r.threeDay = { assigned: c.assigned_lines, total: c.total_lines, updated: c.created_at }
+    }
+  }
+  const rows = Array.from(rowsMap.values()).sort(
+    (a, b) => (b.jahr - a.jahr) || (b.kw - a.kw),
+  )
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Alle Werbungen</CardTitle>
+        <CardDescription>
+          Zentral hochgeladene Werbungen pro Kalenderwoche. Hier kannst du nachträglich PLUs
+          korrigieren, „keine Zuordnung" setzen oder eigene Zeilen ergänzen.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Laden…
+          </div>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Noch keine zentrale Werbung hochgeladen. Lade eine Excel-Datei über „Zentrale Obst- &amp; Gemüse-Werbung" hoch.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>KW</TableHead>
+                <TableHead>Wochenwerbung</TableHead>
+                <TableHead>3-Tagespreis</TableHead>
+                <TableHead>Zuletzt aktualisiert</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r) => {
+                const latest = [r.week?.updated, r.threeDay?.updated]
+                  .filter(Boolean)
+                  .sort()
+                  .reverse()[0]
+                return (
+                  <TableRow key={r.key}>
+                    <TableCell className="font-medium">{formatKWLabel(r.kw, r.jahr)}</TableCell>
+                    <TableCell>
+                      {r.week ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            navigate(
+                              `/super-admin/versions/werbung/obst/${r.kw}/${r.jahr}/wochenwerbung`,
+                            )
+                          }
+                        >
+                          {r.week.assigned} Artikel ansehen
+                          {r.week.total > r.week.assigned
+                            ? ` (+${r.week.total - r.week.assigned} offen)`
+                            : ''}
+                        </Button>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">nicht hochgeladen</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {r.threeDay ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            navigate(
+                              `/super-admin/versions/werbung/obst/${r.kw}/${r.jahr}/dreitagespreis`,
+                            )
+                          }
+                        >
+                          {r.threeDay.assigned} Artikel ansehen
+                          {r.threeDay.total > r.threeDay.assigned
+                            ? ` (+${r.threeDay.total - r.threeDay.assigned} offen)`
+                            : ''}
+                        </Button>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">nicht hochgeladen</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {latest ? formatDate(latest) : '–'}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   )
 }

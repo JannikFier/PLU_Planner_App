@@ -68,6 +68,36 @@ export function getKWAndYearFromDate(date: Date): { kw: number; year: number } {
   }
 }
 
+/**
+ * Backshop Zentralwerbung: Ankerdatum für die ISO-KW-Ermittlung.
+ * Handelsübliche Woche Mo–Sa: ab **Sonntag** 00:00 und ab **Samstag** ≥ 23:59 (lokal)
+ * wird die **folgende** ISO-KW verwendet (Anker = kommender Montag 12:00).
+ */
+export function getBackshopWerbungAnchorDate(now: Date): Date {
+  const y = now.getFullYear()
+  const mo = now.getMonth()
+  const d = now.getDate()
+  const day = now.getDay()
+  const h = now.getHours()
+  const min = now.getMinutes()
+  const saturdayLate = day === 6 && (h > 23 || (h === 23 && min >= 59))
+  const sunday = day === 0
+  if (!sunday && !saturdayLate) return now
+
+  const out = new Date(y, mo, d, 12, 0, 0, 0)
+  if (sunday) {
+    out.setDate(d + 1)
+  } else {
+    out.setDate(d + 2)
+  }
+  return out
+}
+
+/** ISO-KW/-Jahr für Backshop-Werbung unter Berücksichtigung von {@link getBackshopWerbungAnchorDate}. */
+export function getBackshopWerbungKwYearFromDate(now: Date): { kw: number; year: number } {
+  return getKWAndYearFromDate(getBackshopWerbungAnchorDate(now))
+}
+
 /** Kurzformat „KW 12 · 2026“ für Toolbars und Dialoge. */
 export function formatKwDotYear(kw: number, year: number): string {
   return `KW ${kw} · ${year}`
@@ -97,6 +127,110 @@ export function formatBackshopActiveListToolbarRange(
     return `KW ${uploadKw} – KW ${todayKw} · ${todayYear}`
   }
   return `${formatKwDotYear(uploadKw, uploadYear)} – ${formatKwDotYear(todayKw, todayYear)}`
+}
+
+/**
+ * Vergleicht zwei ISO-Kalenderwochen (KW + ISO-Jahr). Negativ wenn a &lt; b, 0 wenn gleich, positiv wenn a &gt; b.
+ */
+export function compareIsoWeekPair(
+  kwA: number,
+  yearA: number,
+  kwB: number,
+  yearB: number,
+): number {
+  const mondayA = startOfISOWeek(setISOWeek(setISOWeekYear(new Date(), yearA), kwA))
+  const mondayB = startOfISOWeek(setISOWeek(setISOWeekYear(new Date(), yearB), kwB))
+  return compareAsc(mondayA, mondayB)
+}
+
+/**
+ * Zerlegung der Toolbar-Zeile für Backshop: die „hintere“ KW ist die vorgesehene Stelle für die Werbungs-Auswahl.
+ * `endKw`/`endYear` = gewähltes Ende (Kalender oder Vorschau-KW).
+ */
+export type BackshopToolbarWerbungLayout =
+  | {
+      variant: 'single_line'
+      prefixBeforeKw: string
+      highlightKw: number
+      suffixAfterKw: string
+    }
+  | {
+      variant: 'range_same_year'
+      prefixBeforeEndKw: string
+      endKw: number
+      suffix: string
+    }
+  | {
+      variant: 'range_cross_year'
+      leftFixed: string
+      endKw: number
+      suffix: string
+    }
+
+export function getBackshopToolbarWerbungLayout(
+  uploadKw: number,
+  uploadYear: number,
+  endKw: number,
+  endYear: number,
+): BackshopToolbarWerbungLayout {
+  const uploadMonday = startOfISOWeek(setISOWeek(setISOWeekYear(new Date(), uploadYear), uploadKw))
+  const endMonday = startOfISOWeek(setISOWeek(setISOWeekYear(new Date(), endYear), endKw))
+  if (compareAsc(endMonday, uploadMonday) < 0) {
+    return {
+      variant: 'single_line',
+      prefixBeforeKw: 'KW ',
+      highlightKw: uploadKw,
+      suffixAfterKw: ` · ${uploadYear}`,
+    }
+  }
+  if (uploadKw === endKw && uploadYear === endYear) {
+    return {
+      variant: 'single_line',
+      prefixBeforeKw: 'KW ',
+      highlightKw: uploadKw,
+      suffixAfterKw: ` · ${uploadYear}`,
+    }
+  }
+  if (uploadYear === endYear) {
+    return {
+      variant: 'range_same_year',
+      prefixBeforeEndKw: `KW ${uploadKw} – KW `,
+      endKw,
+      suffix: ` · ${endYear}`,
+    }
+  }
+  return {
+    variant: 'range_cross_year',
+    leftFixed: `${formatKwDotYear(uploadKw, uploadYear)} – KW `,
+    endKw,
+    suffix: ` · ${endYear}`,
+  }
+}
+
+/**
+ * Kurztext wie in der Backshop-Toolbar (eingespielte Liste bis gewählte Werbungs-KW), für PDF-Titel und Dateiname.
+ * Bei `showWeekMonSat` wie Toolbar: Mo–Sa nur zur **Listen**-KW (eingespielter Stand).
+ */
+export function formatBackshopWerbungContextPlainLabel(
+  uploadKw: number,
+  uploadYear: number,
+  endKw: number,
+  endYear: number,
+  showWeekMonSat: boolean,
+): string {
+  const layout = getBackshopToolbarWerbungLayout(uploadKw, uploadYear, endKw, endYear)
+  let core: string
+  if (layout.variant === 'single_line') {
+    core = `${layout.prefixBeforeKw}${layout.highlightKw}${layout.suffixAfterKw}`
+  } else if (layout.variant === 'range_same_year') {
+    core = `${layout.prefixBeforeEndKw}${layout.endKw}${layout.suffix}`
+  } else {
+    core = `${layout.leftFixed}${layout.endKw}${layout.suffix}`
+  }
+  if (showWeekMonSat) {
+    return `${core} · ${formatIsoWeekMondayToSaturdayDe(uploadKw, uploadYear)}`
+  }
+  return core
 }
 
 /**

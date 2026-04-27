@@ -14,6 +14,7 @@ export const DashboardCard = React.memo(function DashboardCard({
   onClick,
   color,
   bg,
+  dataTour,
 }: {
   title: string
   description: string
@@ -21,11 +22,13 @@ export const DashboardCard = React.memo(function DashboardCard({
   onClick: () => void
   color: string
   bg: string
+  dataTour?: string
 }) {
   return (
     <Card
       className="cursor-pointer transition-all hover:shadow-md hover:border-primary/20"
       onClick={onClick}
+      {...(dataTour ? { 'data-tour': dataTour } : {})}
     >
       <CardHeader className="flex flex-row items-center gap-4 pb-2">
         <div className={cn('rounded-lg p-3', bg)}>

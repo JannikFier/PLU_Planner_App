@@ -25,8 +25,13 @@ export const PERSIST_QUERY_KEY_PREFIXES: readonly string[] = [
   'renamed-items',
   'offer-items',
   'obst-offer-campaign',
+  'obst-offer-campaigns-admin',
+  'obst-offer-campaign-detail',
   'obst-offer-store-disabled',
   'backshop-offer-campaign',
+  'backshop-offer-campaign-slots',
+  'backshop-offer-campaigns-admin',
+  'backshop-offer-campaign-detail',
   'backshop-offer-store-disabled',
   'bezeichnungsregeln',
   'store-obst-block-order',
@@ -37,7 +42,7 @@ export const PERSIST_QUERY_KEY_PREFIXES: readonly string[] = [
   'notification-count',
   'version-notification',
   'unread-notifications',
-  'new-products',
+  'obst-notification-neu-tab',
   'changed-products',
   'all-profiles',
   'profiles-hidden-by',
@@ -65,8 +70,14 @@ export const PERSIST_QUERY_KEY_PREFIXES: readonly string[] = [
   'backshop-active-version-change-count',
   'backshop-notification-count',
   'backshop-version-notification',
-  'backshop-new-products',
+  'backshop-notification-neu-tab',
   'backshop-changed-products',
+  'store-list-carryover',
+  'transition-removed',
+  // Backshop Multi-Source
+  'backshop-product-groups',
+  'backshop-source-choices',
+  'backshop-source-rules',
 ] as const
 
 const ALLOWED_SET = new Set<string>(PERSIST_QUERY_KEY_PREFIXES)

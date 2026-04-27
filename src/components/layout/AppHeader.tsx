@@ -22,7 +22,22 @@ import {
   DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { LogOut, Settings, User, Shield, Crown, ChevronLeft, Eye, Store, FlaskConical } from 'lucide-react'
+import {
+  LogOut,
+  Settings,
+  User,
+  Shield,
+  Crown,
+  ChevronLeft,
+  Eye,
+  Store,
+  FlaskConical,
+  GraduationCap,
+  Sparkles,
+  RotateCcw,
+  Play,
+  X as XIcon,
+} from 'lucide-react'
 import { useTestMode } from '@/contexts/TestModeContext'
 import { UnifiedNotificationBell } from '@/components/plu/UnifiedNotificationBell'
 import { AppBrandLogo } from '@/components/layout/AppBrandLogo'
@@ -30,8 +45,12 @@ import { APP_BRAND_NAME } from '@/lib/brand'
 import {
   ADMIN_PATHS_WITH_OPTIONAL_BACK_TO,
   isSafeAdminBackToTarget,
+  isSafeSuperAdminBackToTarget,
 } from '@/lib/admin-back-navigation'
 import { cn } from '@/lib/utils'
+import { useTutorialOrchestrator } from '@/hooks/useTutorialOrchestrator'
+import { TutorialChecklistPopover } from '@/components/tutorial/TutorialChecklistPopover'
+import { shouldShowNotificationBell } from '@/lib/notification-bell-visibility'
 
 /**
  * App Header – wird auf allen geschützten Seiten angezeigt.
@@ -44,6 +63,13 @@ export function AppHeader() {
   const effectiveRole = useEffectiveRouteRole()
   const [userPreviewDialogOpen, setUserPreviewDialogOpen] = useState(false)
   const { isTestMode, enableTestMode, setShowExitConfirm } = useTestMode()
+  const {
+    isActive: tutorialActive,
+    repeatIntroduction,
+    payload: tutorialPayload,
+    availableModules: tutorialModules,
+    replayModule: tutorialReplayModule,
+  } = useTutorialOrchestrator()
   const { storeName, isAdminDomain, currentStoreId } = useCurrentStore()
   const { data: userStoreAccess } = useStoreAccessByUser(user?.id)
   const { data: allStores } = useAllStores()
@@ -81,8 +107,8 @@ export function AppHeader() {
   const USER_OBST_SUB = ['/user/custom-products', '/user/hidden-products', '/user/offer-products', '/user/renamed-products', '/user/hidden-items', '/user/obst-warengruppen']
   const ADMIN_OBST_SUB = ['/admin/custom-products', '/admin/hidden-products', '/admin/offer-products', '/admin/renamed-products', '/admin/hidden-items', '/admin/obst-warengruppen']
   // Backshop-Unter-Seiten → Zurück zur Backshop-Liste
-  const USER_BACKSHOP_SUB = ['/user/backshop-custom-products', '/user/backshop-hidden-products', '/user/backshop-offer-products', '/user/backshop-renamed-products']
-  const ADMIN_BACKSHOP_SUB = ['/admin/backshop-custom-products', '/admin/backshop-hidden-products', '/admin/backshop-offer-products', '/admin/backshop-renamed-products']
+  const USER_BACKSHOP_SUB = ['/user/backshop-custom-products', '/user/backshop-hidden-products', '/user/backshop-offer-products', '/user/backshop-renamed-products', '/user/marken-auswahl']
+  const ADMIN_BACKSHOP_SUB = ['/admin/backshop-custom-products', '/admin/backshop-hidden-products', '/admin/backshop-offer-products', '/admin/backshop-renamed-products', '/admin/marken-auswahl']
 
   /** Zurück-Ziel für User-Bereich (/user) – Obst-Unter-Seiten → Masterliste, Backshop-Unter-Seiten → Backshop-Liste, Masterliste/Liste → Dashboard */
   function getUserAreaBackTarget(path: string): string | null {
@@ -124,13 +150,20 @@ export function AppHeader() {
     if (path === '/admin/masterlist') return '/admin/obst'
     if (path === '/admin/backshop-list') return '/admin/backshop'
 
-    if (path === '/admin/layout' || path === '/admin/rules' || path === '/admin/block-sort') {
+    if (
+      path === '/admin/layout'
+      || path === '/admin/rules'
+      || path === '/admin/block-sort'
+      || path === '/admin/obst-warengruppen'
+    ) {
       return '/admin/obst/konfiguration'
     }
     if (
       path === '/admin/backshop-layout'
       || path === '/admin/backshop-rules'
       || path === '/admin/backshop-block-sort'
+      || path === '/admin/backshop-warengruppen'
+      || path === '/admin/backshop-gruppenregeln'
     ) {
       return '/admin/backshop/konfiguration'
     }
@@ -143,6 +176,50 @@ export function AppHeader() {
 
   /** Zurueck-Ziel fuer Super-Admin-Bereich – neue Hierarchie mit Upload/Firmen-Trennung */
   function getSuperAdminBackTarget(path: string): string | null {
+    // Backshop-Upload-Assistent (/backshop-upload/:quelle und Schritte) → Quellen-Übersicht
+    // (vor backTo, sonst springt der Kopf-Pfeil z. B. zum Dashboard statt eine Ebene höher)
+    if (path.startsWith('/super-admin/backshop-upload/')) {
+      return '/super-admin/backshop-upload'
+    }
+
+    // Markt-nahe Backshop-Seiten (Masterliste, Konfig, Gruppenregeln, Marken-Auswahl …) → zuerst hier,
+    // damit kein altes / falsches ?backTo= (z. B. Upload) den Kopf-Pfeil in die Upload-Welt schickt.
+    if (path === '/super-admin/backshop-product-groups/neu') {
+      return '/super-admin/backshop-product-groups'
+    }
+
+    // Archiv: KW aus Versionen (Auge) → zurück zur Versionsübersicht
+    if (/^\/super-admin\/backshop-list\/version\/[^/]+$/.test(path)) {
+      return '/super-admin/backshop-versions'
+    }
+
+    const saBackshopMarktUnter = [
+      '/super-admin/backshop-list',
+      '/super-admin/backshop-custom-products',
+      '/super-admin/backshop-hidden-products',
+      '/super-admin/backshop-offer-products',
+      '/super-admin/backshop-renamed-products',
+      '/super-admin/backshop-layout',
+      '/super-admin/backshop-rules',
+      '/super-admin/backshop-block-sort',
+      '/super-admin/backshop-warengruppen',
+      '/super-admin/backshop-gruppenregeln',
+      '/super-admin/marken-auswahl',
+      '/super-admin/backshop-product-groups',
+    ]
+    if (saBackshopMarktUnter.includes(path)) {
+      const saStateBackTo = (location.state as { backTo?: string } | null)?.backTo
+      const saQueryBackTo = new URLSearchParams(location.search).get('backTo')
+      const saBackTo = saStateBackTo || saQueryBackTo
+      if (saBackTo && isSafeSuperAdminBackToTarget(saBackTo)) {
+        return saBackTo
+      }
+      if (path === '/super-admin/backshop-list') {
+        return '/super-admin/backshop'
+      }
+      return '/super-admin/backshop'
+    }
+
     // Wurde von einer Markt-Detailseite hierher navigiert? state oder URL (bleibt nach Reload erhalten)
     const stateBackTo = (location.state as { backTo?: string } | null)?.backTo
     const queryBackTo = new URLSearchParams(location.search).get('backTo')
@@ -167,10 +244,19 @@ export function AppHeader() {
     const backshopGlobalSub = [
       '/super-admin/backshop-upload',
       '/super-admin/backshop-versions',
-      '/super-admin/backshop-warengruppen',
       '/super-admin/central-werbung/backshop',
     ]
     if (backshopGlobalSub.includes(path)) return '/super-admin/backshop'
+
+    // KW-Werbung bearbeiten (Unterseite von Backshop-Versionen)
+    if (path.startsWith('/super-admin/backshop-versions/werbung/')) {
+      return '/super-admin/backshop-versions'
+    }
+
+    // KW-Werbung bearbeiten (Unterseite von Obst-Versionen)
+    if (path.startsWith('/super-admin/versions/werbung/obst/')) {
+      return '/super-admin/versions'
+    }
 
     // Firmen-Verwaltung
     if (path === '/super-admin/companies') return '/super-admin'
@@ -198,9 +284,6 @@ export function AppHeader() {
     // Fallback: Obst-Unterseiten → /super-admin/obst, Backshop → /super-admin/backshop
     const obstSub = ['/super-admin/masterlist', '/super-admin/custom-products', '/super-admin/hidden-products', '/super-admin/offer-products', '/super-admin/renamed-products', '/super-admin/hidden-items', '/super-admin/layout', '/super-admin/rules', '/super-admin/block-sort', '/super-admin/obst-warengruppen']
     if (obstSub.includes(path)) return '/super-admin/obst'
-
-    const backshopSub = ['/super-admin/backshop-list', '/super-admin/backshop-custom-products', '/super-admin/backshop-hidden-products', '/super-admin/backshop-offer-products', '/super-admin/backshop-renamed-products', '/super-admin/backshop-layout', '/super-admin/backshop-rules', '/super-admin/backshop-block-sort']
-    if (backshopSub.includes(path)) return '/super-admin/backshop'
 
     return '/super-admin'
   }
@@ -326,12 +409,68 @@ export function AppHeader() {
             </div>
           )}
 
-          {/* Eine Glocke: Obst + Backshop – nicht für Viewer/Super-Admin (Vorschau: effektive Rolle) */}
-          {effectiveRole !== 'viewer' && effectiveRole !== 'super_admin' && <UnifiedNotificationBell />}
+          {/* Eine Glocke: Obst + Backshop – nicht für Viewer/Super-Admin (Vorschau: effektive Rolle).
+              Bug 3 Fix (PR 2.7): nur auf Routen sichtbar, auf denen sie Listen-/Versions-
+              Notifications zeigen kann. shouldShowNotificationBell kapselt die Whitelist. */}
+          {shouldShowNotificationBell(effectiveRole, location.pathname) && <UnifiedNotificationBell />}
 
-          <DropdownMenu>
+          {/* Onboarding-Checklist-Popover: Status aller Module + Wiederholen-Buttons. */}
+          {tutorialActive && (
+            <TutorialChecklistPopover
+              payload={tutorialPayload}
+              availableModules={tutorialModules}
+              onReplayModule={tutorialReplayModule}
+              onRestartAll={() => void repeatIntroduction('restart')}
+            />
+          )}
+
+          {/* Rundgang-Icon: immer sichtbar, wenn Tutorial-Orchestrator aktiv ist. */}
+          {tutorialActive && (
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Rundgang starten"
+                  title="Rundgang starten"
+                  data-tour="header-tutorial-icon"
+                  className="relative h-9 w-9"
+                >
+                  <Sparkles className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56" data-tour="header-tutorial-content">
+                <DropdownMenuItem
+                  data-tour="header-tutorial-continue"
+                  onClick={() => void repeatIntroduction('continue')}
+                >
+                  <Play className="mr-2 h-4 w-4" />
+                  Weiter wo ich war
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-tour="header-tutorial-restart"
+                  onClick={() => void repeatIntroduction('restart')}
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Von vorn starten
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  data-tour="header-tutorial-cancel"
+                  onClick={() => {
+                    /* Schließen reicht – kein Side-Effect */
+                  }}
+                >
+                  <XIcon className="mr-2 h-4 w-4" />
+                  Abbrechen
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+              <Button variant="ghost" className="relative h-9 w-9 rounded-full" data-tour="profile-menu">
                 <Avatar className="h-9 w-9">
                   <AvatarFallback className={cn(
                     'text-sm font-medium',
@@ -342,7 +481,7 @@ export function AppHeader() {
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-56" data-tour="header-profile-content">
               <div className="flex items-center justify-start gap-2 p-2">
                 <div className="flex flex-col space-y-0.5">
                   <p className="text-sm font-medium">
@@ -378,7 +517,10 @@ export function AppHeader() {
 
               {/* Admin (nicht Super-Admin): nur Admin-Bereich */}
               {isAdmin && !isSuperAdmin && (
-                <DropdownMenuItem onClick={() => navigate('/admin')}>
+                <DropdownMenuItem
+                  data-tour="header-admin-area"
+                  onClick={() => navigate('/admin')}
+                >
                   <Settings className="mr-2 h-4 w-4" />
                   Admin-Bereich
                 </DropdownMenuItem>
@@ -386,13 +528,16 @@ export function AppHeader() {
 
               {/* Testmodus-Toggle (Viewer und Vorschau-Viewer ausblenden) */}
               {effectiveRole !== 'viewer' && (
-                <DropdownMenuItem onClick={() => {
-                  if (isTestMode) {
-                    setShowExitConfirm(true)
-                  } else {
-                    enableTestMode()
-                  }
-                }}>
+                <DropdownMenuItem
+                  data-tour="header-testmode-menu-item"
+                  onClick={() => {
+                    if (isTestMode) {
+                      setShowExitConfirm(true)
+                    } else {
+                      enableTestMode()
+                    }
+                  }}
+                >
                   <FlaskConical className="mr-2 h-4 w-4" />
                   {isTestMode ? 'Testmodus beenden' : 'Testmodus starten'}
                 </DropdownMenuItem>
@@ -401,7 +546,7 @@ export function AppHeader() {
               {/* Markt wechseln (nur wenn User mehrere Maerkte hat) */}
               {showStoreSwitcher && (
                 <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
+                  <DropdownMenuSubTrigger data-tour="header-store-switcher">
                     <Store className="mr-2 h-4 w-4" />
                     Markt wechseln
                   </DropdownMenuSubTrigger>
@@ -426,7 +571,20 @@ export function AppHeader() {
               )}
 
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+              {tutorialActive && (!isSuperAdmin || inSuperAdminPreview) && (
+                <DropdownMenuItem
+                  data-tour="header-replay-intro"
+                  onClick={() => void repeatIntroduction()}
+                >
+                  <GraduationCap className="mr-2 h-4 w-4" />
+                  Einführung wiederholen
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                data-tour="header-logout"
+                onClick={handleLogout}
+                className="text-destructive"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 Abmelden
               </DropdownMenuItem>

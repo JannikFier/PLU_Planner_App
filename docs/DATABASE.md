@@ -324,19 +324,28 @@ Manuelle Werbung: Laufzeit in Wochen (1–4), Start = aktuelle KW beim Anlegen. 
 | `created_by` | UUID (FK → profiles) | Wer hat hinzugefügt |
 | `created_at` | TIMESTAMPTZ | Angelegt am |
 
-**Zentrale Werbung (global, nicht in dieser Tabelle dupliziert):** `obst_offer_campaigns` mit `campaign_kind` (`exit` | `ordersatz_week` | `ordersatz_3day`), **UNIQUE (kw_nummer, jahr, campaign_kind)**; `obst_offer_campaign_lines` (PLU + Aktionspreis); `obst_offer_store_disabled` (Megafon aus pro `store_id` + `plu`). Migrationen 050, 053.
+**Zentrale Werbung (global, nicht in dieser Tabelle dupliziert):** `obst_offer_campaigns` mit `campaign_kind` (`exit` | `ordersatz_week` | `ordersatz_3day`), **UNIQUE (kw_nummer, jahr, campaign_kind)**; `obst_offer_campaign_lines` (PLU + Aktionspreis + Herkunftsarchiv: `source_plu`, `source_artikel`, `origin`); `obst_offer_store_disabled` (Megafon aus pro `store_id` + `plu`). Migrationen 050, 053, 058.
+
+**Herkunftsarchiv je Werbungszeile (Migration 058):** `obst_offer_campaign_lines` und `backshop_offer_campaign_lines` haben jeweils:
+- `source_plu TEXT NULL` – PLU wie in der Excel aufgetaucht (oder `NULL` wenn Zeile manuell ergänzt wurde bzw. bei alten Kampagnen vor der Migration).
+- `source_artikel TEXT NULL` – Artikel-Hinweis aus der Excel (oder `NULL`).
+- `origin TEXT NOT NULL DEFAULT 'excel'` mit CHECK auf `('excel','manual','unassigned')`. Semantik: `excel` = aus Upload zugeordnet, `manual` = nachträglich in der Edit-Seite hinzugefügt, `unassigned` = Zeile aus Excel ohne Master-PLU (bleibt im Archiv, zählt **nicht** für die Marktliste).
+- `plu` ist jetzt **nullable**: exakt `plu IS NULL ↔ origin = 'unassigned'` (zusätzlicher CHECK).
+- UNIQUE-Schlüssel: `(campaign_id, sort_index)` statt `(campaign_id, plu)` – damit keine Konflikte bei null-PLU oder doppelten Source-PLUs entstehen.
+Lesen für die Marktlisten filtert Zeilen mit `plu IS NULL` bzw. `origin = 'unassigned'` raus; nur die Edit-Seite (Super-Admin) sieht sie.
 
 **RLS:** Lesen für alle Auth-User; Einfügen/Löschen/Update nur für User, Admin, Super-Admin (nicht Viewer). Kampagnen: nur Super-Admin schreiben (siehe Migration 050).
 
 ### version_notifications (NEU – Runde 2)
 
-Pro User pro Version eine Benachrichtigung (gelesen/ungelesen).
+Pro User, Version und **Markt** (`store_id`) ein Eintrag (gelesen/ungelesen). **UNIQUE** `(user_id, version_id, store_id)` – Migration **066** (früher nur user+version, Konflikt bei Marktwechsel).
 
 | Feld | Typ | Beschreibung |
 |------|-----|-------------|
 | `id` | UUID (PK) | Notification-ID |
 | `user_id` | UUID (FK → profiles) | Für welchen User |
 | `version_id` | UUID (FK → versions) | Für welche Version |
+| `store_id` | UUID (FK → stores) | Markt |
 | `is_read` | BOOLEAN | Gelesen? |
 | `read_at` | TIMESTAMPTZ | Wann gelesen |
 | `created_at` | TIMESTAMPTZ | Erstellt am |
@@ -417,3 +426,5 @@ Die Datenbank wird über nummerierte SQL-Scripts aufgebaut:
 13. **019_retention_keep_3_versions.sql** – Retention: Es werden nur die 3 neuesten Versionen (Jahr/KW) behalten; ältere werden täglich gelöscht. KW-Switch setzt beim Einfrieren kein delete_after mehr.
 … (020–042 u. a. Multi-Tenancy, RLS, Backshop, Publish-Lock)
 43. **043_profiles_update_allow_super_admin_store.sql** – profiles UPDATE: Super-Admins dürfen current_store_id auf beliebigen Markt setzen (sie haben oft keinen user_store_access; sonst 500 beim Markt-Wechsel).
+44. **059_backshop_multi_source.sql** – Backshop Multi-Source (Edeka/Harry/Aryzta): `source`-Spalte in `backshop_master_plu_items` (default `edeka`) + Unique `(version_id, source, plu)`; neue Tabellen `backshop_product_groups`, `backshop_product_group_members (group_id, plu, source)`, `backshop_source_choice_per_store (store_id, group_id, chosen_sources[])` und `backshop_source_rules_per_store (store_id, block_id, preferred_source)` inkl. RLS. Siehe [BACKSHOP_MULTI_SOURCE.md](BACKSHOP_MULTI_SOURCE.md).
+45. **060_publish_row_lock.sql** – Publish-Sperre: `acquire_publish_lock` / `release_publish_lock` nutzen die Tabelle `publish_connection_locks` (TTL 10 Minuten) statt Session-`pg_advisory_lock`, damit parallele HTTP-Requests über den PostgREST-Connection-Pool die Sperre zuverlässig freigeben (Migration 042 bleibt historisch; Funktionen werden ersetzt).

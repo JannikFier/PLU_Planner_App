@@ -1,7 +1,7 @@
 // Hook: Layout-Einstellungen laden + aktualisieren (pro Markt)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { queryRest } from '@/lib/supabase'
+import { queryRest, isTestModeActive } from '@/lib/supabase'
 import { updateLayoutSettingsTableWithWeekColumnFallback } from '@/lib/supabase-layout-settings-update'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import type { LayoutSettings } from '@/types/database'
@@ -92,6 +92,14 @@ export function useUpdateLayoutSettings() {
 
       if (!currentStoreId) {
         throw new Error('Kein Markt ausgewählt.')
+      }
+
+      if (isTestModeActive()) {
+        queryClient.setQueryData<LayoutSettings>(['layout-settings', currentStoreId], (prev) => {
+          if (!prev) throw new Error('Keine Layout-Einstellungen im Cache')
+          return { ...prev, ...clamped, updated_at: new Date().toISOString() }
+        })
+        return { omittedWeekColumnDueToSchema: false }
       }
 
       let settingsId = queryClient.getQueryData<LayoutSettings>(['layout-settings', currentStoreId])?.id

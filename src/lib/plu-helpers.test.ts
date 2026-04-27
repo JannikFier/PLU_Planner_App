@@ -11,9 +11,14 @@ import {
   filterItemsBySearch,
   splitTextForHighlight,
   groupItemsByLetter,
+  groupItemsByBlock,
   splitIntoColumns,
+  formatProductWordsForDisplay,
+  isLetterPluSectionHeaderLabel,
+  formatPluBlockSectionHeaderForDisplay,
   type PLUItemBase,
 } from './plu-helpers'
+import type { Block } from '@/types/database'
 
 function baseItem(overrides: Partial<PLUItemBase> = {}): PLUItemBase {
   return {
@@ -30,6 +35,20 @@ function baseItem(overrides: Partial<PLUItemBase> = {}): PLUItemBase {
 }
 
 describe('plu-helpers', () => {
+  describe('formatPluBlockSectionHeaderForDisplay', () => {
+    it('erkennt Buchstaben-Köpfe', () => {
+      expect(isLetterPluSectionHeaderLabel('— A —')).toBe(true)
+      expect(isLetterPluSectionHeaderLabel('Regional')).toBe(false)
+    })
+    it('Warengruppe: VERSAL aus DB → Satzschreibung', () => {
+      expect(formatPluBlockSectionHeaderForDisplay('REGIONAL')).toBe('Regional')
+      expect(formatPluBlockSectionHeaderForDisplay('TEST GRUPPE')).toBe('Test gruppe')
+      expect(formatPluBlockSectionHeaderForDisplay('Regional')).toBe('Regional')
+      expect(formatPluBlockSectionHeaderForDisplay('— B —')).toBe('— B —')
+      expect(formatPluBlockSectionHeaderForDisplay('Ohne Zuordnung')).toBe('Ohne Zuordnung')
+    })
+  })
+
   describe('formatKWLabel', () => {
     it('formatiert KW und Jahr mit führender Null', () => {
       expect(formatKWLabel(7, 2026)).toBe('KW07/2026')
@@ -75,6 +94,19 @@ describe('plu-helpers', () => {
       expect(parseBlockNameToItemType('')).toBe(null)
       expect(parseBlockNameToItemType('   ')).toBe(null)
       expect(parseBlockNameToItemType('Sonstiges')).toBe(null)
+    })
+  })
+
+  describe('formatProductWordsForDisplay', () => {
+    it('setzt pro Wort erste Buchstabe groß (de)', () => {
+      expect(formatProductWordsForDisplay('Kiwi gold jumbo')).toBe('Kiwi Gold Jumbo')
+    })
+    it('normalisiert Mehrfach-Leerzeichen', () => {
+      expect(formatProductWordsForDisplay('a  b')).toBe('A B')
+    })
+    it('trimmt und leerer String', () => {
+      expect(formatProductWordsForDisplay('  x  ')).toBe('X')
+      expect(formatProductWordsForDisplay('')).toBe('')
     })
   })
 
@@ -173,6 +205,27 @@ describe('plu-helpers', () => {
     })
     it('columnCount <= 0 gibt alle Items in einer Spalte', () => {
       expect(splitIntoColumns([1, 2], 0)).toEqual([[1, 2]])
+    })
+  })
+
+  describe('groupItemsByBlock', () => {
+    const mkBlock = (id: string, name: string, order_index: number): Block =>
+      ({ id, name, order_index, created_at: '2020-01-01T00:00:00.000Z' }) as Block
+
+    it('includeEmptyBlocks: leere Warengruppe erscheint mit leerer items-Liste', () => {
+      const blocks = [mkBlock('b1', 'Leer', 0), mkBlock('b2', 'Mit', 1)]
+      const items = [baseItem({ id: 'x', block_id: 'b2' })]
+      const g = groupItemsByBlock(items, blocks, { includeEmptyBlocks: true, sortedBlocks: blocks })
+      expect(g.map((x) => x.blockName)).toEqual(['Leer', 'Mit'])
+      expect(g[0]!.items).toEqual([])
+      expect(g[1]!.items).toHaveLength(1)
+    })
+
+    it('ohne includeEmptyBlocks: nur Gruppen mit Artikeln', () => {
+      const blocks = [mkBlock('b1', 'Leer', 0), mkBlock('b2', 'Mit', 1)]
+      const items = [baseItem({ id: 'x', block_id: 'b2' })]
+      const g = groupItemsByBlock(items, blocks, { sortedBlocks: blocks })
+      expect(g.map((x) => x.blockName)).toEqual(['Mit'])
     })
   })
 

@@ -1,6 +1,6 @@
 // Backshop: Eigene Produkte (Bild Pflicht), Ausblenden, Bearbeiten, Löschen
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,11 +14,14 @@ import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
 import { canManageMarketHiddenItems } from '@/lib/permissions'
-import { getDisplayPlu } from '@/lib/plu-helpers'
+import { getDisplayPlu, itemMatchesSearch } from '@/lib/plu-helpers'
+import { useListFindInPageSection } from '@/hooks/useListFindInPageSection'
+import { ListFindInPageToolbar } from '@/components/plu/ListFindInPageToolbar'
+import type { ListFindInPageBinding } from '@/components/plu/list-find-in-page-types'
+import type { BackshopCustomProduct } from '@/types/database'
 import { BackshopCustomProductsList } from '@/components/plu/BackshopCustomProductsList'
 import { BackshopCustomProductDialog } from '@/components/plu/BackshopCustomProductDialog'
 import { EditBackshopCustomProductDialog } from '@/components/plu/EditBackshopCustomProductDialog'
-import type { BackshopCustomProduct } from '@/types/database'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +56,25 @@ export function BackshopCustomProductsPage() {
     [masterItems, customProducts],
   )
 
+  const matchBackshopCustomForFind = useCallback(
+    (cp: BackshopCustomProduct, q: string) =>
+      itemMatchesSearch({ plu: cp.plu, display_name: cp.name, system_name: cp.name }, q),
+    [],
+  )
+  const customListFind = useListFindInPageSection({
+    items: customProducts,
+    scopeId: 'custom-products-backshop-page',
+    isMatch: matchBackshopCustomForFind,
+  })
+  const customFindInPageBinding = useMemo((): ListFindInPageBinding | undefined => {
+    if (customProducts.length === 0) return undefined
+    return {
+      scopeId: 'custom-products-backshop-page',
+      activeRowIndex: customListFind.activeRowIndex,
+      matchIndices: customListFind.matchIndices,
+    }
+  }, [customProducts.length, customListFind.activeRowIndex, customListFind.matchIndices])
+
   const handleDeleteConfirm = async () => {
     if (!productToDelete) return
     try {
@@ -65,21 +87,38 @@ export function BackshopCustomProductsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-6" data-tour="backshop-custom-page">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg p-2 bg-muted">
-              <Plus className="h-5 w-5 text-muted-foreground" />
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg p-2 bg-muted">
+                <Plus className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">Eigene Produkte (Backshop)</h2>
+                <p className="text-sm text-muted-foreground">
+                  Eigene Backshop-Produkte mit Bild hinzufügen, bearbeiten, ausblenden und löschen.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight">Eigene Produkte (Backshop)</h2>
-              <p className="text-sm text-muted-foreground">
-                Eigene Backshop-Produkte mit Bild hinzufügen, bearbeiten, ausblenden und löschen.
-              </p>
+            <div data-tour="backshop-custom-toolbar">
+              {!isLoading && customProducts.length > 0 && (
+                <ListFindInPageToolbar
+                  showBar={customListFind.showBar}
+                  onOpen={customListFind.openSearch}
+                  barProps={customListFind.findInPageBarProps}
+                  dataTour="backshop-custom-search"
+                />
+              )}
             </div>
           </div>
 
-          <Button variant="outline" size="sm" onClick={() => setShowAddDialog(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            data-tour="backshop-custom-add-button"
+            onClick={() => setShowAddDialog(true)}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Eigenes Produkt hinzufügen
           </Button>
@@ -118,6 +157,7 @@ export function BackshopCustomProductsPage() {
                 unhidePending={unhideProduct.isPending}
                 deletePending={deleteProduct.isPending}
                 allowHideUnhide={canHideUnhide}
+                findInPage={customFindInPageBinding}
               />
             )}
           </CardContent>
@@ -141,7 +181,7 @@ export function BackshopCustomProductsPage() {
         )}
 
         <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
-          <AlertDialogContent>
+          <AlertDialogContent data-tour="backshop-custom-delete-confirm">
             <AlertDialogHeader>
               <AlertDialogTitle>Eigenes Produkt löschen?</AlertDialogTitle>
               <AlertDialogDescription>
@@ -154,6 +194,7 @@ export function BackshopCustomProductsPage() {
               <AlertDialogCancel>Abbrechen</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDeleteConfirm}
+                data-tour="backshop-custom-delete-confirm-action"
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 Löschen

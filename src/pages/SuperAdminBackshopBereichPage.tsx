@@ -5,7 +5,7 @@ import { DashboardCard } from '@/components/layout/DashboardCard'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
 import { BackshopNotificationDialog } from '@/components/plu/BackshopNotificationDialog'
-import { Upload, Package, Bell, ListTree, Megaphone } from 'lucide-react'
+import { Upload, Package, Bell, ListTree, Megaphone, Link2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 /**
@@ -32,11 +32,11 @@ export function SuperAdminBackshopBereichPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DashboardCard
             title="Backshop Upload"
-            description="Backshop-Excel-Dateien hochladen und einspielen"
+            description="Edeka-, Harry- und Aryzta-Upload auf einer Seite untereinander"
             icon={Upload}
             onClick={() => navigate('/super-admin/backshop-upload')}
-            color="text-slate-600"
-            bg="bg-slate-100"
+            color="text-blue-700"
+            bg="bg-blue-50"
           />
           <DashboardCard
             title="Benachrichtigungen Backshop"
@@ -56,6 +56,14 @@ export function SuperAdminBackshopBereichPage() {
             onClick={() => navigate('/super-admin/backshop-versions')}
             color="text-orange-600"
             bg="bg-orange-50"
+          />
+          <DashboardCard
+            title="Produktgruppen (Marken)"
+            description="Gleiche Artikel aus Edeka/Harry/Aryzta verbinden oder trennen"
+            icon={Link2}
+            onClick={() => navigate('/super-admin/backshop-product-groups')}
+            color="text-emerald-700"
+            bg="bg-emerald-50"
           />
           <DashboardCard
             title="Warengruppen (global)"

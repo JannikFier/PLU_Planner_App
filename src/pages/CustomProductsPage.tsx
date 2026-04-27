@@ -19,7 +19,10 @@ import { useAuth } from '@/hooks/useAuth'
 import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
 import { canManageMarketHiddenItems } from '@/lib/permissions'
 import { EXCEL_READ_ERROR_FALLBACK, formatError } from '@/lib/error-messages'
-import { formatPreisEur, generatePriceOnlyPlu } from '@/lib/plu-helpers'
+import { formatPreisEur, generatePriceOnlyPlu, itemMatchesSearch } from '@/lib/plu-helpers'
+import { useListFindInPageSection } from '@/hooks/useListFindInPageSection'
+import { ListFindInPageToolbar } from '@/components/plu/ListFindInPageToolbar'
+import type { ListFindInPageBinding } from '@/components/plu/list-find-in-page-types'
 import { parseCustomProductsExcel } from '@/lib/excel-parser'
 import { toast } from 'sonner'
 import { CustomProductDialog } from '@/components/plu/CustomProductDialog'
@@ -98,6 +101,25 @@ export function CustomProductsPage() {
     () => customProducts.some((c) => c.preis != null),
     [customProducts],
   )
+
+  const matchCustomForFind = useCallback(
+    (cp: CustomProduct, q: string) =>
+      itemMatchesSearch({ plu: cp.plu, display_name: cp.name, system_name: cp.name }, q),
+    [],
+  )
+  const customListFind = useListFindInPageSection({
+    items: customProducts,
+    scopeId: 'custom-products-obst-page',
+    isMatch: matchCustomForFind,
+  })
+  const customFindInPageBinding = useMemo((): ListFindInPageBinding | undefined => {
+    if (customProducts.length === 0) return undefined
+    return {
+      scopeId: 'custom-products-obst-page',
+      activeRowIndex: customListFind.activeRowIndex,
+      matchIndices: customListFind.matchIndices,
+    }
+  }, [customProducts.length, customListFind.activeRowIndex, customListFind.matchIndices])
 
   const existingPLUs = useMemo(
     () => new Set([...masterItems.map((m) => m.plu), ...customProducts.map((c) => c.plu)]),
@@ -237,17 +259,30 @@ export function CustomProductsPage() {
             Super-Admin.
           </p>
         )}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg p-2 bg-muted">
-              <Layers className="h-5 w-5 text-muted-foreground" />
+        <div
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+          data-tour="obst-custom-toolbar"
+        >
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg p-2 bg-muted">
+                <Layers className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">Eigene Produkte</h2>
+                <p className="text-sm text-muted-foreground">
+                  Eigene Produkte hinzufügen, bearbeiten, ausblenden und löschen.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight">Eigene Produkte</h2>
-              <p className="text-sm text-muted-foreground">
-                Eigene Produkte hinzufügen, bearbeiten, ausblenden und löschen.
-              </p>
-            </div>
+            {!isLoading && customProducts.length > 0 && (
+              <ListFindInPageToolbar
+                showBar={customListFind.showBar}
+                onOpen={customListFind.openSearch}
+                barProps={customListFind.findInPageBarProps}
+                dataTour="obst-custom-search"
+              />
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -260,20 +295,30 @@ export function CustomProductsPage() {
                   className="hidden"
                   onChange={handleExcelFileSelect}
                 />
-                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  data-tour="obst-custom-excel-button"
+                >
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
                   Per Excel hochladen
                 </Button>
               </>
             )}
-            <Button variant="outline" size="sm" onClick={() => setShowAddDialog(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddDialog(true)}
+              data-tour="obst-custom-add-button"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Eigenes Produkt hinzufügen
             </Button>
           </div>
         </div>
 
-        <Card>
+        <Card data-tour="obst-custom-list">
           <CardContent className="p-4">
             {isLoading && (
               <div className="space-y-3">
@@ -312,6 +357,8 @@ export function CustomProductsPage() {
                 unhidePending={unhideProduct.isPending}
                 deletePending={deleteProduct.isPending}
                 allowHideUnhide={canHideUnhide}
+                findInPage={customFindInPageBinding}
+                firstItemDataTour="obst-custom-first-item"
               />
             )}
           </CardContent>
@@ -322,6 +369,8 @@ export function CustomProductsPage() {
           onOpenChange={setShowAddDialog}
           existingPLUs={existingPLUs}
           blocks={blocks}
+          dataTour="obst-custom-add-dialog"
+          submitDataTour="obst-custom-add-dialog-submit"
         />
 
         {editingProduct && (
@@ -331,11 +380,13 @@ export function CustomProductsPage() {
             onOpenChange={(open) => !open && setEditingProduct(null)}
             product={editingProduct}
             blocks={blocks}
+            dataTour="obst-custom-edit-dialog"
+            submitDataTour="obst-custom-edit-dialog-submit"
           />
         )}
 
         <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
-          <AlertDialogContent>
+          <AlertDialogContent data-tour="obst-custom-delete-confirm">
             <AlertDialogHeader>
               <AlertDialogTitle>Produkt löschen?</AlertDialogTitle>
               <AlertDialogDescription>
@@ -361,7 +412,10 @@ export function CustomProductsPage() {
 
         {/* Excel Import Dialog – aus HiddenItems übernommen */}
         <Dialog open={excelParseResult !== null} onOpenChange={(open) => !open && setExcelParseResult(null)}>
-          <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)] sm:max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogContent
+            className="w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)] sm:max-w-5xl max-h-[90vh] overflow-hidden flex flex-col"
+            data-tour="obst-custom-excel-dialog"
+          >
             <DialogHeader>
               <DialogTitle>Excel-Import – Eigene Produkte</DialogTitle>
               <DialogDescription>
@@ -454,10 +508,16 @@ export function CustomProductsPage() {
                   </table>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setExcelParseResult(null)}>Abbrechen</Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setExcelParseResult(null)}
+                  >
+                    Abbrechen
+                  </Button>
                   <Button
                     onClick={handleExcelAddAll}
                     disabled={excelAddPreview.willAdd === 0 || addBatch.isPending}
+                    data-tour="obst-custom-excel-dialog-submit"
                   >
                     {addBatch.isPending ? 'Wird hinzugefügt...' : excelAddPreview.willSkip > 0 ? `${excelAddPreview.willAdd} Produkte hinzufügen (${excelAddPreview.willSkip} übersprungen)` : `${excelParseResult.rows.length} Produkte hinzufügen`}
                   </Button>

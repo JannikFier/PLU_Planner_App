@@ -73,13 +73,21 @@ export function useBackshopHideProduct() {
   })
 }
 
+export type BackshopUnhideProductInput = string | { plu: string; silentToast?: boolean }
+
+function normalizeUnhideInput(input: BackshopUnhideProductInput): { plu: string; silentToast: boolean } {
+  if (typeof input === 'string') return { plu: input, silentToast: false }
+  return { plu: input.plu, silentToast: Boolean(input.silentToast) }
+}
+
 /** Backshop-PLU wieder einblenden */
 export function useBackshopUnhideProduct() {
   const queryClient = useQueryClient()
   const { currentStoreId } = useCurrentStore()
 
   return useMutation({
-    mutationFn: async (plu: string) => {
+    mutationFn: async (input: BackshopUnhideProductInput) => {
+      const { plu } = normalizeUnhideInput(input)
       if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       if (isTestModeActive()) return
 
@@ -91,7 +99,8 @@ export function useBackshopUnhideProduct() {
 
       if (error) throw error
     },
-    onMutate: async (plu) => {
+    onMutate: async (input) => {
+      const { plu } = normalizeUnhideInput(input)
       await queryClient.cancelQueries({ queryKey: ['backshop-hidden-items', currentStoreId] })
       const prev = queryClient.getQueryData<BackshopHiddenItem[]>(['backshop-hidden-items', currentStoreId])
       queryClient.setQueryData<BackshopHiddenItem[]>(['backshop-hidden-items', currentStoreId], (old = []) =>
@@ -99,12 +108,16 @@ export function useBackshopUnhideProduct() {
       )
       return { prev }
     },
-    onError: (err, _plu, ctx) => {
+    onError: (err, input, ctx) => {
+      const { silentToast } = normalizeUnhideInput(input)
       if (ctx?.prev != null) queryClient.setQueryData(['backshop-hidden-items', currentStoreId], ctx.prev)
-      toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
+      if (!silentToast) {
+        toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
+      }
     },
-    onSuccess: () => {
-      toast.success('Produkt wieder eingeblendet')
+    onSuccess: (_d, input) => {
+      const { silentToast } = normalizeUnhideInput(input)
+      if (!silentToast) toast.success('Produkt wieder eingeblendet')
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['backshop-hidden-items', currentStoreId] })

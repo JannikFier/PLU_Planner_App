@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Warengruppen bearbeiten — HTML-Prototyp</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="./data.js"></script>
+    <script src="./tokens.js"></script>
+    <script type="text/babel" data-presets="react" src="./store.jsx"></script>
+    <script type="text/babel" data-presets="react" src="./ui.jsx"></script>
+    <script type="text/babel" data-presets="react" src="./tablet-app.jsx"></script>
+    <script type="text/babel" data-presets="react" src="./mobile-app.jsx"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel" data-presets="react" id="wg-boot">
+      /*EDITMODE-BEGIN*/{"mobileConcept":"B","showDeliverables":true}/*EDITMODE-END*/
+      const { useState, useEffect, useRef, useCallback } = React
+      const { createRoot } = ReactDOM
+      const { WGProvider } = window.WGStore
+      const { WgMacWindow, WgTabletBezel, WgEmbeddedWorkbench } = window.WGTablet
+      const { WgMobileArtboard } = window.WGMobile
+      const T = window.WG_UI.T
+
+      function parseEditDefaults() {
+        const el = document.getElementById('wg-boot')
+        if (!el) return {}
+        const m = el.textContent.match(/\/\*EDITMODE-BEGIN\*\/([\s\S]*?)\/\*EDITMODE-END\*\//)
+        if (!m) return {}
+        try {
+          return JSON.parse(m[1].trim())
+        } catch {
+          return {}
+        }
+      }
+
+      const WG_EDIT_DEFAULTS = parseEditDefaults()
+
+      const wgArtboardChrome = {
+        borderRadius: 12,
+        boxShadow: '0 1px 0 rgba(21,20,18,0.05), 0 18px 48px rgba(21,20,18,0.1)',
+        outline: `1px solid ${T.hairlineStrong}`,
+        outlineOffset: 0,
+      }
+
+      function WgDeliverablesBoard() {
+        const card = {
+          width: 420,
+          borderRadius: 12,
+          background: T.panel,
+          border: `1px solid ${T.hairlineStrong}`,
+          padding: 20,
+          boxShadow: '0 8px 28px rgba(0,0,0,0.08)',
+          marginBottom: 16,
+        }
+        const h = { fontSize: 14, fontWeight: 700, margin: '0 0 8px', color: T.ink }
+        const p = { fontSize: 13, lineHeight: 1.55, color: T.muted, margin: 0 }
+        return React.createElement(
+          'div',
+          { style: { width: 440 } },
+          React.createElement('div', { style: card },
+            React.createElement('h3', { style: h }, 'Empfehlung: Konzept B'),
+            React.createElement('p', { style: p }, 'Bottom-Sheet mit Suche und klarer Gruppenliste schließt schneller als A (viele Chips) und ist weniger verschachtelt als C, bleibt aber für Power-User erweiterbar.'),
+          ),
+          React.createElement('div', { style: card },
+            React.createElement('h3', { style: h }, 'Komponenten-Inventar'),
+            React.createElement('p', { style: p }, 'Topbar, Sidebar-Zeilen mit Icon-Plate und Zähler, Artikelkarten mit PLU, Status-Panel, Toasts mit Rückgängig, Mehrfach-Leiste, Mobile: Home-Grid, Detail-Liste, Bottom-Sheet / Chip-Leiste / Kontext-Sheet.'),
+          ),
+          React.createElement('div', { style: card },
+            React.createElement('h3', { style: h }, 'Microcopy (Auszug)'),
+            React.createElement('p', { style: p }, 'Toast: „Zuordnung geändert.“ · Undo-Button: „Rückgängig“ · Empty Ohne: „Alles einsortiert“ · Bulk: „Auswahl → [Gruppe] zuweisen“ · „Zu ‚Ohne Zuordnung' verschieben“'),
+          ),
+          React.createElement('div', { style: card },
+            React.createElement('h3', { style: h }, 'Fünf Annahmen'),
+            React.createElement('p', { style: p }, '1) Ein globaler Zuordnungs-Layer ohne Markt/Master. 2) PLU ist eindeutig. 3) Bild-Platzhalter reicht für den Flow. 4) Toast ca. 5 s mit Rückgängig. 5) HTTP-Server für Babel-externe Skripte ist akzeptabel im Prototyp.'),
+          ),
+        )
+      }
+
+      function WgTweaksPanel({ open, mobileConcept, setMobileConcept, showDeliverables, setShowDeliverables, onClose }) {
+        if (!open) return null
+        const panel = {
+          position: 'fixed',
+          bottom: 16,
+          right: 16,
+          top: 'auto',
+          zIndex: 200000,
+          width: 280,
+          background: T.card,
+          border: `1px solid ${T.hairlineStrong}`,
+          borderRadius: 12,
+          padding: 14,
+          boxShadow: '0 12px 40px rgba(0,0,0,0.18)',
+          fontFamily: T.fontUi,
+        }
+        const row = { marginBottom: 12 }
+        const label = { fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: T.muted, marginBottom: 6 }
+        return React.createElement(
+          'div',
+          { style: panel },
+          React.createElement('div', { style: { fontWeight: 700, fontSize: 15, marginBottom: 12 } }, 'TWEAKS'),
+          React.createElement('div', { style: row },
+            React.createElement('div', { style: label }, 'Mobile-Konzept'),
+            ['A', 'B', 'C'].map((k) =>
+              React.createElement(
+                'label',
+                { key: k, style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 14, cursor: 'pointer' } },
+                React.createElement('input', { type: 'radio', name: 'wg-mob', checked: mobileConcept === k, onChange: () => setMobileConcept(k) }),
+                k,
+              ),
+            ),
+          ),
+          React.createElement('label', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 14, cursor: 'pointer' } },
+            React.createElement('input', { type: 'checkbox', checked: showDeliverables, onChange: (e) => setShowDeliverables(e.target.checked) }),
+            'Rationale-Karten anzeigen',
+          ),
+          React.createElement(
+            'button',
+            {
+              type: 'button',
+              onClick: onClose,
+              style: {
+                width: '100%',
+                marginTop: 4,
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: `1px solid ${T.hairlineStrong}`,
+                background: T.bg,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: T.fontUi,
+              },
+            },
+            'Panel schließen',
+          ),
+        )
+      }
+
+      function wgInitialCanvasView() {
+        if (typeof window === 'undefined') return { tx: 40, ty: 32, scale: 0.78 }
+        const sw = window.innerWidth
+        const scale = Math.min(0.9, Math.max(0.52, (sw - 64) / 1580))
+        const tx = Math.max(16, Math.round((sw - 1440 * scale) * 0.38))
+        const ty = 28
+        return { tx, ty, scale }
+      }
+
+      function WgDesignCanvas({ children }) {
+        const iv = wgInitialCanvasView()
+        const [tx, setTx] = useState(iv.tx)
+        const [ty, setTy] = useState(iv.ty)
+        const [scale, setScale] = useState(iv.scale)
+        const surfaceRef = useRef(null)
+        const worldRef = useRef(null)
+        const pan = useRef(null)
+
+        useEffect(() => {
+          const el = surfaceRef.current
+          if (!el) return
+          const onWheel = (e) => {
+            e.preventDefault()
+            const d = e.deltaY > 0 ? -0.07 : 0.07
+            setScale((s) => Math.min(1.85, Math.max(0.35, s + d)))
+          }
+          el.addEventListener('wheel', onWheel, { passive: false })
+          return () => el.removeEventListener('wheel', onWheel)
+        }, [])
+
+        const onPointerDown = useCallback((e) => {
+          const world = worldRef.current
+          if (!world) return
+          if (e.target !== world && !e.altKey && e.button !== 1) return
+          pan.current = { lx: e.clientX, ly: e.clientY }
+        }, [])
+
+        const onPointerMove = useCallback((e) => {
+          if (!pan.current) return
+          const dx = e.clientX - pan.current.lx
+          const dy = e.clientY - pan.current.ly
+          pan.current.lx = e.clientX
+          pan.current.ly = e.clientY
+          setTx((t) => t + dx)
+          setTy((t) => t + dy)
+        }, [])
+
+        const endPan = useCallback(() => {
+          pan.current = null
+        }, [])
+
+        useEffect(() => {
+          window.addEventListener('pointermove', onPointerMove)
+          window.addEventListener('pointerup', endPan)
+          window.addEventListener('pointercancel', endPan)
+          return () => {
+            window.removeEventListener('pointermove', onPointerMove)
+            window.removeEventListener('pointerup', endPan)
+            window.removeEventListener('pointercancel', endPan)
+          }
+        }, [onPointerMove, endPan])
+
+        return React.createElement(
+          'div',
+          { style: { height: '100vh', overflow: 'hidden', position: 'relative', background: T.bg } },
+          React.createElement(
+            'div',
+            {
+              ref: surfaceRef,
+              style: {
+                width: '100%',
+                height: '100%',
+                cursor: 'grab',
+                overflow: 'hidden',
+                touchAction: 'none',
+              },
+            },
+            React.createElement(
+              'div',
+              {
+                ref: worldRef,
+                onPointerDown: onPointerDown,
+                style: {
+                  transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+                  transformOrigin: '0 0',
+                  width: 5200,
+                  height: 2800,
+                  position: 'relative',
+                  background: T.bg,
+                },
+              },
+              children,
+            ),
+          ),
+          React.createElement(
+            'div',
+            {
+              style: {
+                position: 'absolute',
+                left: 12,
+                bottom: 12,
+                fontSize: 12,
+                color: '#444',
+                background: 'rgba(255,255,255,0.85)',
+                padding: '8px 12px',
+                borderRadius: 8,
+                pointerEvents: 'none',
+                fontFamily: T.fontUi,
+              },
+            },
+            'Canvas: auf freier Fläche ziehen oder Alt+Ziehen · Mausrad zoomt',
+          ),
+        )
+      }
+
+      function WgArtboardLabel({ text, x, y, boardId, onDragPointerDown, onFocusClick }) {
+        return React.createElement(
+          'div',
+          {
+            style: {
+              position: 'absolute',
+              left: x,
+              top: y - 30,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              zIndex: 3,
+              pointerEvents: 'auto',
+            },
+          },
+          React.createElement(
+            'button',
+            {
+              type: 'button',
+              title: 'Artboard verschieben',
+              'data-wg-board-handle': boardId || '',
+              onPointerDown: onDragPointerDown,
+              style: {
+                width: 28,
+                height: 22,
+                border: `1px solid ${T.hairlineStrong}`,
+                borderRadius: 6,
+                background: T.card,
+                cursor: 'grab',
+                padding: 0,
+                fontSize: 10,
+                lineHeight: 1,
+                color: T.muted,
+                fontFamily: T.fontMono,
+              },
+            },
+            '::',
+          ),
+          React.createElement(
+            'button',
+            {
+              type: 'button',
+              onClick: onFocusClick,
+              style: {
+                border: 'none',
+                background: 'none',
+                padding: 0,
+                margin: 0,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: '0.12em',
+                color: T.muted,
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                fontFamily: T.fontUi,
+              },
+            },
+            text,
+          ),
+        )
+      }
+
+      function App() {
+        const [editMode, setEditMode] = useState(false)
+        const [mobileConcept, setMobileConcept] = useState(WG_EDIT_DEFAULTS.mobileConcept || 'B')
+        const [showDeliverables, setShowDeliverables] = useState(WG_EDIT_DEFAULTS.showDeliverables !== false)
+        const [focusId, setFocusId] = useState(null)
+        const boardDragRef = useRef(null)
+        const desktopInnerH = 900
+        const macChrome = 36
+        const macH = desktopInnerH + macChrome
+        const [boardPos, setBoardPos] = useState({
+          desktop: { x: 80, y: 80 },
+          ipadL: { x: 80 + 1440 + 100, y: 80 },
+          ipadP: { x: 80, y: 80 + macH + 72 },
+          mobile: { x: 80 + 834 + 24 + 100, y: 80 + macH + 72 },
+          deliverables: { x: 80, y: 80 + macH + 72 + 1194 + 24 + 72 },
+        })
+
+        useEffect(() => {
+          window.wgInjectGlobalStyles && window.wgInjectGlobalStyles()
+          window.wgRegisterProtoIcons && window.wgRegisterProtoIcons()
+        }, [])
+
+        useEffect(() => {
+          const onMsg = (e) => {
+            const d = e.data
+            if (d === '__activate_edit_mode') setEditMode(true)
+            else if (d && typeof d === 'object' && d.type === '__activate_edit_mode') setEditMode(true)
+          }
+          window.addEventListener('message', onMsg)
+          return () => window.removeEventListener('message', onMsg)
+        }, [])
+
+        useEffect(() => {
+          const move = (e) => {
+            const d = boardDragRef.current
+            if (!d) return
+            setBoardPos((prev) => ({
+              ...prev,
+              [d.id]: { x: d.ox + e.clientX - d.px, y: d.oy + e.clientY - d.py },
+            }))
+          }
+          const up = () => {
+            boardDragRef.current = null
+          }
+          window.addEventListener('pointermove', move)
+          window.addEventListener('pointerup', up)
+          window.addEventListener('pointercancel', up)
+          return () => {
+            window.removeEventListener('pointermove', move)
+            window.removeEventListener('pointerup', up)
+            window.removeEventListener('pointercancel', up)
+          }
+        }, [])
+
+        const startBoardDrag = useCallback(
+          (id) => (e) => {
+            const p = boardPos[id]
+            if (!p) return
+            boardDragRef.current = { id, ox: p.x, oy: p.y, px: e.clientX, py: e.clientY }
+            e.preventDefault()
+          },
+          [boardPos],
+        )
+
+        const renderFocusContent = () => {
+          if (focusId === 'desktop')
+            return React.createElement(
+              WGProvider,
+              null,
+              React.createElement(WgMacWindow, { title: 'Warengruppen — Prototyp', w: 1440, h: macH },
+                React.createElement(WgEmbeddedWorkbench, null),
+              ),
+            )
+          if (focusId === 'ipadL')
+            return React.createElement(
+              WGProvider,
+              null,
+              React.createElement(WgTabletBezel, { w: 1194, h: 834 }, React.createElement(WgEmbeddedWorkbench, null)),
+            )
+          if (focusId === 'ipadP')
+            return React.createElement(
+              WGProvider,
+              null,
+              React.createElement(
+                WgTabletBezel,
+                { w: 834, h: 1194 },
+                React.createElement(WgEmbeddedWorkbench, { variant: 'twoColNoStatus' }),
+              ),
+            )
+          if (focusId === 'mobile')
+            return React.createElement(WgMobileArtboard, { concept: mobileConcept, key: mobileConcept + '-f' })
+          return null
+        }
+
+        return React.createElement(
+          React.Fragment,
+          null,
+          focusId
+            ? React.createElement(
+                'div',
+                {
+                  style: {
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 400000,
+                    background: 'rgba(21,20,18,0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 20,
+                  },
+                  onClick: () => setFocusId(null),
+                },
+                React.createElement(
+                  'div',
+                  {
+                    style: { maxWidth: '98vw', maxHeight: '96vh', overflow: 'auto', position: 'relative' },
+                    onClick: (ev) => ev.stopPropagation(),
+                  },
+                  React.createElement(
+                    'button',
+                    {
+                      type: 'button',
+                      onClick: () => setFocusId(null),
+                      style: {
+                        position: 'sticky',
+                        top: 0,
+                        float: 'right',
+                        zIndex: 2,
+                        marginBottom: 8,
+                        padding: '8px 14px',
+                        borderRadius: 10,
+                        border: `1px solid ${T.hairlineStrong}`,
+                        background: T.card,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: T.fontUi,
+                      },
+                    },
+                    'Schließen',
+                  ),
+                  renderFocusContent(),
+                ),
+              )
+            : null,
+          React.createElement(WgTweaksPanel, {
+            open: editMode,
+            mobileConcept,
+            setMobileConcept,
+            showDeliverables,
+            setShowDeliverables,
+            onClose: () => setEditMode(false),
+          }),
+          React.createElement(
+            WgDesignCanvas,
+            null,
+            React.createElement(WgArtboardLabel, {
+              text: 'Desktop 1440×900',
+              x: boardPos.desktop.x,
+              y: boardPos.desktop.y,
+              boardId: 'desktop',
+              onDragPointerDown: startBoardDrag('desktop'),
+              onFocusClick: () => setFocusId('desktop'),
+            }),
+            React.createElement(
+              'div',
+              {
+                'data-wg-artboard': '1',
+                style: { position: 'absolute', left: boardPos.desktop.x, top: boardPos.desktop.y, ...wgArtboardChrome },
+                onPointerDown: (ev) => ev.stopPropagation(),
+              },
+              React.createElement(
+                WGProvider,
+                null,
+                React.createElement(WgMacWindow, { title: 'Warengruppen — Prototyp', w: 1440, h: macH },
+                  React.createElement(WgEmbeddedWorkbench, null),
+                ),
+              ),
+            ),
+            React.createElement(WgArtboardLabel, {
+              text: 'iPad Quer 1194×834',
+              x: boardPos.ipadL.x,
+              y: boardPos.ipadL.y,
+              boardId: 'ipadL',
+              onDragPointerDown: startBoardDrag('ipadL'),
+              onFocusClick: () => setFocusId('ipadL'),
+            }),
+            React.createElement(
+              'div',
+              {
+                'data-wg-artboard': '1',
+                style: { position: 'absolute', left: boardPos.ipadL.x, top: boardPos.ipadL.y, ...wgArtboardChrome },
+                onPointerDown: (ev) => ev.stopPropagation(),
+              },
+              React.createElement(
+                WGProvider,
+                null,
+                React.createElement(
+                  WgTabletBezel,
+                  { w: 1194, h: 834 },
+                  React.createElement(WgEmbeddedWorkbench, null),
+                ),
+              ),
+            ),
+            React.createElement(WgArtboardLabel, {
+              text: 'iPad Hoch 834×1194',
+              x: boardPos.ipadP.x,
+              y: boardPos.ipadP.y,
+              boardId: 'ipadP',
+              onDragPointerDown: startBoardDrag('ipadP'),
+              onFocusClick: () => setFocusId('ipadP'),
+            }),
+            React.createElement(
+              'div',
+              {
+                'data-wg-artboard': '1',
+                style: { position: 'absolute', left: boardPos.ipadP.x, top: boardPos.ipadP.y, ...wgArtboardChrome },
+                onPointerDown: (ev) => ev.stopPropagation(),
+              },
+              React.createElement(
+                WGProvider,
+                null,
+                React.createElement(
+                  WgTabletBezel,
+                  { w: 834, h: 1194 },
+                  React.createElement(WgEmbeddedWorkbench, { variant: 'twoColNoStatus' }),
+                ),
+              ),
+            ),
+            React.createElement(WgArtboardLabel, {
+              text: `iPhone · Konzept ${mobileConcept}`,
+              x: boardPos.mobile.x,
+              y: boardPos.mobile.y,
+              boardId: 'mobile',
+              onDragPointerDown: startBoardDrag('mobile'),
+              onFocusClick: () => setFocusId('mobile'),
+            }),
+            React.createElement(
+              'div',
+              {
+                'data-wg-artboard': '1',
+                style: { position: 'absolute', left: boardPos.mobile.x, top: boardPos.mobile.y, ...wgArtboardChrome },
+                onPointerDown: (ev) => ev.stopPropagation(),
+              },
+              React.createElement(WgMobileArtboard, { concept: mobileConcept, key: mobileConcept }),
+            ),
+            showDeliverables
+              ? React.createElement(
+                  React.Fragment,
+                  null,
+                  React.createElement(WgArtboardLabel, {
+                    text: 'Deliverables',
+                    x: boardPos.deliverables.x,
+                    y: boardPos.deliverables.y,
+                    boardId: 'deliverables',
+                    onDragPointerDown: startBoardDrag('deliverables'),
+                    onFocusClick: () => {},
+                  }),
+                  React.createElement(
+                    'div',
+                    {
+                      'data-wg-artboard': '1',
+                      style: {
+                        position: 'absolute',
+                        left: boardPos.deliverables.x,
+                        top: boardPos.deliverables.y,
+                        ...wgArtboardChrome,
+                      },
+                      onPointerDown: (ev) => ev.stopPropagation(),
+                    },
+                    React.createElement(WgDeliverablesBoard, null),
+                  ),
+                )
+              : null,
+          ),
+        )
+      }
+
+      createRoot(document.getElementById('root')).render(React.createElement(App))
+    </script>
+  </body>
+</html>

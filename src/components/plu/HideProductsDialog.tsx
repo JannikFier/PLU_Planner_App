@@ -67,6 +67,10 @@ interface HideProductsDialogProps {
   /** Wie Masterliste / Layout-Einstellungen */
   flowDirection?: 'ROW_BY_ROW' | 'COLUMN_FIRST'
   fontSizes?: DialogPluFontSizes
+  /** Optional: Tutorial-Anker am DialogContent */
+  dataTour?: string
+  /** Optional: Tutorial-Anker am Bestaetigen-Button */
+  submitDataTour?: string
 }
 
 export function HideProductsDialog({
@@ -77,6 +81,8 @@ export function HideProductsDialog({
   listLayout,
   flowDirection = 'COLUMN_FIRST',
   fontSizes = DEFAULT_FONT_SIZES,
+  dataTour,
+  submitDataTour,
 }: HideProductsDialogProps) {
   const [searchText, setSearchText] = useState('')
   const deferredSearch = useDebouncedValue(searchText, 200)
@@ -172,7 +178,10 @@ export function HideProductsDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-7xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
+      <DialogContent
+        className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-7xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden"
+        {...(dataTour ? { 'data-tour': dataTour } : {})}
+      >
         <DialogHeader className="shrink-0">
           <DialogTitle>Produkte ausblenden</DialogTitle>
           <DialogDescription>
@@ -518,6 +527,7 @@ export function HideProductsDialog({
           <Button
             onClick={handleHide}
             disabled={selectedPLUs.size === 0 || hideBatch.isPending}
+            {...(submitDataTour ? { 'data-tour': submitDataTour } : {})}
           >
             <EyeOff className="h-4 w-4 mr-2" />
             {hideBatch.isPending ? 'Wird ausgeblendet...' : `${selectedPLUs.size} Produkt${selectedPLUs.size === 1 ? '' : 'e'} ausblenden`}

@@ -152,7 +152,10 @@ export function SchlagwortManager({ open, onOpenChange }: SchlagwortManagerProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-4xl max-h-[90vh] overflow-y-auto"
+        data-tour="obst-konfig-rules-schlagwort-dialog"
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Tag className="h-5 w-5" />
@@ -166,7 +169,7 @@ export function SchlagwortManager({ open, onOpenChange }: SchlagwortManagerProps
 
         {/* Aktive Regeln als Badges */}
         {regeln.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-2" data-tour="obst-konfig-rules-schlagwort-active-list">
             <Label className="text-xs text-muted-foreground">Aktive Regeln:</Label>
             <div className="flex flex-wrap gap-2">
               {regeln.map((regel) => (
@@ -211,12 +214,14 @@ export function SchlagwortManager({ open, onOpenChange }: SchlagwortManagerProps
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 placeholder='z.B. "Bio" oder "Pilze"'
+                data-tour="obst-konfig-rules-schlagwort-input"
               />
             </div>
             <Button
               onClick={handleAddOrUpdate}
               disabled={isSaving || !keyword.trim()}
               size="sm"
+              data-tour="obst-konfig-rules-schlagwort-submit"
             >
               {isSaving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -227,10 +232,40 @@ export function SchlagwortManager({ open, onOpenChange }: SchlagwortManagerProps
               )}
             </Button>
             {editingId && (
-              <Button variant="ghost" size="sm" onClick={resetForm}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetForm}
+                data-tour="obst-konfig-rules-schlagwort-cancel"
+              >
                 Abbrechen
               </Button>
             )}
+          </div>
+
+          {/* Position immer sichtbar (Tutorial-Anker + Bedienung vor Eingabe) */}
+          <div className="space-y-2">
+            <Label className="text-xs">Position des Schlagworts:</Label>
+            <div className="flex gap-2">
+              <Button
+                variant={position === 'PREFIX' ? 'default' : 'outline'}
+                size="sm"
+                type="button"
+                onClick={() => setPosition('PREFIX')}
+                data-tour="obst-konfig-rules-schlagwort-position-front"
+              >
+                Vorne anzeigen
+              </Button>
+              <Button
+                variant={position === 'SUFFIX' ? 'default' : 'outline'}
+                size="sm"
+                type="button"
+                onClick={() => setPosition('SUFFIX')}
+                data-tour="obst-konfig-rules-schlagwort-position-back"
+              >
+                Hinten anzeigen
+              </Button>
+            </div>
           </div>
 
           {/* Live-Feedback */}
@@ -246,27 +281,6 @@ export function SchlagwortManager({ open, onOpenChange }: SchlagwortManagerProps
                 <span>
                   <strong>{changedItems.length}</strong> davon werden geändert
                 </span>
-              </div>
-
-              {/* Position-Auswahl */}
-              <div className="space-y-2">
-                <Label className="text-xs">Position des Schlagworts:</Label>
-                <div className="flex gap-2">
-                  <Button
-                    variant={position === 'PREFIX' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setPosition('PREFIX')}
-                  >
-                    Vorne anzeigen
-                  </Button>
-                  <Button
-                    variant={position === 'SUFFIX' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setPosition('SUFFIX')}
-                  >
-                    Hinten anzeigen
-                  </Button>
-                </div>
               </div>
 
               {/* Vorher → Nachher Liste */}
@@ -306,12 +320,17 @@ export function SchlagwortManager({ open, onOpenChange }: SchlagwortManagerProps
         </div>
 
         <DialogFooter className="flex-row justify-between sm:justify-between gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            data-tour="obst-konfig-rules-schlagwort-close"
+          >
             Schließen
           </Button>
           <Button
             onClick={handleApplyAll}
             disabled={applyAllMutation.isPending || regeln.length === 0}
+            data-tour="obst-konfig-rules-schlagwort-apply-all"
           >
             {applyAllMutation.isPending ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Wird angewandt...</>

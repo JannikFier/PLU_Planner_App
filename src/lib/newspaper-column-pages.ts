@@ -161,7 +161,15 @@ export function paginateNewspaperColumns<T>(
   }
 
   for (const g of groups) {
-    if (g.items.length === 0) continue
+    // Leere Warengruppen: trotzdem Gruppenkopf ausgeben (Live-Masterliste „Nach Warengruppen“;
+    // PDF baut Zeilen ohne leere Gruppen via groupItemsByBlock ohne includeEmptyBlocks.)
+    if (g.items.length === 0) {
+      while (remaining() < heights.groupHeader) {
+        advanceColumn()
+      }
+      pushRow({ type: 'group', label: g.label })
+      continue
+    }
 
     let i = 0
     while (i < g.items.length) {

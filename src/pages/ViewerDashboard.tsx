@@ -57,7 +57,7 @@ export function ViewerDashboard() {
   if (!currentStoreId) {
     return (
       <DashboardLayout>
-        <div className="p-6 text-center">
+        <div className="p-6 text-center" data-tour="viewer-dashboard-no-store">
           <p className="text-muted-foreground">Kein Markt zugewiesen. Bitte wende dich an deinen Administrator.</p>
         </div>
       </DashboardLayout>
@@ -77,7 +77,7 @@ export function ViewerDashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
+        <div data-tour="dashboard-welcome">
           <h2 className="text-2xl font-bold tracking-tight">PLU-Liste</h2>
           <p className="text-muted-foreground">
             {cards.length === 0
@@ -87,7 +87,7 @@ export function ViewerDashboard() {
         </div>
 
         {cards.length === 0 ? (
-          <div className="p-6 text-center rounded-lg border bg-muted/30">
+          <div className="p-6 text-center rounded-lg border bg-muted/30" data-tour="viewer-dashboard-empty">
             <p className="text-muted-foreground">Keine Bereiche freigeschaltet. Bitte wende dich an deinen Administrator.</p>
           </div>
         ) : (
@@ -101,6 +101,9 @@ export function ViewerDashboard() {
               onClick={card.onClick}
               color={card.color}
               bg={card.bg}
+              dataTour={
+                card.title.includes('Backshop') ? 'dashboard-card-backshop' : 'dashboard-card-obst'
+              }
             />
           ))}
         </div>

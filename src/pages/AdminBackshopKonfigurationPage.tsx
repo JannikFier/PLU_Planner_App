@@ -3,10 +3,10 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { DashboardCard } from '@/components/layout/DashboardCard'
 import { useEffectiveListVisibility } from '@/hooks/useStoreListVisibility'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
-import { LayoutGrid, BookText, GripVertical } from 'lucide-react'
+import { LayoutGrid, BookText, GripVertical, ListFilter } from 'lucide-react'
 
 /**
- * Admin: Konfiguration Backshop – Layout, Regeln, Block-Sortierung.
+ * Admin: Konfiguration Backshop – Layout, Regeln, Gruppenregeln, Block-Sortierung.
  */
 export function AdminBackshopKonfigurationPage() {
   const navigate = useNavigate()
@@ -35,11 +35,11 @@ export function AdminBackshopKonfigurationPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
+      <div className="space-y-8" data-tour="backshop-konfig-hub-page">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800">Konfiguration Backshop</h2>
           <p className="text-muted-foreground">
-            Layout, Bezeichnungsregeln und Warengruppen – nur bei Bedarf ändern.
+            Layout, Bezeichnungsregeln, bevorzugte Marken pro Warengruppe und Sortierung – nur bei Bedarf ändern.
           </p>
         </div>
 
@@ -51,6 +51,7 @@ export function AdminBackshopKonfigurationPage() {
             onClick={() => navigate('/admin/backshop-layout')}
             color="text-amber-800"
             bg="bg-amber-50"
+            dataTour="backshop-konfig-hub-layout-card"
           />
           <DashboardCard
             title="Bezeichnungsregeln (Backshop)"
@@ -59,6 +60,7 @@ export function AdminBackshopKonfigurationPage() {
             onClick={() => navigate('/admin/backshop-rules')}
             color="text-amber-800"
             bg="bg-amber-50"
+            dataTour="backshop-konfig-hub-rules-card"
           />
           <DashboardCard
             title="Warengruppen sortieren (Backshop)"
@@ -67,6 +69,16 @@ export function AdminBackshopKonfigurationPage() {
             onClick={() => navigate('/admin/backshop-block-sort')}
             color="text-amber-800"
             bg="bg-amber-50"
+            dataTour="backshop-konfig-hub-block-sort-card"
+          />
+          <DashboardCard
+            title="Gruppenregeln (Backshop)"
+            description="Bevorzugte Marke pro Warengruppe, Basis für die Listenansicht"
+            icon={ListFilter}
+            onClick={() => navigate('/admin/backshop-gruppenregeln')}
+            color="text-amber-800"
+            bg="bg-amber-50"
+            dataTour="backshop-konfig-hub-gruppenregeln-card"
           />
         </div>
       </div>

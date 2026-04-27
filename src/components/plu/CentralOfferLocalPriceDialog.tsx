@@ -31,6 +31,10 @@ export interface CentralOfferLocalPriceDialogProps {
   initialLocalPrice?: number | null
   kw_nummer: number
   jahr: number
+  /** Optional: Tutorial-Anker am DialogContent */
+  dataTour?: string
+  /** Optional: Tutorial-Anker am Speichern-Button */
+  submitDataTour?: string
 }
 
 export function CentralOfferLocalPriceDialog({
@@ -43,6 +47,8 @@ export function CentralOfferLocalPriceDialog({
   initialLocalPrice,
   kw_nummer,
   jahr,
+  dataTour,
+  submitDataTour,
 }: CentralOfferLocalPriceDialogProps) {
   const { isViewer } = useAuth()
   const upsertObst = useUpsertObstOfferLocalPrice()
@@ -76,7 +82,10 @@ export function CentralOfferLocalPriceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        {...(dataTour ? { 'data-tour': dataTour } : {})}
+      >
         <DialogHeader>
           <DialogTitle>Eigener Aktionspreis</DialogTitle>
           <DialogDescription>
@@ -109,7 +118,12 @@ export function CentralOfferLocalPriceDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Abbrechen
           </Button>
-          <Button type="button" onClick={handleSave} disabled={isViewer || pending}>
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={isViewer || pending}
+            {...(submitDataTour ? { 'data-tour': submitDataTour } : {})}
+          >
             Speichern
           </Button>
         </DialogFooter>

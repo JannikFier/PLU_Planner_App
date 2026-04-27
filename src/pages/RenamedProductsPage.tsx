@@ -1,7 +1,7 @@
 // RenamedProductsPage – Umbenannte Produkte (Admin/Super-Admin)
 // Liste der umbenannten Master-Items, „Produkte umbenennen“-Dialog, Zurücksetzen mit Bestätigung
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,11 +26,11 @@ import { useBlocks } from '@/hooks/useBlocks'
 import { useBezeichnungsregeln } from '@/hooks/useBezeichnungsregeln'
 import { useOfferItems } from '@/hooks/useOfferItems'
 import {
-  useObstOfferCampaignWithLines,
+  useObstOfferCampaignForKwYear,
   useObstOfferStoreDisabled,
 } from '@/hooks/useCentralOfferCampaigns'
 import { useObstOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalPrices'
-import { useResetProductName } from '@/hooks/useCustomProducts'
+import { useResetProductName, useDeleteObstRenamedByPlu } from '@/hooks/useCustomProducts'
 import { useAuth } from '@/hooks/useAuth'
 import { buildDisplayList } from '@/lib/layout-engine'
 import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
@@ -38,9 +38,18 @@ import { useStoreObstBlockOrder, useStoreObstNameBlockOverrides } from '@/hooks/
 import { buildOfferDisplayMap } from '@/lib/offer-display'
 import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import { orderByPluDisplayOrder } from '@/lib/list-order'
+import { itemMatchesSearch } from '@/lib/plu-helpers'
+import { useListFindInPageSection } from '@/hooks/useListFindInPageSection'
+import { ListFindInPageToolbar } from '@/components/plu/ListFindInPageToolbar'
+import type { ListFindInPageBinding } from '@/components/plu/list-find-in-page-types'
 import { RenameProductsDialog } from '@/components/plu/RenameProductsDialog'
-import { RenamedProductsResponsiveList } from '@/components/plu/RenamedProductsResponsiveList'
+import {
+  RenamedProductsResponsiveList,
+  type RenamedProductDisplayRow,
+} from '@/components/plu/RenamedProductsResponsiveList'
 import type { MasterPLUItem } from '@/types/database'
+import { useStoreListCarryoverRows } from '@/hooks/useStoreListCarryover'
+import { carryoverObstRowToMasterItem } from '@/lib/carryover-master-snapshot'
 
 export function RenamedProductsPage() {
   useAuth()
@@ -51,6 +60,7 @@ export function RenamedProductsPage() {
   const { data: masterItems = [], isLoading: itemsLoading, isError: itemsError } = usePLUData(activeVersion?.id)
   const { data: customProducts = [] } = useCustomProducts()
   const { data: storeRenamed = [], isLoading: renamedLoading } = useRenamedItems()
+  const { data: obstCarryoverRows = [] } = useStoreListCarryoverRows('obst', activeVersion?.id)
   const { data: layoutSettings } = useLayoutSettings()
   const { data: blocks = [] } = useBlocks()
   const { data: regeln = [] } = useBezeichnungsregeln()
@@ -70,10 +80,15 @@ export function RenamedProductsPage() {
     [layoutSettings?.sort_mode, blocks, storeObstBlockOrder, nameBlockOverrides],
   )
   const { data: offerItems = [] } = useOfferItems()
-  const { data: obstCampaign } = useObstOfferCampaignWithLines()
+  const { data: obstCampaign } = useObstOfferCampaignForKwYear(
+    activeVersion?.kw_nummer,
+    activeVersion?.jahr,
+    !!activeVersion,
+  )
   const { data: obstStoreDisabled = new Set() } = useObstOfferStoreDisabled()
   const { overrideMap: obstLocalOverrides } = useObstOfferLocalPriceOverrides(obstCampaign ?? undefined)
   const resetName = useResetProductName()
+  const deleteObstRenamedByPlu = useDeleteObstRenamedByPlu()
   const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
   const flowDirection = (layoutSettings?.flow_direction ?? 'COLUMN_FIRST') as 'ROW_BY_ROW' | 'COLUMN_FIRST'
   const dialogFontSizes = {
@@ -82,18 +97,20 @@ export function RenamedProductsPage() {
     product: layoutSettings?.font_product_px ?? 12,
   }
 
-  const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
+  const { kw: calendarKw, year: calendarJahr } = getKWAndYearFromDate(new Date())
+  const offerMapKw = activeVersion?.kw_nummer ?? calendarKw
+  const offerMapJahr = activeVersion?.jahr ?? calendarJahr
   const offerDisplayByPlu = useMemo(
     () =>
       buildOfferDisplayMap(
-        currentKw,
-        currentJahr,
+        offerMapKw,
+        offerMapJahr,
         obstCampaign ?? null,
         obstStoreDisabled,
         offerItems,
         obstLocalOverrides,
       ),
-    [currentKw, currentJahr, obstCampaign, obstStoreDisabled, offerItems, obstLocalOverrides],
+    [offerMapKw, offerMapJahr, obstCampaign, obstStoreDisabled, offerItems, obstLocalOverrides],
   )
 
   const canonicalListOrderPlu = useMemo(() => {
@@ -124,8 +141,8 @@ export function RenamedProductsPage() {
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
       versionKwNummer: version?.kw_nummer ?? 0,
       versionJahr: version?.jahr ?? now.getFullYear(),
-      currentKwNummer: currentKw,
-      currentJahr,
+      currentKwNummer: offerMapKw,
+      currentJahr: offerMapJahr,
       nameBlockOverrides,
       storeBlockOrder: storeObstBlockOrder,
     })
@@ -139,33 +156,89 @@ export function RenamedProductsPage() {
     blocks,
     layoutSettings,
     activeVersion,
-    currentKw,
-    currentJahr,
+    offerMapKw,
+    offerMapJahr,
     nameBlockOverrides,
     storeObstBlockOrder,
   ])
 
-  // Produkte, die in der aktuellen Version vorkommen UND marktspezifisch umbenannt sind
+  /** Nur in der Liste (Carryover), nicht im Zentral-Master dieser KW – für Umbenennen-Dialog + Übersicht. */
+  const carryoverMastersIncluded = useMemo(() => {
+    if (!activeVersion?.id) return [] as MasterPLUItem[]
+    return obstCarryoverRows
+      .filter((r) => r.market_include)
+      .map((r) => carryoverObstRowToMasterItem(r, activeVersion.id))
+  }, [obstCarryoverRows, activeVersion?.id])
+
+  const masterByPluForRenamed = useMemo(() => {
+    const m = new Map<string, MasterPLUItem>()
+    for (const item of masterItems) m.set(item.plu, item)
+    for (const c of carryoverMastersIncluded) {
+      if (!m.has(c.plu)) m.set(c.plu, c)
+    }
+    return m
+  }, [masterItems, carryoverMastersIncluded])
+
+  const searchableItemsForRename = useMemo(() => Array.from(masterByPluForRenamed.values()), [masterByPluForRenamed])
+
+  // Marktspezifisch umbenannt: Master ODER Carryover-Zeile (PLU nur in Carryover)
   const renamedItems = useMemo(() => {
-    const renamedPlus = new Set(storeRenamed.map((r) => r.plu))
-    const byPlu = new Map(storeRenamed.map((r) => [r.plu, r]))
-    return masterItems
-      .filter((m) => renamedPlus.has(m.plu))
-      .map((m) => {
-        const r = byPlu.get(m.plu)!
-        return { ...m, display_name: r.display_name }
-      })
-  }, [masterItems, storeRenamed])
+    const out: MasterPLUItem[] = []
+    for (const r of storeRenamed) {
+      const base = masterByPluForRenamed.get(r.plu)
+      if (!base) continue
+      out.push({ ...base, display_name: r.display_name })
+    }
+    return out
+  }, [storeRenamed, masterByPluForRenamed])
 
   const sortedRenamedItems = useMemo(
     () => orderByPluDisplayOrder(renamedItems, (x) => x.plu, canonicalListOrderPlu),
     [renamedItems, canonicalListOrderPlu],
   )
 
+  const renamedListRows: RenamedProductDisplayRow[] = useMemo(
+    () =>
+      sortedRenamedItems.map((item) => ({
+        plu: item.plu,
+        systemName: item.system_name,
+        currentName: item.display_name ?? item.system_name,
+        thumbUrl: null,
+        onReset: () => setResetConfirmItem(item),
+      })),
+    [sortedRenamedItems],
+  )
+
+  const matchRenamedRowForFind = useCallback((row: RenamedProductDisplayRow, q: string) => {
+    return itemMatchesSearch(
+      { plu: row.plu, display_name: row.currentName, system_name: row.systemName },
+      q,
+    )
+  }, [])
+
+  const renamedListFind = useListFindInPageSection({
+    items: renamedListRows,
+    scopeId: 'renamed-products-obst-page',
+    isMatch: matchRenamedRowForFind,
+  })
+
+  const renamedFindInPageBinding = useMemo((): ListFindInPageBinding | undefined => {
+    if (renamedListRows.length === 0) return undefined
+    return {
+      scopeId: 'renamed-products-obst-page',
+      activeRowIndex: renamedListFind.activeRowIndex,
+      matchIndices: renamedListFind.matchIndices,
+    }
+  }, [renamedListRows.length, renamedListFind.activeRowIndex, renamedListFind.matchIndices])
+
   const handleResetConfirm = async () => {
     if (!resetConfirmItem) return
     try {
-      await resetName.mutateAsync({ id: resetConfirmItem.id, systemName: resetConfirmItem.system_name })
+      if (resetConfirmItem.id.startsWith('carryover-')) {
+        await deleteObstRenamedByPlu.mutateAsync({ plu: resetConfirmItem.plu })
+      } else {
+        await resetName.mutateAsync({ id: resetConfirmItem.id, systemName: resetConfirmItem.system_name })
+      }
       setResetConfirmItem(null)
     } catch {
       // Toast im Hook
@@ -188,20 +261,38 @@ export function RenamedProductsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg p-2 bg-muted">
-              <Pencil className="h-5 w-5 text-muted-foreground" />
+        <div
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+          data-tour="obst-renamed-toolbar"
+        >
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg p-2 bg-muted">
+                <Pencil className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">Umbenannte Produkte</h2>
+                <p className="text-sm text-muted-foreground">
+                  Anzeigenamen anpassen oder auf das Original zurücksetzen.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight">Umbenannte Produkte</h2>
-              <p className="text-sm text-muted-foreground">
-                Anzeigenamen anpassen oder auf das Original zurücksetzen.
-              </p>
-            </div>
+            {!itemsLoading && !renamedLoading && renamedListRows.length > 0 && (
+              <ListFindInPageToolbar
+                showBar={renamedListFind.showBar}
+                onOpen={renamedListFind.openSearch}
+                barProps={renamedListFind.findInPageBarProps}
+                dataTour="obst-renamed-search"
+              />
+            )}
           </div>
 
-          <Button variant="outline" size="sm" onClick={() => setShowRenameDialog(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowRenameDialog(true)}
+            data-tour="obst-renamed-add-button"
+          >
             <Pencil className="h-4 w-4 mr-2" />
             Produkte umbenennen
           </Button>
@@ -235,18 +326,15 @@ export function RenamedProductsPage() {
         )}
 
         {!itemsLoading && !renamedLoading && sortedRenamedItems.length > 0 && (
-          <Card>
+          <Card data-tour="obst-renamed-list">
             <CardContent className="p-0">
               <RenamedProductsResponsiveList
                 variant="obst"
-                resetPending={resetName.isPending}
-                rows={sortedRenamedItems.map((item) => ({
-                  plu: item.plu,
-                  systemName: item.system_name,
-                  currentName: item.display_name ?? item.system_name,
-                  thumbUrl: null,
-                  onReset: () => setResetConfirmItem(item),
-                }))}
+                resetPending={resetName.isPending || deleteObstRenamedByPlu.isPending}
+                rows={renamedListRows}
+                findInPage={renamedFindInPageBinding}
+                firstItemDataTour="obst-renamed-first-item"
+                firstResetButtonDataTour="obst-renamed-reset-button"
               />
             </CardContent>
           </Card>
@@ -255,16 +343,19 @@ export function RenamedProductsPage() {
         <RenameProductsDialog
           open={showRenameDialog}
           onOpenChange={setShowRenameDialog}
-          searchableItems={masterItems}
+          searchableItems={searchableItemsForRename}
           displayMode={displayMode}
           renamedOverrides={storeRenamed.map((r) => ({ plu: r.plu, display_name: r.display_name }))}
           listLayout={renameDialogListLayout}
           flowDirection={flowDirection}
           fontSizes={dialogFontSizes}
+          dataTour="obst-renamed-add-dialog"
+          renameDialogDataTour="obst-renamed-rename-dialog"
+          renameDialogSubmitDataTour="obst-renamed-rename-dialog-submit"
         />
 
         <AlertDialog open={!!resetConfirmItem} onOpenChange={(open) => !open && setResetConfirmItem(null)}>
-          <AlertDialogContent>
+          <AlertDialogContent data-tour="obst-renamed-reset-confirm">
             <AlertDialogHeader>
               <AlertDialogTitle>Produktnamen zurücksetzen?</AlertDialogTitle>
               <AlertDialogDescription>
@@ -274,8 +365,13 @@ export function RenamedProductsPage() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-              <AlertDialogAction onClick={handleResetConfirm} disabled={resetName.isPending}>
-                {resetName.isPending ? 'Wird zurückgesetzt…' : 'Zurücksetzen'}
+              <AlertDialogAction
+                onClick={handleResetConfirm}
+                disabled={resetName.isPending || deleteObstRenamedByPlu.isPending}
+              >
+                {resetName.isPending || deleteObstRenamedByPlu.isPending
+                  ? 'Wird zurückgesetzt…'
+                  : 'Zurücksetzen'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -132,3 +132,43 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/40;
 }
+
+/* ============================================
+   === Tutorial Demo Overlays ===
+   Wird von src/lib/tutorial-demo-overlay.ts gesetzt/entfernt.
+   --demo-bg kann pro Aufruf dynamisch gesetzt werden (Werbungs-Gelbtoene).
+   ============================================ */
+.tutorial-demo--plu-row-yellow {
+  background: #FEF3C7 !important;
+  box-shadow: inset 4px 0 0 #F59E0B;
+}
+.tutorial-demo--plu-row-red {
+  background: #FEE2E2 !important;
+  box-shadow: inset 4px 0 0 #DC2626;
+}
+.tutorial-demo--plu-row-werbung {
+  background: #FCE7F3 !important;
+  box-shadow: inset 4px 0 0 #DB2777;
+}
+.tutorial-demo--plu-row-werbung-kw0,
+.tutorial-demo--plu-row-werbung-kw1,
+.tutorial-demo--plu-row-werbung-kw2 {
+  background: var(--demo-bg, #FEF3C7) !important;
+}
+.tutorial-demo--plu-cell-stueck {
+  outline: 2px dashed #2563EB;
+  outline-offset: -2px;
+}
+.tutorial-demo--plu-cell-gewicht {
+  outline: 2px dashed #16A34A;
+  outline-offset: -2px;
+}
+.tutorial-demo--pulse-ring {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+  animation: tutorial-pulse 1.5s ease-in-out infinite;
+}
+@keyframes tutorial-pulse {
+  0%, 100% { outline-color: var(--ring); }
+  50%      { outline-color: transparent; }
+}

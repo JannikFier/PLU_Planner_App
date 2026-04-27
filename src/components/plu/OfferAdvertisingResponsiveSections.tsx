@@ -117,6 +117,8 @@ export interface CentralOfferCampaignSectionProps {
   onOpenLocalPrice: (row: CentralOfferCampaignRow) => void
   /** Backshop: Bildspalte + kompaktere Mobile-Zeilen */
   domain?: 'obst' | 'backshop'
+  /** Optional: Tutorial-Anker am ersten Eintrag (Desktop-Zeile + Mobile-Karte) */
+  firstItemDataTour?: string
 }
 
 export function CentralOfferCampaignSection({
@@ -131,6 +133,7 @@ export function CentralOfferCampaignSection({
   onToggleMegaphone,
   onOpenLocalPrice,
   domain = 'obst',
+  firstItemDataTour,
 }: CentralOfferCampaignSectionProps) {
   const isBackshop = domain === 'backshop'
 
@@ -167,13 +170,16 @@ export function CentralOfferCampaignSection({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {rows.map((row, rowIndex) => (
                 <tr
                   key={row.plu}
                   className={cn(
                     'border-b border-border last:border-b-0 hover:bg-muted/30',
                     row.hiddenForStore && 'opacity-50 line-through',
                   )}
+                  {...(firstItemDataTour && rowIndex === 0
+                    ? { 'data-tour': firstItemDataTour }
+                    : {})}
                 >
                   <td className="px-3 py-2 align-middle">
                     <Button
@@ -214,8 +220,14 @@ export function CentralOfferCampaignSection({
         </div>
 
         <ul className="md:hidden divide-y divide-border" data-testid={`${dataTestId}-mobile-list`}>
-          {rows.map((row) => (
-            <li key={row.plu} className="px-3 py-2.5">
+          {rows.map((row, rowIndex) => (
+            <li
+              key={row.plu}
+              className="px-3 py-2.5"
+              {...(firstItemDataTour && rowIndex === 0
+                ? { 'data-tour': firstItemDataTour }
+                : {})}
+            >
               <div className="flex gap-2 items-start">
                 <Button
                   type="button"
@@ -300,6 +312,8 @@ export interface LocalOwnOfferSectionProps {
   removePending: boolean
   onDurationChange: (plu: string, durationWeeks: number) => void
   onRemove: (plu: string) => void
+  /** Optional: Tutorial-Anker am ersten Eintrag (Desktop-Zeile + Mobile-Karte) */
+  firstItemDataTour?: string
 }
 
 export function LocalOwnOfferSection({
@@ -310,6 +324,7 @@ export function LocalOwnOfferSection({
   removePending,
   onDurationChange,
   onRemove,
+  firstItemDataTour,
 }: LocalOwnOfferSectionProps) {
   return (
     <>
@@ -348,8 +363,14 @@ export function LocalOwnOfferSection({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-b border-border last:border-b-0 hover:bg-muted/30">
+              {rows.map((row, rowIndex) => (
+                <tr
+                  key={row.id}
+                  className="border-b border-border last:border-b-0 hover:bg-muted/30"
+                  {...(firstItemDataTour && rowIndex === 0
+                    ? { 'data-tour': firstItemDataTour }
+                    : {})}
+                >
                   <td className="px-3 py-3 font-mono text-sm align-middle whitespace-nowrap">{getDisplayPlu(row.plu)}</td>
                   <td className="px-3 py-3 text-sm align-middle min-w-0 break-words">{row.name}</td>
                   <td className="px-3 py-3 text-sm tabular-nums align-middle">
@@ -401,8 +422,14 @@ export function LocalOwnOfferSection({
         </div>
 
         <ul className="md:hidden divide-y divide-border" data-testid={`${dataTestId}-mobile-list`}>
-          {rows.map((row) => (
-            <li key={row.id} className="px-4 py-3 space-y-3">
+          {rows.map((row, rowIndex) => (
+            <li
+              key={row.id}
+              className="px-4 py-3 space-y-3"
+              {...(firstItemDataTour && rowIndex === 0
+                ? { 'data-tour': firstItemDataTour }
+                : {})}
+            >
               <div>
                 <p className="font-mono text-sm">{getDisplayPlu(row.plu)}</p>
                 <p className="text-sm break-words mt-1">{row.name}</p>

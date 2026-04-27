@@ -27,6 +27,7 @@ const SUPER_ADMIN_MARKET_STORE_PATHS = [
   '/super-admin/block-sort',
   '/super-admin/obst-warengruppen',
   '/super-admin/backshop-block-sort',
+  '/super-admin/backshop-warengruppen',
 ] as const
 
 function isSuperAdminMarketStorePath(pathname: string): boolean {

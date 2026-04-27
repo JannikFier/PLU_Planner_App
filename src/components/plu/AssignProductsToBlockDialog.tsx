@@ -188,7 +188,10 @@ export function AssignProductsToBlockDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-7xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
+      <DialogContent
+        className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-7xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden"
+        data-tour="obst-konfig-warengruppen-assign-dialog"
+      >
         <DialogHeader className="shrink-0">
           <DialogTitle>Produkte zur Warengruppe hinzufügen</DialogTitle>
           <DialogDescription>
@@ -207,6 +210,7 @@ export function AssignProductsToBlockDialog({
               onChange={(e) => setSearchText(e.target.value)}
               className="pl-9"
               aria-label="Suche"
+              data-tour="obst-konfig-warengruppen-assign-search"
             />
           </div>
 
@@ -219,7 +223,11 @@ export function AssignProductsToBlockDialog({
               </div>
             ) : (
               <div ref={scrollContainerRef} className="overflow-auto flex-1 min-h-0">
-                <ul className="md:hidden divide-y divide-border" data-testid="assign-products-to-block-dialog-mobile-list">
+                <ul
+                  className="md:hidden divide-y divide-border"
+                  data-testid="assign-products-to-block-dialog-mobile-list"
+                  data-tour="obst-konfig-warengruppen-assign-mobile-list"
+                >
                   {layout.mobileRows.map((row, i) => {
                     if (row.type === 'section') {
                       const stueck = row.title.includes('Stück')
@@ -280,7 +288,10 @@ export function AssignProductsToBlockDialog({
 
                 {/* Desktop: Zeilenweise */}
                 {layout.mode === 'row_by_row' && (
-                  <table className="hidden md:table w-full table-fixed">
+                  <table
+                    className="hidden md:table w-full table-fixed"
+                    data-tour="obst-konfig-warengruppen-assign-desktop-table"
+                  >
                     <colgroup>
                       <col className="w-[36px]" />
                       <col className="w-[80px]" />
@@ -297,6 +308,7 @@ export function AssignProductsToBlockDialog({
                             id="select-all"
                             checked={selectedPLUs.size === filteredItems.length && filteredItems.length > 0}
                             onCheckedChange={selectAll}
+                            data-tour="obst-konfig-warengruppen-assign-select-all"
                           />
                         </th>
                         <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
@@ -423,7 +435,10 @@ export function AssignProductsToBlockDialog({
                 {/* Desktop: Spaltenweise Obst (Zeitung) */}
                 {layout.mode === 'newspaper_obst' && (
                   <div className="hidden md:block">
-                    <table className="w-full table-fixed">
+                    <table
+                      className="w-full table-fixed"
+                      data-tour="obst-konfig-warengruppen-assign-desktop-table"
+                    >
                       <colgroup>
                         <col className="w-[36px]" />
                         <col className="w-[80px]" />
@@ -440,6 +455,7 @@ export function AssignProductsToBlockDialog({
                               id="select-all-np"
                               checked={selectedPLUs.size === filteredItems.length && filteredItems.length > 0}
                               onCheckedChange={selectAll}
+                              data-tour="obst-konfig-warengruppen-assign-select-all"
                             />
                           </th>
                           <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
@@ -529,12 +545,17 @@ export function AssignProductsToBlockDialog({
         </div>
 
         <DialogFooter className="shrink-0">
-          <Button variant="outline" onClick={() => handleClose(false)}>
+          <Button
+            variant="outline"
+            onClick={() => handleClose(false)}
+            data-tour="obst-konfig-warengruppen-assign-cancel"
+          >
             Abbrechen
           </Button>
           <Button
             onClick={handleAssign}
             disabled={!blockId || selectedPLUs.size === 0 || assignOverride.isPending}
+            data-tour="obst-konfig-warengruppen-assign-submit"
           >
             <UserPlus className="h-4 w-4 mr-2" />
             {assignOverride.isPending

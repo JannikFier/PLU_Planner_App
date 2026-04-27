@@ -1,39 +1,32 @@
-// RulesPage: Bezeichnungsregeln + Warengruppen verwalten
+// RulesPage: Bezeichnungsregeln (Obst/Gemüse) – Warengruppen nur noch unter „Warengruppen (Obst & Gemüse)“
 
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, ArrowRight, ExternalLink, Info, Settings } from 'lucide-react'
+import { Plus, ArrowRight } from 'lucide-react'
 
 import { useBezeichnungsregeln } from '@/hooks/useBezeichnungsregeln'
-import { useLayoutSettings } from '@/hooks/useLayoutSettings'
 import { SchlagwortManager } from '@/components/plu/SchlagwortManager'
-import { WarengruppenPanel } from '@/components/plu/WarengruppenPanel'
 
 export function RulesPage() {
-  const navigate = useNavigate()
   const { data: regeln = [] } = useBezeichnungsregeln()
-  const { data: layoutSettings } = useLayoutSettings()
   const [showSchlagwortManager, setShowSchlagwortManager] = useState(false)
-
-  const isByBlock = layoutSettings?.sort_mode === 'BY_BLOCK'
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-6" data-tour="obst-konfig-rules-page">
         {/* Header */}
         <div>
             <h2 className="text-2xl font-bold tracking-tight">Inhalt & Regeln</h2>
             <p className="text-sm text-muted-foreground">
-              Bezeichnungsregeln und Warengruppen verwalten.
+              Bezeichnungsregeln für Produktnamen verwalten.
             </p>
         </div>
 
         {/* === BEZEICHNUNGSREGELN === */}
-        <Card>
+        <Card data-tour="obst-konfig-rules-keywords-card">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Bezeichnungsregeln</CardTitle>
@@ -41,7 +34,11 @@ export function RulesPage() {
                 Automatische Namensanpassungen (z.B. "Bio" immer vorne).
               </CardDescription>
             </div>
-            <Button size="sm" onClick={() => setShowSchlagwortManager(true)}>
+            <Button
+              size="sm"
+              onClick={() => setShowSchlagwortManager(true)}
+              data-tour="obst-konfig-rules-add-button"
+            >
               <Plus className="h-4 w-4 mr-1" /> Regel
             </Button>
           </CardHeader>
@@ -49,7 +46,7 @@ export function RulesPage() {
             {regeln.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Regeln angelegt.</p>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2" data-tour="obst-konfig-rules-badge-list">
                 {regeln.map((regel) => (
                   <Badge
                     key={regel.id}
@@ -66,55 +63,6 @@ export function RulesPage() {
             )}
           </CardContent>
         </Card>
-
-        {/* === WARENGRUPPEN === */}
-        {isByBlock ? (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Warengruppen</CardTitle>
-                <CardDescription>
-                  Produkte in logische Gruppen einteilen und zuweisen.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <WarengruppenPanel />
-              </CardContent>
-            </Card>
-
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => navigate('/super-admin/block-sort')}
-            >
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Liste interaktiv bearbeiten
-            </Button>
-          </div>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Warengruppen</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50 border border-border">
-                <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Warengruppen werden nur angezeigt wenn die Sortierung auf{' '}
-                    <strong>"Nach Warengruppen"</strong> eingestellt ist.
-                  </p>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to="/super-admin/layout">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Zu den Layout-Einstellungen
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       {/* Schlagwort-Manager Dialog */}

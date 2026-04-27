@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
-export type BackshopThumbnailSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl'
+export type BackshopThumbnailSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'hero'
 
 const SIZE_CLASS: Record<BackshopThumbnailSize, string> = {
   sm: 'h-8 w-8',
@@ -12,6 +12,10 @@ const SIZE_CLASS: Record<BackshopThumbnailSize, string> = {
   xl: 'h-20 w-20',
   /** Listen (Desktop): große Vorschau neben PLU/Name */
   '2xl': 'h-24 w-24',
+  /** Warengruppen-Karten (kompakt) */
+  '3xl': 'h-16 w-16 sm:h-[72px] sm:w-[72px]',
+  /** Warengruppen-Workbench: volle Kartenbreite (3er-Raster: etwas niedriger) */
+  hero: 'h-28 w-full min-h-[112px] self-stretch max-w-none rounded-lg sm:h-32 sm:min-h-[128px]',
 }
 
 export interface BackshopThumbnailProps {

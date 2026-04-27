@@ -5,25 +5,25 @@ import type { BackshopCompareItem } from '@/types/plu'
 import type { BackshopBlock, BackshopBlockRule } from '@/types/database'
 
 /**
- * Schlägt für neue Backshop-Produkte (status NEW_PRODUCT_YELLOW) eine block_id vor.
+ * Schlägt für Backshop-Produkte eine block_id vor.
  * 1. NAME_CONTAINS-Regeln anwenden (first match wins, sortiert nach created_at).
  * 2. Fallback: Wenn Produktname den Warengruppen-Namen enthält, diese Gruppe zuweisen.
+ * @param items zu prüfende Items (z. B. alle neuen oder alle ohne block_id)
  * @returns Map plu → block_id (nur Einträge mit Vorschlag)
  */
-export function suggestBlockIdsForNewItems(
+function buildSuggestions(
   items: BackshopCompareItem[],
   blocks: BackshopBlock[],
   rules: BackshopBlockRule[],
 ): Map<string, string> {
   const result = new Map<string, string>()
-  const newItems = items.filter((i) => i.status === 'NEW_PRODUCT_YELLOW')
-  if (newItems.length === 0) return result
+  if (items.length === 0) return result
 
   const nameContainsRules = rules
     .filter((r) => r.rule_type === 'NAME_CONTAINS')
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
-  for (const item of newItems) {
+  for (const item of items) {
     const searchName = (item.display_name ?? item.system_name ?? '').trim()
     if (!searchName) continue
 
@@ -51,4 +51,32 @@ export function suggestBlockIdsForNewItems(
   }
 
   return result
+}
+
+/**
+ * Schlägt für neue Backshop-Produkte (status NEW_PRODUCT_YELLOW) eine block_id vor.
+ */
+export function suggestBlockIdsForNewItems(
+  items: BackshopCompareItem[],
+  blocks: BackshopBlock[],
+  rules: BackshopBlockRule[],
+): Map<string, string> {
+  return buildSuggestions(items.filter((i) => i.status === 'NEW_PRODUCT_YELLOW'), blocks, rules)
+}
+
+/**
+ * Schlägt für alle Items ohne bestehende block_id eine Warengruppe vor
+ * (unabhängig vom Status). Wird beim Upload genutzt, damit auch „unveränderte"
+ * Produkte ohne Zuordnung aus dem aktiven Master automatisch eingruppiert werden.
+ */
+export function suggestBlockIdsForUnassignedItems(
+  items: BackshopCompareItem[],
+  blocks: BackshopBlock[],
+  rules: BackshopBlockRule[],
+): Map<string, string> {
+  return buildSuggestions(
+    items.filter((i) => i.block_id == null || i.block_id === ''),
+    blocks,
+    rules,
+  )
 }

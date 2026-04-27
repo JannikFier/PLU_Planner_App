@@ -87,12 +87,13 @@ export function ChangePasswordPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" data-tour="change-password-form">
               <div className="space-y-2">
                 <Label htmlFor="new-password">Neues Passwort</Label>
                 <div className="relative">
                   <Input
                     id="new-password"
+                    data-tour="change-password-new"
                     type={showNewPassword ? 'text' : 'password'}
                     placeholder="Mindestens 6 Zeichen"
                     value={newPassword}
@@ -121,6 +122,7 @@ export function ChangePasswordPage() {
                 <div className="relative">
                   <Input
                     id="confirm-password"
+                    data-tour="change-password-confirm"
                     type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="Passwort wiederholen"
                     value={confirmPassword}
@@ -160,7 +162,12 @@ export function ChangePasswordPage() {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isSubmitting}
+                data-tour="change-password-submit"
+              >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

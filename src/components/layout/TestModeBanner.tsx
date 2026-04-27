@@ -26,7 +26,7 @@ export function TestModeBanner() {
       <div className="pointer-events-none fixed inset-0 z-[100] border-[3px] border-yellow-400 rounded-sm" style={{ boxShadow: 'inset 0 0 20px rgba(250, 204, 21, 0.4), 0 0 20px rgba(250, 204, 21, 0.3)' }} />
 
       {/* Schwebender Badge unten rechts */}
-      <div className="fixed bottom-4 right-4 z-[101]">
+      <div className="fixed bottom-4 right-4 z-[101]" data-tour="testmode-exit-button">
         <Button
           size="sm"
           className="gap-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 shadow-lg shadow-yellow-400/30"

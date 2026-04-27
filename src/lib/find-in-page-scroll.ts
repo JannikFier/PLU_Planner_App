@@ -38,3 +38,29 @@ export function scrollToDataRowIndex(idx: number, options?: ScrollIntoViewOption
     }
   }
 }
+
+/**
+ * Wie scrollToDataRowIndex, aber nur innerhalb eines Containers `[data-find-in-scope="scopeId"]`,
+ * damit mehrere Listen auf einer Seite nicht dieselben data-row-index-Werte verwechseln.
+ */
+export function scrollToDataRowIndexInScope(
+  scopeId: string,
+  idx: number,
+  options?: ScrollIntoViewOptions,
+): void {
+  const root = document.querySelector(`[data-find-in-scope="${CSS.escape(scopeId)}"]`)
+  if (!root) return
+  const list = root.querySelectorAll<HTMLElement>(`[data-row-index="${idx}"]`)
+  const merged: ScrollIntoViewOptions = {
+    block: 'center',
+    behavior: 'smooth',
+    inline: 'nearest',
+    ...options,
+  }
+  for (const el of list) {
+    if (isDomElementVisible(el)) {
+      el.scrollIntoView(merged)
+      return
+    }
+  }
+}

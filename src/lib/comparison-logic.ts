@@ -104,6 +104,7 @@ export function compareWithCurrentVersion(input: CompareInput): ComparisonResult
       block_id: null,
       is_admin_eigen: false,
       is_manually_renamed: false,
+      is_manual_supplement: false,
       preis: null,
       created_at: new Date().toISOString(),
     }
@@ -219,6 +220,7 @@ export function resolveConflicts(
         block_id: null,
         is_admin_eigen: false,
         is_manually_renamed: false,
+        is_manual_supplement: false,
         preis: null,
         created_at: new Date().toISOString(),
       })
@@ -237,6 +239,7 @@ export function resolveConflicts(
         block_id: null,
         is_admin_eigen: false,
         is_manually_renamed: false,
+        is_manual_supplement: false,
         preis: null,
         created_at: new Date().toISOString(),
       })
@@ -383,6 +386,7 @@ export function compareBackshopWithCurrentVersion(input: CompareBackshopInput): 
       status: 'UNCHANGED',
       old_plu: null,
       image_url: imageUrl,
+      is_manual_supplement: false,
     }
 
     if (isFirstUpload) {

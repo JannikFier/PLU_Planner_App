@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { dismissTutorialWelcomeIfVisible } from './dismiss-tutorial-welcome'
 
 /**
  * User-Journey: Login → /user → Dashboard → Masterliste, Backshop, Eigenes, Ausgeblendete.
@@ -19,6 +20,7 @@ test.describe('User-Journey @extended', () => {
     await expect(page).toHaveURL(/\/user/, { timeout: 15_000 })
     // Warte auf Dashboard-Inhalt (Store + Visibility laden auf localhost)
     await page.waitForLoadState('networkidle')
+    await dismissTutorialWelcomeIfVisible(page)
     await expect(page.getByRole('heading', { name: 'Willkommen', level: 2 })).toBeVisible({ timeout: 15_000 })
   })
 
@@ -124,6 +126,8 @@ test.describe('User-Journey @extended', () => {
     await expect(page).toHaveURL(/\/user\/backshop-hidden-products/)
     await page.waitForLoadState('networkidle')
     await expect(page.getByRole('heading', { name: 'Ausgeblendete Produkte (Backshop)' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('tab', { name: /Manuell ausgeblendet/i })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('tab', { name: /Durch Regel gefiltert/i })).toBeVisible({ timeout: 15_000 })
   })
 
   test('Backshop Werbung: Seite lädt', async ({ page }) => {

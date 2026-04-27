@@ -162,7 +162,10 @@ export function HideBackshopProductsDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-6xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
+      <DialogContent
+        data-tour="backshop-hidden-add-dialog"
+        className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-6xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden"
+      >
         <DialogHeader className="shrink-0">
           <DialogTitle>Produkte ausblenden (Backshop)</DialogTitle>
           <DialogDescription>
@@ -373,6 +376,7 @@ export function HideBackshopProductsDialog({
           <Button
             onClick={handleHide}
             disabled={selectedPLUs.size === 0 || hideProduct.isPending}
+            data-tour="backshop-hidden-add-dialog-submit"
           >
             <EyeOff className="h-4 w-4 mr-2" />
             {hideProduct.isPending ? 'Wird ausgeblendet…' : `${selectedPLUs.size} Produkt${selectedPLUs.size !== 1 ? 'e' : ''} ausblenden`}

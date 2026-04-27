@@ -1,6 +1,6 @@
 // Backshop: Umbenannte Produkte (Admin/Super-Admin), inkl. Bild im Umbenennen-Dialog
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -29,7 +29,7 @@ import {
 } from '@/hooks/useCentralOfferCampaigns'
 import { useBackshopOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalPrices'
 import { useBackshopRenamedItems } from '@/hooks/useBackshopRenamedItems'
-import { useResetBackshopProductName } from '@/hooks/useBackshopRename'
+import { useResetBackshopProductName, useDeleteBackshopRenamedByPlu } from '@/hooks/useBackshopRename'
 import { useAuth } from '@/hooks/useAuth'
 import { buildBackshopDisplayList } from '@/lib/layout-engine'
 import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
@@ -40,9 +40,24 @@ import {
 import { buildOfferDisplayMap } from '@/lib/offer-display'
 import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import { orderByPluDisplayOrder } from '@/lib/list-order'
+import { itemMatchesSearch } from '@/lib/plu-helpers'
+import { useListFindInPageSection } from '@/hooks/useListFindInPageSection'
+import { ListFindInPageToolbar } from '@/components/plu/ListFindInPageToolbar'
+import type { ListFindInPageBinding } from '@/components/plu/list-find-in-page-types'
 import { RenameProductsDialog } from '@/components/plu/RenameProductsDialog'
-import { RenamedProductsResponsiveList } from '@/components/plu/RenamedProductsResponsiveList'
-import type { BackshopMasterPLUItem, Block } from '@/types/database'
+import {
+  RenamedProductsResponsiveList,
+  type RenamedProductDisplayRow,
+} from '@/components/plu/RenamedProductsResponsiveList'
+import type { BackshopMasterPLUItem, BackshopSource, Block } from '@/types/database'
+import { useStoreListCarryoverRows } from '@/hooks/useStoreListCarryover'
+import { carryoverBackshopRowToMasterItem } from '@/lib/carryover-master-snapshot'
+import { useBackshopLineVisibilityOverrides } from '@/hooks/useBackshopLineVisibilityOverrides'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
+import { useBackshopProductGroups } from '@/hooks/useBackshopProductGroups'
+import { useBackshopSourceChoicesForStore } from '@/hooks/useBackshopSourceChoices'
+import { useBackshopSourceRulesForStore } from '@/hooks/useBackshopSourceRules'
+import { scopeProductGroupsByEffectiveBlock } from '@/lib/backshop-product-groups-scope-by-effective-block'
 
 export function BackshopRenamedProductsPage() {
   useAuth()
@@ -62,13 +77,68 @@ export function BackshopRenamedProductsPage() {
     backshopCampaign ?? undefined,
   )
   const { data: globalRenamed = [], isLoading: renamedLoading } = useBackshopRenamedItems()
+  const { data: backshopCarryoverRows = [] } = useStoreListCarryoverRows('backshop', activeVersion?.id)
   const resetName = useResetBackshopProductName()
+  const deleteBackshopRenamedByPlu = useDeleteBackshopRenamedByPlu()
   const { data: storeBackshopBlockOrder = [] } = useStoreBackshopBlockOrder()
   const { data: storeBackshopNameOverrides = [] } = useStoreBackshopNameBlockOverrides()
+  const { lineForceShowKeys, lineForceHideKeys } = useBackshopLineVisibilityOverrides()
   const nameBlockOverrides = useMemo(
     () => buildNameBlockOverrideMap(storeBackshopNameOverrides),
     [storeBackshopNameOverrides],
   )
+
+  const { currentStoreId } = useCurrentStore()
+  const { data: productGroups = [] } = useBackshopProductGroups()
+  const { data: sourceChoices = [] } = useBackshopSourceChoicesForStore(currentStoreId)
+  const { data: backshopBlockSourceRules = [] } = useBackshopSourceRulesForStore(currentStoreId)
+  const productGroupsForStore = useMemo(
+    () => scopeProductGroupsByEffectiveBlock(productGroups, nameBlockOverrides),
+    [productGroups, nameBlockOverrides],
+  )
+  const blockPreferredSourceByBlockId = useMemo(() => {
+    const m = new Map<string, BackshopSource>()
+    for (const r of backshopBlockSourceRules) {
+      m.set(r.block_id, r.preferred_source as BackshopSource)
+    }
+    return m
+  }, [backshopBlockSourceRules])
+  const {
+    productGroupByPluSource,
+    chosenSourcesByGroup,
+    memberSourcesByGroup,
+    productGroupNames,
+    groupBlockIdByGroupId,
+  } = useMemo(() => {
+    const byPluSource = new Map<string, string>()
+    const names = new Map<string, string>()
+    for (const g of productGroupsForStore) {
+      names.set(g.id, g.display_name)
+      for (const mm of g.members) {
+        byPluSource.set(`${mm.plu}|${mm.source}`, g.id)
+      }
+    }
+    const chosen = new Map<string, BackshopSource[]>()
+    for (const c of sourceChoices) {
+      chosen.set(c.group_id, (c.chosen_sources ?? []) as BackshopSource[])
+    }
+    const memberSourcesByG = new Map<string, Set<BackshopSource>>()
+    const groupBlock = new Map<string, string | null>()
+    for (const g of productGroupsForStore) {
+      const s = new Set<BackshopSource>()
+      for (const mem of g.members) s.add(mem.source as BackshopSource)
+      memberSourcesByG.set(g.id, s)
+      groupBlock.set(g.id, g.block_id ?? null)
+    }
+    return {
+      productGroupByPluSource: byPluSource,
+      chosenSourcesByGroup: chosen,
+      memberSourcesByGroup: memberSourcesByG,
+      productGroupNames: names,
+      groupBlockIdByGroupId: groupBlock,
+    }
+  }, [productGroupsForStore, sourceChoices])
+
   const renameDialogListLayout = useMemo(
     () => ({
       sortMode: (layoutSettings?.sort_mode ?? 'ALPHABETICAL') as 'ALPHABETICAL' | 'BY_BLOCK',
@@ -125,6 +195,14 @@ export function BackshopRenamedProductsPage() {
       currentJahr,
       nameBlockOverrides,
       storeBlockOrder: storeBackshopBlockOrder,
+      productGroupByPluSource,
+      memberSourcesByGroup,
+      chosenSourcesByGroup,
+      productGroupNames,
+      blockPreferredSourceByBlockId,
+      groupBlockIdByGroupId,
+      lineForceShowKeys,
+      lineForceHideKeys,
     })
     return items.map((i) => i.plu)
   }, [
@@ -139,34 +217,101 @@ export function BackshopRenamedProductsPage() {
     currentJahr,
     nameBlockOverrides,
     storeBackshopBlockOrder,
+    productGroupByPluSource,
+    memberSourcesByGroup,
+    chosenSourcesByGroup,
+    productGroupNames,
+    blockPreferredSourceByBlockId,
+    groupBlockIdByGroupId,
+    lineForceShowKeys,
+    lineForceHideKeys,
   ])
 
-  // Produkte, die in der aktuellen Version vorkommen UND global umbenannt sind
+  const carryoverMastersIncluded = useMemo(() => {
+    if (!activeVersion?.id) return [] as BackshopMasterPLUItem[]
+    return backshopCarryoverRows
+      .filter((r) => r.market_include)
+      .map((r) => carryoverBackshopRowToMasterItem(r, activeVersion.id))
+  }, [backshopCarryoverRows, activeVersion?.id])
+
+  const masterByPluForRenamed = useMemo(() => {
+    const m = new Map<string, BackshopMasterPLUItem>()
+    for (const item of masterItems) m.set(item.plu, item)
+    for (const c of carryoverMastersIncluded) {
+      if (!m.has(c.plu)) m.set(c.plu, c)
+    }
+    return m
+  }, [masterItems, carryoverMastersIncluded])
+
+  const searchableItemsForRename = useMemo(() => Array.from(masterByPluForRenamed.values()), [masterByPluForRenamed])
+
+  // Global umbenannt: Master ODER Carryover-Zeile
   const renamedItems = useMemo(() => {
-    const renamedPlus = new Set(globalRenamed.map((r) => r.plu))
-    const byPlu = new Map(globalRenamed.map((r) => [r.plu, r]))
-    return masterItems
-      .filter((m) => renamedPlus.has(m.plu))
-      .map((m) => {
-        const r = byPlu.get(m.plu)!
-        return { ...m, display_name: r.display_name }
-      })
-  }, [masterItems, globalRenamed])
+    const out: BackshopMasterPLUItem[] = []
+    for (const r of globalRenamed) {
+      const base = masterByPluForRenamed.get(r.plu)
+      if (!base) continue
+      out.push({ ...base, display_name: r.display_name })
+    }
+    return out
+  }, [globalRenamed, masterByPluForRenamed])
 
   const sortedRenamedItems = useMemo(
     () => orderByPluDisplayOrder(renamedItems, (x) => x.plu, canonicalListOrderPlu),
     [renamedItems, canonicalListOrderPlu],
   )
 
+  const renamedListRows: RenamedProductDisplayRow[] = useMemo(
+    () =>
+      sortedRenamedItems.map((item) => {
+        const r = globalRenamed.find((g) => g.plu === item.plu)
+        const thumb = (r?.image_url ?? item.image_url) || null
+        return {
+          plu: item.plu,
+          systemName: item.system_name,
+          currentName: item.display_name ?? item.system_name,
+          thumbUrl: thumb,
+          onReset: () => setResetConfirmItem(item),
+        }
+      }),
+    [sortedRenamedItems, globalRenamed],
+  )
+
+  const matchRenamedRowForFind = useCallback((row: RenamedProductDisplayRow, q: string) => {
+    return itemMatchesSearch(
+      { plu: row.plu, display_name: row.currentName, system_name: row.systemName },
+      q,
+    )
+  }, [])
+
+  const renamedListFind = useListFindInPageSection({
+    items: renamedListRows,
+    scopeId: 'renamed-products-backshop-page',
+    isMatch: matchRenamedRowForFind,
+  })
+
+  const renamedFindInPageBinding = useMemo((): ListFindInPageBinding | undefined => {
+    if (renamedListRows.length === 0) return undefined
+    return {
+      scopeId: 'renamed-products-backshop-page',
+      activeRowIndex: renamedListFind.activeRowIndex,
+      matchIndices: renamedListFind.matchIndices,
+    }
+  }, [renamedListRows.length, renamedListFind.activeRowIndex, renamedListFind.matchIndices])
+
   const handleResetConfirm = async () => {
     if (!resetConfirmItem) return
     const systemName = resetConfirmItem.system_name?.trim()
     if (!systemName) return
     try {
-      await resetName.mutateAsync({
-        item_id: resetConfirmItem.id,
-        system_name: systemName,
-      })
+      if (resetConfirmItem.id.startsWith('carryover-')) {
+        await deleteBackshopRenamedByPlu.mutateAsync({ plu: resetConfirmItem.plu })
+      } else {
+        await resetName.mutateAsync({
+          item_id: resetConfirmItem.id,
+          system_name: systemName,
+        })
+      }
       setResetConfirmItem(null)
     } catch {
       // Toast im Hook
@@ -175,21 +320,39 @@ export function BackshopRenamedProductsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg p-2 bg-muted">
-              <Pencil className="h-5 w-5 text-muted-foreground" />
+      <div className="space-y-6" data-tour="backshop-renamed-page">
+        <div
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+          data-tour="backshop-renamed-toolbar"
+        >
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg p-2 bg-muted">
+                <Pencil className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">Umbenannte Produkte (Backshop)</h2>
+                <p className="text-sm text-muted-foreground">
+                  Anzeigenamen und optional Bilder anpassen oder auf das Original zurücksetzen.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight">Umbenannte Produkte (Backshop)</h2>
-              <p className="text-sm text-muted-foreground">
-                Anzeigenamen und optional Bilder anpassen oder auf das Original zurücksetzen.
-              </p>
-            </div>
+            {!itemsLoading && !renamedLoading && renamedListRows.length > 0 && (
+              <ListFindInPageToolbar
+                showBar={renamedListFind.showBar}
+                onOpen={renamedListFind.openSearch}
+                barProps={renamedListFind.findInPageBarProps}
+                dataTour="backshop-renamed-search"
+              />
+            )}
           </div>
 
-          <Button variant="outline" size="sm" onClick={() => setShowRenameDialog(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowRenameDialog(true)}
+            data-tour="backshop-renamed-add-button"
+          >
             <Pencil className="h-4 w-4 mr-2" />
             Produkte umbenennen
           </Button>
@@ -222,22 +385,15 @@ export function BackshopRenamedProductsPage() {
         )}
 
         {!itemsLoading && !renamedLoading && sortedRenamedItems.length > 0 && (
-          <Card>
+          <Card data-tour="backshop-renamed-list">
             <CardContent className="p-0">
               <RenamedProductsResponsiveList
                 variant="backshop"
-                resetPending={resetName.isPending}
-                rows={sortedRenamedItems.map((item) => {
-                  const r = globalRenamed.find((g) => g.plu === item.plu)
-                  const thumb = (r?.image_url ?? item.image_url) || null
-                  return {
-                    plu: item.plu,
-                    systemName: item.system_name,
-                    currentName: item.display_name ?? item.system_name,
-                    thumbUrl: thumb,
-                    onReset: () => setResetConfirmItem(item),
-                  }
-                })}
+                resetPending={resetName.isPending || deleteBackshopRenamedByPlu.isPending}
+                rows={renamedListRows}
+                findInPage={renamedFindInPageBinding}
+                firstItemDataTour="backshop-renamed-first-item"
+                firstResetButtonDataTour="backshop-renamed-reset-button"
               />
             </CardContent>
           </Card>
@@ -246,13 +402,15 @@ export function BackshopRenamedProductsPage() {
         <RenameProductsDialog
           open={showRenameDialog}
           onOpenChange={setShowRenameDialog}
-          searchableItems={masterItems}
+          searchableItems={searchableItemsForRename}
           listType="backshop"
           displayMode={(layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'}
           renamedOverrides={globalRenamed.map((r) => ({ plu: r.plu, display_name: r.display_name }))}
           listLayout={renameDialogListLayout}
           flowDirection={flowDirection}
           fontSizes={dialogFontSizes}
+          dataTour="backshop-renamed-add-dialog"
+          renameDialogSubmitDataTour="backshop-renamed-add-dialog-submit"
         />
 
         <AlertDialog open={!!resetConfirmItem} onOpenChange={(open) => !open && setResetConfirmItem(null)}>
@@ -271,8 +429,13 @@ export function BackshopRenamedProductsPage() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-              <AlertDialogAction onClick={handleResetConfirm} disabled={resetName.isPending}>
-                {resetName.isPending ? 'Wird zurückgesetzt…' : 'Zurücksetzen'}
+              <AlertDialogAction
+                onClick={handleResetConfirm}
+                disabled={resetName.isPending || deleteBackshopRenamedByPlu.isPending}
+              >
+                {resetName.isPending || deleteBackshopRenamedByPlu.isPending
+                  ? 'Wird zurückgesetzt…'
+                  : 'Zurücksetzen'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

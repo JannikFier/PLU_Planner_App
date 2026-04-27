@@ -1,13 +1,26 @@
 // Benachrichtigungen: Version-Notifications (gelesen/ungelesen)
 
+import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase, queryRest, queryRestCount } from '@/lib/supabase'
+import { supabase, queryRest, queryRestCount, isTestModeActive } from '@/lib/supabase'
+import { ensureProfileCurrentStoreId } from '@/lib/ensure-profile-current-store'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { toast } from 'sonner'
 import type { Database, VersionNotification, MasterPLUItem } from '@/types/database'
+import { useVersions } from '@/hooks/useVersions'
+import { getPreviousVersionId } from '@/lib/version-plu-diff'
+import {
+  filterDirectManualObstSupplements,
+  mergeObstNotificationNeuRows,
+} from '@/lib/notification-neu-tab-merge'
+import {
+  getVersionNotificationsUpsertMode,
+  isLegacyOnConflictConstraintError,
+  setVersionNotificationsUpsertMode,
+} from '@/lib/supabase-upsert-on-conflict-fallback'
 
 /** Anzahl neuer + geänderter Produkte in der aktiven Version (für Badge) */
 export function useActiveVersionChangeCount() {
@@ -88,26 +101,79 @@ export function useMarkNotificationRead() {
       if (!user) throw new Error('Nicht eingeloggt')
       if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
 
-      const { error } = await supabase
-        .from('version_notifications')
-        .update(
-        ({
-          is_read: true,
-          read_at: new Date().toISOString(),
-        } as Database['public']['Tables']['version_notifications']['Update']) as never
-      )
-        .eq('user_id', user.id)
-        .eq('version_id', versionId)
-        .eq('store_id', currentStoreId)
+      if (isTestModeActive()) {
+        const readAt = new Date().toISOString()
+        queryClient.setQueryData<VersionNotification | null>(
+          ['version-notification', versionId, currentStoreId],
+          (old) => {
+            if (old) return { ...old, is_read: true, read_at: readAt }
+            return {
+              id: crypto.randomUUID(),
+              user_id: user.id,
+              version_id: versionId,
+              is_read: true,
+              read_at: readAt,
+              created_at: readAt,
+              store_id: currentStoreId,
+            }
+          },
+        )
+        queryClient.setQueryData<number>(['notification-count', currentStoreId], (n) =>
+          typeof n === 'number' ? Math.max(0, n - 1) : 0,
+        )
+        return
+      }
+
+      await ensureProfileCurrentStoreId(user.id, currentStoreId)
+
+      const readAt = new Date().toISOString()
+      const row = {
+        user_id: user.id,
+        version_id: versionId,
+        store_id: currentStoreId,
+        is_read: true,
+        read_at: readAt,
+      } as Database['public']['Tables']['version_notifications']['Insert'] as never
+
+      const mode = getVersionNotificationsUpsertMode()
+      let error: { message: string; code?: string } | null = null
+
+      if (mode === 'legacy') {
+        let r = await supabase
+          .from('version_notifications')
+          .upsert(row, { onConflict: 'user_id,version_id' })
+        if (r.error && isLegacyOnConflictConstraintError(r.error)) {
+          setVersionNotificationsUpsertMode('triple')
+          r = await supabase
+            .from('version_notifications')
+            .upsert(row, { onConflict: 'user_id,version_id,store_id' })
+        }
+        error = r.error
+      } else {
+        let r = await supabase
+          .from('version_notifications')
+          .upsert(row, { onConflict: 'user_id,version_id,store_id' })
+        if (r.error && isLegacyOnConflictConstraintError(r.error)) {
+          setVersionNotificationsUpsertMode('legacy')
+          r = await supabase
+            .from('version_notifications')
+            .upsert(row, { onConflict: 'user_id,version_id' })
+        }
+        error = r.error
+      }
 
       if (error) throw error
     },
     onSuccess: (_, versionId) => {
-      queryClient.invalidateQueries({ queryKey: ['version-notification', versionId, currentStoreId] })
-      queryClient.invalidateQueries({ queryKey: ['notification-count', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['version-notification', versionId, currentStoreId] })
+        queryClient.invalidateQueries({ queryKey: ['notification-count', currentStoreId] })
+        queryClient.invalidateQueries({ queryKey: ['unread-notifications', currentStoreId] })
+      }
     },
     onError: (error) => {
-      toast.error(`Fehler: ${error instanceof Error ? error.message : 'Unbekannt'}`)
+      const em = error as { message?: string }
+      toast.error(`Fehler: ${error instanceof Error ? error.message : em.message?.trim() || 'Unbekannt'}`)
     },
   })
 }
@@ -136,20 +202,46 @@ export function useUnreadNotifications() {
   })
 }
 
-/** Neue Produkte einer Version laden (status = NEW_PRODUCT_YELLOW) */
+/**
+ * Tab „Neu“ in der Glocke: alle `NEW_PRODUCT_YELLOW` plus direkt angelegte manuelle Nachbesserungen
+ * mit `UNCHANGED` (ältere DB), ohne Carryover (PLU existierte in Vorversion schon als manuelles Supplement).
+ */
 export function useNewProducts(versionId: string | undefined) {
+  const { data: versions = [] } = useVersions()
+  const previousId = useMemo(
+    () => getPreviousVersionId(versions, versionId),
+    [versions, versionId],
+  )
+
   return useQuery({
-    queryKey: ['new-products', versionId],
+    queryKey: ['obst-notification-neu-tab', versionId, previousId],
     queryFn: async () => {
       if (!versionId) return []
 
-      const data = await queryRest<MasterPLUItem[]>('master_plu_items', {
-        select: '*',
-        version_id: `eq.${versionId}`,
-        status: 'eq.NEW_PRODUCT_YELLOW',
-        order: 'system_name.asc',
-      })
-      return data ?? []
+      const [yellow, manual, prevManualRows] = await Promise.all([
+        queryRest<MasterPLUItem[]>('master_plu_items', {
+          select: '*',
+          version_id: `eq.${versionId}`,
+          status: 'eq.NEW_PRODUCT_YELLOW',
+        }),
+        queryRest<MasterPLUItem[]>('master_plu_items', {
+          select: '*',
+          version_id: `eq.${versionId}`,
+          is_manual_supplement: 'eq.true',
+          status: 'eq.UNCHANGED',
+        }),
+        previousId
+          ? queryRest<{ plu: string }[]>('master_plu_items', {
+              select: 'plu',
+              version_id: `eq.${previousId}`,
+              is_manual_supplement: 'eq.true',
+            })
+          : Promise.resolve([] as { plu: string }[]),
+      ])
+
+      const prevSet = previousId ? new Set((prevManualRows ?? []).map((r) => r.plu)) : null
+      const directManual = filterDirectManualObstSupplements(manual ?? [], prevSet)
+      return mergeObstNotificationNeuRows(yellow ?? [], directManual)
     },
     enabled: !!versionId,
     staleTime: 30 * 1000,

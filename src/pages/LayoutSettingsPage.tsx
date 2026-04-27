@@ -212,7 +212,7 @@ export function LayoutSettingsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-6" data-tour="obst-konfig-layout-page">
         {/* Header */}
         <div>
             <h2 className="text-2xl font-bold tracking-tight">Layout-Konfiguration</h2>
@@ -226,7 +226,7 @@ export function LayoutSettingsPage() {
           {/* === LINKE SPALTE: Einstellungen === */}
           <div className="space-y-6">
             {/* Anzeige-Modus */}
-            <Card>
+            <Card data-tour="obst-konfig-layout-display-mode-card">
               <CardHeader>
                 <CardTitle className="text-base">Anzeige-Modus</CardTitle>
               </CardHeader>
@@ -247,7 +247,7 @@ export function LayoutSettingsPage() {
             </Card>
 
             {/* Sortierung */}
-            <Card>
+            <Card data-tour="obst-konfig-layout-sort-mode-card">
               <CardHeader>
                 <CardTitle className="text-base">Sortierung</CardTitle>
               </CardHeader>
@@ -268,7 +268,7 @@ export function LayoutSettingsPage() {
             </Card>
 
             {/* Flussrichtung */}
-            <Card>
+            <Card data-tour="obst-konfig-layout-flow-card">
               <CardHeader>
                 <CardTitle className="text-base">Flussrichtung</CardTitle>
                 <CardDescription>Tabelle und PDF</CardDescription>
@@ -299,7 +299,7 @@ export function LayoutSettingsPage() {
             </Card>
 
             {/* Schriftgrößen */}
-            <Card>
+            <Card data-tour="obst-konfig-layout-fonts-card">
               <CardHeader>
                 <CardTitle className="text-base">Schriftgrößen</CardTitle>
                 <CardDescription>
@@ -335,6 +335,7 @@ export function LayoutSettingsPage() {
                         setHeaderText(String(normalized))
                         updateForm({ font_header_px: normalized })
                       }}
+                      data-tour="obst-konfig-layout-fonts-list-header"
                     />
                   </div>
                   {form.flow_direction === 'COLUMN_FIRST' ? (
@@ -356,6 +357,7 @@ export function LayoutSettingsPage() {
                           setProductText(String(normalized))
                           updateForm({ font_column_px: normalized, font_product_px: normalized })
                         }}
+                        data-tour="obst-konfig-layout-fonts-unified-body"
                       />
                     </div>
                   ) : (
@@ -375,6 +377,7 @@ export function LayoutSettingsPage() {
                             setColumnText(String(normalized))
                             updateForm({ font_column_px: normalized })
                           }}
+                          data-tour="obst-konfig-layout-fonts-columns-groups"
                         />
                       </div>
                       <div className="space-y-2">
@@ -392,6 +395,7 @@ export function LayoutSettingsPage() {
                             setProductText(String(normalized))
                             updateForm({ font_product_px: normalized })
                           }}
+                          data-tour="obst-konfig-layout-fonts-product-rows"
                         />
                       </div>
                     </>
@@ -401,7 +405,7 @@ export function LayoutSettingsPage() {
             </Card>
 
             {/* Markierungsdauer */}
-            <Card>
+            <Card data-tour="obst-konfig-layout-mark-duration-card">
               <CardHeader>
                 <CardTitle className="text-base">Markierungsdauer</CardTitle>
                 <CardDescription>
@@ -410,7 +414,7 @@ export function LayoutSettingsPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-tour="obst-konfig-layout-mark-duration-red">
                     <Label>Rot (PLU geändert)</Label>
                     <Select
                       value={String([1, 2, 3, 4].includes(form.mark_red_kw_count) ? form.mark_red_kw_count : 2)}
@@ -424,7 +428,7 @@ export function LayoutSettingsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-tour="obst-konfig-layout-mark-duration-yellow">
                     <Label>Gelb (Neues Produkt)</Label>
                     <Select
                       value={String([1, 2, 3, 4].includes(form.mark_yellow_kw_count) ? form.mark_yellow_kw_count : 3)}
@@ -443,7 +447,7 @@ export function LayoutSettingsPage() {
             </Card>
 
             {/* Kalenderwoche: optional Mo–Sa zur KW */}
-            <Card>
+            <Card data-tour="obst-konfig-layout-kw-card">
               <CardHeader>
                 <CardTitle className="text-base">Kalenderwoche</CardTitle>
                 <CardDescription>
@@ -461,22 +465,23 @@ export function LayoutSettingsPage() {
                   <Switch
                     checked={form.show_week_mon_sat_in_labels}
                     onCheckedChange={(checked) => updateForm({ show_week_mon_sat_in_labels: checked })}
+                    data-tour="obst-konfig-layout-kw-toggle"
                   />
                 </div>
               </CardContent>
             </Card>
 
             {/* Feature-Toggles */}
-            <Card>
+            <Card data-tour="obst-konfig-layout-features-card">
               <CardHeader>
                 <CardTitle className="text-base">Features</CardTitle>
                 <CardDescription>Funktionen für alle User ein-/ausschalten.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {[
-                  { key: 'features_custom_products' as const, label: 'Eigene Produkte', desc: 'User können eigene Artikel hinzufügen' },
-                  { key: 'features_hidden_items' as const, label: 'Produkte ausblenden', desc: 'User können Artikel aus ihrer Liste entfernen' },
-                  { key: 'features_blocks' as const, label: 'Warengruppen', desc: 'Zuordnung zu Warengruppen (Dialog, Liste, Block-Sortierung)' },
+                  { key: 'features_custom_products' as const, label: 'Eigene Produkte', desc: 'User können eigene Artikel hinzufügen', dataTour: 'obst-konfig-layout-feature-custom' },
+                  { key: 'features_hidden_items' as const, label: 'Produkte ausblenden', desc: 'User können Artikel aus ihrer Liste entfernen', dataTour: 'obst-konfig-layout-feature-hidden' },
+                  { key: 'features_blocks' as const, label: 'Warengruppen', desc: 'Zuordnung zu Warengruppen (Dialog, Liste, Block-Sortierung)', dataTour: 'obst-konfig-layout-feature-warengruppen' },
                 ].map((feature) => (
                   <div key={feature.key} className="flex items-center justify-between">
                     <div>
@@ -486,6 +491,7 @@ export function LayoutSettingsPage() {
                     <Switch
                       checked={form[feature.key]}
                       onCheckedChange={(checked) => updateForm({ [feature.key]: checked })}
+                      data-tour={feature.dataTour}
                     />
                   </div>
                 ))}
@@ -494,7 +500,10 @@ export function LayoutSettingsPage() {
 
             {/* Auto-Save Statusanzeige – sichtbar bis Speicherung abgeschlossen */}
             {saveStatus !== 'idle' && (
-              <div className="flex items-center justify-end gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
+              <div
+                className="flex items-center justify-end gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm"
+                data-tour="obst-konfig-layout-save-status"
+              >
                 {saveStatus === 'saving' && (
                   <><Loader2 className="h-4 w-4 animate-spin" /> Speichert...</>
                 )}
@@ -506,7 +515,10 @@ export function LayoutSettingsPage() {
           </div>
 
           {/* === RECHTE SPALTE: Live-Vorschau === */}
-          <div className="lg:sticky lg:top-6 lg:self-start space-y-2">
+          <div
+            className="lg:sticky lg:top-6 lg:self-start space-y-2"
+            data-tour="obst-konfig-layout-preview"
+          >
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
               Vorschau
             </h3>

@@ -35,7 +35,7 @@ export function AdminBackshopHubPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
+      <div className="space-y-8" data-tour="backshop-hub-page">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800">Backshop</h2>
           <p className="text-muted-foreground">
@@ -50,13 +50,15 @@ export function AdminBackshopHubPage() {
             icon={ClipboardList}
             onClick={() => navigate('/admin/backshop-list')}
             variant="backshop"
+            dataTour="backshop-hub-list-card"
           />
           <BereichsauswahlCard
             title="Konfiguration der Liste"
-            description="Layout, Bezeichnungsregeln und Warengruppen-Sortierung"
+            description="Layout, Bezeichnungsregeln, Gruppenregeln und Warengruppen-Sortierung"
             icon={LayoutGrid}
             onClick={() => navigate('/admin/backshop/konfiguration')}
             variant="backshop"
+            dataTour="backshop-hub-konfig-card"
           />
         </div>
       </div>

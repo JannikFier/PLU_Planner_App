@@ -1,5 +1,7 @@
 // Einfache Zuordnung Exit-Excel ↔ PLU (Hauptname / Teilstrings)
 
+import type { BackshopSource } from '@/types/database'
+
 /** Normalisiert für Vergleich (Kleinbuchstaben, typische Präfixe abschwächen) */
 export function normalizeProductLabelForMatch(name: string): string {
   let s = name.toLowerCase().replace(/\s+/g, ' ').trim()
@@ -10,6 +12,8 @@ export function normalizeProductLabelForMatch(name: string): string {
 export interface MasterPluCandidate {
   plu: string
   label: string
+  /** Nur Backshop: Marke/Quelle für UI (E/H/A/N). Obst-Kandidaten ohne Feld. */
+  source?: BackshopSource
 }
 
 /**

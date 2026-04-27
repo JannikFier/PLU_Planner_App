@@ -297,19 +297,27 @@ export function WarengruppenPanel() {
   return (
     <>
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div
+      className="grid grid-cols-1 md:grid-cols-2 gap-4"
+      data-tour="obst-konfig-warengruppen-panel"
+    >
       {/* === LINKE SEITE: Warengruppen === */}
-      <Card>
+      <Card data-tour="obst-konfig-warengruppen-groups-card">
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <CardTitle className="text-sm">Warengruppen</CardTitle>
           {isAdmin ? (
-            <Button size="sm" variant="outline" onClick={() => { setBlockName(''); setShowAddBlock(true) }}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => { setBlockName(''); setShowAddBlock(true) }}
+              data-tour="obst-konfig-warengruppen-group-add-button"
+            >
               <Plus className="h-3 w-3 mr-1" /> Neue Gruppe
             </Button>
           ) : null}
         </CardHeader>
         <CardContent className="space-y-2">
-          <ScrollArea className="h-[300px]">
+          <ScrollArea className="h-[300px]" data-tour="obst-konfig-warengruppen-group-list">
             <div className="space-y-1">
               {sortedBlocks.map((block) => (
                 <DroppableBlock
@@ -341,6 +349,7 @@ export function WarengruppenPanel() {
                   setBlockName(selectedBlock.name)
                   setShowRenameBlock(true)
                 }}
+                data-tour="obst-konfig-warengruppen-group-rename-button"
               >
                 <Pencil className="h-3 w-3 mr-1" /> Umbenennen
               </Button>
@@ -349,6 +358,7 @@ export function WarengruppenPanel() {
                 variant="outline"
                 className="w-full justify-center sm:w-auto"
                 onClick={handleDeleteBlockClick}
+                data-tour="obst-konfig-warengruppen-group-delete-button"
               >
                 <Trash2 className="h-3 w-3 mr-1 text-destructive" /> Löschen
               </Button>
@@ -358,7 +368,7 @@ export function WarengruppenPanel() {
       </Card>
 
       {/* === RECHTE SEITE: Produkte === */}
-      <Card>
+      <Card data-tour="obst-konfig-warengruppen-products-card">
         <CardHeader className="space-y-3 pb-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-sm">Produkte</CardTitle>
@@ -369,6 +379,7 @@ export function WarengruppenPanel() {
                 variant="secondary"
                 className="w-full shrink-0 sm:w-auto"
                 onClick={() => setAssignDialogOpen(true)}
+                data-tour="obst-konfig-warengruppen-products-add-dialog-button"
               >
                 <UserPlus className="mr-1 h-3 w-3" />
                 Produkte hinzufügen…
@@ -384,13 +395,14 @@ export function WarengruppenPanel() {
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8"
               aria-label="Suche"
+              data-tour="obst-konfig-warengruppen-products-search"
             />
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
-          <ScrollArea className="h-[300px]">
+          <ScrollArea className="h-[300px]" data-tour="obst-konfig-warengruppen-products-list">
             <div className="space-y-0.5">
-              {filteredItems.map((item) => {
+              {filteredItems.map((item, idx) => {
                 const isChecked = checkedIds.has(item.id)
                 const effId = effBlock(item)
                 const assignedBlock = effId ? blocks.find((b) => b.id === effId) : null
@@ -404,6 +416,7 @@ export function WarengruppenPanel() {
                     onToggle={() => toggleItem(item.id)}
                     assignedBlockName={assignedBlock?.name}
                     isOtherBlock={!!isOtherBlock}
+                    handleDataTour={idx === 0 ? 'obst-konfig-warengruppen-products-first-handle' : undefined}
                   />
                 )
               })}
@@ -417,6 +430,7 @@ export function WarengruppenPanel() {
               onClick={handleAssign}
               disabled={!selectedBlockId || checkedIds.size === 0 || assignOverride.isPending}
               className="w-full min-w-0 shrink sm:flex-1"
+              data-tour="obst-konfig-warengruppen-products-assign-button"
             >
               {assignOverride.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -431,6 +445,7 @@ export function WarengruppenPanel() {
               variant="outline"
               className="w-full shrink-0 sm:w-auto"
               onClick={() => setCheckedIds(new Set())}
+              data-tour="obst-konfig-warengruppen-products-deselect-button"
             >
               Alle abwählen
             </Button>
@@ -453,7 +468,7 @@ export function WarengruppenPanel() {
 
       {/* Dialog: Neuer Block */}
       <Dialog open={showAddBlock} onOpenChange={setShowAddBlock}>
-        <DialogContent>
+        <DialogContent data-tour="obst-konfig-warengruppen-create-dialog">
           <DialogHeader>
             <DialogTitle>Neue Warengruppe</DialogTitle>
             <DialogDescription>Gib einen Namen für die neue Warengruppe ein.</DialogDescription>
@@ -467,7 +482,11 @@ export function WarengruppenPanel() {
             />
           </div>
           <DialogFooter>
-            <Button onClick={handleCreateBlock} disabled={createBlock.isPending || !blockName.trim()}>
+            <Button
+              onClick={handleCreateBlock}
+              disabled={createBlock.isPending || !blockName.trim()}
+              data-tour="obst-konfig-warengruppen-create-dialog-submit"
+            >
               {createBlock.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Erstellen'}
             </Button>
           </DialogFooter>
@@ -476,7 +495,7 @@ export function WarengruppenPanel() {
 
       {/* Dialog: Umbenennen */}
       <Dialog open={showRenameBlock} onOpenChange={setShowRenameBlock}>
-        <DialogContent>
+        <DialogContent data-tour="obst-konfig-warengruppen-rename-dialog">
           <DialogHeader>
             <DialogTitle>Warengruppe umbenennen</DialogTitle>
             <DialogDescription>Ändere den Namen der ausgewählten Warengruppe.</DialogDescription>
@@ -489,7 +508,11 @@ export function WarengruppenPanel() {
             />
           </div>
           <DialogFooter>
-            <Button onClick={handleRenameBlock} disabled={updateBlock.isPending || !blockName.trim()}>
+            <Button
+              onClick={handleRenameBlock}
+              disabled={updateBlock.isPending || !blockName.trim()}
+              data-tour="obst-konfig-warengruppen-rename-dialog-submit"
+            >
               {updateBlock.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Speichern'}
             </Button>
           </DialogFooter>
@@ -509,7 +532,7 @@ export function WarengruppenPanel() {
       />
 
       <AlertDialog open={showDeleteBlockConfirm} onOpenChange={setShowDeleteBlockConfirm}>
-        <AlertDialogContent>
+        <AlertDialogContent data-tour="obst-konfig-warengruppen-delete-confirm">
           <AlertDialogHeader>
             <AlertDialogTitle>Warengruppe löschen?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -521,6 +544,7 @@ export function WarengruppenPanel() {
             <AlertDialogAction
               onClick={handleDeleteBlockConfirm}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-tour="obst-konfig-warengruppen-delete-confirm-action"
             >
               Löschen
             </AlertDialogAction>
@@ -588,12 +612,14 @@ function DraggableProduct({
   onToggle,
   assignedBlockName,
   isOtherBlock,
+  handleDataTour,
 }: {
   item: MasterPLUItem
   isChecked: boolean
   onToggle: () => void
   assignedBlockName?: string
   isOtherBlock: boolean
+  handleDataTour?: string
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id })
 
@@ -610,6 +636,7 @@ function DraggableProduct({
         className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground shrink-0"
         {...attributes}
         {...listeners}
+        {...(handleDataTour ? { 'data-tour': handleDataTour } : {})}
       >
         <GripVertical className="h-3 w-3" />
       </button>

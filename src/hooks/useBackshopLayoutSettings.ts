@@ -1,7 +1,7 @@
 // Hook: Backshop-Layout-Einstellungen laden + aktualisieren (pro Markt)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { queryRest } from '@/lib/supabase'
+import { queryRest, isTestModeActive } from '@/lib/supabase'
 import { updateLayoutSettingsTableWithWeekColumnFallback } from '@/lib/supabase-layout-settings-update'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import type { BackshopLayoutSettings } from '@/types/database'
@@ -81,6 +81,17 @@ export function useUpdateBackshopLayoutSettings() {
         throw new Error('Keine Backshop-Layout-Einstellungen im Cache gefunden')
       }
 
+      if (isTestModeActive()) {
+        queryClient.setQueryData<BackshopLayoutSettings>(
+          ['backshop-layout-settings', currentStoreId],
+          (prev) => {
+            if (!prev) throw new Error('Keine Backshop-Layout-Einstellungen im Cache gefunden')
+            return { ...prev, ...updates, updated_at: new Date().toISOString() }
+          },
+        )
+        return { omittedWeekColumnDueToSchema: false }
+      }
+
       const UPDATE_TIMEOUT_MS = 12_000
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), UPDATE_TIMEOUT_MS)
@@ -102,7 +113,9 @@ export function useUpdateBackshopLayoutSettings() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['backshop-layout-settings', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['backshop-layout-settings', currentStoreId] })
+      }
     },
   })
 }

@@ -168,6 +168,7 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | Modul | Beschreibung |
 |-------|-------------|
 | `excel-parser.ts` | Excel-Parsing (xlsx), Typ/KW-Erkennung (Dateiname + Header-Zeile: Stück/Gewicht), PLU-Validierung |
+| `backshop-sources.ts` | Backshop Multi-Source-Konstanten (`edeka | harry | aryzta`), Labels, Badge-Farben, Gruppen-Namens-Normalisierung |
 | `comparison-logic.ts` | KW-Vergleich (UNCHANGED, NEW, CHANGED, CONFLICT) |
 | `publish-version.ts` | Version veröffentlichen (freeze, insert, activate, version_notifications erstellen) |
 | `layout-engine.ts` | DisplayItem-Liste (Master + Custom − Hidden + Regeln); berücksichtigt **Markt-Overrides** (`nameBlockOverrides`, `storeBlockOrder`) |
@@ -206,8 +207,8 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | `RenameDialog` | **NEU**: Dialog zum Umbenennen (Custom + Master Products) |
 | `LayoutPreview` | Live-Vorschau für Layout-Einstellungen (reaktiv auf Form-State) |
 | `SchlagwortManager` | Dialog: Bezeichnungsregeln (CRUD, Live-Vorschau, Vorher/Nachher) |
-| `WarengruppenPanel` | Split-Panel: Links Gruppen, Rechts Produkte + Checkboxen |
-| `WarengruppenSortierung` | DnD + Pfeil-Buttons für Block-Reihenfolge |
+| `WarengruppenPanel` | Split-Panel: Links Gruppen, Rechts Produkte + Checkboxen (derzeit keine Obst-Route; Markt-UX über `ObstWarengruppenPanel`) |
+| `WarengruppenSortierung` | Legacy-Komponente (nicht mehr eingebunden); Markt-Reihenfolge über `ObstWarengruppenPanel` / `store_obst_block_order` |
 
 ## Seiten (`src/pages/`)
 
@@ -221,7 +222,7 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | `PLUUploadPage` | `/super-admin/plu-upload` | 4-Schritt Excel-Upload (Vollbild: Dateien, Vergleich, Konflikte, Fertig) |
 | `MasterList` | `*/masterlist` | PLU Obst und Gemüse (User/Admin-Modus), Button „Neuer Upload“ → PLU-Upload-Seite |
 | `LayoutSettingsPage` | `/super-admin/layout` | Layout-Konfiguration |
-| `RulesPage` | `/super-admin/rules` | Bezeichnungsregeln + Warengruppen |
+| `RulesPage` | `/super-admin/rules` | Bezeichnungsregeln (Obst/Gemüse); Warengruppen nur unter `*/obst-warengruppen` |
 | `VersionsPage` | `/super-admin/versions` | Versionen-Manager |
 | `UserManagement` | `*/users` | Benutzerverwaltung |
 | `HiddenItems` | `*/hidden-items` | Ausgeblendete Produkte (alle Rollen) |

@@ -41,7 +41,7 @@ import {
 import {
   ClipboardList, Users, Settings, Trash2, Loader2,
   Apple, Croissant, Eye, Globe, Home, UserPlus, KeyRound, Copy, Check, UserMinus,
-  Plus, EyeOff, Megaphone, Pencil, Palette, FileText, ListOrdered,
+  Plus, EyeOff, Megaphone, Pencil, Palette, FileText, ListOrdered, ListFilter,
 } from 'lucide-react'
 import { validateSubdomain } from '@/lib/subdomain'
 import { toast } from 'sonner'
@@ -68,7 +68,7 @@ function buildObstConfigItems(backTo: string): DashboardGroupCardItem[] {
   return [
     { title: 'Layout', description: 'Sortierung, Anzeige, Schriftgrößen', icon: Palette, to: `/super-admin/layout${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
     { title: 'Inhalt & Regeln', description: 'Bezeichnungsregeln und Warengruppen', icon: FileText, to: `/super-admin/rules${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { title: 'Block-Sortierung', description: 'Reihenfolge der Blöcke anpassen', icon: ListOrdered, to: `/super-admin/block-sort${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
+    { title: 'Warengruppen (Obst & Gemüse)', description: 'Reihenfolge am Markt und Zuordnung', icon: ListOrdered, to: `/super-admin/obst-warengruppen${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
   ]
 }
 
@@ -89,8 +89,9 @@ function buildBackshopConfigItems(backTo: string): DashboardGroupCardItem[] {
   const q = `?backTo=${encodeURIComponent(backTo)}`
   return [
     { title: 'Layout (Backshop)', description: 'Sortierung und Schriftgrößen', icon: Palette, to: `/super-admin/backshop-layout${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
-    { title: 'Inhalt & Regeln (Backshop)', description: 'Bezeichnungsregeln und Warengruppen', icon: FileText, to: `/super-admin/backshop-rules${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { title: 'Block-Sortierung (Backshop)', description: 'Reihenfolge der Blöcke', icon: ListOrdered, to: `/super-admin/backshop-block-sort${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
+    { title: 'Inhalt & Regeln (Backshop)', description: 'Bezeichnungsregeln; Warengruppen unter Block-Sortierung', icon: FileText, to: `/super-admin/backshop-rules${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { title: 'Warengruppen (Backshop)', description: 'Zuordnung und Markt-Overrides', icon: ListOrdered, to: `/super-admin/backshop-block-sort${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
+    { title: 'Gruppenregeln (Backshop)', description: 'Bevorzugte Marke pro Warengruppe', icon: ListFilter, to: `/super-admin/backshop-gruppenregeln${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
   ]
 }
 

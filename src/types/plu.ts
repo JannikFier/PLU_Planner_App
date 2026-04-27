@@ -1,6 +1,6 @@
 // PLU-spezifische Types für Business-Logik
 
-import type { MasterPLUItem, Block, CustomProduct } from './database'
+import type { MasterPLUItem, Block, CustomProduct, BackshopSource } from './database'
 import type { OfferDisplayInfo, ObstCentralCampaignKind } from '@/lib/offer-display'
 
 /** Status eines PLU-Eintrags */
@@ -40,6 +40,17 @@ export interface DisplayItem {
    * Neu/PLU geändert bleiben an der PLU-Zelle.
    */
   offer_name_highlight_kind?: ObstCentralCampaignKind
+  /** Backshop: Quelle des Artikels (edeka | harry | aryzta). Nur digital, nicht im PDF anzeigen. */
+  backshop_source?: BackshopSource | null
+  /** Backshop: Wenn Gruppe mehrere Sources liefert, Sammelzeile „Mehrere Marken“ (deprecated; Platzhalter werden nicht mehr erzeugt). */
+  backshop_is_multi_source_placeholder?: boolean
+  /**
+   * Backshop: Nur digital – wenn Markt nur eine **Teil**-Markenwahl (Teilmenge der Gruppe) hat:
+   * Anzahl weiterer in der Gruppe vorkommender **Quellen**, die aktuell nicht mitgewählt sind.
+   */
+  backshop_other_group_sources_count?: number
+  /** Backshop: Nur digital – `focusGroup` im Marken-Tinder verlinken. */
+  backshop_tinder_group_id?: string
 }
 
 /** Geparste Zeile aus einer Excel-Datei */
@@ -133,6 +144,8 @@ export interface ParsedBackshopRow {
 export interface BackshopSkippedPosition {
   row: number
   col: number
+  /** Rohinhalt der PLU-Zelle bei „ungültige PLU“ (gekürzt), zur Diagnose in der UI. */
+  rawCell?: string
 }
 
 /** Doppelte PLU: Position des Duplikats + PLU + Position der ersten Vorkommens (zum klaren Nachschlagen). */
@@ -142,6 +155,12 @@ export interface BackshopDuplicateDetail {
   plu: string
   firstRow: number
   firstCol: number
+  /**
+   * 0-basiert: erwartete Bild-Zelle für diese zweite (übersprungene) PLU.
+   * Wird für Diagnose genutzt (z. B. „Bild ohne Zeile“ = Duplikat in der Excel).
+   */
+  orphanImageSheetRow0?: number
+  orphanImageSheetCol0?: number
 }
 
 /** Aufschlüsselung: warum Zeilen übersprungen wurden (pro Datei). */
@@ -164,12 +183,17 @@ export interface SameNameDifferentPluEntry {
   occurrences: { plu: string; row: number; col: number }[]
 }
 
+/** Wie die automatische Analyse das Excel-Layout eingestuft hat (für Dialog-Anzeige). */
+export type BackshopDetectedLayout = 'classic_rows' | 'kassenblatt_blocks'
+
 /** Ergebnis des Backshop-Excel-Parsers */
 export interface BackshopParseResult {
   rows: ParsedBackshopRow[]
   fileName: string
   totalRows: number
   skippedRows: number
+  /** Erkanntes bzw. durch manuelles Mapping gewähltes Layout (Auto-Parse vs. manuelle Zuordnung). */
+  detectedLayout: BackshopDetectedLayout
   /** Aufschlüsselung der übersprungenen Zeilen (nur gesetzt wenn skippedRows > 0). */
   skippedReasons?: BackshopSkippedReasons
   /** Zeile/Spalte pro übersprungener Position (1-basiert, zum Nachschlagen in der Excel). */
@@ -194,6 +218,8 @@ export interface BackshopCompareItem {
   status: string
   old_plu: string | null
   image_url: string | null
+  /** Zentrale manuelle Nachbesserung (Quelle manual) */
+  is_manual_supplement?: boolean
   /** Im Upload-Flow: vorgeschlagene oder vom User gewählte Warengruppe (block_id) */
   block_id?: string | null
 }
@@ -267,6 +293,13 @@ export interface LayoutEngineInput {
   nameBlockOverrides?: Map<string, string>
   /** Markt: optionale Reihenfolge der Warengruppen; leer = globale order_index */
   storeBlockOrder?: { block_id: string; order_index: number }[]
+  /** Markt-Carryover: synthetische Master-Zeilen (PLU nicht in Zentral-Master dieser Version) */
+  carryoverMasterItems?: MasterPLUItem[]
+  /**
+   * PLUs mit manueller Nachbesserung in der Vorversion (Carryover-Quelle).
+   * `null` = keine Vorversion; `undefined` = Overlay aus — nur DB-Status für Gelb.
+   */
+  obstPrevManualPluSet?: Set<string> | null
 }
 
 /** Output der Layout-Engine */
@@ -278,5 +311,7 @@ export interface LayoutEngineOutput {
     newCount: number
     changedCount: number
     customCount: number
+    /** Backshop: Anzahl Produktgruppen ohne Marken-Entscheidung (Mehrere Marken möglich). */
+    unresolvedGroupCount?: number
   }
 }

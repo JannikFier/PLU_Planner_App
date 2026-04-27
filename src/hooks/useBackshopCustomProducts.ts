@@ -8,8 +8,9 @@ import { toast } from 'sonner'
 import type { BackshopCustomProduct, Database } from '@/types/database'
 
 /** Alle Backshop-Custom-Products laden */
-export function useBackshopCustomProducts() {
+export function useBackshopCustomProducts(opts?: { enabled?: boolean }) {
   const { currentStoreId } = useCurrentStore()
+  const loadEnabled = opts?.enabled !== false
 
   return useQuery({
     queryKey: ['backshop-custom-products', currentStoreId],
@@ -22,7 +23,7 @@ export function useBackshopCustomProducts() {
       })
       return data ?? []
     },
-    enabled: !!currentStoreId,
+    enabled: loadEnabled && !!currentStoreId,
   })
 }
 

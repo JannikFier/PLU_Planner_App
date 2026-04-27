@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { dismissTutorialWelcomeIfVisible } from './dismiss-tutorial-welcome'
 
 /**
  * Admin-Journey: Login → /admin → Dashboard mit PLU/Backshop + Benutzerverwaltung.
@@ -19,6 +20,7 @@ test.describe('Admin-Journey @extended', () => {
     await expect(page).toHaveURL(/\/admin/, { timeout: 15_000 })
     // Warte auf Dashboard-Inhalt (Store + Visibility laden auf localhost)
     await page.waitForLoadState('networkidle')
+    await dismissTutorialWelcomeIfVisible(page)
     await expect(page.getByRole('heading', { name: 'Administration', level: 2 })).toBeVisible({ timeout: 15_000 })
   })
 
@@ -85,5 +87,28 @@ test.describe('Admin-Journey @extended', () => {
     await expect(page).toHaveURL(/\/admin\/backshop-renamed-products/)
     await page.waitForLoadState('networkidle')
     await expect(page.getByRole('heading', { name: 'Umbenannte Produkte (Backshop)' })).toBeVisible({ timeout: 15_000 })
+  })
+
+  test('Benachrichtigungen: Glocke, Gelesen schließt Dialog (Obst/Backshop)', async ({ page }) => {
+    const bell = page.getByRole('button', { name: 'Benachrichtigungen' })
+    await expect(bell).toBeVisible({ timeout: 15_000 })
+    await bell.click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Benachrichtigungen' })).toBeVisible()
+
+    const obstSection = page.locator('section').filter({ has: page.getByRole('heading', { name: /Obst\/Gemüse/ }) })
+    const backSection = page.locator('section').filter({ has: page.getByRole('heading', { name: /^Backshop/ }) })
+
+    const obstGelesen = obstSection.getByRole('button', { name: 'Gelesen' })
+    const backGelesen = backSection.getByRole('button', { name: 'Gelesen' })
+
+    if ((await obstGelesen.count()) === 0 && (await backGelesen.count()) === 0) {
+      await page.keyboard.press('Escape')
+      return
+    }
+    if ((await obstGelesen.count()) > 0) await obstGelesen.click()
+    if ((await backGelesen.count()) > 0) await backGelesen.click()
+
+    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15_000 })
   })
 })

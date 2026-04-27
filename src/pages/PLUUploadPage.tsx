@@ -47,6 +47,9 @@ import { useBezeichnungsregeln } from '@/hooks/useBezeichnungsregeln'
 import { useStoreObstBlockOrder, useStoreObstNameBlockOverrides } from '@/hooks/useStoreObstBlockLayout'
 import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
 import { PLUTable } from '@/components/plu/PLUTable'
+import { ManualSupplementCarryoverBanner } from '@/components/manual-supplement/ManualSupplementCarryoverBanner'
+import { ObstManualSupplementCard } from '@/components/manual-supplement/ObstManualSupplementCard'
+import { ObstManualSupplementList } from '@/components/manual-supplement/ObstManualSupplementList'
 import { generateUUID } from '@/lib/utils'
 import { formatKWLabel, formatKWShort } from '@/lib/plu-helpers'
 import { resolveConflicts } from '@/lib/comparison-logic'
@@ -54,6 +57,11 @@ import { buildDisplayList } from '@/lib/layout-engine'
 import { getKWOptionsForUpload, getUploadYearOptions, getCurrentKW } from '@/lib/date-kw-utils'
 import type { ConflictItem } from '@/types/plu'
 import type { MasterPLUItem } from '@/types/database'
+
+/** Nur Upload-Schritt 2 (Vorschau): unabhängig von den marktspezifischen Layout-Einstellungen. */
+const UPLOAD_PREVIEW_DISPLAY_MODE = 'SEPARATED' as const
+/** Gleiche Sortierung wie bei getrennter Ansicht zum schnellen Prüfen (A–Z). */
+const UPLOAD_PREVIEW_SORT_MODE = 'ALPHABETICAL' as const
 
 export function PLUUploadPage() {
   const navigate = useNavigate()
@@ -96,8 +104,6 @@ export function PLUUploadPage() {
     [storeObstNameOverrides],
   )
 
-  const displayMode = layoutSettings?.display_mode ?? 'MIXED'
-  const sortMode = layoutSettings?.sort_mode ?? 'ALPHABETICAL'
   const flowDirection = layoutSettings?.flow_direction ?? 'COLUMN_FIRST'
   const fontSizes = {
     header: layoutSettings?.font_header_px ?? 24,
@@ -134,8 +140,8 @@ export function PLUUploadPage() {
       hiddenPLUs: new Set<string>(),
       bezeichnungsregeln: activeRegeln,
       blocks,
-      sortMode,
-      displayMode,
+      sortMode: UPLOAD_PREVIEW_SORT_MODE,
+      displayMode: UPLOAD_PREVIEW_DISPLAY_MODE,
       markRedKwCount: layoutSettings?.mark_red_kw_count ?? 0,
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
       versionKwNummer: versionKw,
@@ -146,7 +152,7 @@ export function PLUUploadPage() {
       storeBlockOrder: storeObstBlockOrder,
     })
     return result.items
-  }, [step, previewItems, regeln, blocks, layoutSettings, sortMode, displayMode, targetKW, targetJahr, uploadPreviewNameOverrides, storeObstBlockOrder])
+  }, [step, previewItems, regeln, blocks, layoutSettings, targetKW, targetJahr, uploadPreviewNameOverrides, storeObstBlockOrder])
 
   const step2ContainerRef = useRef<HTMLDivElement>(null)
   const [step2Boundary, setStep2Boundary] = useState<HTMLDivElement | null>(null)
@@ -170,6 +176,8 @@ export function PLUUploadPage() {
 
         {/* Schritt 1: Dateien auswählen */}
         {step === 1 && (
+          <div className="space-y-4">
+          <ManualSupplementCarryoverBanner listType="obst" />
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -314,6 +322,9 @@ export function PLUUploadPage() {
               </AlertDialog>
             </CardContent>
           </Card>
+          <ObstManualSupplementCard />
+          <ObstManualSupplementList />
+          </div>
         )}
 
         {/* Schritt 2: Vorschau inkl. Vergleich, ggf. Konflikte, Einspielen */}
@@ -389,15 +400,21 @@ export function PLUUploadPage() {
 
               <div className="flex-1 min-h-0 overflow-auto flex flex-col gap-4">
                 {uploadPreviewDisplayItems.length > 0 && (
-                  <div className="rounded-lg border border-border shrink-0">
-                    <PLUTable
-                      items={uploadPreviewDisplayItems}
-                      displayMode={displayMode}
-                      sortMode={sortMode}
-                      flowDirection={flowDirection}
-                      blocks={blocks}
-                      fontSizes={fontSizes}
-                    />
+                  <div className="space-y-2 shrink-0">
+                    <p className="text-sm text-muted-foreground">
+                      Vorschau für die Prüfung: Stück und Gewicht getrennt, alphabetisch – unabhängig von der
+                      Layout-Konfiguration des Marktes (die bleibt für Filialen unverändert).
+                    </p>
+                    <div className="rounded-lg border border-border">
+                      <PLUTable
+                        items={uploadPreviewDisplayItems}
+                        displayMode={UPLOAD_PREVIEW_DISPLAY_MODE}
+                        sortMode={UPLOAD_PREVIEW_SORT_MODE}
+                        flowDirection={flowDirection}
+                        blocks={blocks}
+                        fontSizes={fontSizes}
+                      />
+                    </div>
                   </div>
                 )}
 

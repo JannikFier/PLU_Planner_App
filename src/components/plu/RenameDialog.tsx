@@ -12,9 +12,19 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useUpdateCustomProduct } from '@/hooks/useCustomProducts'
-import { useRenameMasterProduct, useResetProductName } from '@/hooks/useCustomProducts'
-import { useRenameBackshopMasterProduct, useResetBackshopProductName } from '@/hooks/useBackshopRename'
+import {
+  useUpdateCustomProduct,
+  useRenameMasterProduct,
+  useResetProductName,
+  useUpsertObstRenamedByPlu,
+  useDeleteObstRenamedByPlu,
+} from '@/hooks/useCustomProducts'
+import {
+  useRenameBackshopMasterProduct,
+  useResetBackshopProductName,
+  useUpsertBackshopRenamedByPlu,
+  useDeleteBackshopRenamedByPlu,
+} from '@/hooks/useBackshopRename'
 import { useAuth } from '@/hooks/useAuth'
 import { uploadBackshopImage } from '@/lib/backshop-storage'
 import { getDisplayPlu } from '@/lib/plu-helpers'
@@ -29,6 +39,10 @@ interface RenameDialogProps {
   item: DisplayItem | null
   /** Bei 'backshop': Backshop-RPCs + Bild hochladen/ersetzen/entfernen */
   listType?: 'default' | 'backshop'
+  /** Optional: Tutorial-Anker am DialogContent */
+  dataTour?: string
+  /** Optional: Tutorial-Anker am Speichern-Button */
+  submitDataTour?: string
 }
 
 /** Inhalt mit key={item.id}; bei listType backshop: Bild-Bereich + Backshop-Hooks */
@@ -36,10 +50,12 @@ function RenameDialogForm({
   item,
   onOpenChange,
   listType = 'default',
+  submitDataTour,
 }: {
   item: DisplayItem
   onOpenChange: (open: boolean) => void
   listType?: 'default' | 'backshop'
+  submitDataTour?: string
 }) {
   const [newName, setNewName] = useState(item.display_name)
   const { user } = useAuth()
@@ -48,12 +64,18 @@ function RenameDialogForm({
   const updateCustom = useUpdateCustomProduct()
   const renameMaster = useRenameMasterProduct()
   const resetName = useResetProductName()
+  const upsertObstRenamedByPlu = useUpsertObstRenamedByPlu()
+  const deleteObstRenamedByPlu = useDeleteObstRenamedByPlu()
   const renameBackshop = useRenameBackshopMasterProduct()
   const resetBackshop = useResetBackshopProductName()
+  const upsertBackshopRenamedByPlu = useUpsertBackshopRenamedByPlu()
+  const deleteBackshopRenamedByPlu = useDeleteBackshopRenamedByPlu()
 
   const isBackshop = listType === 'backshop'
   const isCustom = item.is_custom
-  const canReset = !isCustom && item.is_manually_renamed
+  const nameDiffersFromSystem =
+    (item.display_name?.trim() ?? '') !== (item.system_name?.trim() ?? '')
+  const canReset = !isCustom && (item.is_manually_renamed || nameDiffersFromSystem)
 
   // Backshop: Bild-Status – 'keep' | 'remove' | { url: string } (neu hochgeladen)
   const [imageState, setImageState] = useState<'keep' | 'remove' | { url: string }>('keep')
@@ -103,16 +125,39 @@ function RenameDialogForm({
         } else if (imageState === 'remove') {
           new_image_url = ''
         }
-        await renameBackshop.mutateAsync({
-          item_id: item.id,
-          new_display_name: newName.trim(),
-          new_image_url,
-        })
+        if (item.id.startsWith('carryover-')) {
+          let imageUrl: string | null
+          if (new_image_url !== undefined) {
+            imageUrl = new_image_url === '' ? null : new_image_url
+          } else {
+            imageUrl = item.image_url ?? null
+          }
+          await upsertBackshopRenamedByPlu.mutateAsync({
+            plu: item.plu,
+            displayName: newName.trim(),
+            systemName: item.system_name,
+            imageUrl,
+          })
+        } else {
+          await renameBackshop.mutateAsync({
+            item_id: item.id,
+            new_display_name: newName.trim(),
+            new_image_url,
+          })
+        }
         onOpenChange(false)
         return
       }
       if (!isBackshop) {
-        await renameMaster.mutateAsync({ id: item.id, displayName: newName.trim() })
+        if (!isCustom && item.id.startsWith('carryover-')) {
+          await upsertObstRenamedByPlu.mutateAsync({
+            plu: item.plu,
+            displayName: newName.trim(),
+            systemName: item.system_name,
+          })
+        } else {
+          await renameMaster.mutateAsync({ id: item.id, displayName: newName.trim() })
+        }
         onOpenChange(false)
       }
     } catch {
@@ -123,7 +168,13 @@ function RenameDialogForm({
   const handleReset = async () => {
     try {
       if (isBackshop) {
-        await resetBackshop.mutateAsync({ item_id: item.id, system_name: item.system_name })
+        if (item.id.startsWith('carryover-')) {
+          await deleteBackshopRenamedByPlu.mutateAsync({ plu: item.plu })
+        } else {
+          await resetBackshop.mutateAsync({ item_id: item.id, system_name: item.system_name })
+        }
+      } else if (item.id.startsWith('carryover-')) {
+        await deleteObstRenamedByPlu.mutateAsync({ plu: item.plu })
       } else {
         await resetName.mutateAsync({ id: item.id, systemName: item.system_name })
       }
@@ -137,8 +188,12 @@ function RenameDialogForm({
     updateCustom.isPending ||
     renameMaster.isPending ||
     resetName.isPending ||
+    upsertObstRenamedByPlu.isPending ||
+    deleteObstRenamedByPlu.isPending ||
     renameBackshop.isPending ||
-    resetBackshop.isPending
+    resetBackshop.isPending ||
+    upsertBackshopRenamedByPlu.isPending ||
+    deleteBackshopRenamedByPlu.isPending
 
   return (
     <>
@@ -239,6 +294,7 @@ function RenameDialogForm({
           <Button
             onClick={handleSave}
             disabled={isPending || !newName.trim() || newName.trim().length < 2}
+            {...(submitDataTour ? { 'data-tour': submitDataTour } : {})}
           >
             {isPending ? 'Speichern...' : 'Speichern'}
           </Button>
@@ -254,13 +310,29 @@ function RenameDialogForm({
  * - Master (Obst/Gemüse): display_name + is_manually_renamed
  * - Backshop (listType backshop): display_name + optional Bild hochladen/ersetzen/entfernen
  */
-export function RenameDialog({ open, onOpenChange, item, listType = 'default' }: RenameDialogProps) {
+export function RenameDialog({
+  open,
+  onOpenChange,
+  item,
+  listType = 'default',
+  dataTour,
+  submitDataTour,
+}: RenameDialogProps) {
   if (!item) return null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={listType === 'backshop' ? 'sm:max-w-[500px]' : 'sm:max-w-[400px]'}>
-        <RenameDialogForm key={item.id} item={item} onOpenChange={onOpenChange} listType={listType} />
+      <DialogContent
+        className={listType === 'backshop' ? 'sm:max-w-[500px]' : 'sm:max-w-[400px]'}
+        {...(dataTour ? { 'data-tour': dataTour } : {})}
+      >
+        <RenameDialogForm
+          key={item.id}
+          item={item}
+          onOpenChange={onOpenChange}
+          listType={listType}
+          submitDataTour={submitDataTour}
+        />
       </DialogContent>
     </Dialog>
   )

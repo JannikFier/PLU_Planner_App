@@ -128,6 +128,27 @@ test.describe('Super-Admin-Journey @extended', () => {
     ).toBeVisible({ timeout: 15_000 })
   })
 
+  test('Versionen: Karte "Alle Werbungen" sichtbar', async ({ page }) => {
+    await page.goto('/super-admin/versions')
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('heading', { name: 'Alle Werbungen' })).toBeVisible({
+      timeout: 15_000,
+    })
+  })
+
+  test('Werbung-Edit (Obst): Wochenwerbung-Seite lädt auch ohne bestehende Kampagne', async ({
+    page,
+  }) => {
+    // arbitrare Zukunftswoche -> Seite ist erreichbar und zeigt "Zeile hinzufügen"
+    await page.goto('/super-admin/versions/werbung/obst/52/2099/wochenwerbung')
+    await page.waitForLoadState('networkidle')
+    await expect(
+      page.getByRole('heading', { name: /Wochenwerbung KW52\/2099/ }),
+    ).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'Zeile hinzufügen' })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Speichern/ })).toBeVisible()
+  })
+
   test('Backshop-Liste: Seite lädt', async ({ page }) => {
     await page.goto('/super-admin/backshop-list')
     await expect(page).toHaveURL(/\/super-admin\/backshop-list/)
@@ -167,6 +188,29 @@ test.describe('Super-Admin-Journey @extended', () => {
       page.getByRole('heading', { name: /Versionen|Backshop/i })
         .or(page.getByText('Versionen'))
     ).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('Marken-Uploads (Edeka, Harry, Aryzta)')).toBeVisible()
+    const expandFirst = page.getByRole('button', { name: 'Quellen aufklappen' }).first()
+    if (await expandFirst.isVisible().catch(() => false)) {
+      await expandFirst.click()
+      await expect(page.getByText('Edeka', { exact: true }).first()).toBeVisible()
+    }
+  })
+
+  test('Backshop-Versionen: Karte "Alle Werbungen" sichtbar', async ({ page }) => {
+    await page.goto('/super-admin/backshop-versions')
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('heading', { name: 'Alle Werbungen' })).toBeVisible({
+      timeout: 15_000,
+    })
+  })
+
+  test('Werbung-Edit (Backshop): Seite lädt auch ohne bestehende Kampagne', async ({ page }) => {
+    await page.goto('/super-admin/backshop-versions/werbung/52/2099')
+    await page.waitForLoadState('networkidle')
+    await expect(
+      page.getByRole('heading', { name: /Werbung KW52\/2099 \(Backshop\)/ }),
+    ).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'Zeile hinzufügen' })).toBeVisible()
   })
 
   test('Firmen & Märkte: Seite lädt', async ({ page }) => {
@@ -179,12 +223,12 @@ test.describe('Super-Admin-Journey @extended', () => {
     ).toBeVisible({ timeout: 15_000 })
   })
 
-  test('Block-Sortierung: Seite lädt', async ({ page }) => {
+  test('Obst Warengruppen: Redirect von alter Block-Sort-URL', async ({ page }) => {
     await page.goto('/super-admin/block-sort')
-    await expect(page).toHaveURL(/\/super-admin\/block-sort/)
+    await expect(page).toHaveURL(/\/super-admin\/obst-warengruppen/, { timeout: 15_000 })
     await page.waitForLoadState('networkidle')
     await expect(
-      page.getByRole('heading', { name: /PLU-Liste bearbeiten|Block/i })
+      page.getByRole('heading', { name: 'Warengruppen (Obst & Gemüse)' })
         .or(page.getByText('Kein Markt'))
     ).toBeVisible({ timeout: 15_000 })
   })
@@ -240,32 +284,32 @@ test.describe('Super-Admin-Journey @extended', () => {
     ).toBeVisible({ timeout: 15_000 })
   })
 
-  test('Backshop Warengruppen: Seite lädt', async ({ page }) => {
+  test('Backshop Warengruppen: Redirect zu Block-Sort', async ({ page }) => {
     await page.goto('/super-admin/backshop-warengruppen')
-    await expect(page).toHaveURL(/\/super-admin\/backshop-warengruppen/)
+    await expect(page).toHaveURL(/\/super-admin\/backshop-block-sort/)
     await page.waitForLoadState('networkidle')
     await expect(
-      page.getByRole('heading', { name: 'Warengruppen bearbeiten' })
+      page.getByRole('heading', { name: 'Warengruppen (Backshop)' })
         .or(page.getByText('Kein Markt'))
     ).toBeVisible({ timeout: 15_000 })
   })
 
-  test('Backshop Inhalt & Regeln: Seite lädt', async ({ page }) => {
+  test('Backshop Bezeichnungsregeln: Seite lädt', async ({ page }) => {
     await page.goto('/super-admin/backshop-rules')
     await expect(page).toHaveURL(/\/super-admin\/backshop-rules/)
     await page.waitForLoadState('networkidle')
     await expect(
-      page.getByRole('heading', { name: 'Inhalt & Regeln (Backshop)' })
+      page.getByRole('heading', { name: 'Bezeichnungsregeln (Backshop)' })
         .or(page.getByText('Kein Markt'))
     ).toBeVisible({ timeout: 15_000 })
   })
 
-  test('Backshop Block-Sortierung: Seite lädt', async ({ page }) => {
+  test('Backshop Warengruppen-Seite: lädt', async ({ page }) => {
     await page.goto('/super-admin/backshop-block-sort')
     await expect(page).toHaveURL(/\/super-admin\/backshop-block-sort/)
     await page.waitForLoadState('networkidle')
     await expect(
-      page.getByRole('heading', { name: /PLU-Liste Backshop bearbeiten|Block/i })
+      page.getByRole('heading', { name: 'Warengruppen (Backshop)' })
         .or(page.getByText('Kein Markt'))
     ).toBeVisible({ timeout: 15_000 })
   })
@@ -288,6 +332,12 @@ test.describe('Super-Admin-Journey @extended', () => {
       page.getByRole('heading', { name: 'Ausgeblendete Produkte (Backshop)' })
         .or(page.getByText('Kein Markt'))
     ).toBeVisible({ timeout: 15_000 })
+    await expect(
+      page.getByRole('tab', { name: /Manuell ausgeblendet/i }).or(page.getByText('Kein Markt')),
+    ).toBeVisible({ timeout: 15_000 })
+    await expect(
+      page.getByRole('tab', { name: /Durch Regel gefiltert/i }).or(page.getByText('Kein Markt')),
+    ).toBeVisible({ timeout: 15_000 })
   })
 
   test('Backshop Werbung: Seite lädt', async ({ page }) => {
@@ -309,5 +359,47 @@ test.describe('Super-Admin-Journey @extended', () => {
       page.getByRole('heading', { name: 'Umbenannte Produkte (Backshop)' })
         .or(page.getByText('Kein Markt'))
     ).toBeVisible({ timeout: 15_000 })
+  })
+
+  test('Backshop Produktgruppen: Mitglied öffnet Kachel-Editor mit ?group=', async ({ page }) => {
+    await page.goto('/super-admin/backshop-product-groups')
+    await expect(page).toHaveURL(/\/super-admin\/backshop-product-groups/)
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('heading', { name: 'Produktgruppen (Backshop)', level: 2 })).toBeVisible({
+      timeout: 15_000,
+    })
+    const mitgliedButtons = page.getByRole('button', { name: /Mitglied/ })
+    if ((await mitgliedButtons.count()) === 0) {
+      test.skip(true, 'Keine Produktgruppe in der Umgebung')
+      return
+    }
+    const first = mitgliedButtons.first()
+    if (await first.isDisabled()) {
+      test.skip(true, 'Keine aktive Backshop-Version')
+      return
+    }
+    await first.click()
+    await expect(page).toHaveURL(/\/super-admin\/backshop-product-groups\/neu\?group=/)
+    await page.waitForLoadState('networkidle')
+    await expect(
+      page
+        .getByRole('heading', { name: 'Mitglieder bearbeiten (Kachel-Editor)', level: 2 })
+        .or(page.getByText('Keine aktive Backshop-Version')),
+    ).toBeVisible({ timeout: 15_000 })
+  })
+
+  test('Backshop Produktgruppen: Kachel-Editor unter /neu lädt', async ({ page }) => {
+    await page.goto('/super-admin/backshop-product-groups/neu')
+    await expect(page).toHaveURL(/\/super-admin\/backshop-product-groups\/neu/)
+    await page.waitForLoadState('networkidle')
+    await expect(
+      page
+        .getByRole('heading', { name: 'Neue Produktgruppe (Kachel-Editor)', level: 2 })
+        .or(page.getByText('Keine aktive Backshop-Version')),
+    ).toBeVisible({ timeout: 15_000 })
+    if (await page.getByRole('heading', { name: 'Neue Produktgruppe (Kachel-Editor)', level: 2 }).isVisible()) {
+      await expect(page.getByRole('button', { name: 'Alle' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Nur offen' })).toBeVisible()
+    }
   })
 })

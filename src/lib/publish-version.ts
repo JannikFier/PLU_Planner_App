@@ -1,6 +1,8 @@
 // Publish-Logik: Version veröffentlichen, Items schreiben, Benachrichtigungen erstellen
 
 import { PUBLISH_BATCH_SIZE } from '@/lib/constants'
+import { fetchStoreNotificationRecipientUserIds } from '@/lib/notification-recipient-ids'
+import { reconcileObstManualSupplementsAfterPublish } from '@/lib/manual-supplement-publish'
 import { supabase } from '@/lib/supabase'
 import type { Database, MasterPLUItem } from '@/types/database'
 
@@ -56,6 +58,13 @@ export async function publishVersion(input: PublishInput): Promise<PublishResult
 
 async function _doPublish(input: PublishInput): Promise<PublishResult> {
   const { kwNummer, jahr, items, createdBy, storeId, replaceExistingVersion } = input
+
+  const { data: prevActiveObstRow } = await supabase
+    .from('versions')
+    .select('id')
+    .eq('status', 'active')
+    .maybeSingle()
+  const previousObstActiveVersionId = (prevActiveObstRow as { id: string } | null)?.id ?? null
 
   // 0. Optional: Bestehende Version für (kwNummer, jahr) löschen (Überschreiben)
   if (replaceExistingVersion) {
@@ -129,6 +138,7 @@ async function _doPublish(input: PublishInput): Promise<PublishResult> {
     block_id: item.block_id,
     is_admin_eigen: item.is_admin_eigen,
     preis: item.preis,
+    is_manual_supplement: item.is_manual_supplement ?? false,
   }))
 
   for (let i = 0; i < itemsToInsert.length; i += PUBLISH_BATCH_SIZE) {
@@ -159,23 +169,36 @@ async function _doPublish(input: PublishInput): Promise<PublishResult> {
     throw new Error(`Version aktivieren fehlgeschlagen: ${activateError.message}`)
   }
 
+  try {
+    await reconcileObstManualSupplementsAfterPublish(
+      supabase,
+      previousObstActiveVersionId,
+      items.map((i) => i.plu),
+    )
+  } catch (e) {
+    if (import.meta.env.DEV) console.warn('Manuelle Obst-Supplemente bereinigen:', e)
+  }
+
+  if (previousObstActiveVersionId) {
+    const { error: carryDelErr } = await supabase
+      .from('store_list_carryover')
+      .delete()
+      .eq('list_type', 'obst')
+      .eq('for_version_id', previousObstActiveVersionId)
+    if (carryDelErr && import.meta.env.DEV) {
+      console.warn('Obst-Carryover für vorherige Version löschen:', carryDelErr.message)
+    }
+  }
+
   // 5. Benachrichtigungen erstellen (version_notifications: pro User pro Version)
-  // Alle User laden (alle Rollen), außer dem Uploader
+  // Admin + User am Markt, ohne Uploader, ohne Viewer
   let notificationCount = 0
 
   try {
-    const { data: storeUsers, error: usersError } = await supabase
-      .from('user_store_access')
-      .select('user_id')
-      .eq('store_id', storeId)
-      .neq('user_id', createdBy)
-
-    if (usersError) {
-      throw new Error(`Benutzer für Benachrichtigungen laden fehlgeschlagen: ${usersError.message}`)
-    }
-    if (storeUsers && storeUsers.length > 0) {
-      const notifications = (storeUsers as { user_id: string }[]).map((row) => ({
-        user_id: row.user_id,
+    const recipientIds = await fetchStoreNotificationRecipientUserIds(supabase, storeId, createdBy)
+    if (recipientIds.length > 0) {
+      const notifications = recipientIds.map((userId) => ({
+        user_id: userId,
         version_id: versionId,
         is_read: false,
         store_id: storeId,

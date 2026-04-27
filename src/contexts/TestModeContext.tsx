@@ -13,6 +13,7 @@ import { flushSync } from 'react-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { setTestModeFlag } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { TUTORIAL_TESTMODE_TURNED_OFF_EVENT } from '@/lib/tutorial-testmode-events'
 
 interface TestModeContextType {
   isTestMode: boolean
@@ -112,6 +113,9 @@ export function TestModeProvider({ children }: { children: ReactNode }) {
     toast.success('Testmodus beendet – echte Daten wiederhergestellt.')
     if (!isBroadcasting.current) {
       channelRef.current?.postMessage({ type: 'TESTMODE_OFF' })
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(TUTORIAL_TESTMODE_TURNED_OFF_EVENT))
     }
   }, [queryClient])
 

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1400">
+<title>Ausgeblendete Produkte — Design-Exploration</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="styles.css">
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<style>
+  html, body, #root { height: 100%; margin: 0; }
+  body { font-family: "Inter", system-ui, sans-serif; background: #f0eee9; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="data.js"></script>
+<script type="text/babel" src="shared.jsx"></script>
+<script type="text/babel" src="variant-a.jsx"></script>
+<script type="text/babel" src="variant-b.jsx"></script>
+<script type="text/babel" src="variant-c.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "density": "normal",
+  "dark": false,
+  "showLabels": true
+}/*EDITMODE-END*/;
+
+function App() {
+  const [tweaks, setTweaks] = useTweaks(TWEAK_DEFAULTS);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", tweaks.dark ? "dark" : "light");
+    document.body.style.background = tweaks.dark ? "#0a0b0d" : "#f0eee9";
+  }, [tweaks.dark]);
+
+  return (
+    <>
+      <DesignCanvas title="Ausgeblendete Produkte (Backshop)" subtitle="Drei Richtungen für die Super-Admin-Ansicht">
+
+        <DCSection id="variants" title="Design-Varianten" subtitle="Klick auf das Pfeil-Symbol am Rand einer Karte, um sie im Vollbild zu sehen.">
+
+          <DCArtboard id="variant-a" label="A · Tabs — Manuell / Regel" width={1280} height={1600}>
+            <VariantA density2={tweaks.density} />
+          </DCArtboard>
+
+          <DCArtboard id="variant-b" label="B · Ein Stream mit Herkunfts-Chip" width={1280} height={1600}>
+            <VariantB density2={tweaks.density} />
+          </DCArtboard>
+
+          <DCArtboard id="variant-c" label="C · Profi-Tabelle mit Sidebar-Facets" width={1480} height={1600}>
+            <VariantC density2={tweaks.density} />
+          </DCArtboard>
+
+        </DCSection>
+
+        <DCSection id="notes" title="Design-Notizen" subtitle="Was jede Variante löst — und welche sich für welches Team eignet.">
+          <DCArtboard id="note-a" label="Notiz · Variante A" width={360} height={260}>
+            <div style={{ padding: 20, background: "#fef4a8", height: "100%", fontFamily: "Inter, sans-serif", fontSize: 13, lineHeight: 1.55, color: "#5a4a2a" }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>A — Tabs</div>
+              Trennt die zwei Listen klar. Manuell ist die „tägliche Arbeit", Regel die „berechnete Ansicht". Regel-Tab gruppiert pro Regel — ein Klick öffnet die Regel zum Bearbeiten. Gut für Teams, die beide Listen selten gleichzeitig brauchen.
+            </div>
+          </DCArtboard>
+          <DCArtboard id="note-b" label="Notiz · Variante B" width={360} height={260}>
+            <div style={{ padding: 20, background: "#d7eaff", height: "100%", fontFamily: "Inter, sans-serif", fontSize: 13, lineHeight: 1.55, color: "#2a3a5a" }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>B — Ein Stream</div>
+              Alle Zeilen in einer Liste, Herkunft als klickbarer Chip pro Zeile. Warengruppen als horizontale Chip-Leiste. Gut, wenn man schnell „zeig alle Edeka-Artikel, egal ob manuell oder regelbasiert" braucht.
+            </div>
+          </DCArtboard>
+          <DCArtboard id="note-c" label="Notiz · Variante C" width={360} height={260}>
+            <div style={{ padding: 20, background: "#d7f0ea", height: "100%", fontFamily: "Inter, sans-serif", fontSize: 13, lineHeight: 1.55, color: "#1f4a40" }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>C — Profi-Tabelle</div>
+              Sidebar-Facetten mit Live-Zählern, dichte sortierbare Tabelle. Für Power-User, die viel filtern und Bulk-Aktionen fahren. Bulk-Toolbar schwebt oben und bietet kontext-spezifische Aktionen.
+            </div>
+          </DCArtboard>
+          <DCArtboard id="note-common" label="Gemeinsame Prinzipien" width={360} height={260}>
+            <div style={{ padding: 20, background: "#eae5ff", height: "100%", fontFamily: "Inter, sans-serif", fontSize: 13, lineHeight: 1.7, color: "#3a2d6b" }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Gemeinsam</div>
+              · Marken-Buchstaben-Badges (E/H/A/O), abstrakt<br/>
+              · Bulk-Toolbar erscheint bei Auswahl<br/>
+              · Regel-Ursache als klickbarer Chip pro Zeile<br/>
+              · Warengruppen filtern konsistent die Liste
+            </div>
+          </DCArtboard>
+        </DCSection>
+
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Ansicht">
+          <TweakRadio
+            label="Dichte"
+            value={tweaks.density}
+            onChange={(v) => setTweaks({ density: v })}
+            options={[
+              { value: "roomy",   label: "Luftig" },
+              { value: "normal",  label: "Normal" },
+              { value: "compact", label: "Kompakt" },
+            ]}
+          />
+          <TweakToggle
+            label="Dark Mode"
+            value={tweaks.dark}
+            onChange={(v) => setTweaks({ dark: v })}
+          />
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+
+</body>
+</html>

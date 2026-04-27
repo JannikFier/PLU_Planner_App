@@ -201,7 +201,7 @@ export function BackshopCustomProductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px]" data-tour="backshop-custom-add-dialog">
         <DialogHeader>
           <DialogTitle>Eigenes Produkt (Backshop) hinzufügen</DialogTitle>
           <DialogDescription>
@@ -434,6 +434,7 @@ export function BackshopCustomProductDialog({
           </Button>
           <Button
             type="submit"
+            data-tour="backshop-custom-add-dialog-submit"
             disabled={addProduct.isPending || !canSubmit}
           >
             {addProduct.isPending ? 'Wird hinzugefügt…' : 'Hinzufügen'}

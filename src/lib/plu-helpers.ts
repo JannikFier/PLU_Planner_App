@@ -140,6 +140,27 @@ export function getDisplayNameForItem(name: string | null, fallback: string, isC
   return normalized.replace(/\s*★\s*/g, ' ').replace(/\s+/g, ' ').trim() || fallback
 }
 
+/**
+ * Wortweise Lesbarkeit: Pro Leerzeichen-getrenntem Wort erster Buchstabe groß, übrige Buchstaben klein (de).
+ * Für Carryover-/Snapshot-Namen, wenn Stammdaten uneinheitliche Kleinbuchstaben liefern (z. B. „Kiwi gold jumbo“).
+ */
+export function formatProductWordsForDisplay(name: string): string {
+  const s = name.replace(/\s+/g, ' ').trim()
+  if (!s) return s
+  return s
+    .split(' ')
+    .map((word) => {
+      if (!word) return word
+      const i = word.search(/\p{L}/u)
+      if (i === -1) return word
+      const before = word.slice(0, i)
+      const letter = word[i]!
+      const after = word.slice(i + 1)
+      return before + letter.toLocaleUpperCase('de-DE') + after.toLocaleLowerCase('de-DE')
+    })
+    .join(' ')
+}
+
 /** Eindeutigen Platzhalter für custom_products.plu erzeugen (Preis-only-Produkte). */
 export function generatePriceOnlyPlu(): string {
   return PRICE_ONLY_PLU_PREFIX + generateUUID()
@@ -361,6 +382,29 @@ export function splitLetterGroupsIntoColumns<T extends PLUItemBase>(
 // Block-Gruppierung (BY_BLOCK-Sortierung)
 // ============================================================
 
+/** Buchstaben-Abschnitt in der PLU-Tabelle (`— A —`), nicht Warengruppen-Name. */
+export function isLetterPluSectionHeaderLabel(label: string): boolean {
+  const t = label.trim()
+  return t.startsWith('—') && t.endsWith('—')
+}
+
+/**
+ * Anzeige-Titel für Warengruppen-Köpfe (ohne CSS-`uppercase`): gemischt geschriebene Namen
+ * aus der DB unverändert; rein VERSALE Strings → erster Buchstabe groß, Rest klein (de).
+ * Buchstaben-Gruppen (`— A —`) und „Ohne Zuordnung“ bleiben wie übergeben.
+ */
+export function formatPluBlockSectionHeaderForDisplay(label: string): string {
+  if (isLetterPluSectionHeaderLabel(label)) return label
+  if (label === 'Ohne Zuordnung') return label
+  const t = label.trim()
+  if (!t) return label
+  const hasLetter = /[a-zA-ZäöüÄÖÜß]/.test(t)
+  if (hasLetter && t === t.toLocaleUpperCase('de')) {
+    return t.charAt(0).toLocaleUpperCase('de') + t.slice(1).toLocaleLowerCase('de')
+  }
+  return t
+}
+
 /** Gruppe von Items innerhalb eines Blocks */
 export interface BlockGroup<T extends PLUItemBase = PLUItemBase> {
   blockId: string | null
@@ -382,6 +426,11 @@ export function groupItemsByBlock<T extends PLUItemBase>(
     resolveBlockId?: (item: T) => string | null
     /** Blöcke bereits in gewünschter Reihenfolge (z. B. nach Markt-store_obst_block_order) */
     sortedBlocks?: Block[]
+    /**
+     * true: alle definierten Warengruppen als Abschnitt (auch ohne Artikel) – Masterliste/Vorschau.
+     * false/omit: nur Gruppen mit mindestens einem Artikel (PDF bleibt kompakt).
+     */
+    includeEmptyBlocks?: boolean
   },
 ): BlockGroup<T>[] {
   const blockMap = new Map<string, Block>()
@@ -410,10 +459,21 @@ export function groupItemsByBlock<T extends PLUItemBase>(
   const result: BlockGroup<T>[] = []
   const sortedBlocks =
     options?.sortedBlocks ?? [...blocks].sort((a, b) => a.order_index - b.order_index)
+  const includeEmptyBlocks = options?.includeEmptyBlocks ?? false
 
   for (const block of sortedBlocks) {
     const blockItems = grouped.get(block.id)
-    if (blockItems && blockItems.length > 0) {
+    if (includeEmptyBlocks) {
+      const arr = blockItems ? [...blockItems] : []
+      if (arr.length > 0) {
+        arr.sort((a, b) => getName(a).localeCompare(getName(b), 'de'))
+      }
+      result.push({
+        blockId: block.id,
+        blockName: block.name,
+        items: arr,
+      })
+    } else if (blockItems && blockItems.length > 0) {
       blockItems.sort((a, b) => getName(a).localeCompare(getName(b), 'de'))
       result.push({
         blockId: block.id,

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { supabase, invokeEdgeFunction } from '@/lib/supabase'
+import { supabase, invokeEdgeFunction, isTestModeActive } from '@/lib/supabase'
 import { createUserSchema, createUserResponseSchema, validateEdgeFunctionResponse } from '@/lib/validation'
 import { useAuth } from '@/hooks/useAuth'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
@@ -119,6 +119,9 @@ export function UserManagement() {
     return withoutSa(adminUsers)
   }, [isSuperAdmin, currentCompanyId, companyUsers, adminUsers])
 
+  /** Deterministische ID der ersten Tabellenzeile fuer Tutorial-Anker (`user-management-row-first`). */
+  const firstUserRowId = useMemo(() => filteredUsers[0]?.id ?? null, [filteredUsers])
+
   // Heimatmarkt des aktuellen Users laden (fuer User-Erstellung)
   const { data: homeStoreId } = useQuery({
     queryKey: ['home-store-id', currentUserId],
@@ -223,7 +226,11 @@ export function UserManagement() {
       setShowCreateDialog(false)
       setShowPasswordDialog(true)
       invalidateProfileLists(queryClient)
-      toast.success('Benutzer erfolgreich angelegt!')
+      if (isTestModeActive()) {
+        toast.info('Testmodus: Es wurde kein echter Benutzer angelegt. Das Einmalpasswort dient nur zur Übung.')
+      } else {
+        toast.success('Benutzer erfolgreich angelegt!')
+      }
 
       // Formular zurücksetzen
       setNewDisplayName('')
@@ -248,7 +255,11 @@ export function UserManagement() {
       setGeneratedPassword(password)
       setShowPasswordDialog(true)
       invalidateProfileLists(queryClient)
-      toast.success('Passwort wurde zurückgesetzt!')
+      if (isTestModeActive()) {
+        toast.info('Testmodus: Passwort wurde nicht wirklich geändert.')
+      } else {
+        toast.success('Passwort wurde zurückgesetzt!')
+      }
     },
     onError: (error: Error) => {
       toast.error(`Fehler: ${error.message}`)
@@ -264,7 +275,11 @@ export function UserManagement() {
       setShowDeleteConfirmDialog(false)
       setUserToDelete(null)
       invalidateProfileLists(queryClient)
-      toast.success('Benutzer wurde gelöscht.')
+      if (isTestModeActive()) {
+        toast.info('Testmodus: Benutzer wurde nicht wirklich gelöscht.')
+      } else {
+        toast.success('Benutzer wurde gelöscht.')
+      }
     },
     onError: (error: Error) => {
       toast.error(`Fehler: ${error.message}`)
@@ -312,7 +327,11 @@ export function UserManagement() {
     },
     onSuccess: () => {
       invalidateProfileLists(queryClient)
-      toast.success('Rolle wurde geändert.')
+      if (isTestModeActive()) {
+        toast.info('Testmodus: Rolle wurde nicht wirklich geändert.')
+      } else {
+        toast.success('Rolle wurde geändert.')
+      }
     },
     onError: (e: Error) => {
       toast.error(e.message)
@@ -334,10 +353,12 @@ export function UserManagement() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-6" data-tour="user-management-page">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-2xl font-bold tracking-tight">Benutzerverwaltung</h2>
+            <h2 className="text-2xl font-bold tracking-tight" data-tour="user-management-heading">
+              Benutzerverwaltung
+            </h2>
             <p className="text-muted-foreground">
               {isSuperAdmin
                 ? 'Admins und Personal anlegen, Rollen und Passwörter verwalten.'
@@ -348,12 +369,12 @@ export function UserManagement() {
           {/* Neuen Benutzer anlegen */}
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2" data-tour="user-management-new-user">
                 <UserPlus className="h-4 w-4" />
                 Neuer Benutzer
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent data-tour="user-management-create-dialog">
               <DialogHeader>
                 <DialogTitle>Neuen Benutzer anlegen</DialogTitle>
                 <DialogDescription>
@@ -435,6 +456,7 @@ export function UserManagement() {
                   Abbrechen
                 </Button>
                 <Button
+                  data-tour="user-management-create-submit"
                   onClick={() => createUserMutation.mutate()}
                   disabled={!(newPersonalnummer.trim() || newEmail.trim()) || !defaultStoreId || createUserMutation.isPending}
                 >
@@ -559,7 +581,7 @@ export function UserManagement() {
         </AlertDialog>
 
         {/* User-Tabelle */}
-        <Card>
+        <Card data-tour="user-management-list">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
@@ -591,7 +613,10 @@ export function UserManagement() {
                 </TableHeader>
                 <TableBody>
                   {filteredUsers?.map((user) => (
-                    <TableRow key={user.id}>
+                    <TableRow
+                      key={user.id}
+                      data-tour={user.id === firstUserRowId ? 'user-management-row-first' : undefined}
+                    >
                       <TableCell className="font-medium">
                         {user.display_name || '–'}
                       </TableCell>
@@ -608,7 +633,10 @@ export function UserManagement() {
                             onValueChange={(v) => updateRoleMutation.mutate({ userId: user.id, newRole: v as 'user' | 'admin' | 'viewer' })}
                             disabled={updateRoleMutation.isPending}
                           >
-                            <SelectTrigger className="w-[140px] h-8">
+                            <SelectTrigger
+                              className="w-[140px] h-8"
+                              data-tour={user.id === firstUserRowId ? 'user-management-row-edit' : undefined}
+                            >
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -648,6 +676,7 @@ export function UserManagement() {
                               variant="outline"
                               size="sm"
                               className="gap-1"
+                              data-tour={user.id === firstUserRowId ? 'user-management-row-reset-pw' : undefined}
                               disabled={resetPasswordMutation.isPending}
                               onClick={() => {
                                 setSelectedUser(user)

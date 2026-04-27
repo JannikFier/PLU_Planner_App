@@ -93,6 +93,10 @@ export interface AddToOfferDialogProps {
   isAdding?: boolean
   /** PLUs die bereits in der zentralen Werbung sind (nicht erneut manuell) */
   blockedPlus?: Set<string>
+  /** Optional: Tutorial-Anker am DialogContent */
+  dataTour?: string
+  /** Optional: Tutorial-Anker am primaeren Bestaetigen-Button (KW-Modus) */
+  submitDataTour?: string
 }
 
 export function AddToOfferDialog({
@@ -102,6 +106,8 @@ export function AddToOfferDialog({
   onAdd,
   isAdding = false,
   blockedPlus,
+  dataTour,
+  submitDataTour,
 }: AddToOfferDialogProps) {
   const [searchText, setSearchText] = useState('')
   const deferredSearch = useDebouncedValue(searchText, 200)
@@ -152,7 +158,10 @@ export function AddToOfferDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[90vw] lg:max-w-4xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
+      <DialogContent
+        className="sm:max-w-[90vw] lg:max-w-4xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden"
+        {...(dataTour ? { 'data-tour': dataTour } : {})}
+      >
         <DialogHeader className="shrink-0">
           <DialogTitle>
             {selected ? 'Produkt zur Werbung hinzufügen' : 'Produkte zur Werbung hinzufügen'}
@@ -213,6 +222,7 @@ export function AddToOfferDialog({
                 className="flex-1"
                 onClick={() => submitAdd(durationWeeks, 'kw')}
                 disabled={isAdding}
+                {...(submitDataTour ? { 'data-tour': submitDataTour } : {})}
               >
                 Zur Aktion hinzufügen (ab dieser KW)
               </Button>

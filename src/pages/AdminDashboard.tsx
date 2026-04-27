@@ -49,7 +49,7 @@ export function AdminDashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-8">
-        <div>
+        <div data-tour="dashboard-welcome">
           <h2 className="text-2xl font-bold tracking-tight">Administration</h2>
           <p className="text-muted-foreground">
             Wähle einen Bereich – Listen und Konfiguration findest du unter Obst/Gemüse und Backshop.
@@ -64,6 +64,7 @@ export function AdminDashboard() {
               icon={Apple}
               onClick={() => navigate('/admin/obst')}
               variant="obst"
+              dataTour="dashboard-card-obst"
             />
           )}
           {backshopVisible && (
@@ -73,6 +74,7 @@ export function AdminDashboard() {
               icon={Croissant}
               onClick={() => navigate('/admin/backshop')}
               variant="backshop"
+              dataTour="dashboard-card-backshop"
             />
           )}
           <BereichsauswahlCard
@@ -81,6 +83,7 @@ export function AdminDashboard() {
             icon={Users}
             onClick={() => navigate('/admin/users')}
             variant="benutzer"
+            dataTour="dashboard-card-users"
           />
         </div>
 

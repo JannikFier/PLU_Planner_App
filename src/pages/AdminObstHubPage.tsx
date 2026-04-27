@@ -35,8 +35,8 @@ export function AdminObstHubPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
-        <div>
+      <div className="space-y-8" data-tour="admin-obst-hub-page">
+        <div data-tour="admin-obst-hub-heading">
           <h2 className="text-2xl font-bold tracking-tight text-emerald-800">Obst und Gemüse</h2>
           <p className="text-muted-foreground">
             PLU-Liste öffnen oder Darstellung und Regeln für diesen Markt anpassen.
@@ -50,13 +50,15 @@ export function AdminObstHubPage() {
             icon={ClipboardList}
             onClick={() => navigate('/admin/masterlist')}
             variant="obst"
+            dataTour="admin-obst-hub-liste"
           />
           <BereichsauswahlCard
             title="Konfiguration der Liste"
-            description="Layout, Bezeichnungsregeln und Warengruppen-Sortierung"
+            description="Layout, Bezeichnungsregeln und Warengruppen (Workbench)"
             icon={LayoutGrid}
             onClick={() => navigate('/admin/obst/konfiguration')}
             variant="obst"
+            dataTour="admin-obst-hub-konfig"
           />
         </div>
       </div>

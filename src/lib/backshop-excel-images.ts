@@ -3,7 +3,7 @@
 import ExcelJS from 'exceljs'
 import JSZip from 'jszip'
 import { supabase } from '@/lib/supabase'
-import type { ParsedBackshopRow } from '@/types/plu'
+import type { BackshopDuplicateDetail, ParsedBackshopRow } from '@/types/plu'
 
 const BUCKET = 'backshop-images'
 /** Gültigkeit signierter URLs (1 Jahr), damit gespeicherte URLs lange funktionieren */
@@ -512,6 +512,46 @@ export async function extractImagesFromBackshopExcel(
   return out
 }
 
+/**
+ * Supabase-Storage-Upload mit Retry bei transienten Fehlern (5xx, Timeout, Netzwerk).
+ * Drei Versuche mit Exponential Backoff (500ms, 1s, 2s). Nicht-retriable Fehler
+ * (4xx, Auth-Fehler, Payload zu groß) werden sofort zurückgegeben.
+ */
+async function uploadToBackshopStorageWithRetry(
+  path: string,
+  buffer: ArrayBuffer,
+  contentType: string,
+  attempts = 3,
+): Promise<{ ok: true; attempts: number; durationMs: number } | { ok: false; error: string; attempts: number; durationMs: number }> {
+  let lastError = 'unknown'
+  const startTs = Date.now()
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, buffer, { contentType, upsert: true })
+      if (!error) {
+        return { ok: true, attempts: i + 1, durationMs: Date.now() - startTs }
+      }
+      lastError = String(error.message ?? error)
+    } catch (err) {
+      lastError = String((err as Error)?.message ?? err)
+    }
+    const retriable = /\b5\d\d\b|timeout|timed out|ECONNRESET|network|fetch failed|load failed/i.test(
+      lastError,
+    )
+    if (!retriable || i === attempts - 1) break
+    const waitMs = 500 * 2 ** i
+    if (import.meta.env.DEV) {
+      console.warn(
+        `[Backshop-Bilder Retry] ${path} fehlgeschlagen (Versuch ${i + 1}/${attempts}): ${lastError} – warte ${waitMs}ms`,
+      )
+    }
+    await new Promise((resolve) => setTimeout(resolve, waitMs))
+  }
+  return { ok: false, error: lastError, attempts, durationMs: Date.now() - startTs }
+}
+
 /** Produkt ohne automatisch zugeordnetes Bild (für manuelle Zuordnung in der UI). */
 export interface UnmatchedProduct {
   plu: string
@@ -528,14 +568,48 @@ export interface UnmatchedProduct {
  * und gibt eine Map PLU → URL zurück (öffentliche oder signierte URL je nach Bucket).
  * @param options.fileIndex - Optional; bei mehreren Dateien pro Batch, damit Pfade nicht kollidieren (z. B. uploadId/0/plu.png).
  */
+/** Wie viele nicht zugeordnete Bilder zu erwarteten Duplikat-Spalten passen (±2 Zeilen wie bei der Auto-Zuordnung). */
+function countUnassignedMatchingDuplicatePluOrphans(
+  unassigned: ExtractedImage[],
+  duplicateDetails: BackshopDuplicateDetail[] | undefined,
+): number {
+  if (!duplicateDetails?.length || unassigned.length === 0) return 0
+  let matched = 0
+  for (const e of unassigned) {
+    for (const d of duplicateDetails) {
+      if (d.orphanImageSheetRow0 == null || d.orphanImageSheetCol0 == null) continue
+      if (d.orphanImageSheetCol0 !== e.col) continue
+      const dr = e.row - d.orphanImageSheetRow0
+      if (dr >= -2 && dr <= 2) {
+        matched++
+        break
+      }
+    }
+  }
+  return matched
+}
+
 export async function uploadBackshopImagesAndAssignUrls(
   parsedRows: ParsedBackshopRow[],
   file: File,
   options: {
     versionIdOrUploadId: string
     fileIndex?: number
+    /** Optional: Duplikat-Details aus dem Parser (für erklärende Toasts bei „Bild ohne Zeile“). */
+    duplicatePluDetails?: BackshopDuplicateDetail[]
     onProgress?: (uploaded: number, total: number) => void
-    onDiagnostic?: (rowsWithoutUrl: number, imagesUnassigned: number, extractedCount: number) => void
+    /**
+     * Diagnose-Callback nach Upload. `failedUploads` enthält Bilder, die nach allen Retries
+     * nicht in den Storage hochgeladen werden konnten (z. B. anhaltende 502/504 von Supabase).
+     */
+    onDiagnostic?: (
+      rowsWithoutUrl: number,
+      imagesUnassigned: number,
+      extractedCount: number,
+      failedUploads?: number,
+      /** Bilder, die zu übersprungenen Duplikat-Spalten passen (gleiche PLU weiter links/oben schon importiert). */
+      imagesUnassignedFromDuplicatePlu?: number,
+    ) => void
     /** Optional: wird aufgerufen wenn Produkte ohne Bild existieren (für manuelle Zuordnung in der UI). */
     onUnmatchedProducts?: (products: UnmatchedProduct[]) => void
   }
@@ -554,7 +628,7 @@ export async function uploadBackshopImagesAndAssignUrls(
   }
   if (extracted.length === 0) {
     const parsedWithPos = parsedRows.filter((r) => r.imageSheetRow0 != null && r.imageSheetCol0 != null).length
-    if (parsedWithPos > 0) options.onDiagnostic?.(parsedWithPos, 0, 0)
+    if (parsedWithPos > 0) options.onDiagnostic?.(parsedWithPos, 0, 0, 0)
     return pluToUrl
   }
 
@@ -613,48 +687,73 @@ export async function uploadBackshopImagesAndAssignUrls(
     )
   }
 
-  // Phase 2: Resize + Upload parallel in Batches
+  // Phase 2: Resize + Upload parallel in Batches (mit Retry pro Bild)
   options.onProgress?.(0, jobs.length)
+  let failedUploads = 0
+  let completedCount = 0
+  // CONCURRENCY=8 ist bewiesen stabil (~38 s für 162 Bilder).
+  // Höhere Werte (z. B. 16) stauen createSignedUrl-Aufrufe und React-Renderings und führen
+  // zu sichtbaren Fortschrittsstalls am Batch-Ende.
   const CONCURRENCY = 8
   for (let i = 0; i < jobs.length; i += CONCURRENCY) {
     const batch = jobs.slice(i, i + CONCURRENCY)
     const results = await Promise.all(
       batch.map(async ({ row, image }): Promise<{ plu: string; url: string } | null> => {
-        const { buffer: uploadBuffer, extension: uploadExt } = await resizeImageToTarget(
-          image.buffer,
-          image.extension
-        )
+        const resizePromise = resizeImageToTarget(image.buffer, image.extension)
+        const resizeTimeout = new Promise<{ buffer: ArrayBuffer; extension: string }>((resolve) => {
+          setTimeout(() => {
+            resolve({ buffer: image.buffer, extension: image.extension })
+          }, 10000)
+        })
+        const { buffer: uploadBuffer, extension: uploadExt } = await Promise.race([resizePromise, resizeTimeout])
         const safePlu = row.plu.replace(/[^a-zA-Z0-9_-]/g, '_')
         const fileName = `${safePlu}.${uploadExt}`
         const path = `${pathPrefix}/${fileName}`
+        const contentType = uploadExt === 'jpg' ? 'image/jpeg' : `image/${uploadExt}`
 
-        const { error: uploadErr } = await supabase.storage
-          .from(BUCKET)
-          .upload(path, uploadBuffer, {
-            contentType: uploadExt === 'jpg' ? 'image/jpeg' : `image/${uploadExt}`,
-            upsert: true,
-          })
-
-        if (uploadErr) {
-          if (import.meta.env.DEV) console.warn(`Backshop-Bild Upload fehlgeschlagen für PLU ${row.plu}:`, uploadErr.message)
+        const uploadResult = await uploadToBackshopStorageWithRetry(path, uploadBuffer, contentType)
+        if (!uploadResult.ok) {
+          if (import.meta.env.DEV) {
+            console.warn(
+              `Backshop-Bild Upload endgültig fehlgeschlagen für PLU ${row.plu} nach 3 Versuchen:`,
+              uploadResult.error,
+            )
+          }
+          completedCount += 1
+          options.onProgress?.(completedCount, jobs.length)
           return null
         }
 
         const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_EXPIRES_IN)
-        if (signed?.signedUrl) return { plu: row.plu, url: signed.signedUrl }
-        const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(path)
-        return { plu: row.plu, url: publicData.publicUrl }
+        const url = signed?.signedUrl ?? supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+        completedCount += 1
+        options.onProgress?.(completedCount, jobs.length)
+        return { plu: row.plu, url }
       })
     )
-    for (const r of results) {
-      if (r) pluToUrl.set(r.plu, r.url)
+    for (let j = 0; j < results.length; j++) {
+      const r = results[j]
+      if (r) {
+        pluToUrl.set(r.plu, r.url)
+      } else {
+        failedUploads++
+      }
     }
-    options.onProgress?.(pluToUrl.size, jobs.length)
   }
 
   const withoutUrl = withPos.filter((r) => !pluToUrl.has(r.plu))
   const unassignedImagesFinal = extracted.filter((e) => !used.has(byKey(e.row, e.col)))
-  options.onDiagnostic?.(withoutUrl.length, unassignedImagesFinal.length, extracted.length)
+  const imagesUnassignedFromDuplicatePlu = countUnassignedMatchingDuplicatePluOrphans(
+    unassignedImagesFinal,
+    options.duplicatePluDetails,
+  )
+  options.onDiagnostic?.(
+    withoutUrl.length,
+    unassignedImagesFinal.length,
+    extracted.length,
+    failedUploads,
+    imagesUnassignedFromDuplicatePlu,
+  )
 
   if (import.meta.env.DEV) {
     console.log('[Backshop-Bilder]', pluToUrl.size, 'PLUs mit Bild-URL zugeordnet')
@@ -689,14 +788,15 @@ export async function uploadManualImage(
 
     const safePlu = plu.replace(/[^a-zA-Z0-9_-]/g, '_')
     const path = `${uploadId}/${fileIndex}/${safePlu}.${resizedExt}`
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(path, resized, {
-        contentType: resizedExt === 'jpg' ? 'image/jpeg' : `image/${resizedExt}`,
-        upsert: true,
-      })
-    if (error) {
-      if (import.meta.env.DEV) console.warn(`Manuelles Bild-Upload fehlgeschlagen für PLU ${plu}:`, error.message)
+    const contentType = resizedExt === 'jpg' ? 'image/jpeg' : `image/${resizedExt}`
+    const uploadResult = await uploadToBackshopStorageWithRetry(path, resized, contentType)
+    if (!uploadResult.ok) {
+      if (import.meta.env.DEV) {
+        console.warn(
+          `Manuelles Bild-Upload endgültig fehlgeschlagen für PLU ${plu} nach 3 Versuchen:`,
+          uploadResult.error,
+        )
+      }
       return null
     }
     const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_EXPIRES_IN)

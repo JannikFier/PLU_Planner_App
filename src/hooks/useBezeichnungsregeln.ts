@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { supabase, queryRest } from '@/lib/supabase'
+import { supabase, queryRest, isTestModeActive } from '@/lib/supabase'
 import { applyAllRulesWithRenamedMerge } from '@/lib/keyword-rules'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import type { Bezeichnungsregel, Database, MasterPLUItem, RenamedItem } from '@/types/database'
@@ -43,6 +43,26 @@ export function useCreateBezeichnungsregel() {
   return useMutation({
     mutationFn: async (regel: RegelInsert) => {
       if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+
+      if (isTestModeActive()) {
+        const now = new Date().toISOString()
+        const fake: Bezeichnungsregel = {
+          id: crypto.randomUUID(),
+          store_id: currentStoreId,
+          keyword: regel.keyword,
+          position: regel.position,
+          case_sensitive: regel.case_sensitive ?? false,
+          is_active: regel.is_active ?? true,
+          created_at: now,
+          created_by: regel.created_by ?? null,
+        }
+        queryClient.setQueryData<Bezeichnungsregel[]>(
+          ['bezeichnungsregeln', currentStoreId],
+          (old) => [...(old ?? []), fake],
+        )
+        return
+      }
+
       const { error } = await supabase
         .from('bezeichnungsregeln')
         .insert(({ ...regel, store_id: currentStoreId } as Database['public']['Tables']['bezeichnungsregeln']['Insert']) as never)
@@ -50,7 +70,9 @@ export function useCreateBezeichnungsregel() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bezeichnungsregeln', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['bezeichnungsregeln', currentStoreId] })
+      }
     },
     onError: (error) => {
       toast.error('Fehler: ' + (error instanceof Error ? error.message : String(error)))
@@ -73,6 +95,14 @@ export function useUpdateBezeichnungsregel() {
       keyword?: string
       position?: 'PREFIX' | 'SUFFIX'
     }) => {
+      if (isTestModeActive()) {
+        queryClient.setQueryData<Bezeichnungsregel[]>(
+          ['bezeichnungsregeln', currentStoreId],
+          (old) => (old ?? []).map((r) => (r.id === id ? { ...r, ...updates } : r)),
+        )
+        return
+      }
+
       const { error } = await supabase
         .from('bezeichnungsregeln')
         .update((updates as Database['public']['Tables']['bezeichnungsregeln']['Update']) as never)
@@ -81,7 +111,9 @@ export function useUpdateBezeichnungsregel() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bezeichnungsregeln', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['bezeichnungsregeln', currentStoreId] })
+      }
     },
     onError: (error) => {
       toast.error('Fehler: ' + (error instanceof Error ? error.message : String(error)))
@@ -96,6 +128,14 @@ export function useDeleteBezeichnungsregel() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      if (isTestModeActive()) {
+        queryClient.setQueryData<Bezeichnungsregel[]>(
+          ['bezeichnungsregeln', currentStoreId],
+          (old) => (old ?? []).filter((r) => r.id !== id),
+        )
+        return
+      }
+
       const { error } = await supabase
         .from('bezeichnungsregeln')
         .delete()
@@ -104,7 +144,9 @@ export function useDeleteBezeichnungsregel() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bezeichnungsregeln', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['bezeichnungsregeln', currentStoreId] })
+      }
     },
     onError: (error) => {
       toast.error('Fehler: ' + (error instanceof Error ? error.message : String(error)))
@@ -195,6 +237,43 @@ export function useApplyAllRules() {
         return { persistedRenamedCount: 0, affectedByRulesCount: 0 }
       }
 
+      if (isTestModeActive()) {
+        if (renamedUpdates.length === 0) {
+          return { persistedRenamedCount: 0, affectedByRulesCount }
+        }
+        const now = new Date().toISOString()
+        queryClient.setQueryData<RenamedItem[]>(['renamed-items', currentStoreId], (old) => {
+          const list = [...(old ?? [])]
+          for (const u of renamedUpdates) {
+            const idx = list.findIndex((r) => r.plu === u.plu && r.store_id === u.store_id)
+            if (idx >= 0) {
+              list[idx] = {
+                ...list[idx],
+                display_name: u.display_name,
+                is_manually_renamed: u.is_manually_renamed,
+                updated_at: now,
+              }
+            } else {
+              list.push({
+                id: crypto.randomUUID(),
+                plu: u.plu,
+                store_id: u.store_id,
+                display_name: u.display_name,
+                is_manually_renamed: u.is_manually_renamed,
+                created_by: null,
+                created_at: now,
+                updated_at: now,
+              })
+            }
+          }
+          return list
+        })
+        return {
+          persistedRenamedCount: renamedUpdates.length,
+          affectedByRulesCount,
+        }
+      }
+
       // Keine Persistenz in master_plu_items (zentral) – Namensdarstellung nur über Layout-Engine je Markt
 
       for (let i = 0; i < renamedUpdates.length; i += PARALLEL_UPDATE_CHUNK) {
@@ -222,7 +301,7 @@ export function useApplyAllRules() {
       }
     },
     onSuccess: (data) => {
-      if (data.persistedRenamedCount > 0) {
+      if (data.persistedRenamedCount > 0 && !isTestModeActive()) {
         queryClient.invalidateQueries({ queryKey: ['renamed-items', currentStoreId] })
       }
     },

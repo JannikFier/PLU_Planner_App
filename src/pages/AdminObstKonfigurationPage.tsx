@@ -6,7 +6,7 @@ import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { LayoutGrid, BookText, GripVertical } from 'lucide-react'
 
 /**
- * Admin: Konfiguration Obst/Gemüse – Layout, Regeln, Block-Sortierung (ein Screen wie Super-Admin „Konfiguration“).
+ * Admin: Konfiguration Obst/Gemüse – Layout, Regeln, Warengruppen-Workbench (ein Screen wie Super-Admin „Konfiguration“).
  */
 export function AdminObstKonfigurationPage() {
   const navigate = useNavigate()
@@ -37,7 +37,7 @@ export function AdminObstKonfigurationPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
+      <div className="space-y-8" data-tour="obst-konfig-hub-page">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-emerald-800">Konfiguration Obst/Gemüse</h2>
           <p className="text-muted-foreground">
@@ -53,6 +53,7 @@ export function AdminObstKonfigurationPage() {
             onClick={() => navigate('/admin/layout', { state: { backTo: konfigBackTo } })}
             color="text-violet-700"
             bg="bg-violet-50"
+            dataTour="obst-konfig-hub-layout-card"
           />
           <DashboardCard
             title="Bezeichnungsregeln (Obst)"
@@ -61,14 +62,16 @@ export function AdminObstKonfigurationPage() {
             onClick={() => navigate('/admin/rules', { state: { backTo: konfigBackTo } })}
             color="text-violet-700"
             bg="bg-violet-50"
+            dataTour="obst-konfig-hub-rules-card"
           />
           <DashboardCard
-            title="Warengruppen sortieren (Obst)"
-            description="Drag & Drop: Reihenfolge und Zuordnung für diesen Markt"
+            title="Warengruppen (Obst & Gemüse)"
+            description="Reihenfolge am Markt, Zuordnung und Status – wie beim Backshop"
             icon={GripVertical}
-            onClick={() => navigate('/admin/block-sort', { state: { backTo: konfigBackTo } })}
+            onClick={() => navigate('/admin/obst-warengruppen', { state: { backTo: konfigBackTo } })}
             color="text-violet-700"
             bg="bg-violet-50"
+            dataTour="obst-konfig-hub-warengruppen-card"
           />
         </div>
       </div>

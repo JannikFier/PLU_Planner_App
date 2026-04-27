@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Vier — 4-shaped mascot for a PLU/Filial planning app</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; font-family: "Inter", system-ui, sans-serif; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="mascot.jsx"></script>
+<script type="text/babel" src="context-mocks.jsx"></script>
+
+<script type="text/babel">
+  // ────────────────────────────────────────────────────────────
+  // Presentation — Design Canvas with sections for variations,
+  // scale tests, and in-context UI examples.
+  // ────────────────────────────────────────────────────────────
+
+  // Labeled card that centers a mascot and shows its name/notes underneath.
+  function MascotCard({ name, note, children }) {
+    return (
+      <div style={{
+        width: 280, height: 340, background: '#FFFFFF',
+        display: 'flex', flexDirection: 'column',
+        fontFamily: '"Inter", system-ui, sans-serif',
+      }}>
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'linear-gradient(180deg, #FAFAFB 0%, #F2F2F5 100%)',
+          borderBottom: '1px solid #EAEAEE',
+        }}>
+          {children}
+        </div>
+        <div style={{ padding: '14px 16px 16px' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1B2E', marginBottom: 2 }}>{name}</div>
+          <div style={{ fontSize: 11.5, color: '#6B7280', lineHeight: 1.45 }}>{note}</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Palette swatch strip
+  function PaletteCard() {
+    const swatches = [
+      { name: 'Primary / Indigo', hex: '#3E4FD6', fg: '#fff' },
+      { name: 'Primary Dark', hex: '#2B3AAE', fg: '#fff' },
+      { name: 'Accent / Amber', hex: '#F5A524', fg: '#1A1B2E' },
+      { name: 'Skin / Warm', hex: '#FFD9B8', fg: '#1A1B2E' },
+      { name: 'Ink', hex: '#1A1B2E', fg: '#fff' },
+    ];
+    return (
+      <div style={{
+        width: 520, height: 200, background: '#fff', padding: 20,
+        boxSizing: 'border-box', fontFamily: '"Inter", system-ui, sans-serif',
+      }}>
+        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8, color: '#6B7280', marginBottom: 4 }}>
+          Palette
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 16, color: '#1A1B2E' }}>
+          Indigo-forward, amber as info/guide signal
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {swatches.map(s => (
+            <div key={s.hex} style={{ flex: 1, height: 110, background: s.hex, borderRadius: 10, padding: 10, color: s.fg, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', boxSizing: 'border-box' }}>
+              <div style={{ fontSize: 10.5, opacity: 0.85, fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace' }}>{s.hex}</div>
+              <div style={{ fontSize: 11, fontWeight: 500 }}>{s.name}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Brief / intro card
+  function BriefCard() {
+    return (
+      <div style={{
+        width: 520, height: 300, background: '#fff', padding: 24,
+        boxSizing: 'border-box', fontFamily: '"Inter", system-ui, sans-serif',
+        color: '#1A1B2E', display: 'flex', flexDirection: 'column', gap: 10,
+      }}>
+        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8, color: '#6B7280' }}>
+          Mascot brief
+        </div>
+        <div style={{ fontSize: 24, fontWeight: 600, letterSpacing: -0.3 }}>
+          Vier — dein Filial-Buddy
+        </div>
+        <div style={{ fontSize: 13, color: '#4B5563', lineHeight: 1.55 }}>
+          Ein freundlicher Guide für die PLU- und Filialplanung, gebaut aus der Ziffer <b>4</b>.
+          Nicht kindlich, nicht laut — ruhig optimistisch, kompetent, hilfsbereit.
+          Einheitliche Silhouette über alle Posen, lesbar ab 16 px, tauglich für Onboarding, Tooltips und leere Zustände.
+        </div>
+        <div style={{ display: 'flex', gap: 24, marginTop: 6, fontSize: 12, color: '#6B7280' }}>
+          <div><b style={{ color: '#1A1B2E' }}>Stil</b> · Flat, leicht volumetrisch</div>
+          <div><b style={{ color: '#1A1B2E' }}>Output</b> · SVG, transparent</div>
+          <div><b style={{ color: '#1A1B2E' }}>Format</b> · 200 × 240 viewBox</div>
+        </div>
+      </div>
+    );
+  }
+
+  function App() {
+    return (
+      <DesignCanvas>
+
+        <DCSection id="brief" title="Brief" subtitle="Direction & palette">
+          <DCArtboard id="brief" label="Brief" width={520} height={300}>
+            <BriefCard />
+          </DCArtboard>
+          <DCArtboard id="palette" label="Palette" width={520} height={200}>
+            <PaletteCard />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="hero" title="Variations" subtitle="Six takes on the 4-mascot — same anatomy, different treatments">
+          <DCArtboard id="v1" label="01 · Flat classic" width={280} height={340}>
+            <MascotCard name="Flat classic" note="Solid indigo, simplest face. Safest default — reads clean at any size.">
+              <MascotFlat size={180} />
+            </MascotCard>
+          </DCArtboard>
+          <DCArtboard id="v2" label="02 · Shaded" width={280} height={340}>
+            <MascotCard name="Shaded" note="Inner notch darkens, subtle spine highlight. A touch more dimensional.">
+              <MascotShaded size={180} />
+            </MascotCard>
+          </DCArtboard>
+          <DCArtboard id="v3" label="03 · Outlined" width={280} height={340}>
+            <MascotCard name="Outlined" note="Bold ink outline, chunky. More playful — good for illustrations & empty states.">
+              <MascotOutlined size={180} />
+            </MascotCard>
+          </DCArtboard>
+          <DCArtboard id="v4" label="04 · Expert" width={280} height={340}>
+            <MascotCard name="Expert" note="Round glasses + amber info badge. Info/explain-mode variant.">
+              <MascotExpert size={180} />
+            </MascotCard>
+          </DCArtboard>
+          <DCArtboard id="v5" label="05 · Waving" width={280} height={340}>
+            <MascotCard name="Waving" note="Greeter pose with a subtle amber sparkle. Onboarding hero.">
+              <MascotWaving size={180} />
+            </MascotCard>
+          </DCArtboard>
+          <DCArtboard id="v6" label="06 · Abstract" width={280} height={340}>
+            <MascotCard name="Abstract" note="Integrated head, no limbs — more icon than character. App-icon territory.">
+              <MascotAbstract size={180} />
+            </MascotCard>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="scale" title="Scaling test" subtitle="Silhouette legibility from 16 to 64 px, plus monochrome on dark">
+          <DCArtboard id="scale" label="Favicon sizes" width={520} height={240}>
+            <FaviconScaleRow />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="context" title="In-context UI" subtitle="How Vier shows up in the actual product">
+          <DCArtboard id="tooltip" label="Tooltip · low-stock nudge" width={520} height={360}>
+            <TooltipMock />
+          </DCArtboard>
+          <DCArtboard id="empty" label="Empty state · no actions yet" width={520} height={360}>
+            <EmptyStateMock />
+          </DCArtboard>
+          <DCArtboard id="onboarding" label="Onboarding · first run" width={520} height={360}>
+            <OnboardingMock />
+          </DCArtboard>
+        </DCSection>
+
+      </DesignCanvas>
+    );
+  }
+
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(<App />);
+</script>
+
+</body>
+</html>

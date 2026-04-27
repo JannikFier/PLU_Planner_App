@@ -27,15 +27,22 @@ type PLUListPageActionsMenuProps = {
 }
 
 /**
- * Nur sichtbar unter `sm` – Desktop nutzt weiterhin einzelne Buttons.
+ * Sichtbar unter `lg` (Viewports < 1024px) – ab `lg` nutzt die Seite die einzelnen Toolbar-Buttons.
  */
 export function PLUListPageActionsMenu({ items, ariaLabel }: PLUListPageActionsMenuProps) {
   if (items.length === 0) return null
   return (
-    <div className="sm:hidden">
+    <div className="lg:hidden">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0" aria-label={ariaLabel}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 shrink-0"
+            aria-label={ariaLabel}
+            data-tour="plu-list-mobile-actions"
+          >
             <Menu className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>

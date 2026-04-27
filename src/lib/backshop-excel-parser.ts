@@ -2,6 +2,7 @@
 // Intelligente Spalten-Erkennung; Namens-Bereinigung: nur Teil bis erstes Komma
 
 import { formatError } from '@/lib/error-messages'
+import { truncateSkippedCellRaw } from '@/lib/backshop-upload-analysis'
 import { loadExcelSheetAsRows } from '@/lib/excel-read-helper'
 import { PLU_REGEX } from '@/lib/plu-helpers'
 import type {
@@ -37,6 +38,12 @@ function normalizePLU(raw: string): string {
   return cleaned
 }
 
+/** Prüft, ob eine Rohzelle (vor Normalisierung) direkt eine 5-stellige Zahl enthält – ohne führende Nullen ergänzen zu müssen. */
+function isRawFiveDigitPlu(raw: string): boolean {
+  const cleaned = raw.replace(/\*/g, '').trim()
+  return /^\d{5}$/.test(cleaned)
+}
+
 /** Nimmt nur den Teil bis zum ersten Komma; reduziert Mehrfach-Leerzeichen auf eines (z. B. „Berliner    Eierlikör“ → „Berliner Eierlikör“). */
 export function backshopNameCleanup(raw: string): string {
   const trimmed = raw.trim()
@@ -46,26 +53,22 @@ export function backshopNameCleanup(raw: string): string {
   return namePart.replace(/\s+/g, ' ').trim()
 }
 
-/** Prüft, ob eine Zelle wie ein Header wirkt (PLU, Spalte, Warentext, etc.). */
-function isHeaderLike(cell: string): boolean {
+/**
+ * Prüft, ob eine Zelle wie ein Header wirkt (PLU, Spalte, Warentext, etc.).
+ * Nutzt Wortgrenzen (\b), damit Produktnamen wie „Plunder“, „Bildschnitte“ oder
+ * „Kunst“ nicht fälschlich als Header erkannt werden (Regression 16.02.2026).
+ */
+export function isHeaderLike(cell: string): boolean {
   const u = cell.toUpperCase().trim()
-  return (
-    u.includes('PLU') ||
-    u.includes('SPALTE') ||
-    u.includes('WARENTEXT') ||
-    u.includes('WAARENTEXT') ||
-    u.includes('WAAGENTEXT') ||
-    u.includes('ETIKETTENTEXT') ||
-    u.includes('ABBILDUNG') ||
-    u.includes('BILD') ||
-    u.includes('ZWS') ||
-    (u.includes('ARTIKEL') && (u.includes('NR') || u.includes('NR.'))) ||
-    (u.includes('ART.') && u.includes('NR')) ||
-    u === 'LIEFERANT' ||
-    u === 'SAP' ||
-    u.includes('BEZEICHNUNG') ||
-    u.includes('ARTIKELBEZEICHNUNG')
-  )
+  if (!u) return false
+  // Einzelne Header-Stichwörter, jeweils als eigenständiges Wort
+  if (/\b(PLU|ZWS|SPALTE|WARENTEXT|WAARENTEXT|WAAGENTEXT|ETIKETTENTEXT|ABBILDUNG|BILD|BEZEICHNUNG|ARTIKELBEZEICHNUNG|LIEFERANT|SAP)\b/.test(u)) {
+    return true
+  }
+  // Kombi: „Artikel-Nr.“ / „Art. Nr.“ – beide Teile müssen als eigenständige Wörter vorkommen
+  if (/\bARTIKEL\b/.test(u) && /\bNR\b/.test(u)) return true
+  if (/\bART\b/.test(u) && /\bNR\b/.test(u)) return true
+  return false
 }
 
 /** Findet die Spaltenindizes für PLU, Name und ggf. Abbildung aus einer Zeile und ein paar Datenzeilen. */
@@ -80,14 +83,54 @@ function detectColumns(
   let nameCol = -1
   let imageCol = -1
 
-  // PLU: Zuerst Spalte „ZWS PLU“ / „*ZWS-PLU“ (5-stellig), dann andere PLU-Header
-  for (let c = 0; c < maxCol; c++) {
-    const headerCell = (headerRow[c] ?? '').trim().toUpperCase()
-    if (headerCell.includes('ZWS') && headerCell.includes('PLU')) pluCol = pluCol === -1 ? c : pluCol
+  // PLU-Heuristik: Bewertung aller Kandidatenspalten, beste gewinnt.
+  // Ziel: ZWS-PLU (5-stellig) bevorzugen gegenüber interner 4-stelliger Hausnummer,
+  // auch wenn beide nach normalizePLU gültige 5-Steller liefern.
+  {
+    const SCAN_ROWS = Math.min(15, Math.max(1, rawRows.length - headerRowIndex - 1))
+    let bestScore = -1
+    let bestCol = -1
+    for (let c = 0; c < maxCol; c++) {
+      const headerCell = (headerRow[c] ?? '').trim().toUpperCase()
+      let rawFive = 0 // bereits 5-stellig in der Excel (starkes Signal)
+      let padded = 0 // durch Padding auf 5 gebracht (schwaches Signal)
+      let invalid = 0
+      let scanned = 0
+      for (let r = headerRowIndex + 1; r < Math.min(headerRowIndex + 1 + SCAN_ROWS, rawRows.length); r++) {
+        const cell = String(rawRows[r]?.[c] ?? '').trim()
+        if (!cell) continue
+        scanned++
+        if (isRawFiveDigitPlu(cell)) {
+          rawFive++
+          continue
+        }
+        const normalized = normalizePLU(cell)
+        if (PLU_REGEX.test(normalized)) padded++
+        else invalid++
+      }
+      if (scanned === 0) continue
+      const valid = rawFive + padded
+      if (valid === 0) continue
+      let score = 0
+      // ZWS-PLU-Header schlägt alles
+      if (headerCell.includes('ZWS') && headerCell.includes('PLU')) score += 1000
+      // Reiner PLU-Header (kurz) ist noch gut
+      else if (headerCell.includes('PLU') && headerCell.length <= 10) score += 200
+      // Bonus für rohe 5-stellige Werte (echte ZWS-PLU) – pro Zeile stärker als Padding
+      score += rawFive * 10
+      score += padded * 1
+      score -= invalid * 5
+      if (score > bestScore) {
+        bestScore = score
+        bestCol = c
+      }
+    }
+    if (bestCol >= 0) pluCol = bestCol
   }
+
+  // Name + Bild per Header
   for (let c = 0; c < maxCol; c++) {
     const headerCell = (headerRow[c] ?? '').trim().toUpperCase()
-    if (pluCol === -1 && headerCell.includes('PLU') && headerCell.length <= 10) pluCol = c
     if (headerCell.includes('WARENTEXT') || headerCell.includes('WAARENTEXT') || headerCell.includes('WAAGENTEXT') || headerCell.includes('ETIKETTENTEXT')) nameCol = c
     if (headerCell.includes('ABBILDUNG') || headerCell.includes('BILD')) imageCol = imageCol === -1 ? c : imageCol
   }
@@ -152,6 +195,8 @@ function detectColumns(
  */
 function detectColumnBasedLayout(rowsStr: string[][]): boolean {
   if (rowsStr.length < 4) return false
+  // Header-Zellen in den ersten 20 Zeilen → kein reines Block-Layout.
+  // isHeaderLike nutzt seit 16.02.2026 Wortgrenzen, damit „Plunder“ o.ä. nicht fälschlich triggern.
   for (let r = 0; r < Math.min(20, rowsStr.length); r++) {
     const row = rowsStr[r] ?? []
     if (row.some((cell) => isHeaderLike(cell))) return false
@@ -165,7 +210,8 @@ function detectColumnBasedLayout(rowsStr: string[][]): boolean {
     const normalized = normalizePLU(plu1) || normalizePLU(plu2)
     if (PLU_REGEX.test(normalized)) columnsWithPlu++
   }
-  return columnsWithPlu >= 2
+  // Mindestens 3 Spalten mit 5-stelliger PLU, damit ein zufälliges Nummernpaar nicht fälschlich Block-Modus aktiviert.
+  return columnsWithPlu >= 3
 }
 
 /**
@@ -202,7 +248,11 @@ function parseColumnBasedLayout(rowsStr: string[][]): {
       if (!PLU_REGEX.test(plu)) {
         if (nameRaw || pluRaw) {
           skippedReasons.invalidPlu++
-          skippedDetails.invalidPlu.push({ row: start + 2, col: c + 1 })
+          skippedDetails.invalidPlu.push({
+            row: start + 2,
+            col: c + 1,
+            rawCell: truncateSkippedCellRaw(pluRaw),
+          })
         }
         continue
       }
@@ -220,6 +270,8 @@ function parseColumnBasedLayout(rowsStr: string[][]): {
           plu,
           firstRow: first?.row ?? start + 2,
           firstCol: first?.col ?? c + 1,
+          orphanImageSheetRow0: start + 3,
+          orphanImageSheetCol0: c,
         })
         continue
       }
@@ -336,7 +388,11 @@ function parseKassenblattColumnLayout(rowsStr: string[][]): {
       if (!PLU_REGEX.test(plu)) {
         if (nameRaw || pluRaw) {
           skippedReasons.invalidPlu++
-          skippedDetails.invalidPlu.push({ row: nameRowIndex + 2, col: c + 1 })
+          skippedDetails.invalidPlu.push({
+            row: nameRowIndex + 2,
+            col: c + 1,
+            rawCell: truncateSkippedCellRaw(pluRaw),
+          })
         }
         continue
       }
@@ -354,6 +410,10 @@ function parseKassenblattColumnLayout(rowsStr: string[][]): {
           plu,
           firstRow: first?.row ?? nameRowIndex + 2,
           firstCol: first?.col ?? c + 1,
+          ...(hasImageRow && {
+            orphanImageSheetRow0: imageRowIndex,
+            orphanImageSheetCol0: c,
+          }),
         })
         continue
       }
@@ -428,7 +488,11 @@ export async function parseBackshopExcelFile(file: File): Promise<BackshopParseR
               const plu = normalizePLU(pluRaw)
               if (!PLU_REGEX.test(plu)) {
                 rowSkippedReasons.invalidPlu++
-                rowSkippedDetails.invalidPlu.push({ row: excelRow1Based, col: pluCol + 1 })
+                rowSkippedDetails.invalidPlu.push({
+                  row: excelRow1Based,
+                  col: pluCol + 1,
+                  rawCell: truncateSkippedCellRaw(pluRaw),
+                })
                 continue
               }
               const nameRaw = (cells[nameCol] ?? '').trim()
@@ -447,6 +511,10 @@ export async function parseBackshopExcelFile(file: File): Promise<BackshopParseR
                   plu,
                   firstRow: first?.row ?? excelRow1Based,
                   firstCol: first?.col ?? pluCol + 1,
+                  ...(imageCol >= 0 && {
+                    orphanImageSheetRow0: r,
+                    orphanImageSheetCol0: imageCol,
+                  }),
                 })
                 continue
               }
@@ -473,6 +541,7 @@ export async function parseBackshopExcelFile(file: File): Promise<BackshopParseR
                 skippedReasons: rowSkipped > 0 ? rowSkippedReasons : undefined,
                 skippedDetails: rowSkipped > 0 ? rowSkippedDetails : undefined,
                 sameNameDifferentPlu: computeSameNameDifferentPlu(rowRows),
+                detectedLayout: 'classic_rows',
                 pluColumnIndex: pluCol,
                 nameColumnIndex: nameCol,
                 hasImageColumn: imageCol >= 0,
@@ -487,6 +556,7 @@ export async function parseBackshopExcelFile(file: File): Promise<BackshopParseR
             skippedReasons: colResult.skippedRows > 0 ? colResult.skippedReasons : undefined,
             skippedDetails: colResult.skippedRows > 0 ? colResult.skippedDetails : undefined,
             sameNameDifferentPlu: computeSameNameDifferentPlu(colRows),
+            detectedLayout: 'kassenblatt_blocks',
             pluColumnIndex: 1,
             nameColumnIndex: 0,
             hasImageColumn: true,
@@ -521,7 +591,11 @@ export async function parseBackshopExcelFile(file: File): Promise<BackshopParseR
           const plu = normalizePLU(pluRaw)
           if (!PLU_REGEX.test(plu)) {
             skippedReasons.invalidPlu++
-            skippedDetails.invalidPlu.push({ row: excelRow1Based, col: pluCol + 1 })
+            skippedDetails.invalidPlu.push({
+              row: excelRow1Based,
+              col: pluCol + 1,
+              rawCell: truncateSkippedCellRaw(pluRaw),
+            })
             continue
           }
           const nameRaw = (cells[nameCol] ?? '').trim()
@@ -540,6 +614,10 @@ export async function parseBackshopExcelFile(file: File): Promise<BackshopParseR
               plu,
               firstRow: first?.row ?? excelRow1Based,
               firstCol: first?.col ?? pluCol + 1,
+              ...(imageCol >= 0 && {
+                orphanImageSheetRow0: r,
+                orphanImageSheetCol0: imageCol,
+              }),
             })
             continue
           }
@@ -560,10 +638,18 @@ export async function parseBackshopExcelFile(file: File): Promise<BackshopParseR
         const skippedRows =
           skippedReasons.invalidPlu + skippedReasons.emptyName + skippedReasons.duplicatePlu
 
-        // Kassenblatt-Fallback: Zeilen-Layout hat 0 Zeilen (z. B. Namenszeile als Header erkannt) → pro Spalte ein Produkt (Zeile N = Name, N+1 = PLU)
-        if (rows.length === 0 && skippedReasons.invalidPlu >= 5) {
+        // Kassenblatt-Safety-Netz:
+        // (a) Klassischer Parser fand 0 Produkte → Kassenblatt probieren.
+        // (b) Klassischer Parser fand <30 % der Datenzeilen als valide → Kassenblatt probieren
+        //     und das Ergebnis mit den meisten Treffern wählen.
+        const dataRowCount = Math.max(0, rowsStr.length - headerRowIndex - 1)
+        const classicRatio = dataRowCount > 0 ? rows.length / dataRowCount : 0
+        const shouldTryKassenblatt =
+          (rows.length === 0 && skippedReasons.invalidPlu >= 5) ||
+          (classicRatio < 0.3 && skippedReasons.invalidPlu >= 5)
+        if (shouldTryKassenblatt) {
           const kassenblatt = parseKassenblattColumnLayout(rowsStr)
-          if (kassenblatt.rows.length > 0) {
+          if (kassenblatt.rows.length > rows.length) {
             const kbSkipped =
               kassenblatt.skippedReasons.invalidPlu +
               kassenblatt.skippedReasons.emptyName +
@@ -579,6 +665,7 @@ export async function parseBackshopExcelFile(file: File): Promise<BackshopParseR
               skippedReasons: kbSkipped > 0 ? kassenblatt.skippedReasons : undefined,
               skippedDetails: kbSkipped > 0 ? kassenblatt.skippedDetails : undefined,
               sameNameDifferentPlu: computeSameNameDifferentPlu(kassenblatt.rows),
+              detectedLayout: 'kassenblatt_blocks',
               pluColumnIndex: 0,
               nameColumnIndex: 0,
               hasImageColumn: hasKassenblattImages,
@@ -594,11 +681,318 @@ export async function parseBackshopExcelFile(file: File): Promise<BackshopParseR
       skippedReasons: skippedRows > 0 ? skippedReasons : undefined,
       skippedDetails: skippedRows > 0 ? skippedDetails : undefined,
       sameNameDifferentPlu: computeSameNameDifferentPlu(rows),
+      detectedLayout: 'classic_rows',
       pluColumnIndex: pluCol,
       nameColumnIndex: nameCol,
       hasImageColumn: imageCol >= 0,
     }
   } catch (err) {
     throw new Error(`Backshop-Excel-Parsing fehlgeschlagen: ${formatError(err)}`)
+  }
+}
+
+// ============================================================
+// Preview + manuelles Spalten-Mapping (Fallback-Dialog)
+// ============================================================
+
+/** Vorschau: die ersten N Zeilen als Tabellen-Daten für manuelle Spalten-Auswahl. */
+export interface BackshopExcelPreview {
+  fileName: string
+  /** 2D-Array der ersten Zeilen (getrimmte Strings). */
+  rows: string[][]
+  /** Zeilenindex der vermuteten Header-Zeile (0-basiert) oder -1 wenn nicht erkannt. */
+  headerRowIndex: number
+  /** Automatische Erkennung als Vorauswahl (ggf. -1). */
+  autoPluCol: number
+  autoNameCol: number
+  autoImageCol: number
+  /** Anzahl Spalten (für Auswahl-Dropdowns). */
+  colCount: number
+}
+
+/** Liest die ersten Zeilen eines Backshop-Excels und liefert die Vorauswahl der Spalten. */
+export async function previewBackshopExcelFile(
+  file: File,
+  maxRows = 15,
+): Promise<BackshopExcelPreview> {
+  const rawRows = await loadExcelSheetAsRows(file)
+  const rowsStr: string[][] = rawRows.map((row) =>
+    (row as unknown[]).map((cell) => (cell != null ? String(cell).trim() : '')),
+  )
+  let headerRowIndex = -1
+  for (let r = 0; r < Math.min(25, rowsStr.length); r++) {
+    const row = rowsStr[r] ?? []
+    if (row.some((cell) => isHeaderLike(cell))) {
+      headerRowIndex = r
+      break
+    }
+  }
+  const effectiveHeader = headerRowIndex >= 0 ? headerRowIndex : 0
+  const { pluCol, nameCol, imageCol } = detectColumns(rowsStr, effectiveHeader)
+  const colCount = Math.max(0, ...rowsStr.slice(0, maxRows).map((r) => r.length))
+  return {
+    fileName: file.name,
+    rows: rowsStr.slice(0, maxRows),
+    headerRowIndex,
+    autoPluCol: pluCol,
+    autoNameCol: nameCol,
+    autoImageCol: imageCol,
+    colCount,
+  }
+}
+
+/** Mapping-Modus für manuelle Spalten-/Block-Auswahl. */
+export type BackshopManualLayoutMode = 'classic' | 'block'
+
+/** Gemeinsamer Typ für das manuelle Mapping aus dem Dialog. */
+export interface BackshopManualMapping {
+  /** Layout-Modus. `classic` = eine Zeile pro Produkt; `block` = pro Spalte ein Produkt (Kassenblatt). */
+  layoutMode?: BackshopManualLayoutMode
+  // Classic
+  pluCol: number
+  nameCol: number
+  imageCol: number
+  /** Headerzeile (0-basiert). `-1` = keine Header-Zeile, Datenzeilen beginnen bei 0. */
+  headerRowIndex?: number
+  // Block
+  /** Zeile mit Produktnamen (0-basiert). */
+  nameRowIndex?: number
+  /** Zeile mit PLU (0-basiert). */
+  pluRowIndex?: number
+  /** Zeile mit Bild-Anker (0-basiert, optional). `-1` oder `undefined` = keine Bildzeile. */
+  imageRowIndex?: number
+  /** Blockhöhe in Zeilen (für Wiederholung der Bänder). Default 5. */
+  blockSize?: number
+}
+
+/**
+ * Parst eine Backshop-Excel mit manuell gewählten Spalten (classic) oder Block-Positionen (block).
+ * Verwendet im `classic`-Modus Zeilen-Layout (eine Zeile = ein Produkt).
+ * Im `block`-Modus Kassenblatt-Layout: pro Spalte ein Produkt (Name-Zeile, PLU-Zeile, optional Bild-Zeile).
+ */
+export async function parseBackshopExcelFileWithColumns(
+  file: File,
+  mapping: BackshopManualMapping,
+): Promise<BackshopParseResult> {
+  try {
+    const rawRows = await loadExcelSheetAsRows(file)
+    const rowsStr: string[][] = rawRows.map((row) =>
+      (row as unknown[]).map((cell) => (cell != null ? String(cell).trim() : '')),
+    )
+
+    // Block-Modus: manuell angegebene Zeilen
+    if ((mapping.layoutMode ?? 'classic') === 'block') {
+      return parseManualBlockLayout(file, rowsStr, mapping)
+    }
+
+    // Classic-Modus: User kann `-1` wählen → „keine Header-Zeile“
+    let headerRowIndex = mapping.headerRowIndex ?? -1
+    if (mapping.headerRowIndex === -1) {
+      // „keine Kopfzeile“ → Daten beginnen bei Zeile 0
+      headerRowIndex = -1
+    } else if (headerRowIndex < 0) {
+      for (let r = 0; r < Math.min(25, rowsStr.length); r++) {
+        const row = rowsStr[r] ?? []
+        if (row.some((cell) => isHeaderLike(cell))) {
+          headerRowIndex = r
+          break
+        }
+      }
+      if (headerRowIndex < 0) headerRowIndex = 0
+    }
+
+    const pluCol = mapping.pluCol
+    const nameCol = mapping.nameCol
+    const imageCol = mapping.imageCol
+
+    const seenPLUs = new Set<string>()
+    const firstOccurrence = new Map<string, { row: number; col: number }>()
+    const rows: ParsedBackshopRow[] = []
+    const skippedReasons: BackshopSkippedReasons = { invalidPlu: 0, emptyName: 0, duplicatePlu: 0 }
+    const skippedDetails: BackshopSkippedDetails = {
+      invalidPlu: [],
+      emptyName: [],
+      duplicatePlu: [],
+    }
+
+    for (let r = headerRowIndex + 1; r < rowsStr.length; r++) {
+      const excelRow1Based = r + 1
+      const cells = rowsStr[r] ?? []
+      const pluRaw = String(cells[pluCol] ?? '').trim()
+      const plu = normalizePLU(pluRaw)
+      if (!PLU_REGEX.test(plu)) {
+        if (pluRaw.length > 0) {
+          skippedReasons.invalidPlu++
+          skippedDetails.invalidPlu.push({
+            row: excelRow1Based,
+            col: pluCol + 1,
+            rawCell: truncateSkippedCellRaw(pluRaw),
+          })
+        }
+        continue
+      }
+      const nameRaw = String(cells[nameCol] ?? '').trim()
+      const systemName = backshopNameCleanup(nameRaw)
+      if (!systemName) {
+        skippedReasons.emptyName++
+        skippedDetails.emptyName.push({ row: excelRow1Based, col: nameCol + 1 })
+        continue
+      }
+      if (seenPLUs.has(plu)) {
+        skippedReasons.duplicatePlu++
+        const first = firstOccurrence.get(plu)
+        skippedDetails.duplicatePlu.push({
+          row: excelRow1Based,
+          col: pluCol + 1,
+          plu,
+          firstRow: first?.row ?? excelRow1Based,
+          firstCol: first?.col ?? pluCol + 1,
+          ...(imageCol >= 0 && {
+            orphanImageSheetRow0: r,
+            orphanImageSheetCol0: imageCol,
+          }),
+        })
+        continue
+      }
+      seenPLUs.add(plu)
+      firstOccurrence.set(plu, { row: excelRow1Based, col: pluCol + 1 })
+      rows.push({
+        plu,
+        systemName,
+        imageColumnIndex: imageCol,
+        imageUrl: null,
+        pluSheetRow: excelRow1Based,
+        pluSheetCol: pluCol + 1,
+        ...(imageCol >= 0 && { imageSheetRow0: r, imageSheetCol0: imageCol }),
+      })
+    }
+
+    const skippedRows =
+      skippedReasons.invalidPlu + skippedReasons.emptyName + skippedReasons.duplicatePlu
+
+    return {
+      rows,
+      fileName: file.name,
+      totalRows: rows.length,
+      skippedRows,
+      skippedReasons: skippedRows > 0 ? skippedReasons : undefined,
+      skippedDetails: skippedRows > 0 ? skippedDetails : undefined,
+      sameNameDifferentPlu: computeSameNameDifferentPlu(rows),
+      detectedLayout: 'classic_rows',
+      pluColumnIndex: pluCol,
+      nameColumnIndex: nameCol,
+      hasImageColumn: imageCol >= 0,
+    }
+  } catch (err) {
+    throw new Error(`Backshop-Excel-Parsing (manuelle Spalten) fehlgeschlagen: ${formatError(err)}`)
+  }
+}
+
+/**
+ * Block-Layout mit manueller Angabe: Namens-, PLU- und (optional) Bild-Zeile plus Blockgröße.
+ * Durchläuft alle Bänder `start = nameRowIndex + k * blockSize`, solange Daten vorhanden sind.
+ * Pro Band wird für jede Spalte ein Produkt angelegt (Name aus Namens-Zeile, PLU aus PLU-Zeile).
+ */
+function parseManualBlockLayout(
+  file: File,
+  rowsStr: string[][],
+  mapping: BackshopManualMapping,
+): BackshopParseResult {
+  const nameRow0 = Math.max(0, mapping.nameRowIndex ?? 0)
+  const pluRow0 = Math.max(0, mapping.pluRowIndex ?? nameRow0 + 1)
+  const imageRow0 = mapping.imageRowIndex != null && mapping.imageRowIndex >= 0 ? mapping.imageRowIndex : -1
+  const blockSize = Math.max(1, mapping.blockSize ?? 5)
+
+  const seenPLUs = new Set<string>()
+  const firstOccurrence = new Map<string, { row: number; col: number }>()
+  const rows: ParsedBackshopRow[] = []
+  const skippedReasons: BackshopSkippedReasons = { invalidPlu: 0, emptyName: 0, duplicatePlu: 0 }
+  const skippedDetails: BackshopSkippedDetails = {
+    invalidPlu: [],
+    emptyName: [],
+    duplicatePlu: [],
+  }
+
+  const nameOffset = 0
+  const pluOffset = pluRow0 - nameRow0
+  const imageOffset = imageRow0 >= 0 ? imageRow0 - nameRow0 : -1
+
+  for (let bandStart = nameRow0; bandStart + pluOffset < rowsStr.length; bandStart += blockSize) {
+    const nameRow = rowsStr[bandStart + nameOffset] ?? []
+    const pluRow = rowsStr[bandStart + pluOffset] ?? []
+    const maxCol = Math.max(nameRow.length, pluRow.length)
+    if (maxCol === 0) continue
+
+    const hasImageRow = imageOffset >= 0 && bandStart + imageOffset < rowsStr.length
+
+    for (let c = 0; c < maxCol; c++) {
+      const nameRaw = String(nameRow[c] ?? '').trim()
+      const pluRaw = String(pluRow[c] ?? '').trim()
+      if (!pluRaw && !nameRaw) continue
+
+      const systemName = backshopNameCleanup(nameRaw)
+      const plu = normalizePLU(pluRaw)
+
+      if (!PLU_REGEX.test(plu)) {
+        if (pluRaw.length > 0) {
+          skippedReasons.invalidPlu++
+          skippedDetails.invalidPlu.push({
+            row: bandStart + pluOffset + 1,
+            col: c + 1,
+            rawCell: truncateSkippedCellRaw(pluRaw),
+          })
+        }
+        continue
+      }
+      if (!systemName) {
+        skippedReasons.emptyName++
+        skippedDetails.emptyName.push({ row: bandStart + nameOffset + 1, col: c + 1 })
+        continue
+      }
+      if (seenPLUs.has(plu)) {
+        skippedReasons.duplicatePlu++
+        const first = firstOccurrence.get(plu)
+        skippedDetails.duplicatePlu.push({
+          row: bandStart + pluOffset + 1,
+          col: c + 1,
+          plu,
+          firstRow: first?.row ?? bandStart + pluOffset + 1,
+          firstCol: first?.col ?? c + 1,
+          ...(hasImageRow && {
+            orphanImageSheetRow0: bandStart + imageOffset,
+            orphanImageSheetCol0: c,
+          }),
+        })
+        continue
+      }
+
+      seenPLUs.add(plu)
+      firstOccurrence.set(plu, { row: bandStart + pluOffset + 1, col: c + 1 })
+      rows.push({
+        plu,
+        systemName,
+        imageColumnIndex: hasImageRow ? c : -1,
+        imageUrl: null,
+        pluSheetRow: bandStart + pluOffset + 1,
+        pluSheetCol: c + 1,
+        ...(hasImageRow && { imageSheetRow0: bandStart + imageOffset, imageSheetCol0: c }),
+      })
+    }
+  }
+
+  const skippedRows =
+    skippedReasons.invalidPlu + skippedReasons.emptyName + skippedReasons.duplicatePlu
+  return {
+    rows,
+    fileName: file.name,
+    totalRows: rows.length,
+    skippedRows,
+    skippedReasons: skippedRows > 0 ? skippedReasons : undefined,
+    skippedDetails: skippedRows > 0 ? skippedDetails : undefined,
+    sameNameDifferentPlu: computeSameNameDifferentPlu(rows),
+    detectedLayout: 'kassenblatt_blocks',
+    pluColumnIndex: 0,
+    nameColumnIndex: 0,
+    hasImageColumn: imageOffset >= 0,
   }
 }

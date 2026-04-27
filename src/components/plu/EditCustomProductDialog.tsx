@@ -33,6 +33,10 @@ interface EditCustomProductDialogProps {
   onOpenChange: (open: boolean) => void
   product: CustomProduct
   blocks: Block[]
+  /** Optional: Tutorial-Anker am DialogContent */
+  dataTour?: string
+  /** Optional: Tutorial-Anker am Speichern-Button */
+  submitDataTour?: string
 }
 
 /** Nur bei open gemountet + key=product.id → Formularwerte aus product ohne setState im Effect. */
@@ -42,12 +46,14 @@ function EditCustomProductDialogBody({
   onOpenChange,
   showItemTypeField,
   showBlockField,
+  submitDataTour,
 }: {
   product: CustomProduct
   blocks: Block[]
   onOpenChange: (open: boolean) => void
   showItemTypeField: boolean
   showBlockField: boolean
+  submitDataTour?: string
 }) {
   const updateProduct = useUpdateCustomProduct()
 
@@ -175,6 +181,7 @@ function EditCustomProductDialogBody({
               name.trim().length < 2 ||
               !isValidPreis
             }
+            {...(submitDataTour ? { 'data-tour': submitDataTour } : {})}
           >
             {updateProduct.isPending ? 'Wird gespeichert...' : 'Speichern'}
           </Button>
@@ -189,6 +196,8 @@ export function EditCustomProductDialog({
   onOpenChange,
   product,
   blocks,
+  dataTour,
+  submitDataTour,
 }: EditCustomProductDialogProps) {
   const { data: layoutSettings } = useLayoutSettings()
   const showItemTypeField = useMemo(
@@ -202,7 +211,10 @@ export function EditCustomProductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent
+        className="sm:max-w-[500px]"
+        {...(dataTour ? { 'data-tour': dataTour } : {})}
+      >
         {open ? (
           <EditCustomProductDialogBody
             key={product.id}
@@ -211,6 +223,7 @@ export function EditCustomProductDialog({
             onOpenChange={onOpenChange}
             showItemTypeField={showItemTypeField}
             showBlockField={showBlockField}
+            submitDataTour={submitDataTour}
           />
         ) : null}
       </DialogContent>

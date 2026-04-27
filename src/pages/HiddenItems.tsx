@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/select'
 import { Undo2, EyeOff, Layers, Plus, FileSpreadsheet, Trash2, Megaphone } from 'lucide-react'
 import { useHiddenItems, useUnhideProduct, useUnhideAll, useHideProductsBatch, useHideProduct } from '@/hooks/useHiddenItems'
-import { useObstOfferCampaignWithLines } from '@/hooks/useCentralOfferCampaigns'
+import { useObstOfferCampaignForKwYear } from '@/hooks/useCentralOfferCampaigns'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
 import { useCustomProducts, useAddCustomProductsBatch, useDeleteCustomProduct } from '@/hooks/useCustomProducts'
@@ -53,7 +53,16 @@ import {
   obstCustomProductShowBlockField,
   obstCustomProductShowItemTypeField,
 } from '@/lib/obst-custom-product-layout'
-import { formatPreisEur, generatePriceOnlyPlu, getDisplayPlu, parseBlockNameToItemType } from '@/lib/plu-helpers'
+import {
+  formatPreisEur,
+  generatePriceOnlyPlu,
+  getDisplayPlu,
+  itemMatchesSearch,
+  parseBlockNameToItemType,
+} from '@/lib/plu-helpers'
+import { useListFindInPageSection } from '@/hooks/useListFindInPageSection'
+import { ListFindInPageToolbar } from '@/components/plu/ListFindInPageToolbar'
+import type { ListFindInPageBinding } from '@/components/plu/list-find-in-page-types'
 import { parseCustomProductsExcel, parseHiddenItemsExcel } from '@/lib/excel-parser'
 import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
@@ -108,8 +117,12 @@ export function HiddenItems() {
 
   // Daten laden
   const { data: hiddenItems = [], isLoading: hiddenLoading, isError: hiddenError } = useHiddenItems()
-  const { data: obstCampaign } = useObstOfferCampaignWithLines()
   const { data: activeVersion } = useActiveVersion()
+  const { data: obstCampaign } = useObstOfferCampaignForKwYear(
+    activeVersion?.kw_nummer,
+    activeVersion?.jahr,
+    !!activeVersion,
+  )
   const { data: masterItems = [] } = usePLUData(activeVersion?.id)
   const { data: customProducts = [], isLoading: customProductsLoading } = useCustomProducts()
   const { data: blocks = [] } = useBlocks()
@@ -276,6 +289,47 @@ export function HiddenItems() {
       })),
     [hiddenProductInfos, currentUserId, centralCampaignPluSet],
   )
+
+  const matchCustomForFind = useCallback(
+    (cp: CustomProduct, q: string) =>
+      itemMatchesSearch({ plu: cp.plu, display_name: cp.name, system_name: cp.name }, q),
+    [],
+  )
+  const customListFind = useListFindInPageSection({
+    items: customProducts,
+    scopeId: 'hidden-items-obst-custom',
+    isMatch: matchCustomForFind,
+  })
+  const customFindInPageBinding = useMemo((): ListFindInPageBinding | undefined => {
+    if (customProducts.length === 0) return undefined
+    return {
+      scopeId: 'hidden-items-obst-custom',
+      activeRowIndex: customListFind.activeRowIndex,
+      matchIndices: customListFind.matchIndices,
+    }
+  }, [customProducts.length, customListFind.activeRowIndex, customListFind.matchIndices])
+
+  const matchHiddenRowForFind = useCallback((row: HiddenProductDisplayRow, q: string) => {
+    const s = q.trim().toLowerCase()
+    if (!s) return false
+    return (
+      itemMatchesSearch({ plu: row.plu, display_name: row.name, system_name: row.name }, q) ||
+      row.hiddenByName.toLowerCase().includes(s)
+    )
+  }, [])
+  const hiddenListFind = useListFindInPageSection({
+    items: hiddenItemsDisplayRows,
+    scopeId: 'hidden-items-obst-hidden',
+    isMatch: matchHiddenRowForFind,
+  })
+  const hiddenFindInPageBinding = useMemo((): ListFindInPageBinding | undefined => {
+    if (hiddenItemsDisplayRows.length === 0) return undefined
+    return {
+      scopeId: 'hidden-items-obst-hidden',
+      activeRowIndex: hiddenListFind.activeRowIndex,
+      matchIndices: hiddenListFind.matchIndices,
+    }
+  }, [hiddenItemsDisplayRows.length, hiddenListFind.activeRowIndex, hiddenListFind.matchIndices])
 
   // Mutations
   const unhideProduct = useUnhideProduct()
@@ -508,7 +562,16 @@ export function HiddenItems() {
               </p>
             )}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-              <h3 className="text-lg font-semibold">Eigene Produkte</h3>
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <h3 className="text-lg font-semibold">Eigene Produkte</h3>
+                {customProducts.length > 0 && (
+                  <ListFindInPageToolbar
+                    showBar={customListFind.showBar}
+                    onOpen={customListFind.openSearch}
+                    barProps={customListFind.findInPageBarProps}
+                  />
+                )}
+              </div>
               <div className="flex flex-wrap gap-2">
                 {isSuperAdmin && (
                   <>
@@ -575,6 +638,7 @@ export function HiddenItems() {
                 unhidePending={false}
                 deletePending={deleteProduct.isPending}
                 allowHideUnhide={canManageHidden}
+                findInPage={customFindInPageBinding}
               />
             )}
           </CardContent>
@@ -584,11 +648,20 @@ export function HiddenItems() {
         {/* === Sektion 2: Ausgeblendete Produkte === */}
         <div className="flex flex-col gap-4 mt-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-semibold">Ausgeblendete Produkte</h3>
-              <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-                Zentrale Werbung kann die Anzeige in der Hauptliste vorübergehend übersteuern (Badge „Sichtbar durch Werbung“).
-              </p>
+            <div className="flex flex-wrap items-start gap-2 min-w-0">
+              <div>
+                <h3 className="text-lg font-semibold">Ausgeblendete Produkte</h3>
+                <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+                  Zentrale Werbung kann die Anzeige in der Hauptliste vorübergehend übersteuern (Badge „Sichtbar durch Werbung“).
+                </p>
+              </div>
+              {hiddenItemsDisplayRows.length > 0 && (
+                <ListFindInPageToolbar
+                  showBar={hiddenListFind.showBar}
+                  onOpen={hiddenListFind.openSearch}
+                  barProps={hiddenListFind.findInPageBarProps}
+                />
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {canManageHidden && (
@@ -657,6 +730,7 @@ export function HiddenItems() {
                 canManageHidden={canManageHidden}
                 unhidePending={unhideProduct.isPending}
                 onUnhide={(plu) => unhideProduct.mutate(plu)}
+                findInPage={hiddenFindInPageBinding}
               />
             </CardContent>
           </Card>

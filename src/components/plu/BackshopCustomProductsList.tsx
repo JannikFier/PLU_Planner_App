@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { getDisplayPlu } from '@/lib/plu-helpers'
 import { BackshopThumbnail } from '@/components/plu/BackshopThumbnail'
 import { cn } from '@/lib/utils'
+import { listFindInPageRowClassName, type ListFindInPageBinding } from '@/components/plu/list-find-in-page-types'
 import type { BackshopCustomProduct } from '@/types/database'
 import { Eye, EyeOff, Pencil, Trash2 } from 'lucide-react'
 
@@ -23,6 +24,7 @@ export interface BackshopCustomProductsListProps {
   deletePending: boolean
   /** false z. B. für Super-Admin */
   allowHideUnhide?: boolean
+  findInPage?: ListFindInPageBinding
 }
 
 export function BackshopCustomProductsList({
@@ -37,6 +39,7 @@ export function BackshopCustomProductsList({
   unhidePending,
   deletePending,
   allowHideUnhide = true,
+  findInPage,
 }: BackshopCustomProductsListProps) {
   const blockName = (blockId: string | null) => blocks.find((b) => b.id === blockId)?.name ?? '–'
 
@@ -44,7 +47,11 @@ export function BackshopCustomProductsList({
   const thumb = (cp: BackshopCustomProduct) => <BackshopThumbnail src={cp.image_url} size="2xl" />
 
   return (
-    <div className="max-w-full min-w-0">
+    <div
+      className="max-w-full min-w-0"
+      data-tour="backshop-custom-list"
+      {...(findInPage ? { 'data-find-in-scope': findInPage.scopeId } : {})}
+    >
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full min-w-0">
           <thead>
@@ -67,10 +74,18 @@ export function BackshopCustomProductsList({
             </tr>
           </thead>
           <tbody>
-            {products.map((cp) => {
+            {products.map((cp, rowIndex) => {
               const rowHidden = isHidden(cp.plu)
               return (
-                <tr key={cp.id} className="border-b border-border last:border-b-0 hover:bg-muted/30">
+                <tr
+                  key={cp.id}
+                  className={cn(
+                    'border-b border-border last:border-b-0 hover:bg-muted/30',
+                    listFindInPageRowClassName(rowIndex, findInPage),
+                  )}
+                  {...(findInPage ? { 'data-row-index': rowIndex } : {})}
+                  {...(rowIndex === 0 && { 'data-tour': 'backshop-custom-first-item' })}
+                >
                   <td className="px-3 py-3 align-middle w-28">{thumb(cp)}</td>
                   <td className="px-3 py-3 font-mono text-sm align-middle whitespace-nowrap">{getDisplayPlu(cp.plu)}</td>
                   <td className="px-3 py-3 text-sm align-middle min-w-0 break-words">{cp.name}</td>
@@ -125,10 +140,15 @@ export function BackshopCustomProductsList({
       </div>
 
       <ul className="md:hidden divide-y divide-border" data-testid="backshop-custom-products-mobile-list">
-        {products.map((cp) => {
+        {products.map((cp, rowIndex) => {
           const rowHidden = isHidden(cp.plu)
           return (
-            <li key={cp.id} className="py-3 first:pt-0">
+            <li
+              key={cp.id}
+              className={cn('py-3 first:pt-0', listFindInPageRowClassName(rowIndex, findInPage))}
+              {...(findInPage ? { 'data-row-index': rowIndex } : {})}
+              {...(rowIndex === 0 && { 'data-tour': 'backshop-custom-first-item' })}
+            >
               <div className="flex gap-2 min-w-0 items-start">
                 <div className="shrink-0 pt-0.5">
                   <BackshopThumbnail src={cp.image_url} size="xl" />

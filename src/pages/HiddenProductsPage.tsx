@@ -1,7 +1,7 @@
 // HiddenProductsPage – Ausgeblendete Produkte (dedizierte Seite)
 // Liste, Einblenden, Bearbeiten (bei eigenen), "Produkte ausblenden" oben rechts
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
@@ -11,7 +11,7 @@ import { EyeOff } from 'lucide-react'
 import { useHiddenItems, useUnhideProduct } from '@/hooks/useHiddenItems'
 import { useOfferItems } from '@/hooks/useOfferItems'
 import {
-  useObstOfferCampaignWithLines,
+  useObstOfferCampaignForKwYear,
   useObstOfferStoreDisabled,
 } from '@/hooks/useCentralOfferCampaigns'
 import { useObstOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalPrices'
@@ -26,7 +26,10 @@ import { useAuth } from '@/hooks/useAuth'
 import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
 import { canManageMarketHiddenItems } from '@/lib/permissions'
 import { supabase } from '@/lib/supabase'
-import { getDisplayPlu } from '@/lib/plu-helpers'
+import { getDisplayPlu, itemMatchesSearch } from '@/lib/plu-helpers'
+import { useListFindInPageSection } from '@/hooks/useListFindInPageSection'
+import { ListFindInPageToolbar } from '@/components/plu/ListFindInPageToolbar'
+import type { ListFindInPageBinding } from '@/components/plu/list-find-in-page-types'
 import { buildDisplayList } from '@/lib/layout-engine'
 import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
 import { useStoreObstBlockOrder, useStoreObstNameBlockOverrides } from '@/hooks/useStoreObstBlockLayout'
@@ -36,7 +39,10 @@ import { orderByPluDisplayOrder } from '@/lib/list-order'
 import { useQuery } from '@tanstack/react-query'
 import { HideProductsDialog } from '@/components/plu/HideProductsDialog'
 import { EditCustomProductDialog } from '@/components/plu/EditCustomProductDialog'
-import { HiddenProductsResponsiveList } from '@/components/plu/HiddenProductsResponsiveList'
+import {
+  HiddenProductsResponsiveList,
+  type HiddenProductDisplayRow,
+} from '@/components/plu/HiddenProductsResponsiveList'
 import type { Profile } from '@/types/database'
 import type { CustomProduct } from '@/types/database'
 
@@ -85,23 +91,29 @@ export function HiddenProductsPage() {
   )
   const { data: renamedItems = [] } = useRenamedItems()
   const { data: offerItems = [] } = useOfferItems()
-  const { data: obstCampaign } = useObstOfferCampaignWithLines()
+  const { data: obstCampaign } = useObstOfferCampaignForKwYear(
+    activeVersion?.kw_nummer,
+    activeVersion?.jahr,
+    !!activeVersion,
+  )
   const { data: obstStoreDisabled = new Set() } = useObstOfferStoreDisabled()
   const { overrideMap: obstLocalOverrides } = useObstOfferLocalPriceOverrides(obstCampaign ?? undefined)
   const unhideProduct = useUnhideProduct()
 
-  const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
+  const { kw: calendarKw, year: calendarJahr } = getKWAndYearFromDate(new Date())
+  const offerMapKw = activeVersion?.kw_nummer ?? calendarKw
+  const offerMapJahr = activeVersion?.jahr ?? calendarJahr
   const offerDisplayByPlu = useMemo(
     () =>
       buildOfferDisplayMap(
-        currentKw,
-        currentJahr,
+        offerMapKw,
+        offerMapJahr,
         obstCampaign ?? null,
         obstStoreDisabled,
         offerItems,
         obstLocalOverrides,
       ),
-    [currentKw, currentJahr, obstCampaign, obstStoreDisabled, offerItems, obstLocalOverrides],
+    [offerMapKw, offerMapJahr, obstCampaign, obstStoreDisabled, offerItems, obstLocalOverrides],
   )
 
   const centralCampaignPluSet = useMemo(() => {
@@ -137,8 +149,8 @@ export function HiddenProductsPage() {
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
       versionKwNummer: version?.kw_nummer ?? 0,
       versionJahr: version?.jahr ?? now.getFullYear(),
-      currentKwNummer: currentKw,
-      currentJahr,
+      currentKwNummer: offerMapKw,
+      currentJahr: offerMapJahr,
       nameBlockOverrides,
       storeBlockOrder: storeObstBlockOrder,
     })
@@ -152,8 +164,8 @@ export function HiddenProductsPage() {
     blocks,
     layoutSettings,
     activeVersion,
-    currentKw,
-    currentJahr,
+    offerMapKw,
+    offerMapJahr,
     nameBlockOverrides,
     storeObstBlockOrder,
   ])
@@ -262,6 +274,52 @@ export function HiddenProductsPage() {
     [hiddenProductInfos, canonicalListOrderPlu],
   )
 
+  const hiddenListRows: HiddenProductDisplayRow[] = useMemo(
+    () =>
+      sortedHiddenProductInfos.map((info) => ({
+        plu: info.plu,
+        name: info.name,
+        hiddenByName: info.hiddenByName,
+        hidden_by: info.hidden_by,
+        showVonMirBadge: Boolean(currentUserId && info.hidden_by === currentUserId),
+        source: info.source,
+        showCentralCampaignBadge: centralCampaignPluSet.has(info.plu),
+        typLabel:
+          info.itemType === 'PIECE' ? 'Stück' : info.itemType === 'WEIGHT' ? 'Gewicht' : '–',
+        thumbUrl: null,
+        onEdit: info.customProduct
+          ? () => {
+              if (info.customProduct) setEditingProduct(info.customProduct)
+            }
+          : undefined,
+      })),
+    [sortedHiddenProductInfos, currentUserId, centralCampaignPluSet],
+  )
+
+  const matchHiddenRowForFind = useCallback((row: HiddenProductDisplayRow, q: string) => {
+    const s = q.trim().toLowerCase()
+    if (!s) return false
+    return (
+      itemMatchesSearch({ plu: row.plu, display_name: row.name, system_name: row.name }, q) ||
+      row.hiddenByName.toLowerCase().includes(s)
+    )
+  }, [])
+
+  const hiddenListFind = useListFindInPageSection({
+    items: hiddenListRows,
+    scopeId: 'hidden-products-obst-page',
+    isMatch: matchHiddenRowForFind,
+  })
+
+  const hiddenFindInPageBinding = useMemo((): ListFindInPageBinding | undefined => {
+    if (hiddenListRows.length === 0) return undefined
+    return {
+      scopeId: 'hidden-products-obst-page',
+      activeRowIndex: hiddenListFind.activeRowIndex,
+      matchIndices: hiddenListFind.matchIndices,
+    }
+  }, [hiddenListRows.length, hiddenListFind.activeRowIndex, hiddenListFind.matchIndices])
+
   if (hiddenError) {
     return (
       <DashboardLayout>
@@ -278,22 +336,40 @@ export function HiddenProductsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg p-2 bg-muted">
-              <EyeOff className="h-5 w-5 text-muted-foreground" />
+        <div
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+          data-tour="obst-hidden-toolbar"
+        >
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg p-2 bg-muted">
+                <EyeOff className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">Ausgeblendete Produkte</h2>
+                <p className="text-sm text-muted-foreground">
+                  Produkte einblenden oder weitere ausblenden. Steht eine PLU in der zentralen Werbung, kann sie
+                  in der Hauptliste trotzdem sichtbar sein (Badge in der Tabelle).
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight">Ausgeblendete Produkte</h2>
-              <p className="text-sm text-muted-foreground">
-                Produkte einblenden oder weitere ausblenden. Steht eine PLU in der zentralen Werbung, kann sie
-                in der Hauptliste trotzdem sichtbar sein (Badge in der Tabelle).
-              </p>
-            </div>
+            {!hiddenLoading && hiddenListRows.length > 0 && (
+              <ListFindInPageToolbar
+                showBar={hiddenListFind.showBar}
+                onOpen={hiddenListFind.openSearch}
+                barProps={hiddenListFind.findInPageBarProps}
+                dataTour="obst-hidden-search"
+              />
+            )}
           </div>
 
           {canManageHidden && (
-            <Button variant="outline" size="sm" onClick={() => setShowHideDialog(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowHideDialog(true)}
+              data-tour="obst-hidden-add-button"
+            >
               <EyeOff className="h-4 w-4 mr-2" />
               Produkte ausblenden
             </Button>
@@ -327,30 +403,17 @@ export function HiddenProductsPage() {
         )}
 
         {!hiddenLoading && sortedHiddenProductInfos.length > 0 && (
-          <Card>
+          <Card data-tour="obst-hidden-list">
             <CardContent className="p-0">
               <HiddenProductsResponsiveList
                 variant="obst"
                 canManageHidden={canManageHidden}
                 unhidePending={unhideProduct.isPending}
                 onUnhide={(plu) => unhideProduct.mutate(plu)}
-                rows={sortedHiddenProductInfos.map((info) => ({
-                  plu: info.plu,
-                  name: info.name,
-                  hiddenByName: info.hiddenByName,
-                  hidden_by: info.hidden_by,
-                  showVonMirBadge: Boolean(currentUserId && info.hidden_by === currentUserId),
-                  source: info.source,
-                  showCentralCampaignBadge: centralCampaignPluSet.has(info.plu),
-                  typLabel:
-                    info.itemType === 'PIECE' ? 'Stück' : info.itemType === 'WEIGHT' ? 'Gewicht' : '–',
-                  thumbUrl: null,
-                  onEdit: info.customProduct
-                    ? () => {
-                        if (info.customProduct) setEditingProduct(info.customProduct)
-                      }
-                    : undefined,
-                }))}
+                rows={hiddenListRows}
+                findInPage={hiddenFindInPageBinding}
+                firstItemDataTour="obst-hidden-first-item"
+                firstShowButtonDataTour="obst-hidden-show-button"
               />
             </CardContent>
           </Card>
@@ -365,6 +428,8 @@ export function HiddenProductsPage() {
             listLayout={hideDialogListLayout}
             flowDirection={flowDirection}
             fontSizes={dialogFontSizes}
+            dataTour="obst-hidden-add-dialog"
+            submitDataTour="obst-hidden-add-dialog-submit"
           />
         )}
 
@@ -375,6 +440,8 @@ export function HiddenProductsPage() {
             onOpenChange={(open) => !open && setEditingProduct(null)}
             product={editingProduct}
             blocks={blocks}
+            dataTour="obst-hidden-edit-dialog"
+            submitDataTour="obst-hidden-edit-dialog-submit"
           />
         )}
       </div>

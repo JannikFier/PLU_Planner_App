@@ -1,21 +1,11 @@
-// BackshopWarengruppenPage: Eigene Seite zum Zuordnen von Produkten zu Warengruppen (Backshop)
+// BackshopWarengruppenPage: Deep-Link → Warengruppen & Sortierung (gemeinsame Seite mit Block-Sort)
 
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { BackshopWarengruppenPanel } from '@/components/plu/BackshopWarengruppenPanel'
+import { Navigate, useLocation } from 'react-router-dom'
 
 export function BackshopWarengruppenPage() {
-  return (
-    <DashboardLayout>
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Warengruppen bearbeiten</h2>
-          <p className="text-sm text-muted-foreground">
-            Produkte per Suche und Mehrfachauswahl den Warengruppen zuordnen. Links die Gruppen, rechts die Zuordnung.
-          </p>
-        </div>
+  const location = useLocation()
+  const prefix = location.pathname.startsWith('/super-admin') ? '/super-admin' : '/admin'
+  const search = location.search ?? ''
 
-        <BackshopWarengruppenPanel />
-      </div>
-    </DashboardLayout>
-  )
+  return <Navigate to={`${prefix}/backshop-block-sort${search}`} replace />
 }

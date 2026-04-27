@@ -17,7 +17,7 @@ import { toast } from 'sonner'
 import { KWSelector } from '@/components/plu/KWSelector'
 import { RadioCard } from '@/components/ui/radio-card'
 import type { DisplayItem } from '@/types/plu'
-import type { Block, Version } from '@/types/database'
+import type { Block, StoreObstBlockOrder, Version } from '@/types/database'
 
 interface ExportPDFDialogProps {
   open: boolean
@@ -35,6 +35,8 @@ interface ExportPDFDialogProps {
   sortMode: 'ALPHABETICAL' | 'BY_BLOCK'
   flowDirection: 'ROW_BY_ROW' | 'COLUMN_FIRST'
   blocks: Block[]
+  /** Markt-Reihenfolge Obst-Warengruppen (wie in der Liste / `store_obst_block_order`) */
+  obstStoreBlockOrder?: StoreObstBlockOrder[]
   /** Optionale KW-Auswahl: Liste der Versionen, aktuelle Auswahl, Callback */
   versions?: Version[]
   selectedVersionId?: string
@@ -58,6 +60,7 @@ export function ExportPDFDialog({
   sortMode,
   flowDirection,
   blocks,
+  obstStoreBlockOrder,
   versions = [],
   selectedVersionId,
   onVersionChange,
@@ -89,6 +92,7 @@ export function ExportPDFDialog({
         sortMode,
         flowDirection,
         blocks,
+        obstStoreBlockOrder,
         fontSizes,
         exportMode,
       })
@@ -108,7 +112,18 @@ export function ExportPDFDialog({
     } finally {
       setIsGenerating(false)
     }
-  }, [items, kwLabel, displayMode, sortMode, flowDirection, blocks, fontSizes, exportMode, onOpenChange])
+  }, [
+    items,
+    kwLabel,
+    displayMode,
+    sortMode,
+    flowDirection,
+    blocks,
+    obstStoreBlockOrder,
+    fontSizes,
+    exportMode,
+    onOpenChange,
+  ])
 
   const handlePrint = useCallback(async () => {
     setIsGenerating(true)
@@ -121,6 +136,7 @@ export function ExportPDFDialog({
         sortMode,
         flowDirection,
         blocks,
+        obstStoreBlockOrder,
         fontSizes,
         exportMode,
       })
@@ -177,7 +193,18 @@ export function ExportPDFDialog({
     } finally {
       setIsGenerating(false)
     }
-  }, [items, kwLabel, displayMode, sortMode, flowDirection, blocks, fontSizes, exportMode, onOpenChange])
+  }, [
+    items,
+    kwLabel,
+    displayMode,
+    sortMode,
+    flowDirection,
+    blocks,
+    obstStoreBlockOrder,
+    fontSizes,
+    exportMode,
+    onOpenChange,
+  ])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

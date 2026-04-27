@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Vier — Situationsbibliothek</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; font-family: "Inter", system-ui, sans-serif; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="mascot-cartoon-v4.jsx"></script>
+<script type="text/babel" src="mascot-library.jsx"></script>
+
+<script type="text/babel">
+  function SituationCard({ name, step, desc, Comp }) {
+    return (
+      <div style={{
+        width: 260, height: 340, background: '#FFFFFF',
+        display: 'flex', flexDirection: 'column',
+        fontFamily: '"Inter", system-ui, sans-serif',
+      }}>
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'linear-gradient(180deg, #FAFAFB 0%, #F2F2F5 100%)',
+          borderBottom: '1px solid #EAEAEE', padding: 12, boxSizing: 'border-box',
+        }}>
+          <Comp size={170} />
+        </div>
+        <div style={{ padding: '12px 14px 14px' }}>
+          <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6, color: '#6B7280', marginBottom: 3 }}>{step}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1B2E', marginBottom: 3 }}>{name}</div>
+          <div style={{ fontSize: 11, color: '#6B7280', lineHeight: 1.4 }}>{desc}</div>
+        </div>
+      </div>
+    );
+  }
+
+  function IntroCard() {
+    return (
+      <div style={{
+        width: 560, height: 280, background: '#fff', padding: 28,
+        boxSizing: 'border-box', fontFamily: '"Inter", system-ui, sans-serif',
+        color: '#1A1B2E', display: 'flex', flexDirection: 'column', gap: 10,
+      }}>
+        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8, color: '#6B7280' }}>
+          Situationsbibliothek
+        </div>
+        <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: -0.3 }}>
+          Vier — alle Posen & Situationen
+        </div>
+        <div style={{ fontSize: 13.5, color: '#4B5563', lineHeight: 1.55 }}>
+          Ein kompletter Pose-Katalog für Onboarding, Tooltips, leere Zustände, System-Rückmeldungen und
+          Reaktionen. Jede Situation ist mit Name, Schritt-Label und Verwendungszweck beschriftet —
+          direkt in Cursor als Referenz verwendbar.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginTop: 12, fontSize: 11 }}>
+          {[
+            ['Tutorial', 10],
+            ['Guidance', 7],
+            ['States', 8],
+            ['Reactions', 8],
+            ['Daily', 4],
+          ].map(([g, n]) => (
+            <div key={g} style={{ background: '#F7F7F9', border: '1px solid #EAEAEE', borderRadius: 8, padding: '10px 12px' }}>
+              <div style={{ fontSize: 22, fontWeight: 600 }}>{n}</div>
+              <div style={{ color: '#6B7280' }}>{g}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function App() {
+    return (
+      <DesignCanvas>
+        <DCSection id="intro" title="Overview" subtitle="37 Situationen in 5 Kategorien">
+          <DCArtboard id="intro" label="Overview" width={560} height={280}>
+            <IntroCard />
+          </DCArtboard>
+        </DCSection>
+
+        {SIT_GROUPS.map(group => (
+          <DCSection key={group.id} id={group.id} title={group.title} subtitle={group.subtitle}>
+            {group.items.map(item => (
+              <DCArtboard key={item.key} id={item.key} label={item.name} width={260} height={340}>
+                <SituationCard name={item.name} step={item.step} desc={item.desc} Comp={item.Comp} />
+              </DCArtboard>
+            ))}
+          </DCSection>
+        ))}
+      </DesignCanvas>
+    );
+  }
+
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(<App />);
+</script>
+
+</body>
+</html>

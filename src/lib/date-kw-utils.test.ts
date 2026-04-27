@@ -2,6 +2,8 @@
 
 import {
   getKWAndYearFromDate,
+  getBackshopWerbungAnchorDate,
+  getBackshopWerbungKwYearFromDate,
   getNextFreeKW,
   versionExistsForKW,
   clampKWToUploadRange,
@@ -11,6 +13,8 @@ import {
   formatBackshopActiveListToolbarRange,
   formatIsoWeekMondayToSaturdayDe,
   formatKwLabelWithOptionalMonSatRange,
+  formatBackshopWerbungContextPlainLabel,
+  getBackshopToolbarWerbungLayout,
 } from './date-kw-utils'
 
 describe('date-kw-utils', () => {
@@ -31,6 +35,40 @@ describe('date-kw-utils', () => {
       expect(year).toBe(2025)
       expect(kw).toBeGreaterThanOrEqual(1)
       expect(kw).toBeLessThanOrEqual(53)
+    })
+  })
+
+  describe('getBackshopWerbungAnchorDate / getBackshopWerbungKwYearFromDate', () => {
+    it('Samstag vor 23:59: Anker = jetzt (gleiche ISO-KW wie getKWAndYearFromDate)', () => {
+      const d = new Date(2026, 3, 18, 23, 58, 0, 0)
+      expect(getBackshopWerbungAnchorDate(d).getTime()).toBe(d.getTime())
+      expect(getBackshopWerbungKwYearFromDate(d)).toEqual(getKWAndYearFromDate(d))
+    })
+    it('Samstag ab 23:59: Anker = folgender Montag 12:00', () => {
+      const d = new Date(2026, 3, 18, 23, 59, 0, 0)
+      const anchor = getBackshopWerbungAnchorDate(d)
+      expect(anchor.getFullYear()).toBe(2026)
+      expect(anchor.getMonth()).toBe(3)
+      expect(anchor.getDate()).toBe(20)
+      expect(anchor.getHours()).toBe(12)
+      expect(getBackshopWerbungKwYearFromDate(d)).toEqual(getKWAndYearFromDate(anchor))
+    })
+    it('Sonntag: Anker = Montag 12:00 (folgende ISO-KW ggü. Samstag davor)', () => {
+      const sunday = new Date(2026, 3, 19, 10, 0, 0, 0)
+      const anchor = getBackshopWerbungAnchorDate(sunday)
+      expect(anchor.getDay()).toBe(1)
+      expect(anchor.getDate()).toBe(20)
+      expect(getBackshopWerbungKwYearFromDate(sunday)).toEqual(getKWAndYearFromDate(anchor))
+    })
+    it('Samstag 23:59 kurz vor Jahreswechsel: Anker im neuen Kalenderjahr', () => {
+      // 30.12.2028 = Samstag; +2 Tage = 01.01.2029
+      const d = new Date(2028, 11, 30, 23, 59, 0, 0)
+      expect(d.getDay()).toBe(6)
+      const anchor = getBackshopWerbungAnchorDate(d)
+      expect(anchor.getFullYear()).toBe(2029)
+      expect(anchor.getMonth()).toBe(0)
+      expect(anchor.getDate()).toBe(1)
+      expect(getBackshopWerbungKwYearFromDate(d)).toEqual(getKWAndYearFromDate(anchor))
     })
   })
 
@@ -61,6 +99,41 @@ describe('date-kw-utils', () => {
     it('zeigt nur Einspiel-KW wenn „heute“ vor Montag der Einspiel-Woche liegt', () => {
       // Einspiel KW 5/2026, „heute“ KW 2/2026 → nur Liste
       expect(formatBackshopActiveListToolbarRange(5, 2026, 2, 2026)).toBe('KW 5 · 2026')
+    })
+  })
+
+  describe('getBackshopToolbarWerbungLayout', () => {
+    it('entspricht einer Zeile bei gleichem Jahr (Bereich)', () => {
+      const l = getBackshopToolbarWerbungLayout(10, 2026, 14, 2026)
+      expect(l).toEqual({
+        variant: 'range_same_year',
+        prefixBeforeEndKw: 'KW 10 – KW ',
+        endKw: 14,
+        suffix: ' · 2026',
+      })
+    })
+    it('entspricht Jahreswechsel (cross_year)', () => {
+      const l = getBackshopToolbarWerbungLayout(52, 2026, 2, 2027)
+      expect(l).toEqual({
+        variant: 'range_cross_year',
+        leftFixed: 'KW 52 · 2026 – KW ',
+        endKw: 2,
+        suffix: ' · 2027',
+      })
+    })
+  })
+
+  describe('formatBackshopWerbungContextPlainLabel', () => {
+    it('zeigt Bereich Liste–Werbung wie Toolbar (PDF-Kontext)', () => {
+      expect(formatBackshopWerbungContextPlainLabel(17, 2026, 18, 2026, false)).toBe('KW 17 – KW 18 · 2026')
+    })
+    it('zeigt eine KW wenn Einspiel und Ende gleich', () => {
+      expect(formatBackshopWerbungContextPlainLabel(18, 2026, 18, 2026, false)).toBe('KW 18 · 2026')
+    })
+    it('ergänzt Mo–Sa zur Listen-KW wenn aktiviert', () => {
+      expect(formatBackshopWerbungContextPlainLabel(17, 2026, 18, 2026, true)).toBe(
+        'KW 17 – KW 18 · 2026 · 20.04.2026–25.04.2026',
+      )
     })
   })
 

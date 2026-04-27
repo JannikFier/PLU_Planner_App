@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { dismissTutorialWelcomeIfVisible } from './dismiss-tutorial-welcome'
 
 /**
  * Viewer-Journey: Login → Dashboard → PLU-Liste Obst → Backshop-Liste.
@@ -17,6 +18,8 @@ test.describe('Viewer-Journey @extended', () => {
     await page.getByLabel(/^Passwort$/i).fill(password)
     await page.getByRole('button', { name: 'Anmelden' }).click()
     await expect(page).toHaveURL(/\/viewer/, { timeout: 15_000 })
+    await page.waitForLoadState('networkidle')
+    await dismissTutorialWelcomeIfVisible(page)
   })
 
   test('Dashboard zeigt PLU-Liste Karten', async ({ page }) => {

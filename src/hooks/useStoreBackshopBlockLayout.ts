@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { supabase, queryRest } from '@/lib/supabase'
+import { supabase, queryRest, isTestModeActive } from '@/lib/supabase'
 import { normalizeSystemNameForBlockOverride } from '@/lib/block-override-utils'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import type { StoreBackshopBlockOrder, StoreBackshopNameBlockOverride } from '@/types/database'
@@ -55,6 +55,22 @@ export function useReorderStoreBackshopBlocks() {
   return useMutation({
     mutationFn: async (orderedBlockIds: string[]) => {
       if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+
+      if (isTestModeActive()) {
+        const now = new Date().toISOString()
+        const rows: StoreBackshopBlockOrder[] = orderedBlockIds.map((block_id, order_index) => ({
+          store_id: currentStoreId,
+          block_id,
+          order_index,
+          updated_at: now,
+        }))
+        queryClient.setQueryData<StoreBackshopBlockOrder[]>(
+          ['store-backshop-block-order', currentStoreId],
+          rows,
+        )
+        return
+      }
+
       const rows = orderedBlockIds.map((block_id, order_index) => ({
         store_id: currentStoreId,
         block_id,
@@ -66,7 +82,9 @@ export function useReorderStoreBackshopBlocks() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['store-backshop-block-order', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['store-backshop-block-order', currentStoreId] })
+      }
     },
     onError: onMutationError,
   })
@@ -88,6 +106,31 @@ export function useAssignBackshopProductBlockOverride() {
     }) => {
       if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
       const key = normalizeSystemNameForBlockOverride(systemName)
+      const qk = ['store-backshop-name-block-override', currentStoreId] as const
+
+      if (isTestModeActive()) {
+        if (targetBlockId === masterBlockId || targetBlockId === null) {
+          queryClient.setQueryData<StoreBackshopNameBlockOverride[]>(qk, (old) =>
+            (old ?? []).filter((r) => r.system_name_normalized !== key),
+          )
+          return
+        }
+        const now = new Date().toISOString()
+        const row: StoreBackshopNameBlockOverride = {
+          store_id: currentStoreId,
+          system_name_normalized: key,
+          block_id: targetBlockId,
+          updated_at: now,
+        }
+        queryClient.setQueryData<StoreBackshopNameBlockOverride[]>(qk, (old) => {
+          const list = [...(old ?? [])]
+          const idx = list.findIndex((r) => r.system_name_normalized === key)
+          if (idx >= 0) list[idx] = row
+          else list.push(row)
+          return list
+        })
+        return
+      }
 
       if (targetBlockId === masterBlockId || targetBlockId === null) {
         const { error } = await supabase
@@ -110,7 +153,9 @@ export function useAssignBackshopProductBlockOverride() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['store-backshop-name-block-override', currentStoreId] })
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['store-backshop-name-block-override', currentStoreId] })
+      }
     },
     onError: onMutationError,
   })

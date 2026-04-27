@@ -6,6 +6,8 @@ import { StatusBadge } from './StatusBadge'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
 import { useBlocks } from '@/hooks/useBlocks'
+import { useStoreObstBlockOrder } from '@/hooks/useStoreObstBlockLayout'
+import { sortBlocksWithStoreOrder } from '@/lib/block-override-utils'
 import {
   groupItemsByLetter,
   groupItemsByBlock,
@@ -39,6 +41,11 @@ export function LayoutPreview({
   const { data: activeVersion } = useActiveVersion()
   const { data: allItems = [] } = usePLUData(activeVersion?.id)
   const { data: blocks = [] } = useBlocks()
+  const { data: storeObstBlockOrder = [] } = useStoreObstBlockOrder()
+  const sortedBlocksForPreview = useMemo(
+    () => sortBlocksWithStoreOrder(blocks, storeObstBlockOrder),
+    [blocks, storeObstBlockOrder],
+  )
 
   // Items einschränken
   const items = useMemo(() => allItems.slice(0, 30), [allItems])
@@ -52,7 +59,10 @@ export function LayoutPreview({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+      <div
+        className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground"
+        data-tour="obst-konfig-layout-preview-empty"
+      >
         Keine PLU-Daten für die Vorschau vorhanden.
         <br />
         Lade zuerst eine Excel-Datei hoch.
@@ -63,10 +73,20 @@ export function LayoutPreview({
   if (displayMode === 'SEPARATED') {
     const pieceItems = items.filter((i) => i.item_type === 'PIECE')
     const weightItems = items.filter((i) => i.item_type === 'WEIGHT')
+    if (pieceItems.length === 0 && weightItems.length === 0) {
+      return (
+        <div
+          className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground"
+          data-tour="obst-konfig-layout-preview-empty"
+        >
+          Keine Stück- oder Gewichtsartikel für die getrennte Vorschau vorhanden.
+        </div>
+      )
+    }
     return (
       <div className="space-y-4">
         {pieceItems.length > 0 && (
-          <div>
+          <div data-tour="obst-konfig-layout-preview-stueck">
             <div className="rounded-t-lg bg-blue-500/10 border border-blue-200 px-3 py-1.5 font-semibold text-blue-700 uppercase tracking-wider" style={{ fontSize: fonts.header }}>
               PLU-Liste Stück
             </div>
@@ -75,13 +95,14 @@ export function LayoutPreview({
               sortMode={sortMode}
               flowDirection={flowDirection}
               blocks={blocks}
+              sortedBlocksOverride={sortedBlocksForPreview}
               totalCount={pieceItems.length}
               fonts={fonts}
             />
           </div>
         )}
         {weightItems.length > 0 && (
-          <div>
+          <div data-tour="obst-konfig-layout-preview-gewicht">
             <div className="rounded-t-lg bg-amber-500/10 border border-amber-200 px-3 py-1.5 font-semibold text-amber-700 uppercase tracking-wider" style={{ fontSize: fonts.header }}>
               PLU-Liste Gewicht
             </div>
@@ -90,6 +111,7 @@ export function LayoutPreview({
               sortMode={sortMode}
               flowDirection={flowDirection}
               blocks={blocks}
+              sortedBlocksOverride={sortedBlocksForPreview}
               totalCount={weightItems.length}
               fonts={fonts}
             />
@@ -100,7 +122,7 @@ export function LayoutPreview({
   }
 
   return (
-    <div>
+    <div data-tour="obst-konfig-layout-preview-mixed">
       <div
         className="rounded-t-lg bg-gray-500/10 border border-b-0 border-gray-300 px-3 py-1 font-semibold text-gray-700 uppercase tracking-wider text-center"
         style={{ fontSize: fonts.header }}
@@ -112,6 +134,7 @@ export function LayoutPreview({
         sortMode={sortMode}
         flowDirection={flowDirection}
         blocks={blocks}
+        sortedBlocksOverride={sortedBlocksForPreview}
         totalCount={items.length}
         fonts={fonts}
       />
@@ -132,6 +155,8 @@ interface PreviewTableProps {
   sortMode: 'ALPHABETICAL' | 'BY_BLOCK'
   flowDirection: 'ROW_BY_ROW' | 'COLUMN_FIRST'
   blocks: Block[]
+  /** Markt-Reihenfolge der Warengruppen (wie Masterliste) */
+  sortedBlocksOverride: Block[]
   totalCount: number
   fonts: FontSizes
 }
@@ -190,11 +215,24 @@ function buildRowByRowTable(groups: (LetterGroup<MasterPLUItem> | BlockGroup<Mas
   return rows
 }
 
-function PreviewTable({ items, sortMode, flowDirection, blocks, totalCount, fonts }: PreviewTableProps) {
+function PreviewTable({
+  items,
+  sortMode,
+  flowDirection,
+  blocks,
+  sortedBlocksOverride,
+  totalCount,
+  fonts,
+}: PreviewTableProps) {
   const groups = useMemo(() => {
-    if (sortMode === 'BY_BLOCK') return groupItemsByBlock<MasterPLUItem>(items, blocks)
+    if (sortMode === 'BY_BLOCK') {
+      return groupItemsByBlock<MasterPLUItem>(items, blocks, {
+        sortedBlocks: sortedBlocksOverride,
+        includeEmptyBlocks: true,
+      })
+    }
     return groupItemsByLetter<MasterPLUItem>(items)
-  }, [items, sortMode, blocks])
+  }, [items, sortMode, blocks, sortedBlocksOverride])
 
   const rowByRowData = useMemo(() => {
     if (flowDirection !== 'ROW_BY_ROW') return null

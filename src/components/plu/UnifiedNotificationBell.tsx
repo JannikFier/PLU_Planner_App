@@ -26,6 +26,7 @@ export function UnifiedNotificationBell() {
         variant="ghost"
         size="icon"
         className="relative"
+        data-tour="unified-notification-bell"
         onClick={() => setDialogOpen(true)}
         aria-label="Benachrichtigungen"
       >

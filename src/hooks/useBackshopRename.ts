@@ -1,8 +1,10 @@
 // Backshop Umbenennen: RPCs für display_name + optional image_url
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, isTestModeActive } from '@/lib/supabase'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { toast } from 'sonner'
+import type { BackshopRenamedItem } from '@/types/database'
 
 /** Fehlermeldung aus Supabase/PostgrestError oder Error lesen */
 function getErrorMessage(error: unknown): string {
@@ -84,6 +86,110 @@ export function useClearBackshopRenamedFlag() {
       queryClient.invalidateQueries({ queryKey: ['backshop-plu-items'] })
       queryClient.invalidateQueries({ queryKey: ['backshop-renamed-items'] })
       toast.success('Aus Liste entfernt')
+    },
+    onError: (error) => {
+      toast.error(`Fehler: ${getErrorMessage(error)}`)
+    },
+  })
+}
+
+/** Nur-Carryover-Zeilen: kein backshop_master_plu_items.id – direkt backshop_renamed_items. */
+export function useUpsertBackshopRenamedByPlu() {
+  const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
+
+  return useMutation({
+    mutationFn: async ({
+      plu,
+      displayName,
+      systemName,
+      imageUrl,
+    }: {
+      plu: string
+      displayName: string
+      systemName: string
+      imageUrl: string | null
+    }) => {
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+      const trimmed = displayName.trim()
+      const isManual = trimmed !== systemName.trim()
+      if (isTestModeActive()) {
+        queryClient.setQueriesData<BackshopRenamedItem[]>(
+          { queryKey: ['backshop-renamed-items', currentStoreId] },
+          (old) => {
+            const list = [...(old ?? [])]
+            const idx = list.findIndex((r) => r.plu === plu)
+            const base: BackshopRenamedItem = {
+              id: idx >= 0 ? list[idx].id : `test-${plu}`,
+              plu,
+              store_id: currentStoreId,
+              display_name: trimmed,
+              is_manually_renamed: isManual,
+              image_url: imageUrl,
+              created_by: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }
+            if (idx >= 0) list[idx] = { ...list[idx], ...base }
+            else list.push(base)
+            return list
+          },
+        )
+        return
+      }
+
+      const { error } = await supabase.from('backshop_renamed_items').upsert(
+        {
+          plu,
+          store_id: currentStoreId,
+          display_name: trimmed,
+          is_manually_renamed: isManual,
+          image_url: imageUrl,
+        } as never,
+        { onConflict: 'plu,store_id' },
+      )
+      if (error) throw error
+    },
+    onSuccess: () => {
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['backshop-plu-items'] })
+        queryClient.invalidateQueries({ queryKey: ['backshop-renamed-items'] })
+      }
+      toast.success('Produktname geändert')
+    },
+    onError: (error) => {
+      toast.error(`Fehler: ${getErrorMessage(error)}`)
+    },
+  })
+}
+
+export function useDeleteBackshopRenamedByPlu() {
+  const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
+
+  return useMutation({
+    mutationFn: async ({ plu }: { plu: string }) => {
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+      if (isTestModeActive()) {
+        queryClient.setQueriesData<BackshopRenamedItem[]>(
+          { queryKey: ['backshop-renamed-items', currentStoreId] },
+          (old) => (old ?? []).filter((r) => r.plu !== plu),
+        )
+        return
+      }
+      const { error } = await supabase
+        .from('backshop_renamed_items')
+        .delete()
+        .eq('plu', plu)
+        .eq('store_id', currentStoreId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['backshop-plu-items'] })
+        queryClient.invalidateQueries({ queryKey: ['backshop-renamed-items'] })
+      }
+      toast.success('Produktname zurückgesetzt')
     },
     onError: (error) => {
       toast.error(`Fehler: ${getErrorMessage(error)}`)

@@ -26,6 +26,18 @@ export function effectiveBlockIdForStoreOverride(
   return o !== undefined ? o : masterBlockId
 }
 
+/**
+ * Verhindert „Geister-block_id“ (z. B. veralteter Override-Cache nach gelöschter Warengruppe):
+ * nur IDs, die noch in `validBlockIds` vorkommen, sonst wie ohne Zuordnung (`null`).
+ */
+export function sanitizeEffectiveBlockId(
+  blockId: string | null | undefined,
+  validBlockIds: ReadonlySet<string>,
+): string | null {
+  if (blockId == null || blockId === '') return null
+  return validBlockIds.has(blockId) ? blockId : null
+}
+
 export type StoreBlockOrderRow = { block_id: string; order_index: number }
 
 /** Globale order_index als Fallback, wenn für einen Block keine Markt-Zeile existiert. */

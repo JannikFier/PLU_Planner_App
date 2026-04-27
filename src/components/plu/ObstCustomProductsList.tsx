@@ -9,6 +9,7 @@ import {
   obstCustomProductShowItemTypeField,
 } from '@/lib/obst-custom-product-layout'
 import { cn } from '@/lib/utils'
+import { listFindInPageRowClassName, type ListFindInPageBinding } from '@/components/plu/list-find-in-page-types'
 import type { CustomProduct } from '@/types/database'
 import { Eye, EyeOff, Pencil, Trash2 } from 'lucide-react'
 
@@ -38,6 +39,10 @@ export interface ObstCustomProductsListProps {
   deletePending: boolean
   /** false z. B. für Super-Admin: keine Ausblend-/Einblend-Aktionen am Markt */
   allowHideUnhide?: boolean
+  /** Optional: Find-in-Page (gleiche Reihenfolge wie products) */
+  findInPage?: ListFindInPageBinding
+  /** Optional: Tutorial-Anker am ersten Listen-Eintrag (Desktop-Zeile + Mobile-Karte). */
+  firstItemDataTour?: string
 }
 
 /** Touch-freundliche Icon-Größe nur auf schmalen Viewports */
@@ -61,6 +66,8 @@ export function ObstCustomProductsList({
   unhidePending,
   deletePending,
   allowHideUnhide = true,
+  findInPage,
+  firstItemDataTour,
 }: ObstCustomProductsListProps) {
   const layoutSlice = { display_mode: displayMode, sort_mode: sortMode, features_blocks: featuresBlocks }
   const showTypeCol = obstCustomProductShowItemTypeField(layoutSlice)
@@ -70,7 +77,10 @@ export function ObstCustomProductsList({
   const blockName = (blockId: string | null) => blocks.find((b) => b.id === blockId)?.name ?? '–'
 
   return (
-    <div className="max-w-full min-w-0">
+    <div
+      className="max-w-full min-w-0"
+      {...(findInPage ? { 'data-find-in-scope': findInPage.scopeId } : {})}
+    >
       {/* Desktop: Tabelle */}
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full min-w-0 table-fixed">
@@ -113,10 +123,20 @@ export function ObstCustomProductsList({
             </tr>
           </thead>
           <tbody>
-            {products.map((cp) => {
+            {products.map((cp, rowIndex) => {
               const rowHidden = isFull ? isHidden(cp.plu) : false
               return (
-                <tr key={cp.id} className="border-b border-border last:border-b-0 hover:bg-muted/30">
+                <tr
+                  key={cp.id}
+                  className={cn(
+                    'border-b border-border last:border-b-0 hover:bg-muted/30',
+                    listFindInPageRowClassName(rowIndex, findInPage),
+                  )}
+                  {...(findInPage ? { 'data-row-index': rowIndex } : {})}
+                  {...(firstItemDataTour && rowIndex === 0
+                    ? { 'data-tour': firstItemDataTour }
+                    : {})}
+                >
                   <td className="px-3 py-3 font-mono text-sm align-middle whitespace-nowrap">{getDisplayPlu(cp.plu)}</td>
                   <td className="px-3 py-3 text-sm align-middle min-w-0">
                     <span className="flex items-center gap-2 flex-wrap">
@@ -228,7 +248,7 @@ export function ObstCustomProductsList({
 
       {/* Mobile: kompakte Liste (kein horizontales Scrollen der Seite) */}
       <ul className="md:hidden divide-y divide-border" data-testid="obst-custom-products-mobile-list">
-        {products.map((cp) => {
+        {products.map((cp, rowIndex) => {
           const rowHidden = isFull ? isHidden(cp.plu) : false
           const metaParts: string[] = []
           if (showTypeCol) metaParts.push(cp.item_type === 'PIECE' ? 'Stück' : 'Gewicht')
@@ -237,7 +257,14 @@ export function ObstCustomProductsList({
           const metaLine = metaParts.join(' · ')
 
           return (
-            <li key={cp.id} className="py-3 first:pt-0">
+            <li
+              key={cp.id}
+              className={cn('py-3 first:pt-0', listFindInPageRowClassName(rowIndex, findInPage))}
+              {...(findInPage ? { 'data-row-index': rowIndex } : {})}
+              {...(firstItemDataTour && rowIndex === 0
+                ? { 'data-tour': firstItemDataTour }
+                : {})}
+            >
               <div className="flex gap-2 min-w-0 items-start">
                 <span className="font-mono text-sm shrink-0 pt-2">{getDisplayPlu(cp.plu)}</span>
                 <div className="min-w-0 flex-1 pt-2">

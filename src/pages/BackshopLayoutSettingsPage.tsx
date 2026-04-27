@@ -160,7 +160,7 @@ export function BackshopLayoutSettingsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-6" data-tour="backshop-konfig-layout-page">
         <div>
             <h2 className="text-2xl font-bold tracking-tight">Layout (Backshop)</h2>
             <p className="text-sm text-muted-foreground">
@@ -170,7 +170,7 @@ export function BackshopLayoutSettingsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-6">
-          <Card>
+          <Card data-tour="backshop-konfig-layout-display-mode-card">
             <CardHeader>
               <CardTitle className="text-base">Anzeige</CardTitle>
               <CardDescription>Wie soll die Backshop-Liste gegliedert sein? Innerhalb immer alphabetisch (A–Z).</CardDescription>
@@ -191,7 +191,7 @@ export function BackshopLayoutSettingsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour="backshop-konfig-layout-flow-card">
             <CardHeader>
               <CardTitle className="text-base">Flussrichtung</CardTitle>
               <CardDescription>Tabelle und PDF</CardDescription>
@@ -220,7 +220,7 @@ export function BackshopLayoutSettingsPage() {
           </Card>
 
           {form.sort_mode === 'BY_BLOCK' && (
-            <Card>
+            <Card data-tour="backshop-konfig-layout-pdf-card">
               <CardHeader>
                 <CardTitle className="text-base">PDF</CardTitle>
                 <CardDescription>Seitenumbruch bei Warengruppen</CardDescription>
@@ -238,13 +238,14 @@ export function BackshopLayoutSettingsPage() {
                   <Switch
                     checked={form.page_break_per_block}
                     onCheckedChange={(checked) => updateForm({ page_break_per_block: checked })}
+                    data-tour="backshop-konfig-layout-pdf-page-break"
                   />
                 </div>
               </CardContent>
             </Card>
           )}
 
-          <Card>
+          <Card data-tour="backshop-konfig-layout-fonts-card">
             <CardHeader>
               <CardTitle className="text-base">Schriftgrößen</CardTitle>
               <CardDescription>
@@ -280,6 +281,7 @@ export function BackshopLayoutSettingsPage() {
                       const v = parseInt(e.target.value, 10)
                       if (isNaN(v) || v < 10) updateForm({ font_header_px: 32 })
                     }}
+                    data-tour="backshop-konfig-layout-fonts-list-header"
                   />
                 </div>
                 {form.flow_direction === 'COLUMN_FIRST' ? (
@@ -301,6 +303,7 @@ export function BackshopLayoutSettingsPage() {
                         const n = clampUnifiedBodyPx(form.font_product_px)
                         updateForm({ font_column_px: n, font_product_px: n })
                       }}
+                      data-tour="backshop-konfig-layout-fonts-unified-body"
                     />
                   </div>
                 ) : (
@@ -320,6 +323,7 @@ export function BackshopLayoutSettingsPage() {
                           const v = parseInt(e.target.value, 10)
                           if (isNaN(v) || v < 8) updateForm({ font_column_px: 18 })
                         }}
+                        data-tour="backshop-konfig-layout-fonts-columns-groups"
                       />
                     </div>
                     <div className="space-y-2">
@@ -337,6 +341,7 @@ export function BackshopLayoutSettingsPage() {
                           const v = parseInt(e.target.value, 10)
                           if (isNaN(v) || v < 6) updateForm({ font_product_px: 18 })
                         }}
+                        data-tour="backshop-konfig-layout-fonts-product-rows"
                       />
                     </div>
                   </>
@@ -345,7 +350,7 @@ export function BackshopLayoutSettingsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour="backshop-konfig-layout-mark-duration-card">
             <CardHeader>
               <CardTitle className="text-base">Markierungsdauer</CardTitle>
               <CardDescription>Wie viele Kalenderwochen sollen Farbmarkierungen sichtbar bleiben?</CardDescription>
@@ -358,7 +363,7 @@ export function BackshopLayoutSettingsPage() {
                     value={String(form.mark_red_kw_count)}
                     onValueChange={(v) => updateForm({ mark_red_kw_count: parseInt(v) })}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger data-tour="backshop-konfig-layout-mark-duration-red"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {[1, 2, 3, 4].map((n) => (
                         <SelectItem key={n} value={String(n)}>{n} KW{n > 1 ? 's' : ''}</SelectItem>
@@ -372,7 +377,7 @@ export function BackshopLayoutSettingsPage() {
                     value={String(form.mark_yellow_kw_count)}
                     onValueChange={(v) => updateForm({ mark_yellow_kw_count: parseInt(v) })}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger data-tour="backshop-konfig-layout-mark-duration-yellow"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {[1, 2, 3, 4].map((n) => (
                         <SelectItem key={n} value={String(n)}>{n} KW{n > 1 ? 's' : ''}</SelectItem>
@@ -384,7 +389,7 @@ export function BackshopLayoutSettingsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour="backshop-konfig-layout-kw-card">
             <CardHeader>
               <CardTitle className="text-base">Kalenderwoche</CardTitle>
               <CardDescription>
@@ -402,21 +407,22 @@ export function BackshopLayoutSettingsPage() {
                 <Switch
                   checked={form.show_week_mon_sat_in_labels}
                   onCheckedChange={(checked) => updateForm({ show_week_mon_sat_in_labels: checked })}
+                  data-tour="backshop-konfig-layout-kw-toggle"
                 />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour="backshop-konfig-layout-features-card">
             <CardHeader>
               <CardTitle className="text-base">Features</CardTitle>
               <CardDescription>Funktionen für die Backshop-Liste ein-/ausschalten.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {[
-                { key: 'features_custom_products' as const, label: 'Eigene Produkte', desc: 'User können eigene Backshop-Artikel hinzufügen' },
-                { key: 'features_hidden_items' as const, label: 'Produkte ausblenden', desc: 'User können Artikel aus ihrer Liste entfernen' },
-                { key: 'features_keyword_rules' as const, label: 'Bezeichnungsregeln', desc: 'Automatische Namensanpassungen' },
+                { key: 'features_custom_products' as const, label: 'Eigene Produkte', desc: 'User können eigene Backshop-Artikel hinzufügen', dataTour: 'backshop-konfig-layout-feature-custom' },
+                { key: 'features_hidden_items' as const, label: 'Produkte ausblenden', desc: 'User können Artikel aus ihrer Liste entfernen', dataTour: 'backshop-konfig-layout-feature-hidden' },
+                { key: 'features_keyword_rules' as const, label: 'Bezeichnungsregeln', desc: 'Automatische Namensanpassungen', dataTour: 'backshop-konfig-layout-feature-bezeichnungen' },
               ].map((feature) => (
                 <div key={feature.key} className="flex items-center justify-between">
                   <div>
@@ -426,6 +432,7 @@ export function BackshopLayoutSettingsPage() {
                   <Switch
                     checked={form[feature.key]}
                     onCheckedChange={(checked) => updateForm({ [feature.key]: checked })}
+                    data-tour={feature.dataTour}
                   />
                 </div>
               ))}
@@ -433,7 +440,10 @@ export function BackshopLayoutSettingsPage() {
           </Card>
 
           {saveStatus !== 'idle' && (
-            <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+            <div
+              className="flex items-center justify-end gap-2 text-sm text-muted-foreground"
+              data-tour="backshop-konfig-layout-save-status"
+            >
               {saveStatus === 'saving' && (
                 <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Speichert...</>
               )}
@@ -444,7 +454,7 @@ export function BackshopLayoutSettingsPage() {
           )}
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-4" data-tour="backshop-konfig-layout-preview">
             <BackshopLayoutPreview
               sortMode={form.sort_mode}
               flowDirection={form.flow_direction}

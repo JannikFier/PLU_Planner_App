@@ -8,9 +8,7 @@ import {
   useCallback,
   forwardRef,
   useImperativeHandle,
-  type ReactNode,
 } from 'react'
-import { createPortal } from 'react-dom'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
   PLU_TABLE_HEADER_CLASS,
@@ -24,6 +22,8 @@ import {
   getDisplayNameForItem,
   getDisplayPreisForItem,
   itemMatchesSearch,
+  formatPluBlockSectionHeaderForDisplay,
+  isLetterPluSectionHeaderLabel,
 } from '@/lib/plu-helpers'
 import {
   paginateNewspaperColumns,
@@ -35,20 +35,67 @@ import { cn } from '@/lib/utils'
 import { obstOfferNameInnerClass } from '@/lib/obst-offer-name-highlight'
 import { scrollToDataRowIndex } from '@/lib/find-in-page-scroll'
 import { useFindInPage } from '@/hooks/useFindInPage'
-import { Megaphone, Search, Tag } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { GitCompareArrows, Megaphone, Search, Tag } from 'lucide-react'
 import { FindInPageBar } from '@/components/plu/FindInPageBar'
+import { FindInPageFixedPortal } from '@/components/plu/FindInPageFixedPortal'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { PreisBadge } from './PreisBadge'
 import { StatusBadge } from './StatusBadge'
 import { HighlightedSearchText } from './HighlightedSearchText'
-import type { Block } from '@/types/database'
+import { BackshopSourceBadge } from '@/components/backshop/BackshopSourceBadge'
+import type { Block, StoreObstBlockOrder } from '@/types/database'
+import { sortBlocksWithStoreOrder } from '@/lib/block-override-utils'
 import type { DisplayItem } from '@/types/plu'
 import type { LetterGroup, BlockGroup } from '@/lib/plu-helpers'
 
 function itemHasDisplayPreis(item: DisplayItem | undefined): boolean {
   if (!item) return false
   return getDisplayPreisForItem(item) != null
+}
+
+/** Inline-Badge mit Marke (nur Backshop, nicht im PDF). */
+function BackshopSourceInlineBadge({ item, listType }: { item: DisplayItem; listType: 'obst' | 'backshop' }) {
+  if (listType !== 'backshop') return null
+  if (item.is_custom) return null
+  if (!item.backshop_source) return null
+  return (
+    <BackshopSourceBadge
+      source={item.backshop_source}
+      className="ml-1 align-middle"
+      dataTour="backshop-master-source-badge"
+    />
+  )
+}
+
+/** Kompakter Link zur Marken-Tinder-Gruppe (nur digital), wenn Teilmengen-Markenwahl. */
+function BackshopMarkenTinderHintLine({
+  item,
+  hrefForGroup,
+}: {
+  item: DisplayItem
+  hrefForGroup?: (groupId: string) => string
+}) {
+  const gid = item.backshop_tinder_group_id
+  const n = item.backshop_other_group_sources_count
+  if (gid == null || n == null || n <= 0 || !hrefForGroup) return null
+  const label =
+    n === 1
+      ? 'Weitere Marke in dieser Gruppe – in der Marken-Auswahl anpassen'
+      : 'Weitere Marken in dieser Gruppe – in der Marken-Auswahl anpassen'
+  return (
+    <Link
+      to={hrefForGroup(gid)}
+      className="inline-flex shrink-0 items-center rounded-sm p-0.5 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+      aria-label={label}
+      title={label}
+      data-tour="backshop-master-marken-hint"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <GitCompareArrows className="h-3.5 w-3.5" aria-hidden />
+    </Link>
+  )
 }
 
 function OfferKindBadge({ item }: { item: DisplayItem }) {
@@ -101,12 +148,21 @@ function BackshopImage({ src, size = 'default' }: { src: string | null | undefin
           'inline-flex items-center justify-center rounded border border-border bg-muted/50 text-muted-foreground text-xs',
           box,
         )}
+        data-tour="backshop-master-thumbnail"
       >
         –
       </span>
     )
   }
-  return <img src={src} alt="" className={cn(box, BACKSHOP_IMAGE_CLASS)} onError={() => setLoadFailed(true)} />
+  return (
+    <img
+      src={src}
+      alt=""
+      className={cn(box, BACKSHOP_IMAGE_CLASS)}
+      data-tour="backshop-master-thumbnail"
+      onError={() => setLoadFailed(true)}
+    />
+  )
 }
 
 interface PLUTableProps {
@@ -115,6 +171,8 @@ interface PLUTableProps {
   sortMode?: 'ALPHABETICAL' | 'BY_BLOCK'
   flowDirection?: 'ROW_BY_ROW' | 'COLUMN_FIRST'
   blocks?: Block[]
+  /** Obst: Markt-Reihenfolge der Warengruppen (`store_obst_block_order`) für Liste und Suche – muss zu PDF passen. */
+  obstStoreBlockOrder?: StoreObstBlockOrder[]
   fontSizes?: FontSizes
   selectionMode?: boolean
   selectedPLUs?: Set<string>
@@ -128,6 +186,11 @@ interface PLUTableProps {
   findInPageExternalTrigger?: boolean
   /** Obst/Gemüse (Standard) oder Backshop (Bild-Spalte, eine Liste) */
   listType?: 'obst' | 'backshop'
+  /**
+   * Nur Backshop, Masterliste: Link-Ziel pro Produktgruppe für Hinweis bei Teilmengen-Markenwahl
+   * (`?focusGroup=…` am Marken-Tinder).
+   */
+  backshopMarkenTinderHrefForGroup?: (groupId: string) => string
 }
 
 /** Imperative API für externe Toolbar (Lupen-Button) */
@@ -207,6 +270,7 @@ function PLUColumn({
   listType = 'obst',
   /** Spalten-Zeitung Obst: Buchstaben-Header gleiche Schriftgröße wie Produktzeilen */
   letterGroupHeaderFontPx,
+  backshopMarkenTinderHrefForGroup,
 }: {
   rows: FlatRow[]
   fonts: FontSizes
@@ -219,6 +283,7 @@ function PLUColumn({
   findInPageQuery?: string
   listType?: 'obst' | 'backshop'
   letterGroupHeaderFontPx?: number
+  backshopMarkenTinderHrefForGroup?: (groupId: string) => string
 }) {
   const groupHeaderFontPx = letterGroupHeaderFontPx ?? fonts.column
   const hasAnyPrice = useMemo(
@@ -226,6 +291,10 @@ function PLUColumn({
     [rows],
   )
   const showImageColumn = listType === 'backshop'
+  const firstItemRowIdx = useMemo(
+    () => rows.findIndex((r) => r.type === 'item' && r.item != null),
+    [rows],
+  )
 
   const colCount = (selectionMode ? 1 : 0) + (showImageColumn ? 1 : 0) + 2 + (hasAnyPrice ? 1 : 0)
 
@@ -276,6 +345,9 @@ function PLUColumn({
           {rows.map((row, i) => {
             if (row.type === 'header') {
               const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
+              const raw = row.label ?? ''
+              const letterHdr = isLetterPluSectionHeaderLabel(raw)
+              const displayLabel = formatPluBlockSectionHeaderForDisplay(raw)
               return (
                 <tr
                   key={`header-${i}-${row.label}`}
@@ -284,14 +356,17 @@ function PLUColumn({
                 >
                   <td
                     colSpan={colCount}
-                    className="px-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50"
+                    className={cn(
+                      'px-2 text-center font-bold text-muted-foreground bg-muted/50',
+                      letterHdr ? 'tracking-widest uppercase' : 'tracking-wide',
+                    )}
                     style={{
                       fontSize: groupHeaderFontPx + 'px',
                       paddingTop: '0.35em',
                       paddingBottom: '0.35em',
                     }}
                   >
-                    {row.label}
+                    {displayLabel}
                   </td>
                 </tr>
               )
@@ -311,6 +386,9 @@ function PLUColumn({
               <tr
                 key={item.id}
                 {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}
+                {...(listType === 'backshop' && i === firstItemRowIdx && {
+                  'data-tour': 'backshop-master-first-row',
+                })}
                 className={cn(
                   'border-b border-border last:border-b-0',
                   selectionMode && 'cursor-pointer hover:bg-muted/30',
@@ -349,22 +427,32 @@ function PLUColumn({
                   style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}
                   title={getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
                 >
-                  <span
-                    className={obstOfferNameInnerClass(
-                      listType,
-                      item.offer_name_highlight_kind,
-                    )}
-                  >
-                    {hq?.trim() ? (
-                      <HighlightedSearchText
-                        text={getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
-                        query={hq}
-                      />
-                    ) : (
-                      getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)
-                    )}
-                    <OfferKindBadge item={item} />
-                  </span>
+                  <div className="min-w-0">
+                    <span
+                      className={cn(
+                        obstOfferNameInnerClass(listType, item.offer_name_highlight_kind),
+                        listType === 'backshop' &&
+                          'inline-flex max-w-full flex-wrap items-center gap-x-1 gap-y-0.5 align-middle',
+                      )}
+                    >
+                      {hq?.trim() ? (
+                        <HighlightedSearchText
+                          text={getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)}
+                          query={hq}
+                        />
+                      ) : (
+                        getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)
+                      )}
+                      <BackshopSourceInlineBadge item={item} listType={listType} />
+                      <OfferKindBadge item={item} />
+                      {listType === 'backshop' && (
+                        <BackshopMarkenTinderHintLine
+                          item={item}
+                          hrefForGroup={backshopMarkenTinderHrefForGroup}
+                        />
+                      )}
+                    </span>
+                  </div>
                 </td>
                 {hasAnyPrice && (
                   <td className="w-[90px] min-w-[90px] px-2 border-l border-border" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}>
@@ -395,6 +483,7 @@ function BackshopPLUMobileList({
   findInPageRowOffset,
   findInPageHighlightRowIndex,
   findInPageQuery,
+  backshopMarkenTinderHrefForGroup,
 }: {
   rows: FlatRow[]
   fonts: FontSizes
@@ -404,20 +493,31 @@ function BackshopPLUMobileList({
   findInPageRowOffset?: number
   findInPageHighlightRowIndex?: number | null
   findInPageQuery?: string
+  backshopMarkenTinderHrefForGroup?: (groupId: string) => string
 }) {
+  const firstItemRowIdx = useMemo(
+    () => rows.findIndex((r) => r.type === 'item' && r.item != null),
+    [rows],
+  )
   return (
     <div className="flex-1 min-w-0 divide-y divide-border bg-background">
       {rows.map((row, i) => {
         if (row.type === 'header') {
           const rowIndex = findInPageRowOffset !== undefined ? findInPageRowOffset + i : undefined
+          const raw = row.label ?? ''
+          const letterHdr = isLetterPluSectionHeaderLabel(raw)
+          const displayLabel = formatPluBlockSectionHeaderForDisplay(raw)
           return (
             <div
               key={`mheader-${i}-${row.label}`}
               {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}
-              className="bg-muted/50 px-2 py-1.5 text-center font-bold uppercase tracking-wider text-muted-foreground"
+              className={cn(
+                'bg-muted/50 px-2 py-1.5 text-center font-bold text-muted-foreground',
+                letterHdr ? 'uppercase tracking-wider' : 'tracking-wide',
+              )}
               style={{ fontSize: Math.min(fonts.column, 14) + 'px' }}
             >
-              {row.label}
+              {displayLabel}
             </div>
           )
         }
@@ -438,6 +538,7 @@ function BackshopPLUMobileList({
           <div
             key={item.id}
             {...(rowIndex !== undefined && { 'data-row-index': rowIndex })}
+            {...(i === firstItemRowIdx && { 'data-tour': 'backshop-master-first-row' })}
             className={cn(
               'flex gap-3 px-2 py-2.5',
               selectionMode && 'cursor-pointer active:bg-muted/30',
@@ -462,7 +563,7 @@ function BackshopPLUMobileList({
             {/* Reihenfolge: Name → PLU → (Angebot + Preis eine Zeile) – nur mobile Kartenliste */}
             <div className="min-w-0 flex-1 flex flex-col gap-1">
               <div
-                className="font-medium leading-snug text-foreground"
+                className="font-medium leading-snug text-foreground inline-flex max-w-full flex-wrap items-center gap-x-1 gap-y-0.5"
                 style={{ fontSize: fonts.product + 'px' }}
               >
                 {hq?.trim() ? (
@@ -473,6 +574,8 @@ function BackshopPLUMobileList({
                 ) : (
                   getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)
                 )}
+                <BackshopSourceInlineBadge item={item} listType="backshop" />
+                <BackshopMarkenTinderHintLine item={item} hrefForGroup={backshopMarkenTinderHrefForGroup} />
               </div>
               <div>
                 <StatusBadge
@@ -513,6 +616,7 @@ function RowByRowTable({
   findInPageHighlightRowIndex,
   findInPageQuery,
   listType = 'obst',
+  backshopMarkenTinderHrefForGroup,
 }: {
   tableRows: TableRow[]
   /** Gleiche flache Liste wie bei der mobilen Ansicht – Zuordnung data-row-index pro Artikel */
@@ -525,6 +629,7 @@ function RowByRowTable({
   findInPageHighlightRowIndex?: number | null
   findInPageQuery?: string
   listType?: 'obst' | 'backshop'
+  backshopMarkenTinderHrefForGroup?: (groupId: string) => string
 }) {
   const showImageColumn = listType === 'backshop'
   const flatIndexByItemId = useMemo(() => {
@@ -544,6 +649,10 @@ function RowByRowTable({
     [tableRows],
   )
   const totalCols = (selectionMode ? 2 : 0) + (showImageColumn ? 2 : 0) + 4 + (hasAnyPrice ? 2 : 0)
+  const firstPairRowIdx = useMemo(
+    () => tableRows.findIndex((r) => r.type === 'itemPair'),
+    [tableRows],
+  )
 
   return (
     <table className="w-full table-fixed">
@@ -579,13 +688,25 @@ function RowByRowTable({
           if (row.type === 'fullHeader') {
             const headerFlatIdx = flatRows.findIndex((r) => r.type === 'header' && r.label === row.label)
             const headerDataIdx = headerFlatIdx >= 0 ? off + headerFlatIdx : undefined
+            const raw = row.label ?? ''
+            const letterHdr = isLetterPluSectionHeaderLabel(raw)
+            const displayLabel = formatPluBlockSectionHeaderForDisplay(raw)
             return (
               <tr
                 key={`header-${i}-${row.label}`}
                 className="border-b border-border"
                 {...(headerDataIdx !== undefined && { 'data-row-index': headerDataIdx })}
               >
-                <td colSpan={totalCols} className="px-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50" style={{ fontSize: fonts.column + 'px', paddingTop: '0.35em', paddingBottom: '0.35em' }}>{row.label}</td>
+                <td
+                  colSpan={totalCols}
+                  className={cn(
+                    'px-2 text-center font-bold text-muted-foreground bg-muted/50',
+                    letterHdr ? 'tracking-widest uppercase' : 'tracking-wide',
+                  )}
+                  style={{ fontSize: fonts.column + 'px', paddingTop: '0.35em', paddingBottom: '0.35em' }}
+                >
+                  {displayLabel}
+                </td>
               </tr>
             )
           }
@@ -604,7 +725,14 @@ function RowByRowTable({
           const findHL = 'bg-primary/15 ring-1 ring-inset ring-primary/35'
 
           return (
-            <tr key={`pair-${i}`} className="border-b border-border last:border-b-0">
+            <tr
+              key={`pair-${i}`}
+              className="border-b border-border last:border-b-0"
+              {...(i === firstPairRowIdx && {
+                'data-tour':
+                  listType === 'backshop' ? 'backshop-master-first-row' : 'plu-table-first-data-row',
+              })}
+            >
               {row.left ? (
                 <>
                   {selectionMode && (
@@ -635,22 +763,32 @@ function RowByRowTable({
                     style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}
                     title={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}
                   >
-                    <span
-                      className={obstOfferNameInnerClass(
-                        listType,
-                        row.left.offer_name_highlight_kind,
-                      )}
-                    >
-                      {hqLeft?.trim() ? (
-                        <HighlightedSearchText
-                          text={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}
-                          query={hqLeft}
-                        />
-                      ) : (
-                        getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)
-                      )}
-                      <OfferKindBadge item={row.left} />
-                    </span>
+                    <div className="min-w-0">
+                      <span
+                        className={cn(
+                          obstOfferNameInnerClass(listType, row.left.offer_name_highlight_kind),
+                          listType === 'backshop' &&
+                            'inline-flex max-w-full flex-wrap items-center gap-x-1 gap-y-0.5 align-middle',
+                        )}
+                      >
+                        {hqLeft?.trim() ? (
+                          <HighlightedSearchText
+                            text={getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)}
+                            query={hqLeft}
+                          />
+                        ) : (
+                          getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)
+                        )}
+                        <BackshopSourceInlineBadge item={row.left} listType={listType} />
+                        <OfferKindBadge item={row.left} />
+                        {listType === 'backshop' && (
+                          <BackshopMarkenTinderHintLine
+                            item={row.left}
+                            hrefForGroup={backshopMarkenTinderHrefForGroup}
+                          />
+                        )}
+                      </span>
+                    </div>
                   </td>
                   {hasAnyPrice && (
                     <td
@@ -706,22 +844,32 @@ function RowByRowTable({
                     style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}
                     title={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}
                   >
-                    <span
-                      className={obstOfferNameInnerClass(
-                        listType,
-                        row.right.offer_name_highlight_kind,
-                      )}
-                    >
-                      {hqRight?.trim() ? (
-                        <HighlightedSearchText
-                          text={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}
-                          query={hqRight}
-                        />
-                      ) : (
-                        getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)
-                      )}
-                      <OfferKindBadge item={row.right} />
-                    </span>
+                    <div className="min-w-0">
+                      <span
+                        className={cn(
+                          obstOfferNameInnerClass(listType, row.right.offer_name_highlight_kind),
+                          listType === 'backshop' &&
+                            'inline-flex max-w-full flex-wrap items-center gap-x-1 gap-y-0.5 align-middle',
+                        )}
+                      >
+                        {hqRight?.trim() ? (
+                          <HighlightedSearchText
+                            text={getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)}
+                            query={hqRight}
+                          />
+                        ) : (
+                          getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)
+                        )}
+                        <BackshopSourceInlineBadge item={row.right} listType={listType} />
+                        <OfferKindBadge item={row.right} />
+                        {listType === 'backshop' && (
+                          <BackshopMarkenTinderHintLine
+                            item={row.right}
+                            hrefForGroup={backshopMarkenTinderHrefForGroup}
+                          />
+                        )}
+                      </span>
+                    </div>
                   </td>
                   {hasAnyPrice && (
                     <td
@@ -760,38 +908,6 @@ function isFlatRowMatch(row: FlatRow, searchText: string): boolean {
   return row.item != null && itemMatchesSearch(row.item, searchText)
 }
 
-/** Find-in-Page-Leiste: unter Header fixiert; bei Tastatur (visualViewport) am sichtbaren oberen Rand */
-function FindInPageFixedPortal({ children }: { children: ReactNode }) {
-  const [topPx, setTopPx] = useState(64)
-  useEffect(() => {
-    const vv = window.visualViewport
-    if (!vv) return
-    const HEADER = 64
-    const sync = () => {
-      setTopPx(Math.max(HEADER, Math.round(vv.offsetTop) + 8))
-    }
-    vv.addEventListener('resize', sync)
-    vv.addEventListener('scroll', sync)
-    sync()
-    return () => {
-      vv.removeEventListener('resize', sync)
-      vv.removeEventListener('scroll', sync)
-    }
-  }, [])
-  if (typeof document === 'undefined') return null
-  return createPortal(
-    <div className="fixed left-0 right-0 z-[45] pointer-events-none" style={{ top: topPx }}>
-      {/* links wie Hauptinhalt (max-w-7xl), nicht mittig – kein mx-auto auf der Karte */}
-      <div className="mx-auto flex max-w-7xl justify-start px-2 pt-1 sm:px-6 sm:pt-2 pointer-events-auto">
-        <div className="w-full max-w-[min(100%,300px)] rounded-lg border border-border bg-background/95 p-2 shadow-lg backdrop-blur-sm sm:max-w-[min(100%,420px)] sm:p-3">
-          {children}
-        </div>
-      </div>
-    </div>,
-    document.body,
-  )
-}
-
 /**
  * PLU-Tabelle im Zwei-Spalten-Layout.
  */
@@ -802,6 +918,7 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
     sortMode = 'ALPHABETICAL',
     flowDirection = 'COLUMN_FIRST',
     blocks = [],
+    obstStoreBlockOrder,
     fontSizes,
     selectionMode = false,
     selectedPLUs,
@@ -809,12 +926,19 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
     showFindInPage = false,
     findInPageExternalTrigger = false,
     listType = 'obst',
+    backshopMarkenTinderHrefForGroup,
   },
   ref,
 ) {
   const fonts = fontSizes ?? DEFAULT_FONT_SIZES
   /** Backshop: eine gemeinsame Liste (Bild | PLU | Name), kein Stück/Gewicht-Split; Layout wie Obst (md+: zwei Spalten bei ROW_BY_ROW) */
   const effectiveDisplayMode = listType === 'backshop' ? 'MIXED' : displayMode
+
+  /** Obst BY_BLOCK: gleiche Reihenfolge wie `buildDisplayList` / PDF (nicht nur globales `blocks.order_index`). */
+  const obstBlockGroupOrder = useMemo(() => {
+    if (listType !== 'obst' || sortMode !== 'BY_BLOCK' || blocks.length === 0) return undefined
+    return sortBlocksWithStoreOrder(blocks, obstStoreBlockOrder ?? [])
+  }, [listType, sortMode, blocks, obstStoreBlockOrder])
 
   const { searchableRows, sectionOffsets } = useMemo((): {
     searchableRows: FlatRow[]
@@ -825,7 +949,13 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
     const buildForItems = (its: DisplayItem[]): FlatRow[] => {
       const grp =
         sortMode === 'BY_BLOCK'
-          ? groupItemsByBlock(its, blocks)
+          ? groupItemsByBlock(
+              its,
+              blocks,
+              obstBlockGroupOrder
+                ? { sortedBlocks: obstBlockGroupOrder, includeEmptyBlocks: true }
+                : { includeEmptyBlocks: true },
+            )
           : groupItemsByLetter(its)
       if (flowDirection === 'ROW_BY_ROW') {
         if (sortMode === 'ALPHABETICAL') {
@@ -872,7 +1002,17 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
     }
     const rows = buildForItems(items)
     return { searchableRows: rows, sectionOffsets: [0] }
-  }, [showFindInPage, items, effectiveDisplayMode, sortMode, flowDirection, blocks, listType, fonts])
+  }, [
+    showFindInPage,
+    items,
+    effectiveDisplayMode,
+    sortMode,
+    flowDirection,
+    blocks,
+    listType,
+    fonts,
+    obstBlockGroupOrder,
+  ])
 
   const [searchText, setSearchText] = useState('')
   const deferredSearch = useDebouncedValue(searchText, 200)
@@ -973,6 +1113,7 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
         {pieceItems.length > 0 && (
           <div>
             <div
+              data-tour="plu-table-header-stueck"
               className={PLU_TABLE_HEADER_STUECK_CLASS}
               style={{ fontSize: fonts.header + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}
             >
@@ -983,6 +1124,7 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
               sortMode={sortMode}
               flowDirection={flowDirection}
               blocks={blocks}
+              obstBlockGroupOrder={obstBlockGroupOrder}
               fonts={fonts}
               selectionMode={selectionMode}
               selectedPLUs={selectedPLUs}
@@ -991,12 +1133,14 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
               findInPageRowOffset={showFindInPage ? sectionOffsets[0] : undefined}
               findInPageQuery={showFindInPage ? deferredSearch : undefined}
               listType={listType}
+              backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
             />
           </div>
         )}
         {weightItems.length > 0 && (
           <div>
             <div
+              data-tour="plu-table-header-gewicht"
               className={PLU_TABLE_HEADER_GEWICHT_CLASS}
               style={{ fontSize: fonts.header + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}
             >
@@ -1007,6 +1151,7 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
               sortMode={sortMode}
               flowDirection={flowDirection}
               blocks={blocks}
+              obstBlockGroupOrder={obstBlockGroupOrder}
               fonts={fonts}
               selectionMode={selectionMode}
               selectedPLUs={selectedPLUs}
@@ -1015,6 +1160,7 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
               findInPageRowOffset={showFindInPage ? sectionOffsets[1] : undefined}
               findInPageQuery={showFindInPage ? deferredSearch : undefined}
               listType={listType}
+              backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
             />
           </div>
         )}
@@ -1031,6 +1177,7 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
       <div
         className={PLU_TABLE_HEADER_CLASS}
         style={{ fontSize: fonts.header + 'px', paddingTop: '0.3em', paddingBottom: '0.3em' }}
+        data-tour="plu-table-header-mixed"
       >
         {listType === 'backshop' ? (
           <>
@@ -1069,6 +1216,7 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
         sortMode={sortMode}
         flowDirection={flowDirection}
         blocks={blocks}
+        obstBlockGroupOrder={obstBlockGroupOrder}
         fonts={fonts}
         selectionMode={selectionMode}
         selectedPLUs={selectedPLUs}
@@ -1077,6 +1225,7 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
         findInPageRowOffset={showFindInPage ? sectionOffsets[0] : undefined}
         findInPageQuery={showFindInPage ? deferredSearch : undefined}
         listType={listType}
+        backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
       />
     </div>
   )
@@ -1090,6 +1239,7 @@ function TwoColumnLayout({
   sortMode,
   flowDirection,
   blocks,
+  obstBlockGroupOrder,
   fonts,
   selectionMode,
   selectedPLUs,
@@ -1098,11 +1248,13 @@ function TwoColumnLayout({
   findInPageRowOffset,
   findInPageQuery,
   listType = 'obst',
+  backshopMarkenTinderHrefForGroup,
 }: {
   items: DisplayItem[]
   sortMode: 'ALPHABETICAL' | 'BY_BLOCK'
   flowDirection: 'ROW_BY_ROW' | 'COLUMN_FIRST'
   blocks: Block[]
+  obstBlockGroupOrder?: Block[]
   fonts: FontSizes
   selectionMode?: boolean
   selectedPLUs?: Set<string>
@@ -1111,11 +1263,20 @@ function TwoColumnLayout({
   findInPageRowOffset?: number
   findInPageQuery?: string
   listType?: 'obst' | 'backshop'
+  backshopMarkenTinderHrefForGroup?: (groupId: string) => string
 }) {
   const groups = useMemo(() => {
-    if (sortMode === 'BY_BLOCK') return groupItemsByBlock(items, blocks)
+    if (sortMode === 'BY_BLOCK') {
+      return groupItemsByBlock(
+        items,
+        blocks,
+        obstBlockGroupOrder
+          ? { sortedBlocks: obstBlockGroupOrder, includeEmptyBlocks: true }
+          : { includeEmptyBlocks: true },
+      )
+    }
     return groupItemsByLetter(items)
-  }, [items, sortMode, blocks])
+  }, [items, sortMode, blocks, obstBlockGroupOrder])
 
   const rowByRowData = useMemo(() => {
     if (flowDirection !== 'ROW_BY_ROW') return null
@@ -1153,7 +1314,7 @@ function TwoColumnLayout({
             label: bg.blockName,
             items: bg.items,
           }))
-    return { pages: paginateNewspaperColumns(groupList, heights), heights }
+    return { pages: paginateNewspaperColumns(groupList, heights) }
   }, [listType, flowDirection, sortMode, groups, fonts])
 
   const allFlatRows = useMemo(() => {
@@ -1163,7 +1324,7 @@ function TwoColumnLayout({
 
   if (flowDirection === 'ROW_BY_ROW' && rowByRowData) {
     return (
-      <div className="rounded-b-lg border border-t-0 border-border overflow-hidden">
+      <div className="rounded-b-lg border border-t-0 border-border">
         <div className="hidden md:block">
           <RowByRowTable
             tableRows={rowByRowData}
@@ -1176,6 +1337,7 @@ function TwoColumnLayout({
             findInPageHighlightRowIndex={findInPageHighlightRowIndex}
             findInPageQuery={findInPageQuery}
             listType={listType}
+            backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
           />
         </div>
         <div className="md:hidden">
@@ -1189,6 +1351,7 @@ function TwoColumnLayout({
               findInPageRowOffset={findInPageRowOffset}
               findInPageHighlightRowIndex={findInPageHighlightRowIndex}
               findInPageQuery={findInPageQuery}
+              backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
             />
           ) : (
             <PLUColumn
@@ -1201,6 +1364,7 @@ function TwoColumnLayout({
               findInPageHighlightRowIndex={findInPageHighlightRowIndex}
               findInPageQuery={findInPageQuery}
               listType={listType}
+              backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
             />
           )}
         </div>
@@ -1209,117 +1373,34 @@ function TwoColumnLayout({
   }
 
   if (obstNewspaper) {
-    const mobileNewspaperRows = newspaperRowsToFlatRows(
+    // Eine durchgehende Tabelle (wie Suche / Mobil): PDF-ähnliche Paginierung nur für die Zeilenfolge,
+    // nicht mehr zwei getrennte Spalten auf Desktop — sonst wirken Artikel unter dem linken Gruppenkopf „weg“
+    // (sie stehen in der rechten Spalte / auf Folgeseiten).
+    const obstNewspaperFlatRows = newspaperRowsToFlatRows(
       flattenNewspaperPagesToRows(obstNewspaper.pages),
     )
-    const baseRowOffset = findInPageRowOffset ?? 0
-    const newspaperDesktopPages = obstNewspaper.pages.reduce<{
-      offset: number
-      rows: Array<{
-        pageIdx: number
-        leftFlat: FlatRow[]
-        rightFlat: FlatRow[]
-        leftOff: number
-        rightOff: number
-      }>
-    }>(
-      (acc, page, pageIdx) => {
-        const leftFlat = newspaperRowsToFlatRows(page.left)
-        const rightFlat = newspaperRowsToFlatRows(page.right)
-        const leftOff = acc.offset
-        const afterLeft = acc.offset + leftFlat.length
-        const rightOff = afterLeft
-        const afterRight = afterLeft + rightFlat.length
-        return {
-          offset: afterRight,
-          rows: [
-            ...acc.rows,
-            {
-              pageIdx,
-              leftFlat,
-              rightFlat,
-              leftOff,
-              rightOff,
-            },
-          ],
-        }
-      },
-      { offset: baseRowOffset, rows: [] },
-    ).rows
     return (
-      <div className="rounded-b-lg border border-t-0 border-border overflow-hidden">
-        <div className="hidden md:block">
-          {newspaperDesktopPages.map(
-            ({ pageIdx, leftFlat, rightFlat, leftOff, rightOff }) => {
-            const minH =
-              pageIdx === 0
-                ? obstNewspaper.heights.columnHeightFirstPage
-                : obstNewspaper.heights.columnHeightContinuationPage
-            return (
-              <div key={`np-${pageIdx}`}>
-                {pageIdx > 0 && (
-                  <div
-                    className="flex items-center gap-3 border-t border-dashed border-border bg-muted/25 px-4 py-2.5 text-sm font-medium text-muted-foreground"
-                    role="separator"
-                    aria-label={`Seite ${pageIdx + 1}`}
-                  >
-                    <span className="h-px min-w-[2rem] flex-1 bg-border" aria-hidden />
-                    Seite {pageIdx + 1}
-                    <span className="h-px min-w-[2rem] flex-1 bg-border" aria-hidden />
-                  </div>
-                )}
-                <div className="flex divide-x divide-border items-start" style={{ minHeight: minH }}>
-                  <PLUColumn
-                    rows={leftFlat}
-                    fonts={fonts}
-                    letterGroupHeaderFontPx={fonts.product}
-                    selectionMode={selectionMode}
-                    selectedPLUs={selectedPLUs}
-                    onToggleSelect={onToggleSelect}
-                    findInPageRowOffset={leftOff}
-                    findInPageHighlightRowIndex={findInPageHighlightRowIndex}
-                    findInPageQuery={findInPageQuery}
-                    listType={listType}
-                  />
-                  <PLUColumn
-                    rows={rightFlat}
-                    fonts={fonts}
-                    letterGroupHeaderFontPx={fonts.product}
-                    selectionMode={selectionMode}
-                    selectedPLUs={selectedPLUs}
-                    onToggleSelect={onToggleSelect}
-                    findInPageRowOffset={rightOff}
-                    findInPageHighlightRowIndex={findInPageHighlightRowIndex}
-                    findInPageQuery={findInPageQuery}
-                    listType={listType}
-                  />
-                </div>
-              </div>
-            )
-          },
-          )}
-        </div>
-        <div className="md:hidden">
-          <PLUColumn
-            rows={mobileNewspaperRows}
-            fonts={fonts}
-            letterGroupHeaderFontPx={fonts.product}
-            selectionMode={selectionMode}
-            selectedPLUs={selectedPLUs}
-            onToggleSelect={onToggleSelect}
-            findInPageRowOffset={findInPageRowOffset}
-            findInPageHighlightRowIndex={findInPageHighlightRowIndex}
-            findInPageQuery={findInPageQuery}
-            listType={listType}
-          />
-        </div>
+      <div className="rounded-b-lg border border-t-0 border-border">
+        <PLUColumn
+          rows={obstNewspaperFlatRows}
+          fonts={fonts}
+          letterGroupHeaderFontPx={fonts.product}
+          selectionMode={selectionMode}
+          selectedPLUs={selectedPLUs}
+          onToggleSelect={onToggleSelect}
+          findInPageRowOffset={findInPageRowOffset}
+          findInPageHighlightRowIndex={findInPageHighlightRowIndex}
+          findInPageQuery={findInPageQuery}
+          listType={listType}
+          backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
+        />
       </div>
     )
   }
 
   const leftRowCount = leftRows.length
   return (
-    <div className="rounded-b-lg border border-t-0 border-border overflow-hidden">
+    <div className="rounded-b-lg border border-t-0 border-border">
       <div className="hidden md:flex divide-x divide-border">
         <PLUColumn
           rows={leftRows}
@@ -1331,6 +1412,7 @@ function TwoColumnLayout({
           findInPageHighlightRowIndex={findInPageHighlightRowIndex}
           findInPageQuery={findInPageQuery}
           listType={listType}
+          backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
         />
         <PLUColumn
           rows={rightRows}
@@ -1342,6 +1424,7 @@ function TwoColumnLayout({
           findInPageHighlightRowIndex={findInPageHighlightRowIndex}
           findInPageQuery={findInPageQuery}
           listType={listType}
+          backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
         />
       </div>
       <div className="md:hidden">
@@ -1355,6 +1438,7 @@ function TwoColumnLayout({
             findInPageRowOffset={findInPageRowOffset}
             findInPageHighlightRowIndex={findInPageHighlightRowIndex}
             findInPageQuery={findInPageQuery}
+            backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
           />
         ) : (
           <PLUColumn
@@ -1367,6 +1451,7 @@ function TwoColumnLayout({
             findInPageHighlightRowIndex={findInPageHighlightRowIndex}
             findInPageQuery={findInPageQuery}
             listType={listType}
+            backshopMarkenTinderHrefForGroup={backshopMarkenTinderHrefForGroup}
           />
         )}
       </div>

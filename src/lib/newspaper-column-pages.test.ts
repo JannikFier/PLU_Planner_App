@@ -48,6 +48,28 @@ describe('paginateNewspaperColumns', () => {
   it('liefert leere Seitenliste bei leeren Gruppen', () => {
     expect(paginateNewspaperColumns([], h)).toEqual([])
   })
+
+  it('verliert keine Items bei leerer Gruppe vor voller Gruppe', () => {
+    const groups = [
+      { label: 'Leer', items: [] as { id: string }[] },
+      { label: 'Voll', items: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] },
+    ]
+    const pages = paginateNewspaperColumns(groups, h)
+    const flat = flattenNewspaperPagesToRows(pages)
+    expect(flat.filter((r) => r.type === 'item')).toHaveLength(3)
+  })
+
+  it('zeigt Gruppenkopf auch bei leerer Warengruppe (nur Header, keine Items)', () => {
+    const groups = [
+      { label: 'Leer', items: [] as { id: string }[] },
+      { label: 'Mit', items: [{ id: 'x' }] },
+    ]
+    const pages = paginateNewspaperColumns(groups, h)
+    expect(pages.length).toBeGreaterThanOrEqual(1)
+    const flat = flattenNewspaperPagesToRows(pages)
+    expect(flat.some((r) => r.type === 'group' && r.label === 'Leer')).toBe(true)
+    expect(flat.some((r) => r.type === 'item')).toBe(true)
+  })
 })
 
 describe('flattenNewspaperPagesToRows', () => {

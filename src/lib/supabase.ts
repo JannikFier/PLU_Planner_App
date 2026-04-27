@@ -21,10 +21,10 @@ let _testModeActive = false
 
 /** Supabase-Client-Fetch: Testmodus blockiert Schreib-Requests an /rest/v1/ ohne Backend. */
 function supabaseClientFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const urlStr =
+    typeof input === 'string' ? input : input instanceof URL ? input.href : input instanceof Request ? input.url : ''
+  const method = (init?.method ?? (input instanceof Request ? input.method : undefined) ?? 'GET').toUpperCase()
   try {
-    const urlStr =
-      typeof input === 'string' ? input : input instanceof URL ? input.href : input instanceof Request ? input.url : ''
-    const method = (init?.method ?? (input instanceof Request ? input.method : undefined) ?? 'GET').toUpperCase()
     const isSupabaseRest = urlStr.includes(supabaseUrl) && urlStr.includes('/rest/v1/')
     const isWriteMethod = method === 'POST' || method === 'PATCH' || method === 'DELETE'
     if (_testModeActive && isSupabaseRest && isWriteMethod) {

@@ -76,6 +76,10 @@ interface CustomProductDialogProps {
   existingPLUs: Set<string>
   /** Verfügbare Warengruppen/Blöcke */
   blocks: Block[]
+  /** Optional: Tutorial-Anker am DialogContent */
+  dataTour?: string
+  /** Optional: Tutorial-Anker am Speichern-Button */
+  submitDataTour?: string
 }
 
 export function CustomProductDialog({
@@ -83,6 +87,8 @@ export function CustomProductDialog({
   onOpenChange,
   existingPLUs,
   blocks,
+  dataTour,
+  submitDataTour,
 }: CustomProductDialogProps) {
   const { isAdmin } = useAuth()
   const addProduct = useAddCustomProduct()
@@ -244,7 +250,10 @@ export function CustomProductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent
+        className="sm:max-w-[500px]"
+        {...(dataTour ? { 'data-tour': dataTour } : {})}
+      >
         <DialogHeader>
           <DialogTitle>Eigenes Produkt hinzufügen</DialogTitle>
           <DialogDescription>
@@ -423,6 +432,7 @@ export function CustomProductDialog({
               (showBlockField && !blockId) ||
               (showItemTypeField && !itemType)
             }
+            {...(submitDataTour ? { 'data-tour': submitDataTour } : {})}
           >
             {addProduct.isPending ? 'Wird hinzugefügt...' : 'Hinzufügen'}
           </Button>

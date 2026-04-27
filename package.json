@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "dev:clean": "rm -rf node_modules/.vite && vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && npm run tutorial:validate && vite build",
     "generate:favicons": "node scripts/generate-favicons.mjs",
+    "tutorial:validate": "node scripts/validate-tutorial-selectors.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
@@ -45,6 +46,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
+    "driver.js": "^1.4.0",
     "exceljs": "^4.4.0",
     "jspdf": "^4.1.0",
     "jszip": "^3.10.1",

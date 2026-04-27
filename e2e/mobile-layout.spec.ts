@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
+import { dismissTutorialWelcomeIfVisible } from './dismiss-tutorial-welcome'
 
 /**
  * Keine horizontale Scrollbreite auf kritischen User-Routen (Handy + Tablet).
@@ -49,12 +50,14 @@ test.describe('Mobile Layout @mobile @extended', () => {
     await page.getByRole('button', { name: 'Anmelden' }).click()
     await expect(page).toHaveURL(/\/user/, { timeout: 15_000 })
     await page.waitForLoadState('networkidle')
+    await dismissTutorialWelcomeIfVisible(page)
   })
 
   test('Dashboard: keine horizontale Scrollbreite', async ({ page }) => {
     await page.goto('/user')
     await expect(page).toHaveURL(/\/user\/?$/)
     await page.waitForLoadState('networkidle')
+    await dismissTutorialWelcomeIfVisible(page)
     await expect(page.getByRole('heading', { name: 'Willkommen', level: 2 })).toBeVisible({ timeout: 15_000 })
     await expectNoHorizontalOverflow(page)
   })
@@ -71,6 +74,7 @@ test.describe('Mobile Layout @mobile @extended', () => {
     await page.goto('/user/backshop-list')
     await expect(page).toHaveURL(/\/user\/backshop-list/)
     await page.waitForLoadState('networkidle')
+    await dismissTutorialWelcomeIfVisible(page)
     await expect(
       page
         .getByRole('heading', { name: /PLU-Liste Backshop|PLU Backshop/ })
@@ -255,29 +259,45 @@ test.describe('Mobile Layout Super-Admin @mobile @extended', () => {
     }
   })
 
-  test('Super-Admin PLU-Liste bearbeiten (Obst): keine horizontale Scrollbreite', async ({ page }) => {
-    await page.goto('/super-admin/block-sort')
-    await expect(page).toHaveURL(/\/super-admin\/block-sort/)
+  test('Super-Admin Warengruppen (Obst): keine horizontale Scrollbreite', async ({ page }) => {
+    await page.goto('/super-admin/obst-warengruppen')
+    await expect(page).toHaveURL(/\/super-admin\/obst-warengruppen/)
     await page.waitForLoadState('networkidle')
-    await expect(page.getByRole('heading', { name: 'PLU-Liste bearbeiten' })).toBeVisible({ timeout: 15_000 })
-    await expectNoHorizontalOverflow(page)
-    const pluRoot = page.locator('[data-testid="interactive-plu-scroll-root"]')
-    if ((await pluRoot.count()) > 0) {
-      await expectNoHorizontalOverflowInLocator(pluRoot.first(), 'interactive-plu-scroll-root (Obst Block-Sort)')
-    }
-  })
-
-  test('Super-Admin PLU-Liste bearbeiten (Backshop): keine horizontale Scrollbreite', async ({ page }) => {
-    await page.goto('/super-admin/backshop-block-sort')
-    await expect(page).toHaveURL(/\/super-admin\/backshop-block-sort/)
-    await page.waitForLoadState('networkidle')
-    await expect(page.getByRole('heading', { name: 'PLU-Liste Backshop bearbeiten' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: 'Warengruppen (Obst & Gemüse)' })).toBeVisible({
       timeout: 15_000,
     })
     await expectNoHorizontalOverflow(page)
-    const bsRoot = page.locator('[data-testid="interactive-backshop-block-sort-root"]')
+    const wgRoot = page.locator('[data-testid="obst-warengruppen-panel-root"]')
+    if ((await wgRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(wgRoot.first(), 'obst-warengruppen-panel-root')
+    }
+  })
+
+  test('Super-Admin Warengruppen (Backshop): keine horizontale Scrollbreite', async ({ page }) => {
+    await page.goto('/super-admin/backshop-block-sort')
+    await expect(page).toHaveURL(/\/super-admin\/backshop-block-sort/)
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('heading', { name: 'Warengruppen (Backshop)' })).toBeVisible({
+      timeout: 15_000,
+    })
+    await expectNoHorizontalOverflow(page)
+    const bsRoot = page.locator('[data-testid="backshop-warengruppen-panel-root"]')
     if ((await bsRoot.count()) > 0) {
-      await expectNoHorizontalOverflowInLocator(bsRoot.first(), 'interactive-backshop-block-sort-root')
+      await expectNoHorizontalOverflowInLocator(bsRoot.first(), 'backshop-warengruppen-panel-root')
+    }
+  })
+
+  test('Super-Admin Gruppenregeln (Backshop): keine horizontale Scrollbreite', async ({ page }) => {
+    await page.goto('/super-admin/backshop-gruppenregeln')
+    await expect(page).toHaveURL(/\/super-admin\/backshop-gruppenregeln/)
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('heading', { name: 'Gruppenregeln (Backshop)' })).toBeVisible({
+      timeout: 15_000,
+    })
+    await expectNoHorizontalOverflow(page)
+    const mobileList = page.locator('[data-testid="backshop-gruppenregeln-mobile-list"]')
+    if ((await mobileList.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(mobileList.first(), 'backshop-gruppenregeln-mobile-list')
     }
   })
 })

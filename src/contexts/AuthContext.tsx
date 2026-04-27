@@ -4,6 +4,7 @@ import { supabase, clearSupabaseAuthStorage } from '@/lib/supabase'
 import { queryClient } from '@/lib/query-client'
 import { isAbortError } from '@/lib/error-utils'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
+import { clearDeferReplayWelcome } from '@/lib/tutorial-replay-session'
 import { loginEmailSchema, loginPersonalnummerSchema } from '@/lib/validation'
 import type { User, Session } from '@supabase/supabase-js'
 import type { Database, Profile } from '@/types/database'
@@ -354,6 +355,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             sessionStorage.removeItem(PROFILE_CACHE_KEY)
             sessionStorage.removeItem(SESSION_CACHE_KEY)
             sessionStorage.removeItem('PLU_PLANNER_QUERY_CACHE')
+            clearDeferReplayWelcome()
             queryClient.clear()
           } catch {
             // ignorieren

@@ -38,6 +38,39 @@ describe('excel-read-helper', () => {
       expect(rows[0]).toEqual(['A', '', 'C'])
     })
 
+    it('liest Text aus gemergten Zellen auch in den „leeren“ Nachbarspalten (Master-Zelle)', async () => {
+      const workbook = new ExcelJS.Workbook()
+      const sheet = workbook.addWorksheet('Sheet1')
+      sheet.mergeCells(1, 1, 1, 2)
+      sheet.getCell(1, 1).value = 'Gemergt'
+      sheet.addRow(['X', 'Y'])
+
+      const buffer = (await workbook.xlsx.writeBuffer()) as ArrayBuffer
+      const file = new File([buffer], 'merge.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+
+      const rows = await loadExcelSheetAsRows(file)
+
+      expect(rows[0]?.[0]).toBe('Gemergt')
+      expect(rows[0]?.[1]).toBe('Gemergt')
+      expect(rows[1]).toEqual(['X', 'Y'])
+    })
+
+    it('füllt horizontale Merges wie Z1:AA1 – Slave-Spalte ohne eigenes <c> erhält Master-Text', async () => {
+      const workbook = new ExcelJS.Workbook()
+      const sheet = workbook.addWorksheet('Sheet1')
+      // Spalte 26 = Z, 27 = AA (Kassenblatt-Namenszeile)
+      sheet.mergeCells(1, 26, 1, 27)
+      sheet.getCell(1, 26).value = 'Kassenblatt-Name'
+
+      const buffer = (await workbook.xlsx.writeBuffer()) as ArrayBuffer
+      const file = new File([buffer], 'z-aa.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+
+      const rows = await loadExcelSheetAsRows(file)
+
+      expect(rows[0]?.[25]).toBe('Kassenblatt-Name')
+      expect(rows[0]?.[26]).toBe('Kassenblatt-Name')
+    })
+
     it('wirft bei leerem Workbook', async () => {
       const workbook = new ExcelJS.Workbook()
       const buffer = (await workbook.xlsx.writeBuffer()) as ArrayBuffer

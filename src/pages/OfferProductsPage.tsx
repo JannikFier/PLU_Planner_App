@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Megaphone, FileSpreadsheet } from 'lucide-react'
 import { useOfferItems, useAddOfferItem, useRemoveOfferItem, useAddOfferItemsBatch, useUpdateOfferItem } from '@/hooks/useOfferItems'
 import {
-  useObstOfferCampaignWithLines,
+  useObstOfferCampaignForKwYear,
   useObstOfferStoreDisabled,
   useToggleObstOfferDisabled,
 } from '@/hooks/useCentralOfferCampaigns'
@@ -71,10 +71,14 @@ export function OfferProductsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data: offerItems = [], isLoading: offerLoading } = useOfferItems()
-  const { data: obstCampaign } = useObstOfferCampaignWithLines()
+  const { data: activeVersion } = useActiveVersion()
+  const { data: obstCampaign } = useObstOfferCampaignForKwYear(
+    activeVersion?.kw_nummer,
+    activeVersion?.jahr,
+    !!activeVersion,
+  )
   const { data: obstStoreDisabled = new Set() } = useObstOfferStoreDisabled()
   const toggleCentralObst = useToggleObstOfferDisabled()
-  const { data: activeVersion } = useActiveVersion()
   const { data: masterItems = [] } = usePLUData(activeVersion?.id)
   const { data: customProducts = [] } = useCustomProducts()
   const { data: hiddenItems = [] } = useHiddenItems()
@@ -94,10 +98,12 @@ export function OfferProductsPage() {
   const addBatch = useAddOfferItemsBatch()
   const updateOffer = useUpdateOfferItem()
 
-  const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
+  const { kw: calendarKw, year: calendarJahr } = getKWAndYearFromDate(new Date())
+  const listKw = activeVersion?.kw_nummer ?? calendarKw
+  const listJahr = activeVersion?.jahr ?? calendarJahr
   const activeOfferPLUs = useMemo(
-    () => getActiveOfferPLUs(offerItems, currentKw, currentJahr),
-    [offerItems, currentKw, currentJahr],
+    () => getActiveOfferPLUs(offerItems, listKw, listJahr),
+    [offerItems, listKw, listJahr],
   )
 
   const rawHiddenPluSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
@@ -109,14 +115,14 @@ export function OfferProductsPage() {
   const offerDisplayByPlu = useMemo(
     () =>
       buildOfferDisplayMap(
-        currentKw,
-        currentJahr,
+        listKw,
+        listJahr,
         obstCampaign ?? null,
         obstStoreDisabled,
         offerItems,
         obstLocalOverrides,
       ),
-    [currentKw, currentJahr, obstCampaign, obstStoreDisabled, offerItems, obstLocalOverrides],
+    [listKw, listJahr, obstCampaign, obstStoreDisabled, offerItems, obstLocalOverrides],
   )
 
   const searchableItems = useMemo(() => {
@@ -147,8 +153,8 @@ export function OfferProductsPage() {
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
       versionKwNummer: version?.kw_nummer ?? 0,
       versionJahr: version?.jahr ?? now.getFullYear(),
-      currentKwNummer: currentKw,
-      currentJahr,
+      currentKwNummer: listKw,
+      currentJahr: listJahr,
       nameBlockOverrides,
       storeBlockOrder: storeObstBlockOrder,
     })
@@ -169,8 +175,8 @@ export function OfferProductsPage() {
     blocks,
     layoutSettings,
     activeVersion,
-    currentKw,
-    currentJahr,
+    listKw,
+    listJahr,
     nameBlockOverrides,
     storeObstBlockOrder,
   ])
@@ -285,7 +291,10 @@ export function OfferProductsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+          data-tour="obst-offer-toolbar"
+        >
           <div className="flex items-center gap-3">
             <div className="rounded-lg p-2 bg-muted">
               <Megaphone className="h-5 w-5 text-muted-foreground" />
@@ -312,13 +321,19 @@ export function OfferProductsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
+                  data-tour="obst-offer-excel-button"
                 >
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
                   Per Excel hinzufügen
                 </Button>
               </>
             )}
-            <Button variant="outline" size="sm" onClick={() => setShowAddDialog(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddDialog(true)}
+              data-tour="obst-offer-add-button"
+            >
               <Megaphone className="h-4 w-4 mr-2" />
               Produkte zur Werbung hinzufügen
             </Button>
@@ -326,7 +341,7 @@ export function OfferProductsPage() {
         </div>
 
         {excelResult && (
-          <Card>
+          <Card data-tour="obst-offer-excel-preview-card">
             <CardContent className="p-4 space-y-4">
               <h3 className="font-semibold">Werbung aus Excel – Vorschau</h3>
               <p className="text-sm text-muted-foreground">
@@ -353,10 +368,20 @@ export function OfferProductsPage() {
                 </table>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setExcelResult(null)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setExcelResult(null)}
+                  data-tour="obst-offer-excel-cancel"
+                >
                   Abbrechen
                 </Button>
-                <Button size="sm" onClick={() => handleExcelConfirm()} disabled={addBatch.isPending}>
+                <Button
+                  size="sm"
+                  onClick={() => handleExcelConfirm()}
+                  disabled={addBatch.isPending}
+                  data-tour="obst-offer-excel-confirm"
+                >
                   Zur Werbung hinzufügen
                 </Button>
               </div>
@@ -391,15 +416,15 @@ export function OfferProductsPage() {
         )}
 
         {!offerLoading && (obstCampaign?.lines.length ?? 0) > 0 && (
-          <Card>
+          <Card data-tour="obst-offer-section-zentral">
             <CardContent className="p-0">
               <CentralOfferCampaignSection
                 title="Zentrale Werbung"
                 description="Megafon: Angebot für diesen Markt ein/aus (aus = nicht in Liste/PDF)."
                 dataTestId="offer-central-campaign-scroll-root"
                 domain="obst"
-                currentKw={currentKw}
-                currentJahr={currentJahr}
+                currentKw={listKw}
+                currentJahr={listJahr}
                 rows={centralCampaignRows}
                 isViewer={isViewer}
                 togglePending={toggleCentralObst.isPending}
@@ -417,13 +442,14 @@ export function OfferProductsPage() {
                     jahr: camp.jahr,
                   })
                 }}
+                firstItemDataTour="obst-offer-zentral-first-item"
               />
             </CardContent>
           </Card>
         )}
 
         {!offerLoading && offerProductInfos.length > 0 && (
-          <Card>
+          <Card data-tour="obst-offer-section-eigen">
             <CardContent className="p-0">
               <LocalOwnOfferSection
                 title="Eigene Werbung"
@@ -435,6 +461,7 @@ export function OfferProductsPage() {
                   updateOffer.mutate({ plu, durationWeeks })
                 }
                 onRemove={(plu) => removeOffer.mutate(plu)}
+                firstItemDataTour="obst-offer-eigen-first-item"
               />
             </CardContent>
           </Card>
@@ -447,6 +474,8 @@ export function OfferProductsPage() {
           onAdd={handleAddFromDialog}
           isAdding={addOffer.isPending}
           blockedPlus={centralPluSet}
+          dataTour="obst-offer-add-dialog"
+          submitDataTour="obst-offer-add-dialog-submit"
         />
 
         {localPriceTarget && (
@@ -460,6 +489,8 @@ export function OfferProductsPage() {
             initialLocalPrice={localPriceTarget.initialLocalPrice}
             kw_nummer={localPriceTarget.kw}
             jahr={localPriceTarget.jahr}
+            dataTour="obst-offer-central-local-price-dialog"
+            submitDataTour="obst-offer-central-local-price-dialog-submit"
           />
         )}
       </div>

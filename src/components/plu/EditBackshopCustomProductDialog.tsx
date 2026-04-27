@@ -103,7 +103,7 @@ export function EditBackshopCustomProductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px]" data-tour="backshop-custom-edit-dialog">
         <DialogHeader>
           <DialogTitle>Eigenes Produkt (Backshop) bearbeiten</DialogTitle>
           <DialogDescription>
@@ -215,6 +215,7 @@ export function EditBackshopCustomProductDialog({
           </Button>
           <Button
             type="submit"
+            data-tour="backshop-custom-edit-dialog-submit"
             disabled={updateProduct.isPending || !name.trim() || name.trim().length < 2}
           >
             {updateProduct.isPending ? 'Speichern…' : 'Speichern'}

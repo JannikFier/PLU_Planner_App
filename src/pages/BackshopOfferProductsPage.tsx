@@ -27,6 +27,16 @@ import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
 import { useBackshopRenamedItems } from '@/hooks/useBackshopRenamedItems'
 import { useBackshopBezeichnungsregeln } from '@/hooks/useBackshopBezeichnungsregeln'
 import { useBackshopOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalPrices'
+import { useBackshopLineVisibilityOverrides } from '@/hooks/useBackshopLineVisibilityOverrides'
+import { useCurrentStore } from '@/hooks/useCurrentStore'
+import { useBackshopProductGroups } from '@/hooks/useBackshopProductGroups'
+import { useBackshopSourceChoicesForStore } from '@/hooks/useBackshopSourceChoices'
+import { useBackshopSourceRulesForStore } from '@/hooks/useBackshopSourceRules'
+import {
+  useStoreBackshopNameBlockOverrides,
+} from '@/hooks/useStoreBackshopBlockLayout'
+import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
+import { scopeProductGroupsByEffectiveBlock } from '@/lib/backshop-product-groups-scope-by-effective-block'
 import { useAuth } from '@/hooks/useAuth'
 import { EXCEL_READ_ERROR_FALLBACK, formatError } from '@/lib/error-messages'
 import { getDisplayPlu } from '@/lib/plu-helpers'
@@ -48,7 +58,7 @@ import {
   type LocalOwnOfferRow,
 } from '@/components/plu/OfferAdvertisingResponsiveSections'
 import { toast } from 'sonner'
-import type { BackshopOfferItem } from '@/types/database'
+import type { BackshopOfferItem, BackshopSource } from '@/types/database'
 import type { OfferItemsParseResult } from '@/types/plu'
 
 interface OfferProductInfo {
@@ -86,6 +96,7 @@ export function BackshopOfferProductsPage() {
   const { data: blocks = [] } = useBackshopBlocks()
   const { data: renamedItems = [] } = useBackshopRenamedItems()
   const { data: regeln = [] } = useBackshopBezeichnungsregeln()
+  const { lineForceShowKeys, lineForceHideKeys } = useBackshopLineVisibilityOverrides()
   const { overrideMap: backshopLocalOverrides } = useBackshopOfferLocalPriceOverrides(
     backshopCampaign ?? undefined,
   )
@@ -119,6 +130,64 @@ export function BackshopOfferProductsPage() {
     [currentKw, currentJahr, backshopCampaign, backshopStoreDisabled, offerItems, backshopLocalOverrides],
   )
 
+  const { currentStoreId } = useCurrentStore()
+  const { data: productGroups = [] } = useBackshopProductGroups()
+  const { data: sourceChoices = [] } = useBackshopSourceChoicesForStore(currentStoreId)
+  const { data: backshopBlockSourceRules = [] } = useBackshopSourceRulesForStore(currentStoreId)
+  const { data: storeBackshopNameOverrides = [] } = useStoreBackshopNameBlockOverrides()
+
+  const nameBlockOverrides = useMemo(
+    () => buildNameBlockOverrideMap(storeBackshopNameOverrides),
+    [storeBackshopNameOverrides],
+  )
+  const productGroupsForStore = useMemo(
+    () => scopeProductGroupsByEffectiveBlock(productGroups, nameBlockOverrides),
+    [productGroups, nameBlockOverrides],
+  )
+  const blockPreferredSourceByBlockId = useMemo(() => {
+    const m = new Map<string, BackshopSource>()
+    for (const r of backshopBlockSourceRules) {
+      m.set(r.block_id, r.preferred_source as BackshopSource)
+    }
+    return m
+  }, [backshopBlockSourceRules])
+
+  const {
+    productGroupByPluSource,
+    chosenSourcesByGroup,
+    memberSourcesByGroup,
+    productGroupNames,
+    groupBlockIdByGroupId,
+  } = useMemo(() => {
+    const byPluSource = new Map<string, string>()
+    const names = new Map<string, string>()
+    for (const g of productGroupsForStore) {
+      names.set(g.id, g.display_name)
+      for (const mm of g.members) {
+        byPluSource.set(`${mm.plu}|${mm.source}`, g.id)
+      }
+    }
+    const chosen = new Map<string, BackshopSource[]>()
+    for (const c of sourceChoices) {
+      chosen.set(c.group_id, (c.chosen_sources ?? []) as BackshopSource[])
+    }
+    const memberSourcesByG = new Map<string, Set<BackshopSource>>()
+    const groupBlock = new Map<string, string | null>()
+    for (const g of productGroupsForStore) {
+      const s = new Set<BackshopSource>()
+      for (const mem of g.members) s.add(mem.source as BackshopSource)
+      memberSourcesByG.set(g.id, s)
+      groupBlock.set(g.id, g.block_id ?? null)
+    }
+    return {
+      productGroupByPluSource: byPluSource,
+      chosenSourcesByGroup: chosen,
+      memberSourcesByGroup: memberSourcesByG,
+      productGroupNames: names,
+      groupBlockIdByGroupId: groupBlock,
+    }
+  }, [productGroupsForStore, sourceChoices])
+
   const searchableItems = useMemo(() => {
     const activeRegeln = regeln.filter((r) => r.is_active)
     const markYellow = layoutSettings?.mark_yellow_kw_count ?? 4
@@ -142,6 +211,15 @@ export function BackshopOfferProductsPage() {
       markYellowKwCount: markYellow,
       currentKwNummer: currentKw,
       currentJahr,
+      nameBlockOverrides,
+      productGroupByPluSource,
+      memberSourcesByGroup,
+      chosenSourcesByGroup,
+      productGroupNames,
+      blockPreferredSourceByBlockId,
+      groupBlockIdByGroupId,
+      lineForceShowKeys,
+      lineForceHideKeys,
     })
     return items.map((i) => ({
       id: i.id,
@@ -160,6 +238,15 @@ export function BackshopOfferProductsPage() {
     renamedItems,
     currentKw,
     currentJahr,
+    nameBlockOverrides,
+    productGroupByPluSource,
+    memberSourcesByGroup,
+    chosenSourcesByGroup,
+    productGroupNames,
+    blockPreferredSourceByBlockId,
+    groupBlockIdByGroupId,
+    lineForceShowKeys,
+    lineForceHideKeys,
   ])
 
   const centralPluSet = useMemo(
@@ -270,7 +357,7 @@ export function BackshopOfferProductsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-6" data-tour="backshop-offer-page">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="rounded-lg p-2 bg-muted">
@@ -284,7 +371,7 @@ export function BackshopOfferProductsPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2" data-tour="backshop-offer-toolbar">
             {showExcelUpload && (
               <>
                 <input
@@ -298,13 +385,19 @@ export function BackshopOfferProductsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
+                  data-tour="backshop-offer-excel-button"
                 >
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
                   Per Excel hinzufügen
                 </Button>
               </>
             )}
-            <Button variant="outline" size="sm" onClick={() => setShowAddDialog(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddDialog(true)}
+              data-tour="backshop-offer-add-button"
+            >
               <Megaphone className="h-4 w-4 mr-2" />
               Produkte zur Werbung hinzufügen
             </Button>
@@ -377,7 +470,7 @@ export function BackshopOfferProductsPage() {
         )}
 
         {!offerLoading && (backshopCampaign?.lines.length ?? 0) > 0 && (
-          <Card>
+          <Card data-tour="backshop-offer-section-zentral">
             <CardContent className="p-0">
               <CentralOfferCampaignSection
                 title="Zentrale Werbung"
@@ -389,6 +482,7 @@ export function BackshopOfferProductsPage() {
                 rows={centralCampaignRows}
                 isViewer={isViewer}
                 togglePending={toggleCentralBackshop.isPending}
+                firstItemDataTour="backshop-offer-zentral-first-item"
                 onToggleMegaphone={(plu, hiddenForStore) =>
                   toggleCentralBackshop.mutate({ plu, disabled: !hiddenForStore })
                 }
@@ -409,7 +503,7 @@ export function BackshopOfferProductsPage() {
         )}
 
         {!offerLoading && offerProductInfos.length > 0 && (
-          <Card>
+          <Card data-tour="backshop-offer-section-eigen">
             <CardContent className="p-0">
               <LocalOwnOfferSection
                 title="Eigene Werbung"
@@ -417,6 +511,7 @@ export function BackshopOfferProductsPage() {
                 rows={localOfferRows}
                 updatePending={updateOffer.isPending}
                 removePending={removeOffer.isPending}
+                firstItemDataTour="backshop-offer-eigen-first-item"
                 onDurationChange={(plu, durationWeeks) =>
                   updateOffer.mutate({ plu, durationWeeks })
                 }
@@ -433,6 +528,8 @@ export function BackshopOfferProductsPage() {
           onAdd={handleAddFromDialog}
           isAdding={addOffer.isPending}
           blockedPlus={centralPluSet}
+          dataTour="backshop-offer-add-dialog"
+          submitDataTour="backshop-offer-add-dialog-submit"
         />
 
         {localPriceTarget && (
@@ -446,6 +543,7 @@ export function BackshopOfferProductsPage() {
             initialLocalPrice={localPriceTarget.initialLocalPrice}
             kw_nummer={localPriceTarget.kw}
             jahr={localPriceTarget.jahr}
+            dataTour="backshop-offer-local-price-dialog"
           />
         )}
       </div>

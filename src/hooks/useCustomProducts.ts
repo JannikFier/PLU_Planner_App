@@ -5,7 +5,7 @@ import { supabase, queryRest, isTestModeActive } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { toast } from 'sonner'
-import type { CustomProduct, Database, MasterPLUItem } from '@/types/database'
+import type { CustomProduct, Database, MasterPLUItem, RenamedItem } from '@/types/database'
 
 /** Alle globalen Custom Products laden */
 export function useCustomProducts() {
@@ -303,6 +303,104 @@ export function useResetProductName() {
     onSuccess: () => {
       if (!isTestModeActive()) {
         queryClient.invalidateQueries({ queryKey: ['plu-items'] })
+        queryClient.invalidateQueries({ queryKey: ['renamed-items'] })
+      }
+      toast.success('Produktname zurückgesetzt')
+    },
+    onError: (error) => {
+      toast.error(`Fehler: ${error instanceof Error ? error.message : 'Unbekannt'}`)
+    },
+  })
+}
+
+/** Nur-Carryover-Zeilen: kein master_plu_items.id – Umbenennung direkt in renamed_items. */
+export function useUpsertObstRenamedByPlu() {
+  const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
+
+  return useMutation({
+    mutationFn: async ({
+      plu,
+      displayName,
+      systemName,
+    }: {
+      plu: string
+      displayName: string
+      systemName: string
+    }) => {
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+      const trimmed = displayName.trim()
+      const isManual = trimmed !== systemName.trim()
+      if (isTestModeActive()) {
+        queryClient.setQueriesData<RenamedItem[]>(
+          { queryKey: ['renamed-items', currentStoreId] },
+          (old) => {
+            const list = [...(old ?? [])]
+            const idx = list.findIndex((r) => r.plu === plu)
+            const base: RenamedItem = {
+              id: idx >= 0 ? list[idx].id : `test-${plu}`,
+              plu,
+              store_id: currentStoreId,
+              display_name: trimmed,
+              is_manually_renamed: isManual,
+              created_by: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }
+            if (idx >= 0) list[idx] = { ...list[idx], ...base }
+            else list.push(base)
+            return list
+          },
+        )
+        return
+      }
+
+      const { error } = await supabase.from('renamed_items').upsert(
+        {
+          plu,
+          store_id: currentStoreId,
+          display_name: trimmed,
+          is_manually_renamed: isManual,
+        } as never,
+        { onConflict: 'plu,store_id' },
+      )
+      if (error) throw error
+    },
+    onSuccess: () => {
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['renamed-items'] })
+      }
+      toast.success('Produktname geändert')
+    },
+    onError: (error) => {
+      toast.error(`Fehler: ${error instanceof Error ? error.message : 'Unbekannt'}`)
+    },
+  })
+}
+
+export function useDeleteObstRenamedByPlu() {
+  const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
+
+  return useMutation({
+    mutationFn: async ({ plu }: { plu: string }) => {
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+      if (isTestModeActive()) {
+        queryClient.setQueriesData<RenamedItem[]>(
+          { queryKey: ['renamed-items', currentStoreId] },
+          (old) => (old ?? []).filter((r) => r.plu !== plu),
+        )
+        return
+      }
+      const { error } = await supabase
+        .from('renamed_items')
+        .delete()
+        .eq('plu', plu)
+        .eq('store_id', currentStoreId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      if (!isTestModeActive()) {
         queryClient.invalidateQueries({ queryKey: ['renamed-items'] })
       }
       toast.success('Produktname zurückgesetzt')

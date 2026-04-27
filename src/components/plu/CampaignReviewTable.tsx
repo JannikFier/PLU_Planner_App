@@ -1,0 +1,273 @@
+// Wiederverwendbare Review-Tabelle fuer zentrale Werbung (Upload + nachtraegliche Pflege)
+// Links Excel-Herkunft (PLU + Artikel), rechts Master-PLU-Zuordnung mit Suche + "Keine Zuordnung"
+
+import { useMemo, useState } from 'react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import { Badge } from '@/components/ui/badge'
+import { ChevronsUpDown, Plus, Trash2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import type { MasterPluCandidate } from '@/lib/exit-offer-matching'
+import { MarkenQuellBadge } from '@/components/marken-auswahl/MarkenQuellBadge'
+
+export type CampaignReviewRow = {
+  /** Stabiler Key (id aus DB oder generierte id fuer neue Zeilen) */
+  id: string
+  /** 1-basierte Excel-Zeile, falls vorhanden */
+  rowIndex?: number | null
+  /** PLU aus Excel; null = manuell hinzugefuegt (ohne Excel-Herkunft) */
+  sourcePlu: string | null
+  /** Artikel-Hinweis aus Excel; null = nicht verfuegbar (manuell oder alte Kampagne) */
+  sourceArtikel: string | null
+  /** Aktuell ausgewaehlte Master-PLU; null = keine Zuordnung */
+  selectedPlu: string | null
+  /** Herkunft der Zeile */
+  origin: 'excel' | 'manual' | 'unassigned'
+}
+
+/** Durchsuchbare Master-PLU-Auswahl mit Option "Keine Zuordnung". */
+export function CampaignPluCombobox({
+  candidates,
+  value,
+  onChange,
+  disabled,
+}: {
+  candidates: MasterPluCandidate[]
+  value: string | null
+  onChange: (plu: string | null) => void
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const selected = value ? candidates.find((c) => c.plu === value) : null
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className="w-full min-w-[200px] max-w-[420px] justify-between gap-2 font-normal"
+        >
+          <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
+            {selected?.source != null && (
+              <MarkenQuellBadge source={selected.source} size="sm" className="shrink-0" />
+            )}
+            <span
+              className={cn('min-w-0 flex-1 truncate', !value && 'text-muted-foreground')}
+            >
+              {value ? `${value} – ${selected?.label ?? '?'}` : 'PLU wählen…'}
+            </span>
+          </span>
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[min(100vw-2rem,420px)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="PLU oder Name suchen…" />
+          <CommandList>
+            <CommandEmpty>Kein Treffer.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="__none__"
+                onSelect={() => {
+                  onChange(null)
+                  setOpen(false)
+                }}
+              >
+                — Keine Zuordnung —
+              </CommandItem>
+              {candidates.map((c) => (
+                <CommandItem
+                  key={c.plu}
+                  value={`${c.plu} ${c.label}`}
+                  onSelect={() => {
+                    onChange(c.plu)
+                    setOpen(false)
+                  }}
+                >
+                  <span className="flex min-w-0 w-full items-center gap-2">
+                    {c.source != null && (
+                      <MarkenQuellBadge source={c.source} size="sm" className="shrink-0" />
+                    )}
+                    <span className="font-mono text-xs shrink-0">{c.plu}</span>
+                    <span className="min-w-0 flex-1 truncate">{c.label}</span>
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+export interface CampaignReviewTableProps {
+  rows: CampaignReviewRow[]
+  candidates: MasterPluCandidate[]
+  onChangePlu: (rowId: string, plu: string | null) => void
+  /** Zeile hinzufuegen (nur wenn editierbar) */
+  onAddRow?: () => void
+  /** Manuelle Zeile entfernen (nur manuell hinzugefuegte duerfen weg) */
+  onRemoveRow?: (rowId: string) => void
+  /** Optionale Preis-Spalte (Backshop) */
+  pricesById?: Record<string, number>
+  onChangePrice?: (rowId: string, price: number) => void
+  disabled?: boolean
+  emptyMessage?: string
+}
+
+/**
+ * Review-Tabelle mit Excel-Herkunft links, Master-PLU rechts.
+ * Wenn onAddRow gesetzt ist, wird ein "Zeile hinzufuegen"-Button angezeigt.
+ */
+export function CampaignReviewTable({
+  rows,
+  candidates,
+  onChangePlu,
+  onAddRow,
+  onRemoveRow,
+  pricesById,
+  onChangePrice,
+  disabled,
+  emptyMessage = 'Keine Zeilen vorhanden.',
+}: CampaignReviewTableProps) {
+  const showPriceColumn = !!(pricesById && onChangePrice)
+  const assignedCount = useMemo(
+    () => rows.filter((r) => r.selectedPlu && r.origin !== 'unassigned').length,
+    [rows],
+  )
+  const unassignedCount = rows.length - assignedCount
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="secondary">{assignedCount} zugeordnet</Badge>
+          {unassignedCount > 0 && (
+            <Badge variant="outline">{unassignedCount} ohne Zuordnung</Badge>
+          )}
+        </div>
+        {onAddRow && (
+          <Button type="button" variant="outline" size="sm" onClick={onAddRow} disabled={disabled}>
+            <Plus className="h-4 w-4 mr-1" />
+            Zeile hinzufügen
+          </Button>
+        )}
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+      ) : (
+        <div className="rounded-md border overflow-x-auto max-h-[min(65vh,560px)] overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-16">Zeile</TableHead>
+                <TableHead className="w-28">PLU (Excel)</TableHead>
+                <TableHead>Artikel (Excel)</TableHead>
+                <TableHead className="min-w-[260px]">Master-PLU (suchen &amp; wählen)</TableHead>
+                {showPriceColumn && <TableHead className="w-28">Preis</TableHead>}
+                {onRemoveRow && <TableHead className="w-16" />}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r, idx) => {
+                const sourceEmpty = r.sourcePlu == null && r.sourceArtikel == null
+                return (
+                  <TableRow key={r.id}>
+                    <TableCell className="text-muted-foreground">
+                      {r.rowIndex ?? idx + 1}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {r.sourcePlu ?? <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="max-w-xs break-words">
+                      {r.sourceArtikel
+                        ? r.sourceArtikel
+                        : sourceEmpty && r.origin === 'manual'
+                          ? (
+                            <span className="text-xs text-muted-foreground italic">manuell hinzugefügt</span>
+                          )
+                          : (
+                            <span className="text-xs text-muted-foreground italic">
+                              (Excel nicht archiviert)
+                            </span>
+                          )}
+                    </TableCell>
+                    <TableCell>
+                      <CampaignPluCombobox
+                        candidates={candidates}
+                        value={r.selectedPlu}
+                        onChange={(plu) => onChangePlu(r.id, plu)}
+                        disabled={disabled}
+                      />
+                    </TableCell>
+                    {showPriceColumn && (
+                      <TableCell>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          min={0}
+                          className="h-9 w-24 rounded-md border border-input bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                          value={
+                            pricesById && pricesById[r.id] != null
+                              ? String(pricesById[r.id])
+                              : ''
+                          }
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value)
+                            onChangePrice?.(r.id, Number.isFinite(v) ? v : 0)
+                          }}
+                          disabled={disabled}
+                          aria-label="Preis"
+                        />
+                      </TableCell>
+                    )}
+                    {onRemoveRow && (
+                      <TableCell>
+                        {r.origin === 'manual' && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onRemoveRow(r.id)}
+                            disabled={disabled}
+                            title="Zeile entfernen"
+                            aria-label="Zeile entfernen"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    )}
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  )
+}

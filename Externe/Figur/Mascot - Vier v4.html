@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Vier v3 — cartoon mascot</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; font-family: "Inter", system-ui, sans-serif; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="mascot-cartoon-v4.jsx"></script>
+<script type="text/babel" src="context-cartoon.jsx"></script>
+
+<script type="text/babel">
+  function MascotCard({ name, note, children }) {
+    return (
+      <div style={{
+        width: 280, height: 340, background: '#FFFFFF',
+        display: 'flex', flexDirection: 'column',
+        fontFamily: '"Inter", system-ui, sans-serif',
+      }}>
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'linear-gradient(180deg, #FAFAFB 0%, #F2F2F5 100%)',
+          borderBottom: '1px solid #EAEAEE',
+        }}>
+          {children}
+        </div>
+        <div style={{ padding: '14px 16px 16px' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1B2E', marginBottom: 2 }}>{name}</div>
+          <div style={{ fontSize: 11.5, color: '#6B7280', lineHeight: 1.45 }}>{note}</div>
+        </div>
+      </div>
+    );
+  }
+
+  function PaletteCard() {
+    const swatches = [
+      { name: 'Body · Indigo', hex: '#3E4FD6', fg: '#fff' },
+      { name: 'Outline · Ink', hex: '#111218', fg: '#fff' },
+      { name: 'Accent · Amber', hex: '#F5A524', fg: '#1A1B2E' },
+      { name: 'Tongue · Pink', hex: '#F07A8E', fg: '#1A1B2E' },
+      { name: 'Gloves · White', hex: '#FFFFFF', fg: '#1A1B2E', border: true },
+    ];
+    return (
+      <div style={{
+        width: 520, height: 200, background: '#fff', padding: 20,
+        boxSizing: 'border-box', fontFamily: '"Inter", system-ui, sans-serif',
+      }}>
+        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8, color: '#6B7280', marginBottom: 4 }}>
+          Palette
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 16, color: '#1A1B2E' }}>
+          Cartoon — chunky outlines, saturated fills, white gloves
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {swatches.map(s => (
+            <div key={s.hex} style={{ flex: 1, height: 110, background: s.hex, borderRadius: 10, padding: 10, color: s.fg, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', boxSizing: 'border-box', border: s.border ? '1px solid #E5E7EB' : 'none' }}>
+              <div style={{ fontSize: 10.5, opacity: 0.85, fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace' }}>{s.hex}</div>
+              <div style={{ fontSize: 11, fontWeight: 500 }}>{s.name}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function BriefCard() {
+    return (
+      <div style={{
+        width: 520, height: 300, background: '#fff', padding: 24,
+        boxSizing: 'border-box', fontFamily: '"Inter", system-ui, sans-serif',
+        color: '#1A1B2E', display: 'flex', flexDirection: 'column', gap: 10,
+      }}>
+        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8, color: '#6B7280' }}>
+          Cartoon direction · v3
+        </div>
+        <div style={{ fontSize: 24, fontWeight: 600, letterSpacing: -0.3 }}>
+          Vier — cartoon edition
+        </div>
+        <div style={{ fontSize: 13, color: '#4B5563', lineHeight: 1.55 }}>
+          Spielerisch, expressiv, Sticker-Energie. Chunky schwarze Outlines, große Cartoon-Augen mit Pupillen
+          und Glanzlicht, offener Mund mit Zunge und Zahn, dünne Stick-Arme/-Beine mit weißen Handschuhen
+          und orangen Schuhen. Ton: verspielt, freundlich, charaktervoll — aber noch SaaS-tauglich.
+        </div>
+        <div style={{ display: 'flex', gap: 24, marginTop: 6, fontSize: 12, color: '#6B7280' }}>
+          <div><b style={{ color: '#1A1B2E' }}>Stil</b> · Cartoon-Sticker</div>
+          <div><b style={{ color: '#1A1B2E' }}>Outline</b> · 8 px ink</div>
+          <div><b style={{ color: '#1A1B2E' }}>viewBox</b> · 200 × 250</div>
+        </div>
+      </div>
+    );
+  }
+
+  function App() {
+    return (
+      <DesignCanvas>
+
+        <DCSection id="brief" title="Direction" subtitle="Cartoon reboot — inspired by reference sticker style">
+          <DCArtboard id="brief" label="Brief" width={520} height={300}>
+            <BriefCard />
+          </DCArtboard>
+          <DCArtboard id="palette" label="Palette" width={520} height={200}>
+            <PaletteCard />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="poses" title="Pose set" subtitle="Same character, six expressions — ready for onboarding, tooltips, empty states">
+          <DCArtboard id="c1" label="01 · Hero wave" width={280} height={340}>
+            <MascotCard name="Hero · waving" note="Open smile with tongue. Onboarding + marketing hero.">
+              <MascotCartoonHero size={190} />
+            </MascotCard>
+          </DCArtboard>
+          <DCArtboard id="c2" label="02 · Stand" width={280} height={340}>
+            <MascotCard name="Neutral stand" note="Closed grin, arms at sides. Default idle pose.">
+              <MascotCartoonStand size={190} />
+            </MascotCard>
+          </DCArtboard>
+          <DCArtboard id="c3" label="03 · Point" width={280} height={340}>
+            <MascotCard name="Pointing" note="Looks and points right. Tooltip-anchor, callouts.">
+              <MascotCartoonPoint size={190} />
+            </MascotCard>
+          </DCArtboard>
+          <DCArtboard id="c4" label="04 · Think" width={280} height={340}>
+            <MascotCard name="Thinking" note="Hand at chin + thought bubbles. Loading / reasoning states.">
+              <MascotCartoonThink size={190} />
+            </MascotCard>
+          </DCArtboard>
+          <DCArtboard id="c5" label="05 · Surprised" width={280} height={340}>
+            <MascotCard name="Surprised" note="Hands on hips, small 'o' mouth. For empty states / 'nothing here'.">
+              <MascotCartoonSurprised size={190} />
+            </MascotCard>
+          </DCArtboard>
+          <DCArtboard id="c6" label="06 · Walk" width={280} height={340}>
+            <MascotCard name="Walking" note="Leg asymmetry + arm swing. Seed frame for a 3-frame walk cycle.">
+              <MascotCartoonWalk size={190} />
+            </MascotCard>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="scale" title="Scaling test" subtitle="How the cartoon character holds up at favicon sizes">
+          <DCArtboard id="scale" label="Favicon sizes" width={520} height={240}>
+            <FaviconScaleRow />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="context" title="In-context UI" subtitle="Vier showing up in the real product">
+          <DCArtboard id="tooltip" label="Tooltip · low-stock nudge" width={520} height={360}>
+            <TooltipMock />
+          </DCArtboard>
+          <DCArtboard id="empty" label="Empty state · no actions yet" width={520} height={360}>
+            <EmptyStateMock />
+          </DCArtboard>
+          <DCArtboard id="onboarding" label="Onboarding · first run" width={520} height={360}>
+            <OnboardingMock />
+          </DCArtboard>
+        </DCSection>
+
+      </DesignCanvas>
+    );
+  }
+
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(<App />);
+</script>
+
+</body>
+</html>

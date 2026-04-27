@@ -33,6 +33,8 @@ const STORE_SCOPED_QUERY_PREFIXES = [
   'version-notification',
   'backshop-version-notification',
   'unread-notifications',
+  'store-list-carryover',
+  'transition-removed',
   'user-list-visibility',
   'store-list-visibility',
 ] as const

@@ -50,7 +50,7 @@ export function UserDashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-8">
-        <div>
+        <div data-tour="dashboard-welcome">
           <h2 className="text-2xl font-bold tracking-tight">Willkommen</h2>
           <p className="text-muted-foreground">
             {obstVisible && backshopVisible
@@ -74,6 +74,7 @@ export function UserDashboard() {
               icon={Apple}
               onClick={() => navigate('/user/masterlist')}
               variant="obst"
+              dataTour="dashboard-card-obst"
             />
           )}
           {backshopVisible && (
@@ -83,6 +84,7 @@ export function UserDashboard() {
               icon={Croissant}
               onClick={() => navigate('/user/backshop-list')}
               variant="backshop"
+              dataTour="dashboard-card-backshop"
             />
           )}
         </div>

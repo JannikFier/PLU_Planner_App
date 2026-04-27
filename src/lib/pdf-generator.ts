@@ -3,7 +3,8 @@
 
 import jsPDF from 'jspdf'
 import type { DisplayItem } from '@/types/plu'
-import type { Block } from '@/types/database'
+import type { Block, StoreObstBlockOrder } from '@/types/database'
+import { sortBlocksWithStoreOrder } from '@/lib/block-override-utils'
 import {
   getDisplayPlu,
   getDisplayNameForItem,
@@ -160,6 +161,8 @@ interface PDFGeneratorInput {
   sortMode: 'ALPHABETICAL' | 'BY_BLOCK'
   flowDirection: 'ROW_BY_ROW' | 'COLUMN_FIRST'
   blocks: Block[]
+  /** Obst: Markt-Reihenfolge – gleiche Logik wie PLUTable / `buildDisplayList` */
+  obstStoreBlockOrder?: StoreObstBlockOrder[]
   /** Schriftgrößen aus Layout-Einstellungen (optional) */
   fontSizes?: { header: number; column: number; product: number }
   exportMode?: PdfExportContentMode
@@ -224,7 +227,17 @@ function shouldInsertPageBeforeBackshopGroup(params: {
  */
 export function generatePDF(input: PDFGeneratorInput): jsPDF {
   const megaphoneRaster = loadMegaphoneIconRaster()
-  const { items: rawItems, kwLabel, displayMode, sortMode, flowDirection, blocks, fontSizes: inputFonts, exportMode = 'full_with_offers' } = input
+  const {
+    items: rawItems,
+    kwLabel,
+    displayMode,
+    sortMode,
+    flowDirection,
+    blocks,
+    obstStoreBlockOrder,
+    fontSizes: inputFonts,
+    exportMode = 'full_with_offers',
+  } = input
   let items = rawItems
   if (exportMode === 'offers_only') {
     items = rawItems
@@ -262,18 +275,18 @@ export function generatePDF(input: PDFGeneratorInput): jsPDF {
     const weightItems = items.filter((i) => i.item_type === 'WEIGHT')
 
     if (pieceItems.length > 0) {
-      const piecePDFRows = buildPDFRows(pieceItems, sortMode, blocks)
+      const piecePDFRows = buildPDFRows(pieceItems, sortMode, blocks, obstStoreBlockOrder)
       renderSection(doc, piecePDFRows, `${mainTitle} – Stück`, dateStr, kwLabel, flowDirection, PDF_FONTS, megaphoneRaster, showOfferHints)
     }
 
     if (weightItems.length > 0) {
       if (pieceItems.length > 0) doc.addPage()
-      const weightPDFRows = buildPDFRows(weightItems, sortMode, blocks)
+      const weightPDFRows = buildPDFRows(weightItems, sortMode, blocks, obstStoreBlockOrder)
       renderSection(doc, weightPDFRows, `${mainTitle} – Gewicht`, dateStr, kwLabel, flowDirection, PDF_FONTS, megaphoneRaster, showOfferHints)
     }
   } else {
     // MIXED: Ein Durchlauf
-    const pdfRows = buildPDFRows(items, sortMode, blocks)
+    const pdfRows = buildPDFRows(items, sortMode, blocks, obstStoreBlockOrder)
     renderSection(doc, pdfRows, mainTitle, dateStr, kwLabel, flowDirection, PDF_FONTS, megaphoneRaster, showOfferHints)
   }
 
@@ -285,11 +298,16 @@ function buildPDFRows(
   items: DisplayItem[],
   sortMode: 'ALPHABETICAL' | 'BY_BLOCK',
   blocks: Block[],
+  obstStoreBlockOrder?: StoreObstBlockOrder[],
 ): PDFRow[] {
   const rows: PDFRow[] = []
 
   if (sortMode === 'BY_BLOCK') {
-    const groups = groupItemsByBlock(items, blocks)
+    const sortedBlocks =
+      obstStoreBlockOrder !== undefined
+        ? sortBlocksWithStoreOrder(blocks, obstStoreBlockOrder)
+        : [...blocks].sort((a, b) => a.order_index - b.order_index)
+    const groups = groupItemsByBlock(items, blocks, { sortedBlocks: sortedBlocks })
     for (const group of groups) {
       rows.push({ type: 'group', label: group.blockName })
       for (const item of group.items) {

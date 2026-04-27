@@ -174,6 +174,12 @@ export interface RenameProductsDialogProps {
   /** Wie Masterliste; Backshop-Standard: zeilenweise */
   flowDirection?: 'ROW_BY_ROW' | 'COLUMN_FIRST'
   fontSizes?: DialogPluFontSizes
+  /** Optional: Tutorial-Anker am Auswahl-DialogContent */
+  dataTour?: string
+  /** Optional: Tutorial-Anker am inneren RenameDialog DialogContent */
+  renameDialogDataTour?: string
+  /** Optional: Tutorial-Anker am inneren RenameDialog Speichern-Button */
+  renameDialogSubmitDataTour?: string
 }
 
 export function RenameProductsDialog({
@@ -186,6 +192,9 @@ export function RenameProductsDialog({
   listLayout,
   flowDirection: flowDirectionProp,
   fontSizes: fontSizesProp,
+  dataTour,
+  renameDialogDataTour,
+  renameDialogSubmitDataTour,
 }: RenameProductsDialogProps) {
   const listKind = listType === 'backshop' ? 'backshop' : 'obst'
   const flowDirection =
@@ -273,8 +282,10 @@ export function RenameProductsDialog({
       setRenameItem(null)
       if (listType === 'backshop') {
         queryClient.invalidateQueries({ queryKey: ['backshop-plu-items'] })
+        queryClient.invalidateQueries({ queryKey: ['backshop-renamed-items'] })
       } else {
         queryClient.invalidateQueries({ queryKey: ['plu-items'] })
+        queryClient.invalidateQueries({ queryKey: ['renamed-items'] })
       }
     },
     [queryClient, listType],
@@ -285,10 +296,20 @@ export function RenameProductsDialog({
     if (!master) return
     if (listType === 'backshop') {
       const display = backshopMasterItemToDisplayItem(master as BackshopMasterPLUItem)
-      display.display_name = overrideByPlu.get(master.plu) ?? display.display_name
+      const ov = overrideByPlu.get(master.plu)
+      display.display_name = ov ?? display.display_name
+      display.is_manually_renamed =
+        (ov != null && ov.trim() !== (master.system_name ?? '').trim()) ||
+        (display.is_manually_renamed ?? false)
       setRenameItem(display)
     } else {
-      setRenameItem(masterItemToDisplayItem(master as MasterPLUItem))
+      const display = masterItemToDisplayItem(master as MasterPLUItem)
+      const ov = overrideByPlu.get(master.plu)
+      display.display_name = ov ?? display.display_name
+      display.is_manually_renamed =
+        (ov != null && ov.trim() !== (master.system_name ?? '').trim()) ||
+        (display.is_manually_renamed ?? false)
+      setRenameItem(display)
     }
   }
 
@@ -300,7 +321,10 @@ export function RenameProductsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-7xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
+        <DialogContent
+          className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-7xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden"
+          {...(dataTour ? { 'data-tour': dataTour } : {})}
+        >
           <DialogHeader className="shrink-0">
             <DialogTitle>Produkte umbenennen</DialogTitle>
             <DialogDescription>
@@ -633,6 +657,8 @@ export function RenameProductsDialog({
         onOpenChange={handleRenameDialogClose}
         item={renameItem}
         listType={listType}
+        dataTour={renameDialogDataTour}
+        submitDataTour={renameDialogSubmitDataTour}
       />
     </>
   )

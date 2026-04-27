@@ -1,0 +1,484 @@
+/* Variant A — nur Seite „Ausgeblendete Produkte (Backshop)“. Keine globalen shadcn-Overrides. */
+[data-page='backshop-hidden'] {
+  --bshva-n-0: #ffffff;
+  --bshva-n-25: #fafafa;
+  --bshva-n-50: #f6f7f8;
+  --bshva-n-75: #eef0f2;
+  --bshva-n-100: #e5e7eb;
+  --bshva-n-200: #c9cdd4;
+  --bshva-n-300: #9ea4ad;
+  --bshva-n-400: #7a8089;
+  --bshva-n-500: #5a6068;
+  --bshva-n-600: #3f444b;
+  --bshva-n-700: #2a2e34;
+  --bshva-n-800: #1a1d21;
+  --bshva-bg-card: #ffffff;
+  --bshva-bg-subtle: #f8f9fa;
+  --bshva-bg-sunken: #eceef1;
+  --bshva-border: #e3e5e9;
+  --bshva-blue-50: #eaf1ff;
+  --bshva-blue-500: #2f6bff;
+  --bshva-blue-600: #1f57ea;
+  --bshva-blue-700: #1a47c4;
+  /* Marken: wie App-Standard (Edeka blau, Harry orange, Aryzta violett/rosa) */
+  --bshva-brand-e: #1e40af;
+  --bshva-brand-e-bg: #dbeafe;
+  --bshva-brand-h: #9a3412;
+  --bshva-brand-h-bg: #ffedd5;
+  --bshva-brand-a: #9d174d;
+  --bshva-brand-a-bg: #fce7f3;
+  --bshva-brand-o: #5a6068;
+  --bshva-brand-o-bg: #e8ebef;
+  --bshva-rule-50: #f3edff;
+  --bshva-rule-600: #6b4fd8;
+  --bshva-r-sm: 6px;
+  --bshva-r-md: 8px;
+  --bshva-r-lg: 12px;
+  --bshva-r-pill: 999px;
+  --bshva-shadow-sm: 0 1px 2px rgba(15, 17, 20, 0.05), 0 1px 1px rgba(15, 17, 20, 0.03);
+  --bshva-shadow-lg: 0 10px 28px rgba(15, 17, 20, 0.1), 0 2px 6px rgba(15, 17, 20, 0.05);
+  color: var(--bshva-n-700);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+[data-page='backshop-hidden'] .bshva-filter-card {
+  background: var(--bshva-bg-card);
+  border: 1px solid var(--bshva-border);
+  border-radius: var(--bshva-r-lg);
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+[data-page='backshop-hidden'] .bshva-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--bshva-border);
+  padding: 0 4px;
+}
+
+[data-page='backshop-hidden'] .bshva-tab {
+  padding: 10px 14px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--bshva-n-500);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: -1px;
+}
+
+[data-page='backshop-hidden'] .bshva-tab:hover {
+  color: var(--bshva-n-800);
+}
+
+[data-page='backshop-hidden'] .bshva-tab[aria-selected='true'] {
+  color: var(--bshva-blue-600);
+  border-bottom-color: var(--bshva-blue-500);
+}
+
+[data-page='backshop-hidden'] .bshva-tab-count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: var(--bshva-r-pill);
+  background: var(--bshva-n-75);
+  color: var(--bshva-n-600);
+}
+
+[data-page='backshop-hidden'] .bshva-tab[aria-selected='true'] .bshva-tab-count {
+  background: var(--bshva-blue-50);
+  color: var(--bshva-blue-600);
+}
+
+/* Tabs: gleichmäßige, lesbare zwei Spalten auf schmalen Handys */
+@media (max-width: 639px) {
+  [data-page='backshop-hidden'] .bshva-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    padding: 8px 6px;
+    font-size: 12px;
+    gap: 6px;
+  }
+
+  [data-page='backshop-hidden'] .bshva-tab > span {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 4px;
+    text-align: center;
+  }
+
+  [data-page='backshop-hidden'] .bshva-tab-count {
+    font-size: 10px;
+    padding: 1px 5px;
+  }
+}
+
+[data-page='backshop-hidden'] .bshva-filter-strip {
+  padding: 14px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--bshva-border);
+}
+
+[data-page='backshop-hidden'] .bshva-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+[data-page='backshop-hidden'] .bshva-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  border-radius: var(--bshva-r-pill);
+  border: 1px solid var(--bshva-border);
+  background: var(--bshva-bg-card);
+  font-size: 12px;
+  color: var(--bshva-n-700);
+  cursor: pointer;
+}
+
+[data-page='backshop-hidden'] .bshva-chip:hover {
+  border-color: #cfd3d9;
+}
+
+[data-page='backshop-hidden'] .bshva-chip[aria-pressed='true'] {
+  background: var(--bshva-n-800);
+  color: #fff;
+  border-color: var(--bshva-n-800);
+}
+
+[data-page='backshop-hidden'] .bshva-chip-count {
+  color: var(--bshva-n-400);
+  font-size: 11px;
+}
+
+[data-page='backshop-hidden'] .bshva-chip[aria-pressed='true'] .bshva-chip-count {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+[data-page='backshop-hidden'] .bshva-tiles-wrap {
+  padding: 14px;
+}
+
+[data-page='backshop-hidden'] .bshva-section-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--bshva-n-500);
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+[data-page='backshop-hidden'] .bshva-tiles-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (min-width: 1024px) {
+  [data-page='backshop-hidden'] .bshva-tiles-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+[data-page='backshop-hidden'] .bshva-panel {
+  background: var(--bshva-bg-card);
+  border: 1px solid var(--bshva-border);
+  border-radius: var(--bshva-r-lg);
+  overflow: hidden;
+}
+
+[data-page='backshop-hidden'] .bshva-panel-head {
+  padding: 14px 18px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--bshva-border);
+}
+
+[data-page='backshop-hidden'] .bshva-panel-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bshva-n-800);
+}
+
+[data-page='backshop-hidden'] .bshva-panel-head-sub {
+  font-size: 12.5px;
+  color: var(--bshva-n-500);
+  margin: 4px 0 0;
+  font-weight: 400;
+}
+
+[data-page='backshop-hidden'] .bshva-panel-body-flush {
+  padding: 0;
+}
+
+[data-page='backshop-hidden'] .bshva-a-head,
+[data-page='backshop-hidden'] .bshva-a-row {
+  display: grid;
+  grid-template-columns: 80px 96px minmax(180px, 1.55fr) minmax(140px, 1fr) 140px minmax(120px, 1.1fr) auto;
+  gap: 12px;
+  padding: 10px 14px;
+  align-items: center;
+}
+
+@media (min-width: 1280px) {
+  [data-page='backshop-hidden'] .bshva-a-head,
+  [data-page='backshop-hidden'] .bshva-a-row {
+    grid-template-columns: 84px 100px minmax(220px, 1.55fr) minmax(160px, 1fr) 160px minmax(130px, 1.1fr) auto;
+    padding: 12px 16px;
+    gap: 14px;
+  }
+}
+
+/* Regel-Tabelle: keine Hinweis-Spalte */
+[data-page='backshop-hidden'] .bshva-a-table--rule .bshva-a-head,
+[data-page='backshop-hidden'] .bshva-a-table--rule .bshva-a-row {
+  grid-template-columns: 80px 96px minmax(200px, 1.6fr) minmax(160px, 1.15fr) minmax(140px, 1fr) auto;
+}
+
+@media (min-width: 1280px) {
+  [data-page='backshop-hidden'] .bshva-a-table--rule .bshva-a-head,
+  [data-page='backshop-hidden'] .bshva-a-table--rule .bshva-a-row {
+    grid-template-columns: 84px 100px minmax(240px, 1.6fr) minmax(180px, 1.15fr) minmax(160px, 1fr) auto;
+  }
+}
+
+[data-page='backshop-hidden'] .bshva-a-head {
+  background: var(--bshva-bg-subtle);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--bshva-n-500);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--bshva-border);
+}
+
+[data-page='backshop-hidden'] .bshva-a-row {
+  border-top: 1px solid var(--bshva-border);
+  background: var(--bshva-bg-card);
+}
+
+[data-page='backshop-hidden'] .bshva-a-row:first-of-type {
+  border-top: 0;
+}
+
+[data-page='backshop-hidden'] .bshva-a-row:hover {
+  background: var(--bshva-n-25);
+}
+
+[data-page='backshop-hidden'] .bshva-a-row.bshva-a-row--selected {
+  background: var(--bshva-blue-50);
+}
+
+[data-page='backshop-hidden'] .bshva-prow-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--bshva-n-200);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: var(--bshva-bg-card);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+[data-page='backshop-hidden'] .bshva-prow-check[aria-checked='true'] {
+  background: var(--bshva-blue-500);
+  border-color: var(--bshva-blue-500);
+  color: #fff;
+}
+
+[data-page='backshop-hidden'] .bshva-prow-thumb {
+  width: 76px;
+  height: 76px;
+  border-radius: var(--bshva-r-md);
+  background: var(--bshva-bg-sunken);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+[data-page='backshop-hidden'] .bshva-prow-plu {
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  color: var(--bshva-n-600);
+  font-weight: 600;
+}
+
+[data-page='backshop-hidden'] .bshva-prow-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bshva-n-800);
+  line-height: 1.35;
+}
+
+[data-page='backshop-hidden'] .bshva-prow-name-sub {
+  font-size: 11.5px;
+  color: var(--bshva-n-400);
+  margin-top: 2px;
+}
+
+[data-page='backshop-hidden'] .bshva-prow-hint {
+  font-size: 12px;
+  color: var(--bshva-n-500);
+  line-height: 1.4;
+}
+
+[data-page='backshop-hidden'] .bshva-prow-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+[data-page='backshop-hidden'] .bshva-bbadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--bshva-r-sm);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+[data-page='backshop-hidden'] .bshva-bbadge--E {
+  background: var(--bshva-brand-e-bg);
+  color: var(--bshva-brand-e);
+}
+[data-page='backshop-hidden'] .bshva-bbadge--H {
+  background: var(--bshva-brand-h-bg);
+  color: var(--bshva-brand-h);
+}
+[data-page='backshop-hidden'] .bshva-bbadge--A {
+  background: var(--bshva-brand-a-bg);
+  color: var(--bshva-brand-a);
+}
+[data-page='backshop-hidden'] .bshva-bbadge--O {
+  background: var(--bshva-brand-o-bg);
+  color: var(--bshva-brand-o);
+}
+
+[data-page='backshop-hidden'] .bshva-bulkbar {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 14px;
+  background: var(--bshva-n-800);
+  color: #fff;
+  border-radius: var(--bshva-r-lg);
+  box-shadow: var(--bshva-shadow-lg);
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+[data-page='backshop-hidden'] .bshva-bulkbar-count-num {
+  background: var(--bshva-blue-500);
+  padding: 2px 8px;
+  border-radius: var(--bshva-r-pill);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+[data-page='backshop-hidden'] .bshva-bulkbar-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+[data-page='backshop-hidden'] .bshva-bulkbar-spacer {
+  flex: 1;
+}
+
+[data-page='backshop-hidden'] .bshva-rule-group {
+  border-top: 1px solid var(--bshva-border);
+}
+
+[data-page='backshop-hidden'] .bshva-rule-group:first-child {
+  border-top: 0;
+}
+
+[data-page='backshop-hidden'] .bshva-rule-group-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bshva-bg-subtle);
+  cursor: pointer;
+  width: 100%;
+  border: 0;
+  text-align: left;
+}
+
+[data-page='backshop-hidden'] .bshva-rule-group-head:hover {
+  background: var(--bshva-n-75);
+}
+
+[data-page='backshop-hidden'] .bshva-rule-group-chev {
+  color: var(--bshva-n-400);
+  transition: transform 0.15s;
+}
+
+[data-page='backshop-hidden'] .bshva-rule-group-head[aria-expanded='true'] .bshva-rule-group-chev {
+  transform: rotate(90deg);
+}
+
+[data-page='backshop-hidden'] .bshva-rule-group-title {
+  font-weight: 600;
+  color: var(--bshva-n-800);
+  font-size: 13px;
+  flex: 1;
+}
+
+[data-page='backshop-hidden'] .bshva-rule-group-count {
+  font-size: 12px;
+  color: var(--bshva-n-500);
+}
+
+[data-page='backshop-hidden'] .bshva-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--bshva-n-400);
+  font-size: 13px;
+}
+
+[data-page='backshop-hidden'] .bshva-btn-primary {
+  background: var(--bshva-blue-500) !important;
+  border-color: var(--bshva-blue-500) !important;
+  color: #fff !important;
+}
+
+[data-page='backshop-hidden'] .bshva-btn-primary:hover {
+  background: var(--bshva-blue-600) !important;
+  border-color: var(--bshva-blue-600) !important;
+}
+
+[data-page='backshop-hidden'] .bshva-bulkbar .bshva-btn-ghost-light {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+[data-page='backshop-hidden'] .bshva-bulkbar .bshva-btn-ghost-light:hover {
+  background: rgba(255, 255, 255, 0.14);
+}

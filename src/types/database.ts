@@ -109,6 +109,24 @@ export interface Database {
           is_visible?: boolean
         }
       }
+      user_tutorial_state: {
+        Row: {
+          user_id: string
+          store_id: string
+          state: Record<string, unknown>
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          store_id: string
+          state?: Record<string, unknown>
+          updated_at?: string
+        }
+        Update: {
+          state?: Record<string, unknown>
+          updated_at?: string
+        }
+      }
       profiles: {
         Row: {
           id: string
@@ -192,6 +210,7 @@ export interface Database {
           block_id: string | null
           is_admin_eigen: boolean
           is_manually_renamed: boolean
+          is_manual_supplement: boolean
           preis: number | null
           created_at: string
         }
@@ -208,6 +227,7 @@ export interface Database {
           block_id?: string | null
           is_admin_eigen?: boolean
           is_manually_renamed?: boolean
+          is_manual_supplement?: boolean
           preis?: number | null
           created_at?: string
         }
@@ -222,6 +242,7 @@ export interface Database {
           block_id?: string | null
           is_admin_eigen?: boolean
           is_manually_renamed?: boolean
+          is_manual_supplement?: boolean
           preis?: number | null
         }
       }
@@ -462,6 +483,62 @@ export interface Database {
           plu?: string
         }
       }
+      store_list_carryover: {
+        Row: {
+          id: string
+          store_id: string
+          list_type: 'obst' | 'backshop'
+          for_version_id: string
+          from_version_id: string
+          plu: string
+          system_name: string
+          display_name: string | null
+          item_type: 'PIECE' | 'WEIGHT'
+          preis: number | null
+          block_id: string | null
+          warengruppe: string | null
+          old_plu: string | null
+          image_url: string | null
+          source: string | null
+          market_include: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          store_id: string
+          list_type: 'obst' | 'backshop'
+          for_version_id: string
+          from_version_id: string
+          plu: string
+          system_name: string
+          display_name?: string | null
+          item_type: 'PIECE' | 'WEIGHT'
+          preis?: number | null
+          block_id?: string | null
+          warengruppe?: string | null
+          old_plu?: string | null
+          image_url?: string | null
+          source?: string | null
+          market_include?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          system_name?: string
+          display_name?: string | null
+          item_type?: 'PIECE' | 'WEIGHT'
+          preis?: number | null
+          block_id?: string | null
+          warengruppe?: string | null
+          old_plu?: string | null
+          image_url?: string | null
+          source?: string | null
+          market_include?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+      }
       plu_offer_items: {
         Row: {
           id: string
@@ -525,24 +602,33 @@ export interface Database {
         Row: {
           id: string
           campaign_id: string
-          plu: string
+          plu: string | null
           promo_price: number
           sort_index: number
           source_art_nr: string | null
+          source_plu: string | null
+          source_artikel: string | null
+          origin: 'excel' | 'manual' | 'unassigned'
         }
         Insert: {
           id?: string
           campaign_id: string
-          plu: string
+          plu?: string | null
           promo_price: number
           sort_index?: number
           source_art_nr?: string | null
+          source_plu?: string | null
+          source_artikel?: string | null
+          origin?: 'excel' | 'manual' | 'unassigned'
         }
         Update: {
-          plu?: string
+          plu?: string | null
           promo_price?: number
           sort_index?: number
           source_art_nr?: string | null
+          source_plu?: string | null
+          source_artikel?: string | null
+          origin?: 'excel' | 'manual' | 'unassigned'
         }
       }
       obst_offer_store_disabled: {
@@ -645,6 +731,7 @@ export interface Database {
           frozen_at: string | null
           delete_after: string | null
           created_by: string | null
+          transfer_week_started_at: string | null
         }
         Insert: {
           id?: string
@@ -656,6 +743,7 @@ export interface Database {
           frozen_at?: string | null
           delete_after?: string | null
           created_by?: string | null
+          transfer_week_started_at?: string | null
         }
         Update: {
           kw_nummer?: number
@@ -664,6 +752,31 @@ export interface Database {
           published_at?: string | null
           frozen_at?: string | null
           delete_after?: string | null
+          transfer_week_started_at?: string | null
+        }
+      }
+      backshop_version_source_publish: {
+        Row: {
+          version_id: string
+          source: 'edeka' | 'harry' | 'aryzta'
+          published_at: string
+          published_by: string | null
+          row_count: number
+          updated_at: string
+        }
+        Insert: {
+          version_id: string
+          source: 'edeka' | 'harry' | 'aryzta'
+          published_at: string
+          published_by?: string | null
+          row_count: number
+          updated_at?: string
+        }
+        Update: {
+          published_at?: string
+          published_by?: string | null
+          row_count?: number
+          updated_at?: string
         }
       }
       backshop_master_plu_items: {
@@ -679,6 +792,8 @@ export interface Database {
           block_id: string | null
           is_manually_renamed: boolean
           image_url: string | null
+          source: 'edeka' | 'harry' | 'aryzta' | 'manual'
+          is_manual_supplement: boolean
           created_at: string
         }
         Insert: {
@@ -693,6 +808,8 @@ export interface Database {
           block_id?: string | null
           is_manually_renamed?: boolean
           image_url?: string | null
+          source?: 'edeka' | 'harry' | 'aryzta' | 'manual'
+          is_manual_supplement?: boolean
           created_at?: string
         }
         Update: {
@@ -705,6 +822,8 @@ export interface Database {
           block_id?: string | null
           is_manually_renamed?: boolean
           image_url?: string | null
+          source?: 'edeka' | 'harry' | 'aryzta' | 'manual'
+          is_manual_supplement?: boolean
         }
       }
       backshop_blocks: {
@@ -802,6 +921,31 @@ export interface Database {
         }
         Update: Record<string, never>
       }
+      backshop_store_line_visibility_overrides: {
+        Row: {
+          id: string
+          store_id: string
+          plu: string
+          source: 'edeka' | 'harry' | 'aryzta' | 'manual'
+          mode: 'force_show' | 'force_hide'
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          store_id: string
+          plu: string
+          source: 'edeka' | 'harry' | 'aryzta' | 'manual'
+          mode: 'force_show' | 'force_hide'
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          mode?: 'force_show' | 'force_hide'
+          created_at?: string
+          created_by?: string | null
+        }
+      }
       backshop_renamed_items: {
         Row: {
           id: string
@@ -892,24 +1036,33 @@ export interface Database {
         Row: {
           id: string
           campaign_id: string
-          plu: string
+          plu: string | null
           promo_price: number
           sort_index: number
           source_art_nr: string | null
+          source_plu: string | null
+          source_artikel: string | null
+          origin: 'excel' | 'manual' | 'unassigned'
         }
         Insert: {
           id?: string
           campaign_id: string
-          plu: string
+          plu?: string | null
           promo_price: number
           sort_index?: number
           source_art_nr?: string | null
+          source_plu?: string | null
+          source_artikel?: string | null
+          origin?: 'excel' | 'manual' | 'unassigned'
         }
         Update: {
-          plu?: string
+          plu?: string | null
           promo_price?: number
           sort_index?: number
           source_art_nr?: string | null
+          source_plu?: string | null
+          source_artikel?: string | null
+          origin?: 'excel' | 'manual' | 'unassigned'
         }
       }
       backshop_offer_store_disabled: {
@@ -1134,6 +1287,105 @@ export interface Database {
           updated_at?: string
         }
       }
+      backshop_product_groups: {
+        Row: {
+          id: string
+          display_name: string
+          block_id: string | null
+          origin: 'auto' | 'manual'
+          needs_review: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          display_name: string
+          block_id?: string | null
+          origin?: 'auto' | 'manual'
+          needs_review?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          display_name?: string
+          block_id?: string | null
+          origin?: 'auto' | 'manual'
+          needs_review?: boolean
+          updated_at?: string
+        }
+      }
+      backshop_product_group_members: {
+        Row: {
+          group_id: string
+          plu: string
+          source: 'edeka' | 'harry' | 'aryzta'
+          added_at: string
+        }
+        Insert: {
+          group_id: string
+          plu: string
+          source: 'edeka' | 'harry' | 'aryzta'
+          added_at?: string
+        }
+        Update: {
+          group_id?: string
+        }
+      }
+      backshop_source_choice_per_store: {
+        Row: {
+          id: string
+          store_id: string
+          group_id: string
+          chosen_sources: ('edeka' | 'harry' | 'aryzta')[]
+          origin: 'bulk' | 'manual'
+          created_at: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          store_id: string
+          group_id: string
+          chosen_sources?: ('edeka' | 'harry' | 'aryzta')[]
+          origin?: 'bulk' | 'manual'
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          chosen_sources?: ('edeka' | 'harry' | 'aryzta')[]
+          origin?: 'bulk' | 'manual'
+          updated_by?: string | null
+          updated_at?: string
+        }
+      }
+      backshop_source_rules_per_store: {
+        Row: {
+          id: string
+          store_id: string
+          block_id: string
+          preferred_source: 'edeka' | 'harry' | 'aryzta'
+          created_at: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          store_id: string
+          block_id: string
+          preferred_source: 'edeka' | 'harry' | 'aryzta'
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          preferred_source?: 'edeka' | 'harry' | 'aryzta'
+          updated_by?: string | null
+          updated_at?: string
+        }
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -1177,6 +1429,64 @@ export interface Database {
         Args: { p_user_id: string }
         Returns: string | null
       }
+      insert_obst_manual_supplement: {
+        Args: {
+          p_version_id: string
+          p_plu: string
+          p_system_name: string
+          p_item_type: string
+          p_block_id?: string | null
+          p_preis?: number | null
+        }
+        Returns: string
+      }
+      insert_backshop_manual_supplement: {
+        Args: {
+          p_version_id: string
+          p_plu: string
+          p_system_name: string
+          p_image_url: string
+          p_block_id?: string | null
+        }
+        Returns: string
+      }
+      carry_over_obst_manual_supplements: {
+        Args: { p_from_version_id: string; p_to_version_id: string }
+        Returns: number
+      }
+      carry_over_backshop_manual_supplements: {
+        Args: { p_from_version_id: string; p_to_version_id: string }
+        Returns: number
+      }
+      update_obst_manual_supplement: {
+        Args: {
+          p_id: string
+          p_plu: string
+          p_system_name: string
+          p_item_type: string
+          p_block_id?: string | null
+          p_preis?: number | null
+        }
+        Returns: undefined
+      }
+      update_backshop_manual_supplement: {
+        Args: {
+          p_id: string
+          p_plu: string
+          p_system_name: string
+          p_image_url: string
+          p_block_id?: string | null
+        }
+        Returns: undefined
+      }
+      set_backshop_transfer_week_started: {
+        Args: Record<string, never>
+        Returns: undefined
+      }
+      delete_backshop_master_items_by_source: {
+        Args: { p_version_id: string; p_source: string }
+        Returns: undefined
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -1189,6 +1499,7 @@ export type Store = Database['public']['Tables']['stores']['Row']
 export type UserStoreAccess = Database['public']['Tables']['user_store_access']['Row']
 export type StoreListVisibility = Database['public']['Tables']['store_list_visibility']['Row']
 export type UserListVisibility = Database['public']['Tables']['user_list_visibility']['Row']
+export type UserTutorialStateRow = Database['public']['Tables']['user_tutorial_state']['Row']
 
 // Convenience Types
 export type Profile = Database['public']['Tables']['profiles']['Row']
@@ -1209,9 +1520,11 @@ export type ObstOfferCampaignLine = Database['public']['Tables']['obst_offer_cam
 export type ObstOfferStoreDisabled = Database['public']['Tables']['obst_offer_store_disabled']['Row']
 export type ObstOfferStoreLocalPrice = Database['public']['Tables']['obst_offer_store_local_prices']['Row']
 export type VersionNotification = Database['public']['Tables']['version_notifications']['Row']
+export type StoreListCarryover = Database['public']['Tables']['store_list_carryover']['Row']
 
 // Backshop
 export type BackshopVersion = Database['public']['Tables']['backshop_versions']['Row']
+export type BackshopVersionSourcePublish = Database['public']['Tables']['backshop_version_source_publish']['Row']
 export type BackshopMasterPLUItem = Database['public']['Tables']['backshop_master_plu_items']['Row']
 export type BackshopBlock = Database['public']['Tables']['backshop_blocks']['Row']
 export type BackshopCustomProduct = Database['public']['Tables']['backshop_custom_products']['Row']
@@ -1230,3 +1543,10 @@ export type StoreObstBlockOrder = Database['public']['Tables']['store_obst_block
 export type StoreBackshopBlockOrder = Database['public']['Tables']['store_backshop_block_order']['Row']
 export type StoreObstNameBlockOverride = Database['public']['Tables']['store_obst_name_block_override']['Row']
 export type StoreBackshopNameBlockOverride = Database['public']['Tables']['store_backshop_name_block_override']['Row']
+
+// Backshop Multi-Source (Edeka/Harry/Aryzta)
+export type BackshopSource = 'edeka' | 'harry' | 'aryzta' | 'manual'
+export type BackshopProductGroup = Database['public']['Tables']['backshop_product_groups']['Row']
+export type BackshopProductGroupMember = Database['public']['Tables']['backshop_product_group_members']['Row']
+export type BackshopSourceChoicePerStore = Database['public']['Tables']['backshop_source_choice_per_store']['Row']
+export type BackshopSourceRulePerStore = Database['public']['Tables']['backshop_source_rules_per_store']['Row']

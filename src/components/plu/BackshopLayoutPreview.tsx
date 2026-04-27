@@ -93,9 +93,20 @@ export function BackshopLayoutPreview({
   const itemCount = previewRows.filter((r) => r.type === 'item').length
   const showAsSeparatePages = sortMode === 'BY_BLOCK' && pageBreakPerBlock
 
+  if (itemCount === 0) {
+    return (
+      <div
+        className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground"
+        data-tour="backshop-konfig-layout-preview-empty"
+      >
+        Keine Beispieldaten für die Vorschau verfügbar.
+      </div>
+    )
+  }
+
   if (showAsSeparatePages) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4" data-tour="backshop-konfig-layout-preview-block">
         <div
           className="rounded-t-lg bg-gray-500/10 border border-b-0 border-gray-300 px-3 py-1 font-semibold text-gray-700 uppercase tracking-wider text-center"
           style={{ fontSize: fonts.header }}
@@ -139,7 +150,13 @@ export function BackshopLayoutPreview({
   }
 
   return (
-    <div>
+    <div
+      data-tour={
+        sortMode === 'BY_BLOCK'
+          ? 'backshop-konfig-layout-preview-block'
+          : 'backshop-konfig-layout-preview-alphabetical'
+      }
+    >
       <div
         className="rounded-t-lg bg-gray-500/10 border border-b-0 border-gray-300 px-3 py-1 font-semibold text-gray-700 uppercase tracking-wider text-center"
         style={{ fontSize: fonts.header }}
