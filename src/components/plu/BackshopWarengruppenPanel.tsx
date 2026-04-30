@@ -1,6 +1,6 @@
 // BackshopWarengruppenPanel: Warengruppen-Workbench (3 Spalten, Markt-Overrides, DnD)
 
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, startTransition } from 'react'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { toast } from 'sonner'
 import {
@@ -150,7 +150,10 @@ export function BackshopWarengruppenPanel() {
   const [mobileWorkbenchStep, setMobileWorkbenchStep] = useState<'groups' | 'products'>('groups')
 
   useEffect(() => {
-    if (isWorkbenchDesktop) setMobileWorkbenchStep('groups')
+    if (!isWorkbenchDesktop) return
+    startTransition(() => {
+      setMobileWorkbenchStep('groups')
+    })
   }, [isWorkbenchDesktop])
 
   const pushRecentBatchLines = useCallback((lines: WarengruppeRecentLine[]) => {

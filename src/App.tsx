@@ -17,6 +17,8 @@ import { SpeedInsights } from '@vercel/speed-insights/react'
 
 // Layout (nicht lazy – wird überall gebraucht)
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
+import { KioskAreaGuard } from '@/components/layout/KioskAreaGuard'
+import { KioskDefaultRedirect } from '@/components/layout/KioskDefaultRedirect'
 import { ListAreaGuard } from '@/components/layout/ListAreaGuard'
 import { RedirectRolePrefixed } from '@/components/RedirectRolePrefixed'
 import { RedirectToMarkenAuswahl } from '@/components/RedirectToMarkenAuswahl'
@@ -42,6 +44,12 @@ const SuperAdminDashboard = lazy(() => import('@/pages/SuperAdminDashboard').the
 const SuperAdminCompaniesPage = lazy(() => import('@/pages/SuperAdminCompaniesPage').then((m) => ({ default: m.SuperAdminCompaniesPage })))
 const SuperAdminCompanyDetailPage = lazy(() => import('@/pages/SuperAdminCompanyDetailPage').then((m) => ({ default: m.SuperAdminCompanyDetailPage })))
 const SuperAdminStoreDetailPage = lazy(() => import('@/pages/SuperAdminStoreDetailPage').then((m) => ({ default: m.SuperAdminStoreDetailPage })))
+const SuperAdminMarktObstKonfigurationPage = lazy(() =>
+  import('@/pages/SuperAdminMarktObstKonfigurationPage').then((m) => ({ default: m.SuperAdminMarktObstKonfigurationPage })),
+)
+const SuperAdminMarktBackshopKonfigurationPage = lazy(() =>
+  import('@/pages/SuperAdminMarktBackshopKonfigurationPage').then((m) => ({ default: m.SuperAdminMarktBackshopKonfigurationPage })),
+)
 const SuperAdminUploadPage = lazy(() => import('@/pages/SuperAdminUploadPage').then((m) => ({ default: m.SuperAdminUploadPage })))
 const CentralCampaignUploadPage = lazy(() =>
   import('@/pages/CentralCampaignUploadPage').then((m) => ({ default: m.CentralCampaignUploadPage })),
@@ -54,7 +62,16 @@ const CustomProductsPage = lazy(() => import('@/pages/CustomProductsPage').then(
 const HiddenProductsPage = lazy(() => import('@/pages/HiddenProductsPage').then((m) => ({ default: m.HiddenProductsPage })))
 const OfferProductsPage = lazy(() => import('@/pages/OfferProductsPage').then((m) => ({ default: m.OfferProductsPage })))
 const RenamedProductsPage = lazy(() => import('@/pages/RenamedProductsPage').then((m) => ({ default: m.RenamedProductsPage })))
+const PickHideObstPage = lazy(() => import('@/pages/PickHideObstPage').then((m) => ({ default: m.PickHideObstPage })))
+const PickRenameObstPage = lazy(() => import('@/pages/PickRenameObstPage').then((m) => ({ default: m.PickRenameObstPage })))
 const UserManagement = lazy(() => import('@/pages/UserManagement').then((m) => ({ default: m.UserManagement })))
+const AdminKassenmodusPage = lazy(() =>
+  import('@/pages/AdminKassenmodusPage').then((m) => ({ default: m.AdminKassenmodusPage })),
+)
+const KasseEntrancePage = lazy(() =>
+  import('@/pages/KasseEntrancePage').then((m) => ({ default: m.KasseEntrancePage })),
+)
+const KioskLayout = lazy(() => import('@/pages/KioskLayout').then((m) => ({ default: m.KioskLayout })))
 const NotFound = lazy(() => import('@/pages/NotFound').then((m) => ({ default: m.NotFound })))
 const LayoutSettingsPage = lazy(() => import('@/pages/LayoutSettingsPage').then((m) => ({ default: m.LayoutSettingsPage })))
 const RulesPage = lazy(() => import('@/pages/RulesPage').then((m) => ({ default: m.RulesPage })))
@@ -85,6 +102,8 @@ const BackshopCustomProductsPage = lazy(() => import('@/pages/BackshopCustomProd
 const BackshopHiddenProductsPage = lazy(() => import('@/pages/BackshopHiddenProductsPage').then((m) => ({ default: m.BackshopHiddenProductsPage })))
 const BackshopOfferProductsPage = lazy(() => import('@/pages/BackshopOfferProductsPage').then((m) => ({ default: m.BackshopOfferProductsPage })))
 const BackshopRenamedProductsPage = lazy(() => import('@/pages/BackshopRenamedProductsPage').then((m) => ({ default: m.BackshopRenamedProductsPage })))
+const PickHideBackshopPage = lazy(() => import('@/pages/PickHideBackshopPage').then((m) => ({ default: m.PickHideBackshopPage })))
+const PickRenameBackshopPage = lazy(() => import('@/pages/PickRenameBackshopPage').then((m) => ({ default: m.PickRenameBackshopPage })))
 const BackshopVersionsPage = lazy(() => import('@/pages/BackshopVersionsPage').then((m) => ({ default: m.BackshopVersionsPage })))
 const SuperAdminBackshopCampaignEditPage = lazy(() =>
   import('@/pages/SuperAdminBackshopCampaignEditPage').then((m) => ({
@@ -98,6 +117,12 @@ const BackshopWarengruppenGrundregelnPage = lazy(() =>
   import('@/pages/BackshopWarengruppenGrundregelnPage').then((m) => ({ default: m.BackshopWarengruppenGrundregelnPage })),
 )
 const BackshopWarengruppenPage = lazy(() => import('@/pages/BackshopWarengruppenPage').then((m) => ({ default: m.BackshopWarengruppenPage })))
+const BackshopWerbungKwListPage = lazy(() =>
+  import('@/pages/BackshopWerbungKwListPage').then((m) => ({ default: m.BackshopWerbungKwListPage })),
+)
+const BackshopWerbungKwDetailPage = lazy(() =>
+  import('@/pages/BackshopWerbungKwDetailPage').then((m) => ({ default: m.BackshopWerbungKwDetailPage })),
+)
 
 // Backshop-Upload-Wizard (nicht lazy – nur Super-Admin, gemeinsamer Kontext)
 import { BackshopUploadWizardLayout } from '@/pages/backshop-upload/BackshopUploadWizardLayout'
@@ -166,6 +191,7 @@ function App() {
           <Routes>
             {/* === Öffentlich === */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/kasse/:entranceToken" element={<KasseEntrancePage />} />
 
             {/* === Passwort ändern (Einmalpasswort-Flow) === */}
             <Route
@@ -235,6 +261,36 @@ function App() {
               }
             />
 
+            {/* === Kassenmodus (Rolle kiosk) === */}
+            <Route
+              path="/kiosk"
+              element={
+                <ProtectedRoute>
+                  <KioskAreaGuard>
+                    <KioskLayout />
+                  </KioskAreaGuard>
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<KioskDefaultRedirect />} />
+              <Route
+                path="obst"
+                element={
+                  <ListAreaGuard listType="obst_gemuese">
+                    <MasterList mode="kiosk" />
+                  </ListAreaGuard>
+                }
+              />
+              <Route
+                path="backshop"
+                element={
+                  <ListAreaGuard listType="backshop">
+                    <BackshopMasterList />
+                  </ListAreaGuard>
+                }
+              />
+            </Route>
+
             {/* === User-Bereich (alle Rollen) === */}
             <Route
               path="/user"
@@ -285,6 +341,16 @@ function App() {
               }
             />
             <Route
+              path="/user/pick-hide-obst"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="obst_gemuese">
+                    <PickHideObstPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/user/offer-products"
               element={
                 <ProtectedRoute>
@@ -300,6 +366,16 @@ function App() {
                 <ProtectedRoute>
                   <ListAreaGuard listType="obst_gemuese">
                     <RenamedProductsPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/pick-rename-obst"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="obst_gemuese">
+                    <PickRenameObstPage />
                   </ListAreaGuard>
                 </ProtectedRoute>
               }
@@ -345,11 +421,41 @@ function App() {
               }
             />
             <Route
+              path="/user/pick-hide-backshop"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <PickHideBackshopPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/user/backshop-offer-products"
               element={
                 <ProtectedRoute>
                   <ListAreaGuard listType="backshop">
                     <BackshopOfferProductsPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/backshop-werbung/:kw/:jahr"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopWerbungKwDetailPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/backshop-werbung"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopWerbungKwListPage />
                   </ListAreaGuard>
                 </ProtectedRoute>
               }
@@ -384,6 +490,16 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/user/pick-rename-backshop"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <PickRenameBackshopPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
 
             {/* === Viewer-Bereich (nur viewer) === */}
             <Route
@@ -410,6 +526,26 @@ function App() {
                 <ProtectedRoute>
                   <ListAreaGuard listType="backshop">
                     <BackshopMasterList />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/viewer/backshop-werbung/:kw/:jahr"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopWerbungKwDetailPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/viewer/backshop-werbung"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopWerbungKwListPage />
                   </ListAreaGuard>
                 </ProtectedRoute>
               }
@@ -497,6 +633,16 @@ function App() {
               }
             />
             <Route
+              path="/admin/pick-hide-obst"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <ListAreaGuard listType="obst_gemuese">
+                    <PickHideObstPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/offer-products"
               element={
                 <ProtectedRoute requireAdmin>
@@ -512,6 +658,16 @@ function App() {
                 <ProtectedRoute requireAdmin>
                   <ListAreaGuard listType="obst_gemuese">
                     <RenamedProductsPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/pick-rename-obst"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <ListAreaGuard listType="obst_gemuese">
+                    <PickRenameObstPage />
                   </ListAreaGuard>
                 </ProtectedRoute>
               }
@@ -547,6 +703,16 @@ function App() {
               }
             />
             <Route
+              path="/admin/pick-hide-backshop"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <ListAreaGuard listType="backshop">
+                    <PickHideBackshopPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/backshop-offer-products"
               element={
                 <ProtectedRoute requireAdmin>
@@ -557,11 +723,41 @@ function App() {
               }
             />
             <Route
+              path="/admin/backshop-werbung/:kw/:jahr"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopWerbungKwDetailPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/backshop-werbung"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopWerbungKwListPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/backshop-renamed-products"
               element={
                 <ProtectedRoute requireAdmin>
                   <ListAreaGuard listType="backshop">
                     <BackshopRenamedProductsPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/pick-rename-backshop"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <ListAreaGuard listType="backshop">
+                    <PickRenameBackshopPage />
                   </ListAreaGuard>
                 </ProtectedRoute>
               }
@@ -583,6 +779,14 @@ function App() {
                   <ListAreaGuard listType="backshop">
                     <RedirectToMarkenAuswahl />
                   </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/kassenmodus"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminKassenmodusPage />
                 </ProtectedRoute>
               }
             />
@@ -719,6 +923,26 @@ function App() {
               }
             />
             <Route
+              path="/super-admin/markt/obst/konfiguration"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <ListAreaGuard listType="obst_gemuese">
+                    <SuperAdminMarktObstKonfigurationPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/markt/backshop/konfiguration"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <ListAreaGuard listType="backshop">
+                    <SuperAdminMarktBackshopKonfigurationPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/super-admin/upload"
               element={
                 <ProtectedRoute requireSuperAdmin>
@@ -797,6 +1021,16 @@ function App() {
               }
             />
             <Route
+              path="/super-admin/pick-hide-obst"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <ListAreaGuard listType="obst_gemuese">
+                    <PickHideObstPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/super-admin/offer-products"
               element={
                 <ProtectedRoute requireSuperAdmin>
@@ -812,6 +1046,16 @@ function App() {
                 <ProtectedRoute requireSuperAdmin>
                   <ListAreaGuard listType="obst_gemuese">
                     <RenamedProductsPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/pick-rename-obst"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <ListAreaGuard listType="obst_gemuese">
+                    <PickRenameObstPage />
                   </ListAreaGuard>
                 </ProtectedRoute>
               }
@@ -887,6 +1131,16 @@ function App() {
               }
             />
             <Route
+              path="/super-admin/pick-hide-backshop"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <ListAreaGuard listType="backshop">
+                    <PickHideBackshopPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/super-admin/backshop-offer-products"
               element={
                 <ProtectedRoute requireSuperAdmin>
@@ -897,11 +1151,41 @@ function App() {
               }
             />
             <Route
+              path="/super-admin/backshop-werbung/:kw/:jahr"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopWerbungKwDetailPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/backshop-werbung"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopWerbungKwListPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/super-admin/backshop-renamed-products"
               element={
                 <ProtectedRoute requireSuperAdmin>
                   <ListAreaGuard listType="backshop">
                     <BackshopRenamedProductsPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/pick-rename-backshop"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <ListAreaGuard listType="backshop">
+                    <PickRenameBackshopPage />
                   </ListAreaGuard>
                 </ProtectedRoute>
               }

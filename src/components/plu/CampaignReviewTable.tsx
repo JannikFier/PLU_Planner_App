@@ -129,9 +129,12 @@ export interface CampaignReviewTableProps {
   onAddRow?: () => void
   /** Manuelle Zeile entfernen (nur manuell hinzugefuegte duerfen weg) */
   onRemoveRow?: (rowId: string) => void
-  /** Optionale Preis-Spalte (Backshop) */
+  /** Optionale Preis-Spalte (Backshop: Akt. UVP / VK) */
   pricesById?: Record<string, number>
   onChangePrice?: (rowId: string, price: number) => void
+  /** Optionale Erwerb-Spalte (Backshop) */
+  purchasePricesById?: Record<string, number | null | undefined>
+  onChangePurchasePrice?: (rowId: string, price: number | null) => void
   disabled?: boolean
   emptyMessage?: string
 }
@@ -148,10 +151,13 @@ export function CampaignReviewTable({
   onRemoveRow,
   pricesById,
   onChangePrice,
+  purchasePricesById,
+  onChangePurchasePrice,
   disabled,
   emptyMessage = 'Keine Zeilen vorhanden.',
 }: CampaignReviewTableProps) {
   const showPriceColumn = !!(pricesById && onChangePrice)
+  const showPurchaseColumn = !!(purchasePricesById && onChangePurchasePrice)
   const assignedCount = useMemo(
     () => rows.filter((r) => r.selectedPlu && r.origin !== 'unassigned').length,
     [rows],
@@ -186,7 +192,8 @@ export function CampaignReviewTable({
                 <TableHead className="w-28">PLU (Excel)</TableHead>
                 <TableHead>Artikel (Excel)</TableHead>
                 <TableHead className="min-w-[260px]">Master-PLU (suchen &amp; wählen)</TableHead>
-                {showPriceColumn && <TableHead className="w-28">Preis</TableHead>}
+                {showPriceColumn && <TableHead className="w-28">VK (Akt. UVP)</TableHead>}
+                {showPurchaseColumn && <TableHead className="w-28">Erwerb</TableHead>}
                 {onRemoveRow && <TableHead className="w-16" />}
               </TableRow>
             </TableHeader>
@@ -240,7 +247,39 @@ export function CampaignReviewTable({
                             onChangePrice?.(r.id, Number.isFinite(v) ? v : 0)
                           }}
                           disabled={disabled}
-                          aria-label="Preis"
+                          aria-label="VK Akt. UVP"
+                        />
+                      </TableCell>
+                    )}
+                    {showPurchaseColumn && (
+                      <TableCell>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          min={0}
+                          className="h-9 w-24 rounded-md border border-input bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                          value={
+                            purchasePricesById && purchasePricesById[r.id] != null &&
+                            purchasePricesById[r.id] !== undefined
+                              ? String(purchasePricesById[r.id])
+                              : ''
+                          }
+                          onChange={(e) => {
+                            const raw = e.target.value.trim()
+                            if (raw === '') {
+                              onChangePurchasePrice?.(r.id, null)
+                              return
+                            }
+                            const v = parseFloat(raw)
+                            onChangePurchasePrice?.(
+                              r.id,
+                              Number.isFinite(v) ? v : null,
+                            )
+                          }}
+                          disabled={disabled}
+                          aria-label="Erwerbspreis"
+                          placeholder="—"
                         />
                       </TableCell>
                     )}

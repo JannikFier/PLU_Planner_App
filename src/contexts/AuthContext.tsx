@@ -20,6 +20,8 @@ export interface AuthState {
   isSuperAdmin: boolean
   /** true NUR für viewer (nur Liste + PDF) */
   isViewer: boolean
+  /** true NUR für Kassenmodus (nur Leselisten) */
+  isKiosk: boolean
   /** true wenn User beim Login sein Passwort ändern muss */
   mustChangePassword: boolean
   isLoading: boolean
@@ -51,6 +53,7 @@ function authReducer(
     isAdmin: profile?.role === 'super_admin' || profile?.role === 'admin',
     isSuperAdmin: profile?.role === 'super_admin',
     isViewer: profile?.role === 'viewer',
+    isKiosk: profile?.role === 'kiosk',
     mustChangePassword: profile?.must_change_password ?? false,
   }
 }
@@ -63,6 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAdmin: false,
     isSuperAdmin: false,
     isViewer: false,
+    isKiosk: false,
     mustChangePassword: false,
     isLoading: true,
     error: null,
@@ -102,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAdmin: false,
       isSuperAdmin: false,
       isViewer: false,
+      isKiosk: false,
       mustChangePassword: false,
       isLoading: false,
       error: null,
@@ -367,6 +372,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isAdmin: false,
             isSuperAdmin: false,
             isViewer: false,
+            isKiosk: false,
             mustChangePassword: false,
             isLoading: false,
             error: null,

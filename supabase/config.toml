@@ -5,3 +5,18 @@ verify_jwt = false
 
 [functions.create-user]
 verify_jwt = false
+
+[functions.kiosk-login]
+verify_jwt = false
+
+[functions.create-kiosk-register]
+verify_jwt = false
+
+[functions.update-kiosk-register]
+verify_jwt = false
+
+[functions.delete-kiosk-register]
+verify_jwt = false
+
+[functions.rotate-kiosk-entrance]
+verify_jwt = false

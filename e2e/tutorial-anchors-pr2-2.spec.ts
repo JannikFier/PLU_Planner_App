@@ -107,13 +107,14 @@ test.describe('Tutorial PR 2.2 Anchors @extended', () => {
     if ((await addBtn.count()) === 0) {
       test.info().annotations.push({
         type: 'skip-reason',
-        description: 'Rolle ohne Manage-Hidden-Berechtigung; Dialog nicht erreichbar.',
+        description: 'Rolle ohne Manage-Hidden-Berechtigung; Picker nicht erreichbar.',
       })
       return
     }
     await addBtn.first().click()
+    await expect(page).toHaveURL(/pick-hide-obst/, { timeout: 10_000 })
     await expect(page.locator('[data-tour="obst-hidden-add-dialog"]')).toBeAttached({
-      timeout: 5_000,
+      timeout: 10_000,
     })
     await expect(
       page.locator('[data-tour="obst-hidden-add-dialog-submit"]'),
@@ -193,8 +194,9 @@ test.describe('Tutorial PR 2.2 Anchors @extended', () => {
     await page.waitForLoadState('networkidle')
 
     await page.locator('[data-tour="obst-renamed-add-button"]').first().click()
+    await expect(page).toHaveURL(/pick-rename-obst/, { timeout: 10_000 })
     await expect(page.locator('[data-tour="obst-renamed-add-dialog"]')).toBeAttached({
-      timeout: 5_000,
+      timeout: 10_000,
     })
   })
 

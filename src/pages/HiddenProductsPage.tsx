@@ -2,7 +2,7 @@
 // Liste, Einblenden, Bearbeiten (bei eigenen), "Produkte ausblenden" oben rechts
 
 import { useMemo, useState, useCallback } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -37,7 +37,6 @@ import { buildOfferDisplayMap } from '@/lib/offer-display'
 import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import { orderByPluDisplayOrder } from '@/lib/list-order'
 import { useQuery } from '@tanstack/react-query'
-import { HideProductsDialog } from '@/components/plu/HideProductsDialog'
 import { EditCustomProductDialog } from '@/components/plu/EditCustomProductDialog'
 import {
   HiddenProductsResponsiveList,
@@ -58,13 +57,19 @@ interface HiddenProductInfo {
 }
 
 export function HiddenProductsPage() {
-  const { pathname } = useLocation()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { pathname } = location
   const { user } = useAuth()
   const effectiveRole = useEffectiveRouteRole()
   const canManageHidden = canManageMarketHiddenItems(effectiveRole, pathname)
   const currentUserId = user?.id ?? null
 
-  const [showHideDialog, setShowHideDialog] = useState(false)
+  const pathPrefix =
+    pathname.startsWith('/super-admin') ? '/super-admin'
+    : pathname.startsWith('/admin') ? '/admin'
+    : '/user'
+
   const [editingProduct, setEditingProduct] = useState<CustomProduct | null>(null)
 
   const { data: hiddenItems = [], isLoading: hiddenLoading, isError: hiddenError } = useHiddenItems()
@@ -79,15 +84,6 @@ export function HiddenProductsPage() {
   const nameBlockOverrides = useMemo(
     () => buildNameBlockOverrideMap(storeObstNameOverrides),
     [storeObstNameOverrides],
-  )
-  const hideDialogListLayout = useMemo(
-    () => ({
-      sortMode: (layoutSettings?.sort_mode ?? 'ALPHABETICAL') as 'ALPHABETICAL' | 'BY_BLOCK',
-      blocks,
-      storeBlockOrder: storeObstBlockOrder,
-      nameBlockOverrides,
-    }),
-    [layoutSettings?.sort_mode, blocks, storeObstBlockOrder, nameBlockOverrides],
   )
   const { data: renamedItems = [] } = useRenamedItems()
   const { data: offerItems = [] } = useOfferItems()
@@ -169,38 +165,6 @@ export function HiddenProductsPage() {
     nameBlockOverrides,
     storeObstBlockOrder,
   ])
-
-  const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
-  const flowDirection = (layoutSettings?.flow_direction ?? 'COLUMN_FIRST') as 'ROW_BY_ROW' | 'COLUMN_FIRST'
-  const dialogFontSizes = {
-    header: layoutSettings?.font_header_px ?? 24,
-    column: layoutSettings?.font_column_px ?? 16,
-    product: layoutSettings?.font_product_px ?? 12,
-  }
-  const hiddenPLUSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
-  const searchableItems = useMemo(() => {
-    const master = masterItems
-      .filter((m) => !hiddenPLUSet.has(m.plu))
-      .map((m) => ({
-        id: m.id,
-        plu: m.plu,
-        display_name: m.display_name ?? m.system_name,
-        system_name: m.system_name,
-        item_type: m.item_type as 'PIECE' | 'WEIGHT',
-        block_id: m.block_id,
-      }))
-    const custom = customProducts
-      .filter((c) => !hiddenPLUSet.has(c.plu))
-      .map((c) => ({
-        id: c.id,
-        plu: c.plu,
-        display_name: c.name,
-        system_name: c.name,
-        item_type: c.item_type as 'PIECE' | 'WEIGHT',
-        block_id: c.block_id,
-      }))
-    return [...master, ...custom]
-  }, [masterItems, customProducts, hiddenPLUSet])
 
   const hiddenByIds = useMemo(() => [...new Set(hiddenItems.map((h) => h.hidden_by))], [hiddenItems])
 
@@ -367,7 +331,11 @@ export function HiddenProductsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowHideDialog(true)}
+              onClick={() =>
+                navigate(`${pathPrefix}/pick-hide-obst`, {
+                  state: { backTo: `${pathname}${location.search ?? ''}` },
+                })
+              }
               data-tour="obst-hidden-add-button"
             >
               <EyeOff className="h-4 w-4 mr-2" />
@@ -417,20 +385,6 @@ export function HiddenProductsPage() {
               />
             </CardContent>
           </Card>
-        )}
-
-        {canManageHidden && (
-          <HideProductsDialog
-            open={showHideDialog}
-            onOpenChange={setShowHideDialog}
-            searchableItems={searchableItems}
-            displayMode={displayMode}
-            listLayout={hideDialogListLayout}
-            flowDirection={flowDirection}
-            fontSizes={dialogFontSizes}
-            dataTour="obst-hidden-add-dialog"
-            submitDataTour="obst-hidden-add-dialog-submit"
-          />
         )}
 
         {editingProduct && (

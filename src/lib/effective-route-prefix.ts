@@ -5,7 +5,7 @@
 
 import type { UserPreviewSessionState } from '@/lib/user-preview-session'
 
-export type DashboardPath = '/super-admin' | '/admin' | '/user' | '/viewer'
+export type DashboardPath = '/super-admin' | '/admin' | '/user' | '/viewer' | '/kiosk'
 
 /** Basis-Dashboard je DB-Rolle bzw. simulierter Rolle. */
 export function roleToDashboardPath(role: string | undefined): DashboardPath {
@@ -16,6 +16,8 @@ export function roleToDashboardPath(role: string | undefined): DashboardPath {
       return '/admin'
     case 'viewer':
       return '/viewer'
+    case 'kiosk':
+      return '/kiosk'
     default:
       return '/user'
   }

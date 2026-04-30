@@ -48,6 +48,7 @@ export function EditBackshopCustomProductDialog({
 
   const [name, setName] = useState(product.name)
   const [blockId, setBlockId] = useState(product.block_id ?? '')
+  const [offerSheetTest, setOfferSheetTest] = useState(product.is_offer_sheet_test)
   const [newImageFile, setNewImageFile] = useState<File | null>(null)
   const [newImagePreview, setNewImagePreview] = useState<string | null>(null)
   const [errorPopup, setErrorPopup] = useState<string | null>(null)
@@ -94,12 +95,13 @@ export function EditBackshopCustomProductDialog({
         name: name.trim(),
         ...(imageUrl !== undefined && { image_url: imageUrl }),
         block_id: blockId || null,
+        is_offer_sheet_test: offerSheetTest,
       })
       onOpenChange(false)
     } catch (e) {
       setErrorPopup(e instanceof Error ? e.message : 'Unbekannter Fehler')
     }
-  }, [product.id, name, blockId, newImageFile, user, updateProduct, onOpenChange])
+  }, [product.id, name, blockId, offerSheetTest, newImageFile, user, updateProduct, onOpenChange])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -125,6 +127,22 @@ export function EditBackshopCustomProductDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="z.B. Croissant"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-backshop-offer-sheet">Angebots-PDF</Label>
+            <Select
+              value={offerSheetTest ? 'test' : 'firm'}
+              onValueChange={(v) => setOfferSheetTest(v === 'test')}
+            >
+              <SelectTrigger id="edit-backshop-offer-sheet">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="test">Test (unter „Neue Produkte“ auf Angebots-PDF)</SelectItem>
+                <SelectItem value="firm">In Hauptliste fest</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

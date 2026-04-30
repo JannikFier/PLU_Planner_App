@@ -18,12 +18,13 @@ import { AppBrandLogo } from '@/components/layout/AppBrandLogo'
  */
 export function LoginPage() {
   const location = useLocation()
-  const {
+    const {
     user,
     isLoading,
     isSuperAdmin,
     isAdmin,
     isViewer,
+    isKiosk,
     mustChangePassword,
     error,
     loginWithEmail,
@@ -57,7 +58,18 @@ export function LoginPage() {
     if (mustChangePassword) {
       return <Navigate to="/change-password" replace />
     }
-    const dashboardPath = isSuperAdmin ? '/super-admin' : isAdmin ? '/admin' : isViewer ? '/viewer' : '/user'
+    const dashboardPath = isSuperAdmin
+      ? '/super-admin'
+      : isAdmin
+        ? '/admin'
+        : isViewer
+          ? '/viewer'
+          : isKiosk
+            ? '/kiosk'
+            : '/user'
+    if (isKiosk) {
+      return <Navigate to="/kiosk" replace />
+    }
     const from = (location.state as { from?: { pathname?: string } })?.from?.pathname || dashboardPath
     return <Navigate to={from} replace />
   }

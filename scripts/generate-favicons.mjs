@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import toIco from 'to-ico';
+import { buildIcoFromPngBuffers } from './ico-from-png.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, '..', 'public');
@@ -28,7 +28,7 @@ writeFileSync(join(publicDir, 'apple-touch-icon.png'), await png(180));
 writeFileSync(join(publicDir, 'icon-192.png'), await png(192));
 writeFileSync(join(publicDir, 'icon-512.png'), await png(512));
 
-const icoBuffer = await toIco([png16, png32, png48]);
+const icoBuffer = buildIcoFromPngBuffers([png16, png32, png48]);
 writeFileSync(join(publicDir, 'favicon.ico'), icoBuffer);
 
 console.log('Favicons generiert: favicon.ico, PNGs (16–512), apple-touch-icon.');

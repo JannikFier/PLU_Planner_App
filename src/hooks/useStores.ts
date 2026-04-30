@@ -76,6 +76,7 @@ export function useCreateStore() {
         .insert([
           { store_id: storeData.id, list_type: 'obst_gemuese', is_visible: true },
           { store_id: storeData.id, list_type: 'backshop', is_visible: true },
+          { store_id: storeData.id, list_type: 'kiosk', is_visible: true },
         ] as never)
 
       return storeData

@@ -95,7 +95,7 @@ export type TutorialPose = string
  */
 export interface TutorialStepCtx {
   store: { id: string | null; name: string | null }
-  role: 'viewer' | 'user' | 'admin' | 'super_admin' | null
+  role: 'viewer' | 'kiosk' | 'user' | 'admin' | 'super_admin' | null
   device: DeviceClass
   obst: {
     visible: boolean

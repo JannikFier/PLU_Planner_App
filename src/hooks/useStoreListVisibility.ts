@@ -9,7 +9,12 @@ import { useAuth } from '@/hooks/useAuth'
 /** list_type-Werte in store_list_visibility / user_list_visibility */
 export const LIST_TYPE_OBST_GEMUESE = 'obst_gemuese' as const
 export const LIST_TYPE_BACKSHOP = 'backshop' as const
-export type ListTypeKey = typeof LIST_TYPE_OBST_GEMUESE | typeof LIST_TYPE_BACKSHOP
+/** Kassenmodus (QR / Kassen-Anmeldung) – nur Markt-Ebene, kein Eintrag in user_list_visibility */
+export const LIST_TYPE_KIOSK = 'kiosk' as const
+export type ListTypeKey =
+  | typeof LIST_TYPE_OBST_GEMUESE
+  | typeof LIST_TYPE_BACKSHOP
+  | typeof LIST_TYPE_KIOSK
 
 function rowVisible(
   rows: StoreListVisibility[] | UserListVisibility[] | undefined,
@@ -57,6 +62,8 @@ export function useUpdateStoreListVisibility() {
     },
     onSuccess: (_, params) => {
       queryClient.invalidateQueries({ queryKey: ['store-list-visibility', params.storeId] })
+      queryClient.invalidateQueries({ queryKey: ['kiosk-entrance', params.storeId] })
+      queryClient.invalidateQueries({ queryKey: ['kiosk-registers', params.storeId] })
       toast.success('Listen-Sichtbarkeit wurde aktualisiert.')
     },
     onError: (e: Error) => toast.error(e.message),
@@ -111,23 +118,26 @@ export function useEffectiveListVisibility() {
 
   const result = useMemo(() => {
     if (!currentStoreId) {
-      return { obstGemuese: true, backshop: true }
+      return { obstGemuese: true, backshop: true, kiosk: true }
     }
     const s = storeQ.data
     const u = userQ.data
     const storeObst = rowVisible(s, LIST_TYPE_OBST_GEMUESE)
     const storeBack = rowVisible(s, LIST_TYPE_BACKSHOP)
+    const storeKiosk = rowVisible(s, LIST_TYPE_KIOSK)
     const userObst = u ? rowVisible(u, LIST_TYPE_OBST_GEMUESE) : true
     const userBack = u ? rowVisible(u, LIST_TYPE_BACKSHOP) : true
     return {
       obstGemuese: storeObst && userObst,
       backshop: storeBack && userBack,
+      kiosk: storeKiosk,
     }
   }, [currentStoreId, storeQ.data, userQ.data])
 
   return {
     obstGemuese: result.obstGemuese,
     backshop: result.backshop,
+    kiosk: result.kiosk,
     isLoading: hasStoreContext ? isLoading : false,
   }
 }
@@ -137,11 +147,12 @@ export function useStoreListAreaEnabled(storeId: string | undefined) {
   const storeQ = useStoreListVisibility(storeId)
   const isLoading = Boolean(storeId && storeQ.isLoading)
   const result = useMemo(() => {
-    if (!storeId) return { obstGemuese: true, backshop: true }
+    if (!storeId) return { obstGemuese: true, backshop: true, kiosk: true }
     const s = storeQ.data
     return {
       obstGemuese: rowVisible(s, LIST_TYPE_OBST_GEMUESE),
       backshop: rowVisible(s, LIST_TYPE_BACKSHOP),
+      kiosk: rowVisible(s, LIST_TYPE_KIOSK),
     }
   }, [storeId, storeQ.data])
   return { ...result, isLoading }

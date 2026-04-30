@@ -65,7 +65,7 @@ import { carryoverObstRowToMasterItem } from '@/lib/carryover-master-snapshot'
 import { useObstPrevManualSupplementPluSet } from '@/hooks/usePrevManualSupplementPluSet'
 
 interface MasterListProps {
-  mode: 'user' | 'admin' | 'viewer'
+  mode: 'user' | 'admin' | 'viewer' | 'kiosk'
 }
 
 /**
@@ -88,7 +88,10 @@ export function MasterList({ mode }: MasterListProps) {
     location.pathname.startsWith('/super-admin') ? '/super-admin'
     : location.pathname.startsWith('/admin') ? '/admin'
     : location.pathname.startsWith('/viewer') ? '/viewer'
+    : location.pathname.startsWith('/kiosk') ? '/kiosk'
     : '/user'
+
+  const readOnlyListMode = mode === 'viewer' || mode === 'kiosk'
 
   // Daten laden
   const { data: activeVersion, isLoading: versionLoading } = useActiveVersion()
@@ -417,7 +420,7 @@ export function MasterList({ mode }: MasterListProps) {
         }
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : 'Aktive Version setzen fehlgeschlagen'))
-  }, [versionLoading, versionsLoading, versions, queryClient])
+  }, [isSnapshot, versionLoading, versionsLoading, versions, queryClient])
 
   // Tab wurde sichtbar: Browser throttelt Hintergrund-Tabs – Re-Render erzwingen,
   // damit bereits geladene Daten sofort angezeigt werden (sonst erst nach Klick).
@@ -439,7 +442,7 @@ export function MasterList({ mode }: MasterListProps) {
 
   /** Mobile (max-sm): Aktionen im ⋮-Menü – gleiche Ziele wie die Desktop-Buttons */
   const obstMobileMenuItems = useMemo((): PLUListPageActionMenuItem[] => {
-    if (mode === 'viewer') return []
+    if (readOnlyListMode) return []
     if (snapshotReadOnly) {
       return [
         {
@@ -511,6 +514,7 @@ export function MasterList({ mode }: MasterListProps) {
     return items
   }, [
     mode,
+    readOnlyListMode,
     snapshotReadOnly,
     location.pathname,
     location.search,
@@ -522,7 +526,7 @@ export function MasterList({ mode }: MasterListProps) {
   ])
 
   return (
-    <DashboardLayout>
+    <DashboardLayout hideHeader={mode === 'kiosk'}>
       <div className="space-y-4">
         {/* === Header: Schmal – kompakt (Titel | Aktionen-Menü) === */}
         <div className="lg:hidden flex items-center justify-between gap-3 min-w-0">
@@ -666,7 +670,7 @@ export function MasterList({ mode }: MasterListProps) {
 
             {/* Rechts: Aktionen ab lg (eine Zeile, rechtsbündig) */}
             <div className="hidden lg:flex shrink-0 flex-nowrap items-center gap-2" data-tour="masterlist-toolbar-actions">
-              {mode !== 'viewer' && !snapshotReadOnly && (
+              {!readOnlyListMode && !snapshotReadOnly && (
                 <>
                   {featuresCustomProducts && (
                   <Button
@@ -711,7 +715,7 @@ export function MasterList({ mode }: MasterListProps) {
                   </Button>
                 </>
               )}
-              {mode !== 'viewer' && !snapshotReadOnly && (
+              {!readOnlyListMode && !snapshotReadOnly && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -726,7 +730,7 @@ export function MasterList({ mode }: MasterListProps) {
                   Umbenennen
                 </Button>
               )}
-              {sortMode === 'BY_BLOCK' && !snapshotReadOnly && (
+              {sortMode === 'BY_BLOCK' && !readOnlyListMode && !snapshotReadOnly && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -743,6 +747,7 @@ export function MasterList({ mode }: MasterListProps) {
                   Warengruppen
                 </Button>
               )}
+              {mode !== 'kiosk' && (
               <Button
                 variant="outline"
                 size="sm"
@@ -755,6 +760,7 @@ export function MasterList({ mode }: MasterListProps) {
                 <FileDown className="h-4 w-4 mr-1" />
                 PDF
               </Button>
+              )}
             </div>
             {/* Viewer: PDF auf dem Handy ohne ⋮-Menü */}
             {mode === 'viewer' && (
@@ -904,7 +910,7 @@ export function MasterList({ mode }: MasterListProps) {
       </div>
 
       {/* === Dialoge – PDF-Export lazy, damit jspdf/html2canvas erst bei Öffnen geladen werden === */}
-      {showPDFDialog && (
+      {showPDFDialog && mode !== 'kiosk' && (
         <Suspense fallback={null}>
           <ExportPDFDialog
             open={showPDFDialog}

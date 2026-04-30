@@ -5,6 +5,7 @@ import { dismissTutorialWelcomeIfVisible } from './dismiss-tutorial-welcome'
  * Tutorial: Smoke-Tests für die wichtigsten UX-Flows – Dismiss / Skip / ESC /
  * Basics-dann-TrackPick. Volle Walkthroughs liegen in tutorial-full-walkthrough.spec.ts.
  * @extended — benötigt .env.e2e mit E2E_ADMIN_* (wie Admin-Journey).
+ * Wichtig: E2E_ADMIN_* muss ein echter Admin (role admin, /admin/) sein – kein Super-Admin-Konto.
  */
 test.describe('Tutorial Smoke @extended', () => {
   test.beforeEach(async ({ page }) => {
@@ -74,7 +75,7 @@ test.describe('Tutorial Smoke @extended', () => {
     await expect(page.getByRole('dialog').filter({ hasText: 'Hi, ich bin Fier' })).not.toBeVisible()
   })
 
-  test('Tour starten: Basics inkl. Bereich wählen, dann Einstieg ins gewählte Modul', async ({ page }) => {
+  test('Tour starten: nach Basics TrackPick oder bereichsinferierter Modulstart', async ({ page }) => {
     test.setTimeout(60_000)
     await page.locator('[data-tour="profile-menu"]').click()
     await page.getByRole('menuitem', { name: 'Einführung wiederholen' }).click()
@@ -85,29 +86,23 @@ test.describe('Tutorial Smoke @extended', () => {
 
     // Basics: Admin/Non-Viewer = interaktiver Coach (TutorialCoachPanel, „Weiter“); sonst driver.js.
     // Max. Iterationen hoch – Basics inkl. Header-Hints + Pick-Area sind viele Schritte.
-    // Nach dem Pick-Schritt („Wähle einen Bereich“) muss eine Kachel geklickt werden; sonst bleibt
-    // runBasicsSegment hängen. TrackPick nach Basics entfällt, sobald die Route ein Modul erkennt
-    // (siehe inferTutorialModuleFromPath) – daher Ziel-URL statt TrackPick-Dialog.
-    let pickedModule = false
+    // Nach „Bereich wählen“ kann die App den Track-Pick überspringen und das Modul aus der URL ableiten
+    // (inferTutorialModuleFromPath) – dann erscheint kein „Womit möchtest du starten?“-Dialog.
+    const masterlistPageTitle = page.getByRole('heading', { name: /PLU Obst und Gemüse/i, level: 2 })
+    const backshopListTitle = page.getByRole('heading', { name: /PLU-Liste Backshop|PLU Backshop/i })
     for (let i = 0; i < 45; i += 1) {
       const trackPick = page.getByRole('dialog').filter({
         hasText: /Womit möchtest du starten|Weiter mit einem nächsten Bereich/,
       })
       if (await trackPick.isVisible().catch(() => false)) break
-
-      const pickAreaCoach = page.getByRole('status').filter({ hasText: 'Wähle einen Bereich' })
-      if (await pickAreaCoach.isVisible().catch(() => false)) {
-        const obst = page.locator('[data-tour="dashboard-card-obst"]')
-        const backshop = page.locator('[data-tour="dashboard-card-backshop"]')
-        const users = page.locator('[data-tour="dashboard-card-users"]')
-        if (await obst.isVisible().catch(() => false)) await obst.click()
-        else if (await backshop.isVisible().catch(() => false)) await backshop.click()
-        else if (await users.isVisible().catch(() => false)) await users.click()
-        await page.waitForTimeout(400)
-        pickedModule = true
-        break
-      }
-
+      const inferredContent =
+        (await page.locator('[data-tour="masterlist-toolbar-actions"]').isVisible().catch(() => false)) ||
+        (await page.locator('[data-tour="obst-master-toolbar"]').isVisible().catch(() => false)) ||
+        (await masterlistPageTitle.isVisible().catch(() => false)) ||
+        (await page.locator('[data-tour="backshop-master-toolbar"]').isVisible().catch(() => false)) ||
+        (await backshopListTitle.isVisible().catch(() => false)) ||
+        (await page.locator('[data-tour="user-management-heading"]').isVisible().catch(() => false))
+      if (inferredContent) break
       const coachWeiter = page.locator('[data-testid="tutorial-coach-panel"]').getByRole('button', { name: 'Weiter' })
       if (await coachWeiter.isVisible().catch(() => false)) {
         await coachWeiter.click()
@@ -119,6 +114,53 @@ test.describe('Tutorial Smoke @extended', () => {
         await next.click()
         await page.waitForTimeout(200)
         continue
+      }
+      // basics-pick-area: Coach fordert Kachel-Klick; oft kein „Weiter“ (nur Validierung per Navigation).
+      const urlNow = page.url()
+      const pathNorm = new URL(urlNow).pathname.replace(/\/+$/, '') || '/'
+      const bareAdminDashboard = pathNorm === '/admin'
+      const coachPanel = page.locator('[data-testid="tutorial-coach-panel"]')
+      const pickCoachVisible =
+        bareAdminDashboard &&
+        ((await coachPanel.getByText(/Wähle einen Bereich/).isVisible().catch(() => false)) ||
+          (await coachPanel.getByText(/Klicke auf eine Kachel/).isVisible().catch(() => false)))
+      if (pickCoachVisible) {
+        const obstCard = page.locator('[data-tour="dashboard-card-obst"]')
+        const backshopCard = page.locator('[data-tour="dashboard-card-backshop"]')
+        const usersCard = page.locator('[data-tour="dashboard-card-users"]')
+        if (await obstCard.isVisible().catch(() => false)) {
+          await obstCard.click()
+          await page.waitForTimeout(500)
+          continue
+        }
+        if (await backshopCard.isVisible().catch(() => false)) {
+          await backshopCard.click()
+          await page.waitForTimeout(500)
+          continue
+        }
+        if (await usersCard.isVisible().catch(() => false)) {
+          await usersCard.click()
+          await page.waitForTimeout(500)
+          continue
+        }
+        const obstHeading = page.getByRole('heading', { name: /^Obst und Gemüse$/, level: 3 })
+        const backshopHeading = page.getByRole('heading', { name: /^Backshop$/, level: 3 })
+        const usersHeading = page.getByRole('heading', { name: /^Benutzer$/, level: 3 })
+        if (await obstHeading.isVisible().catch(() => false)) {
+          await obstHeading.click()
+          await page.waitForTimeout(500)
+          continue
+        }
+        if (await backshopHeading.isVisible().catch(() => false)) {
+          await backshopHeading.click()
+          await page.waitForTimeout(500)
+          continue
+        }
+        if (await usersHeading.isVisible().catch(() => false)) {
+          await usersHeading.click()
+          await page.waitForTimeout(500)
+          continue
+        }
       }
       // Interaktiver Task: Profilmenü öffnen / Testmodus starten
       const profile = page.locator('[data-tour="profile-menu"]')
@@ -134,9 +176,15 @@ test.describe('Tutorial Smoke @extended', () => {
       }
     }
 
-    expect(pickedModule).toBe(true)
-
-    // Orchestrator startet nach Kachelwahl das passende Modul (z. B. Masterliste).
-    await expect(page).toHaveURL(/\/admin\/(masterlist|backshop-list|users)/, { timeout: 30_000 })
+    const trackPickOrInferredStart = page
+      .getByRole('dialog')
+      .filter({ hasText: /Womit möchtest du starten|Weiter mit einem nächsten Bereich/ })
+      .or(page.locator('[data-tour="masterlist-toolbar-actions"]'))
+      .or(page.locator('[data-tour="obst-master-toolbar"]'))
+      .or(masterlistPageTitle)
+      .or(page.locator('[data-tour="backshop-master-toolbar"]'))
+      .or(backshopListTitle)
+      .or(page.locator('[data-tour="user-management-heading"]'))
+    await expect(trackPickOrInferredStart.first()).toBeVisible({ timeout: 45_000 })
   })
 })

@@ -133,7 +133,7 @@ export interface Database {
           email: string
           personalnummer: string
           display_name: string | null
-          role: 'super_admin' | 'admin' | 'user' | 'viewer'
+          role: 'super_admin' | 'admin' | 'user' | 'viewer' | 'kiosk'
           must_change_password: boolean
           created_by: string | null
           created_at: string
@@ -145,7 +145,7 @@ export interface Database {
           email: string
           personalnummer: string
           display_name?: string | null
-          role?: 'super_admin' | 'admin' | 'user' | 'viewer'
+          role?: 'super_admin' | 'admin' | 'user' | 'viewer' | 'kiosk'
           must_change_password?: boolean
           created_by?: string | null
           created_at?: string
@@ -157,10 +157,54 @@ export interface Database {
           email?: string
           personalnummer?: string
           display_name?: string | null
-          role?: 'super_admin' | 'admin' | 'user' | 'viewer'
+          role?: 'super_admin' | 'admin' | 'user' | 'viewer' | 'kiosk'
           must_change_password?: boolean
           last_login?: string | null
           current_store_id?: string | null
+        }
+      }
+      store_kiosk_entrances: {
+        Row: {
+          id: string
+          store_id: string
+          token: string
+          created_at: string
+          revoked_at: string | null
+        }
+        Insert: {
+          id?: string
+          store_id: string
+          token: string
+          created_at?: string
+          revoked_at?: string | null
+        }
+        Update: {
+          revoked_at?: string | null
+        }
+      }
+      store_kiosk_registers: {
+        Row: {
+          id: string
+          store_id: string
+          sort_order: number
+          display_label: string
+          auth_user_id: string
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          store_id: string
+          sort_order: number
+          display_label: string
+          auth_user_id: string
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          sort_order?: number
+          display_label?: string
+          active?: boolean
         }
       }
       versions: {
@@ -884,6 +928,8 @@ export interface Database {
           created_at: string
           updated_at: string
           store_id: string
+          /** true: Block „Neue Produkte“ auf Angebots-PDF; false: fest in Hauptliste */
+          is_offer_sheet_test: boolean
         }
         Insert: {
           id?: string
@@ -895,6 +941,7 @@ export interface Database {
           store_id?: string
           created_at?: string
           updated_at?: string
+          is_offer_sheet_test?: boolean
         }
         Update: {
           plu?: string
@@ -902,6 +949,7 @@ export interface Database {
           image_url?: string
           block_id?: string | null
           updated_at?: string
+          is_offer_sheet_test?: boolean
         }
       }
       backshop_hidden_items: {
@@ -1015,6 +1063,8 @@ export interface Database {
           kw_nummer: number
           jahr: number
           source_file_name: string | null
+          /** Auslieferung ab (Exit-Excel), nur Datum */
+          auslieferung_ab: string | null
           created_at: string
           created_by: string
         }
@@ -1023,6 +1073,7 @@ export interface Database {
           kw_nummer: number
           jahr: number
           source_file_name?: string | null
+          auslieferung_ab?: string | null
           created_at?: string
           created_by: string
         }
@@ -1030,6 +1081,7 @@ export interface Database {
           kw_nummer?: number
           jahr?: number
           source_file_name?: string | null
+          auslieferung_ab?: string | null
         }
       }
       backshop_offer_campaign_lines: {
@@ -1038,6 +1090,12 @@ export interface Database {
           campaign_id: string
           plu: string | null
           promo_price: number
+          /** Erwerbspreis aus Zentral-Excel (optional) */
+          purchase_price: number | null
+          /** Listen-EK (optional) */
+          list_ek: number | null
+          /** Listen-VK (optional) */
+          list_vk: number | null
           sort_index: number
           source_art_nr: string | null
           source_plu: string | null
@@ -1049,6 +1107,9 @@ export interface Database {
           campaign_id: string
           plu?: string | null
           promo_price: number
+          purchase_price?: number | null
+          list_ek?: number | null
+          list_vk?: number | null
           sort_index?: number
           source_art_nr?: string | null
           source_plu?: string | null
@@ -1058,6 +1119,9 @@ export interface Database {
         Update: {
           plu?: string | null
           promo_price?: number
+          purchase_price?: number | null
+          list_ek?: number | null
+          list_vk?: number | null
           sort_index?: number
           source_art_nr?: string | null
           source_plu?: string | null
@@ -1100,6 +1164,46 @@ export interface Database {
         Update: {
           local_promo_price?: number
           updated_at?: string
+        }
+      }
+      backshop_werbung_weekday_quantities: {
+        Row: {
+          store_id: string
+          kw_nummer: number
+          jahr: number
+          plu: string
+          qty_mo: number | null
+          qty_di: number | null
+          qty_mi: number | null
+          qty_do: number | null
+          qty_fr: number | null
+          qty_sa: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          store_id: string
+          kw_nummer: number
+          jahr: number
+          plu: string
+          qty_mo?: number | null
+          qty_di?: number | null
+          qty_mi?: number | null
+          qty_do?: number | null
+          qty_fr?: number | null
+          qty_sa?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          qty_mo?: number | null
+          qty_di?: number | null
+          qty_mi?: number | null
+          qty_do?: number | null
+          qty_fr?: number | null
+          qty_sa?: number | null
+          updated_at?: string
+          updated_by?: string | null
         }
       }
       backshop_version_notifications: {
@@ -1487,6 +1591,10 @@ export interface Database {
         Args: { p_version_id: string; p_source: string }
         Returns: undefined
       }
+      kiosk_list_registers: {
+        Args: { p_token: string }
+        Returns: { id: string; display_label: string; sort_order: number }[]
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -1535,6 +1643,7 @@ export type BackshopOfferCampaign = Database['public']['Tables']['backshop_offer
 export type BackshopOfferCampaignLine = Database['public']['Tables']['backshop_offer_campaign_lines']['Row']
 export type BackshopOfferStoreDisabled = Database['public']['Tables']['backshop_offer_store_disabled']['Row']
 export type BackshopOfferStoreLocalPrice = Database['public']['Tables']['backshop_offer_store_local_prices']['Row']
+export type BackshopWerbungWeekdayQuantity = Database['public']['Tables']['backshop_werbung_weekday_quantities']['Row']
 export type BackshopVersionNotification = Database['public']['Tables']['backshop_version_notifications']['Row']
 export type BackshopLayoutSettings = Database['public']['Tables']['backshop_layout_settings']['Row']
 export type BackshopBlockRule = Database['public']['Tables']['backshop_block_rules']['Row']

@@ -195,6 +195,20 @@ test.describe('Mobile Layout @mobile @extended', () => {
     }
   })
 
+  test('Backshop Werbung bestellen (KW-Liste): keine horizontale Scrollbreite', async ({ page }) => {
+    await page.goto('/user/backshop-werbung')
+    await expect(page).toHaveURL(/\/user\/backshop-werbung/)
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('heading', { name: 'Werbung bestellen', level: 2 })).toBeVisible({
+      timeout: 15_000,
+    })
+    await expectNoHorizontalOverflow(page)
+    const kwListRoot = page.locator('[data-testid="backshop-werbung-kw-list"]')
+    if ((await kwListRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(kwListRoot.first(), 'backshop-werbung-kw-list')
+    }
+  })
+
   test('Backshop Umbenannte: keine horizontale Scrollbreite', async ({ page }) => {
     await page.goto('/user/backshop-renamed-products')
     await expect(page).toHaveURL(/\/user\/backshop-renamed-products/)
@@ -209,7 +223,7 @@ test.describe('Mobile Layout @mobile @extended', () => {
     }
   })
 
-  test('Ausblenden-Dialog: Footer-Buttons im Modal sichtbar (kurze Viewport-Höhe)', async ({ page }, testInfo) => {
+  test('Ausblenden-Picker: Footer-Buttons sichtbar (kurze Viewport-Höhe)', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 420 })
     await page.goto('/user/hidden-products')
     await expect(page).toHaveURL(/\/user\/hidden-products/)
@@ -221,11 +235,16 @@ test.describe('Mobile Layout @mobile @extended', () => {
       return
     }
     await openBtn.click()
-    await expect(page.getByRole('dialog', { name: 'Produkte ausblenden' })).toBeVisible({ timeout: 10_000 })
+    await expect(page).toHaveURL(/\/user\/pick-hide-obst/, { timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: 'Produkte ausblenden', level: 2 })).toBeVisible({
+      timeout: 10_000,
+    })
     const cancel = page.getByRole('button', { name: 'Abbrechen' })
     const confirm = page.getByRole('button', { name: /Produkt.*ausblenden/ })
     await expect(cancel).toBeVisible()
     await expect(confirm).toBeVisible()
+    // Vollseite: Footer sitzt unter der Liste — bei niedriger Höhe erst scrollen, dann im Viewport prüfen
+    await cancel.scrollIntoViewIfNeeded()
     await expect(cancel).toBeInViewport()
     await expect(confirm).toBeInViewport()
   })

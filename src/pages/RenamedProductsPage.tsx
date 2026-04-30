@@ -2,6 +2,7 @@
 // Liste der umbenannten Master-Items, „Produkte umbenennen“-Dialog, Zurücksetzen mit Bestätigung
 
 import { useMemo, useState, useCallback } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -42,7 +43,6 @@ import { itemMatchesSearch } from '@/lib/plu-helpers'
 import { useListFindInPageSection } from '@/hooks/useListFindInPageSection'
 import { ListFindInPageToolbar } from '@/components/plu/ListFindInPageToolbar'
 import type { ListFindInPageBinding } from '@/components/plu/list-find-in-page-types'
-import { RenameProductsDialog } from '@/components/plu/RenameProductsDialog'
 import {
   RenamedProductsResponsiveList,
   type RenamedProductDisplayRow,
@@ -53,7 +53,13 @@ import { carryoverObstRowToMasterItem } from '@/lib/carryover-master-snapshot'
 
 export function RenamedProductsPage() {
   useAuth()
-  const [showRenameDialog, setShowRenameDialog] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const pathPrefix =
+    location.pathname.startsWith('/super-admin') ? '/super-admin'
+    : location.pathname.startsWith('/admin') ? '/admin'
+    : location.pathname.startsWith('/viewer') ? '/viewer'
+    : '/user'
   const [resetConfirmItem, setResetConfirmItem] = useState<MasterPLUItem | null>(null)
 
   const { data: activeVersion } = useActiveVersion()
@@ -70,15 +76,6 @@ export function RenamedProductsPage() {
     () => buildNameBlockOverrideMap(storeObstNameOverrides),
     [storeObstNameOverrides],
   )
-  const renameDialogListLayout = useMemo(
-    () => ({
-      sortMode: (layoutSettings?.sort_mode ?? 'ALPHABETICAL') as 'ALPHABETICAL' | 'BY_BLOCK',
-      blocks,
-      storeBlockOrder: storeObstBlockOrder,
-      nameBlockOverrides,
-    }),
-    [layoutSettings?.sort_mode, blocks, storeObstBlockOrder, nameBlockOverrides],
-  )
   const { data: offerItems = [] } = useOfferItems()
   const { data: obstCampaign } = useObstOfferCampaignForKwYear(
     activeVersion?.kw_nummer,
@@ -89,13 +86,6 @@ export function RenamedProductsPage() {
   const { overrideMap: obstLocalOverrides } = useObstOfferLocalPriceOverrides(obstCampaign ?? undefined)
   const resetName = useResetProductName()
   const deleteObstRenamedByPlu = useDeleteObstRenamedByPlu()
-  const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
-  const flowDirection = (layoutSettings?.flow_direction ?? 'COLUMN_FIRST') as 'ROW_BY_ROW' | 'COLUMN_FIRST'
-  const dialogFontSizes = {
-    header: layoutSettings?.font_header_px ?? 24,
-    column: layoutSettings?.font_column_px ?? 16,
-    product: layoutSettings?.font_product_px ?? 12,
-  }
 
   const { kw: calendarKw, year: calendarJahr } = getKWAndYearFromDate(new Date())
   const offerMapKw = activeVersion?.kw_nummer ?? calendarKw
@@ -178,8 +168,6 @@ export function RenamedProductsPage() {
     }
     return m
   }, [masterItems, carryoverMastersIncluded])
-
-  const searchableItemsForRename = useMemo(() => Array.from(masterByPluForRenamed.values()), [masterByPluForRenamed])
 
   // Marktspezifisch umbenannt: Master ODER Carryover-Zeile (PLU nur in Carryover)
   const renamedItems = useMemo(() => {
@@ -290,7 +278,11 @@ export function RenamedProductsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowRenameDialog(true)}
+            onClick={() =>
+              navigate(`${pathPrefix}/pick-rename-obst`, {
+                state: { backTo: `${location.pathname}${location.search ?? ''}` },
+              })
+            }
             data-tour="obst-renamed-add-button"
           >
             <Pencil className="h-4 w-4 mr-2" />
@@ -339,20 +331,6 @@ export function RenamedProductsPage() {
             </CardContent>
           </Card>
         )}
-
-        <RenameProductsDialog
-          open={showRenameDialog}
-          onOpenChange={setShowRenameDialog}
-          searchableItems={searchableItemsForRename}
-          displayMode={displayMode}
-          renamedOverrides={storeRenamed.map((r) => ({ plu: r.plu, display_name: r.display_name }))}
-          listLayout={renameDialogListLayout}
-          flowDirection={flowDirection}
-          fontSizes={dialogFontSizes}
-          dataTour="obst-renamed-add-dialog"
-          renameDialogDataTour="obst-renamed-rename-dialog"
-          renameDialogSubmitDataTour="obst-renamed-rename-dialog-submit"
-        />
 
         <AlertDialog open={!!resetConfirmItem} onOpenChange={(open) => !open && setResetConfirmItem(null)}>
           <AlertDialogContent data-tour="obst-renamed-reset-confirm">

@@ -25,13 +25,18 @@ export function useTutorialStepCtx(device: DeviceClass): TutorialStepCtx {
   const bs = useBackshopLayoutSettings()
 
   return useMemo<TutorialStepCtx>(() => {
+    const r = profile?.role
     const role: TutorialStepCtx['role'] = isSuperAdmin
       ? 'super_admin'
       : isAdmin
         ? 'admin'
         : isViewer
           ? 'viewer'
-          : profile?.role ?? null
+          : r === 'kiosk'
+            ? 'kiosk'
+            : r === 'user'
+              ? 'user'
+              : null
 
     return {
       store: { id: currentStoreId, name: storeName },

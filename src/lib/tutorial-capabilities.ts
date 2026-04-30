@@ -68,7 +68,7 @@ export type TutorialCapabilitySet = ReadonlySet<TutorialCapability>
  * damit die Logik losgeloest von React-Hooks getestet werden kann.
  */
 export interface TutorialCapabilityInputs {
-  role: 'viewer' | 'user' | 'admin' | 'super_admin' | null
+  role: 'viewer' | 'kiosk' | 'user' | 'admin' | 'super_admin' | null
   hasStore: boolean
   obstVisible: boolean
   backshopVisible: boolean
@@ -102,7 +102,7 @@ export function deriveTutorialCapabilities(
   if (inputs.mustChangePassword) out.add('firstLogin')
 
   const role = inputs.role
-  const isViewer = role === 'viewer'
+  const isViewer = role === 'viewer' || role === 'kiosk'
   const isAdmin = role === 'admin' || role === 'super_admin'
   const isWriter = role === 'user' || role === 'admin' || role === 'super_admin'
   const carryoverWrite = isWriter && inputs.hasStore

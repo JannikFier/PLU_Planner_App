@@ -43,12 +43,11 @@ import {
   useStoreBackshopBlockOrder,
   useStoreBackshopNameBlockOverrides,
 } from '@/hooks/useStoreBackshopBlockLayout'
-import { buildBackshopDisplayList, type BackshopDisplayListInput } from '@/lib/layout-engine'
+import { buildBackshopDisplayList, type BackshopDisplayListInput, toBackshopCustomProductInput } from '@/lib/layout-engine'
 import { buildOfferDisplayMap } from '@/lib/offer-display'
 import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import { orderByPluDisplayOrder } from '@/lib/list-order'
 import { useQuery } from '@tanstack/react-query'
-import { HideBackshopProductsDialog } from '@/components/plu/HideBackshopProductsDialog'
 import { EditBackshopCustomProductDialog } from '@/components/plu/EditBackshopCustomProductDialog'
 import {
   HiddenProductsResponsiveList,
@@ -128,7 +127,6 @@ export function BackshopHiddenProductsPage() {
   const canManageHidden = canManageMarketHiddenItems(effectiveRole, pathname)
   const { currentStoreId } = useCurrentStore()
   const [sourceSegment, setSourceSegment] = useState<BackshopHiddenSourceSegment>('all')
-  const [showHideDialog, setShowHideDialog] = useState(false)
   const [editingProduct, setEditingProduct] = useState<BackshopCustomProduct | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const manualBlockParam = searchParams.get('manualBlock')
@@ -184,17 +182,6 @@ export function BackshopHiddenProductsPage() {
     () => scopeProductGroupsByEffectiveBlock(productGroups, nameBlockOverrides),
     [productGroups, nameBlockOverrides],
   )
-
-  const hideDialogListLayout = useMemo(
-    () => ({
-      sortMode: (layoutSettings?.sort_mode ?? 'ALPHABETICAL') as 'ALPHABETICAL' | 'BY_BLOCK',
-      blocks: blocks as Block[],
-      storeBlockOrder: storeBackshopBlockOrder,
-      nameBlockOverrides,
-    }),
-    [layoutSettings?.sort_mode, blocks, storeBackshopBlockOrder, nameBlockOverrides],
-  )
-  const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
 
   const rolePrefix =
     pathname.startsWith('/super-admin') ? '/super-admin'
@@ -295,14 +282,7 @@ export function BackshopHiddenProductsPage() {
       offerDisplayByPlu,
       sortMode,
       blocks: blocks as Block[],
-      customProducts: customProducts.map((c) => ({
-        id: c.id,
-        plu: c.plu,
-        name: c.name,
-        image_url: c.image_url,
-        block_id: c.block_id,
-        created_at: c.created_at,
-      })),
+      customProducts: customProducts.map(toBackshopCustomProductInput),
       bezeichnungsregeln: regeln,
       renamedItems,
       markYellowKwCount: markYellow,
@@ -803,33 +783,6 @@ export function BackshopHiddenProductsPage() {
   const prevManualReady = !versionId || backshopPrevManualLoaded
   const isLoading = hiddenLoading || masterItemsLoading || !prevManualReady
 
-  const hideDialogSearchableItems = useMemo(() => {
-    const master = masterItems
-      .filter((m) => !rawHiddenPluSet.has(m.plu))
-      .map((m) => {
-        const r = renamedByPlu.get(m.plu)
-        return {
-          id: m.id,
-          plu: m.plu,
-          display_name: r?.display_name ?? m.display_name ?? m.system_name,
-          system_name: m.system_name,
-          item_type: 'PIECE' as const,
-          block_id: m.block_id,
-        }
-      })
-    const custom = customProducts
-      .filter((c) => !rawHiddenPluSet.has(c.plu))
-      .map((c) => ({
-        id: c.id,
-        plu: c.plu,
-        display_name: c.name,
-        system_name: c.name,
-        item_type: 'PIECE' as const,
-        block_id: c.block_id,
-      }))
-    return [...master, ...custom]
-  }, [masterItems, customProducts, rawHiddenPluSet, renamedByPlu])
-
   return (
     <DashboardLayout>
       <div
@@ -882,7 +835,11 @@ export function BackshopHiddenProductsPage() {
                   size="sm"
                   className="shrink-0 bshva-btn-primary border-0 shadow-sm"
                   data-tour="backshop-hidden-add-button"
-                  onClick={() => setShowHideDialog(true)}
+                  onClick={() =>
+                    navigate(`${rolePrefix}/pick-hide-backshop`, {
+                      state: { backTo: `${location.pathname}${location.search ?? ''}` },
+                    })
+                  }
                 >
                   <EyeOff className="h-4 w-4 mr-2" />
                   Produkte ausblenden
@@ -1258,16 +1215,6 @@ export function BackshopHiddenProductsPage() {
               </div>
             </div>
           </div>
-        )}
-
-        {canManageHidden && (
-          <HideBackshopProductsDialog
-            open={showHideDialog}
-            onOpenChange={setShowHideDialog}
-            searchableItems={hideDialogSearchableItems}
-            displayMode={displayMode}
-            listLayout={hideDialogListLayout}
-          />
         )}
 
         {editingProduct && (

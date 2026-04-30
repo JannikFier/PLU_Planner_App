@@ -149,6 +149,75 @@ async function handleAuthError(status: number): Promise<boolean> {
 /** Timeout fuer Edge Function Aufrufe (Cold Starts koennen 10–30s dauern) */
 const EDGE_FUNCTION_TIMEOUT_MS = 60_000
 
+/** True wenn VITE_SUPABASE_URL auf die lokale Supabase-CLI zeigt (typisch Port 54321). */
+function isLocalSupabaseApiUrl(): boolean {
+  try {
+    const h = new URL(supabaseUrl).hostname
+    return h === 'localhost' || h === '127.0.0.1'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Edge-Aufrufe sollen nur dort ueber die Vite-Origin laufen, wo server.preview.proxy
+ * wirklich existiert (Vite dev / Vite preview), nicht z. B. bei `serve dist` auf Port 3000.
+ */
+function useEdgeFunctionsViteProxy(): boolean {
+  if (import.meta.env.DEV) return true
+  if (typeof window === 'undefined') return false
+  if (!isLocalSupabaseApiUrl()) return false
+  const host = window.location.hostname
+  if (host !== 'localhost' && host !== '127.0.0.1') return false
+  if (!import.meta.env.PROD) return false
+  const p = window.location.port || ''
+  return ['5173', '4173', '4174', '5180', '5137'].includes(p)
+}
+
+/**
+ * Basis-URL fuer Edge Functions:
+ * - Vite-Dev (`npm run dev`): gleiche Origin + server.proxy (CORS umgehen).
+ * - Vite-Preview (`npm run preview`) mit lokalem Supabase: gleiche Origin + preview.proxy.
+ * - Sonst: direkt VITE_SUPABASE_URL (Production / gehostetes Supabase).
+ */
+function getEdgeFunctionsOrigin(): string {
+  const base = supabaseUrl.replace(/\/$/, '')
+  if (typeof window === 'undefined') return base
+  if (useEdgeFunctionsViteProxy()) return window.location.origin
+  return base
+}
+
+function supabaseConfiguredHost(): string {
+  try {
+    return new URL(supabaseUrl).host
+  } catch {
+    return '(ungültige VITE_SUPABASE_URL)'
+  }
+}
+
+function edgeFunctionNotFoundHint(functionName: string): string {
+  const host = supabaseConfiguredHost()
+  if (isLocalSupabaseApiUrl()) {
+    return (
+      `Die Edge Function „${functionName}“ wurde nicht gefunden (HTTP 404). ` +
+      `Konfigurierter Host: ${host}. ` +
+      'Lokales Supabase: Edge Functions muessen laufen (z. B. zweites Terminal: `supabase functions serve` ' +
+      'oder laut Supabase-Doku „Edge Functions: Local development“). ' +
+      'Remote-Projekt: `supabase functions deploy ' +
+      functionName +
+      '`'
+    )
+  }
+  return (
+    `Die Edge Function „${functionName}“ wurde nicht gefunden (HTTP 404). ` +
+      `Konfigurierter API-Host: ${host}. ` +
+      'Diese Function ist auf genau diesem Supabase-Projekt nicht erreichbar (noch nicht deployt oder falsches Projekt in .env.local). ' +
+      'Im Dashboard unter Edge Functions prüfen. Deploy: `supabase link` (passender project-ref) und dann `supabase functions deploy ' +
+      functionName +
+      '` oder im Projekt `npm run supabase:deploy:functions`.'
+  )
+}
+
 /**
  * Ruft eine Supabase Edge Function per direktem fetch auf.
  * Umgeht supabase.functions.invoke, das bei Cold Starts haengen kann.
@@ -168,19 +237,21 @@ export async function invokeEdgeFunction<T = Record<string, unknown>>(
     const timeoutId = setTimeout(() => controller.abort(), EDGE_FUNCTION_TIMEOUT_MS)
 
     try {
-      const resp = await supabaseClientFetch(
-        `${supabaseUrl}/functions/v1/${functionName}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseAnonKey,
-            'Authorization': `Bearer ${jwt}`,
-          },
-          body: JSON.stringify(body),
-          signal: controller.signal,
+      const edgeBase = getEdgeFunctionsOrigin()
+      const edgeUrl = `${edgeBase}/functions/v1/${functionName}`
+
+      // Direkt natives fetch: Edge Functions nicht über supabaseClientFetch (nur REST v1 + Testmodus),
+      // damit keine verdeckten CORS-/Wrapper-Effekte beim Aufruf von functions/v1.
+      const resp = await _nativeFetch(edgeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${jwt}`,
         },
-      )
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
       clearTimeout(timeoutId)
       return resp
     } catch (e) {
@@ -209,10 +280,69 @@ export async function invokeEdgeFunction<T = Record<string, unknown>>(
     throw new Error(`Edge Function Fehler: ${resp.status} – ${text.slice(0, 200)}`)
   }
 
-  if (!resp.ok) throw new Error(json.error || `Edge Function Fehler: ${resp.status}`)
+  if (!resp.ok) {
+    if (resp.status === 404) {
+      throw new Error(edgeFunctionNotFoundHint(functionName))
+    }
+    throw new Error(json.error || `Edge Function Fehler: ${resp.status}`)
+  }
   if (json.error) throw new Error(json.error)
 
   return json
+}
+
+/**
+ * Edge Function ohne Nutzer-JWT (nur Anon-Key), z. B. Kassen-Login.
+ */
+export async function invokeEdgeFunctionAnon<T = Record<string, unknown>>(
+  functionName: string,
+  body: Record<string, unknown>,
+): Promise<T> {
+  if (_testModeActive) return { success: true } as T
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), EDGE_FUNCTION_TIMEOUT_MS)
+
+  try {
+    const edgeUrl = `${getEdgeFunctionsOrigin()}/functions/v1/${functionName}`
+    const resp = await _nativeFetch(edgeUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': supabaseAnonKey,
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+
+    const text = await resp.text()
+    let json: T & { error?: string }
+    try {
+      json = JSON.parse(text)
+    } catch {
+      throw new Error(`Edge Function Fehler: ${resp.status} – ${text.slice(0, 200)}`)
+    }
+
+    if (!resp.ok) {
+      if (resp.status === 404) {
+        throw new Error(edgeFunctionNotFoundHint(functionName))
+      }
+      throw new Error(json.error || `Edge Function Fehler: ${resp.status}`)
+    }
+    if (json.error) throw new Error(json.error)
+
+    return json
+  } catch (e) {
+    clearTimeout(timeoutId)
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error(
+        'Die Anfrage hat zu lange gedauert. Bitte versuche es erneut – beim ersten Aufruf kann es etwas länger dauern.',
+      )
+    }
+    throw e
+  }
 }
 
 /**

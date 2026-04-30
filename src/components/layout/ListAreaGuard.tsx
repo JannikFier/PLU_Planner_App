@@ -13,22 +13,24 @@ interface ListAreaGuardProps {
 function homeForPath(pathname: string): string {
   const seg = pathname.split('/').filter(Boolean)[0]
   if (seg === 'viewer') return '/viewer'
+  if (seg === 'kiosk') return '/kiosk'
   if (seg === 'admin') return '/admin'
   if (seg === 'super-admin') return '/super-admin'
   return '/user'
 }
 
 /**
- * Leitet weg, wenn Obst/Gemüse oder Backshop für den aktuellen Markt + User effektiv nicht sichtbar ist.
+ * Leitet weg, wenn Obst/Gemüse, Backshop oder Kassenmodus für den aktuellen Markt + User effektiv nicht sichtbar ist.
  * Ohne Marktkontext bleibt Zugriff erlaubt.
  * Super-Admin unter `/super-admin/*` ebenfalls immer: globale Upload-/Bereiche dürfen nicht vom Marktschalter blockiert werden.
  */
 export function ListAreaGuard({ listType, children }: ListAreaGuardProps) {
   const location = useLocation()
   const { profile } = useAuth()
-  const { obstGemuese, backshop, isLoading } = useEffectiveListVisibility()
+  const { obstGemuese, backshop, kiosk, isLoading } = useEffectiveListVisibility()
 
-  const visible = listType === 'obst_gemuese' ? obstGemuese : backshop
+  const visible =
+    listType === 'obst_gemuese' ? obstGemuese : listType === 'backshop' ? backshop : kiosk
 
   /** Inhaber-Routen unter /super-admin sind global (Upload, KW-Listen), nicht über Markt-Sichtbarkeit sperren. */
   const superAdminGlobalBypass =
@@ -47,6 +49,15 @@ export function ListAreaGuard({ listType, children }: ListAreaGuardProps) {
   }
 
   if (!visible) {
+    // Kiosk: nicht auf /kiosk landen (Index wuerde sonst Schleife zur ersten Liste triggern)
+    if (location.pathname.startsWith('/kiosk')) {
+      if (listType === 'obst_gemuese' && backshop) {
+        return <Navigate to="/kiosk/backshop" replace />
+      }
+      if (listType === 'backshop' && obstGemuese) {
+        return <Navigate to="/kiosk/obst" replace />
+      }
+    }
     return <Navigate to={homeForPath(location.pathname)} replace />
   }
 

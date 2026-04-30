@@ -33,6 +33,12 @@ export type SaveCampaignLineInput = {
   /** null = "keine Zuordnung" (origin muss dann 'unassigned' sein) */
   plu: string | null
   promo_price: number
+  /** Backshop: Erwerbspreis aus Excel oder manuell; optional (Aktions-EK) */
+  purchase_price?: number | null
+  /** Backshop: Listen-EK optional */
+  list_ek?: number | null
+  /** Backshop: Listen-VK optional */
+  list_vk?: number | null
   source_art_nr?: string | null
   source_plu?: string | null
   source_artikel?: string | null
@@ -260,11 +266,38 @@ export async function fetchBackshopOfferCampaignSlots(): Promise<Array<{ kw: num
   return out
 }
 
-export function useBackshopOfferCampaignSlots() {
+/** Distinct KW/Jahr mit Obst-Zentralwerbung (leichtgewichtig für Upload-Vorauswahl). */
+export async function fetchObstOfferCampaignSlots(): Promise<Array<{ kw: number; jahr: number }>> {
+  const rows = await queryRest<Array<{ kw_nummer: number; jahr: number }>>('obst_offer_campaigns', {
+    select: 'kw_nummer,jahr',
+    order: 'jahr.desc,kw_nummer.desc',
+  })
+  const seen = new Set<string>()
+  const out: Array<{ kw: number; jahr: number }> = []
+  for (const r of rows ?? []) {
+    const key = `${r.jahr}-${r.kw_nummer}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ kw: r.kw_nummer, jahr: r.jahr })
+  }
+  return out
+}
+
+export function useBackshopOfferCampaignSlots(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['backshop-offer-campaign-slots'],
     staleTime: 60_000,
+    enabled: options?.enabled ?? true,
     queryFn: fetchBackshopOfferCampaignSlots,
+  })
+}
+
+export function useObstOfferCampaignSlots(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['obst-offer-campaign-slots'],
+    staleTime: 60_000,
+    enabled: options?.enabled ?? true,
+    queryFn: fetchObstOfferCampaignSlots,
   })
 }
 
@@ -406,6 +439,7 @@ export function useSaveObstOfferCampaign() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['obst-offer-campaign'] })
+      queryClient.invalidateQueries({ queryKey: ['obst-offer-campaign-slots'] })
       queryClient.invalidateQueries({ queryKey: ['obst-offer-campaigns-admin'] })
       queryClient.invalidateQueries({ queryKey: ['obst-offer-campaign-detail'] })
       toast.success('Zentrale Werbung (Obst/Gemüse) gespeichert')
@@ -426,6 +460,8 @@ export function useSaveBackshopOfferCampaign() {
       kwNummer: number
       jahr: number
       fileName?: string | null
+      /** Aus Exit-Spalte „Auslieferung ab“ (yyyy-MM-dd) */
+      auslieferung_ab?: string | null
       lines: SaveCampaignLineInput[]
     }) => {
       if (!user) throw new Error('Nicht eingeloggt')
@@ -442,6 +478,7 @@ export function useSaveBackshopOfferCampaign() {
           kw_nummer: payload.kwNummer,
           jahr: payload.jahr,
           source_file_name: payload.fileName ?? null,
+          auslieferung_ab: payload.auslieferung_ab ?? null,
           created_by: user.id,
         } as never)
         .select('id')
@@ -455,6 +492,9 @@ export function useSaveBackshopOfferCampaign() {
         campaign_id: campaignId,
         plu: l.plu,
         promo_price: l.promo_price,
+        purchase_price: l.purchase_price ?? null,
+        list_ek: l.list_ek ?? null,
+        list_vk: l.list_vk ?? null,
         sort_index: i,
         source_art_nr: l.source_art_nr ?? null,
         source_plu: l.source_plu ?? null,
@@ -498,6 +538,8 @@ export type BackshopOfferCampaignAdminSummary = {
   jahr: number
   source_file_name: string | null
   created_at: string
+  /** Aus Exit „Auslieferung ab“, yyyy-MM-dd */
+  auslieferung_ab: string | null
   total_lines: number
   assigned_lines: number
 }
@@ -567,7 +609,7 @@ export function useBackshopOfferCampaignsAdminList() {
     staleTime: 30_000,
     queryFn: async (): Promise<BackshopOfferCampaignAdminSummary[]> => {
       const campaigns = await queryRest<BackshopOfferCampaign[]>('backshop_offer_campaigns', {
-        select: 'id,kw_nummer,jahr,source_file_name,created_at',
+        select: 'id,kw_nummer,jahr,source_file_name,created_at,auslieferung_ab',
         order: 'jahr.desc,kw_nummer.desc',
       })
       const list = campaigns ?? []
@@ -583,6 +625,7 @@ export function useBackshopOfferCampaignsAdminList() {
           jahr: c.jahr,
           source_file_name: c.source_file_name ?? null,
           created_at: c.created_at,
+          auslieferung_ab: c.auslieferung_ab ?? null,
           total_lines: k.total,
           assigned_lines: k.assigned,
         }
@@ -600,6 +643,12 @@ export type CampaignDetailLine = {
   sort_index: number
   plu: string | null
   promo_price: number
+  /** Nur Backshop: Erwerbspreis (EK) */
+  purchase_price?: number | null
+  /** Nur Backshop: Listen-EK */
+  list_ek?: number | null
+  /** Nur Backshop: Listen-VK */
+  list_vk?: number | null
   origin: 'excel' | 'manual' | 'unassigned'
   source_plu: string | null
   source_artikel: string | null
@@ -612,6 +661,8 @@ export type CampaignDetail = {
   jahr: number
   source_file_name: string | null
   created_at: string
+  /** Nur Backshop-Exit: Auslieferung ab (ISO-Datum) */
+  auslieferung_ab?: string | null
   campaign_kind?: ObstCentralCampaignKind
   lines: CampaignDetailLine[]
 }
@@ -670,14 +721,14 @@ export function useBackshopOfferCampaignDetail(kw: number | null, jahr: number |
     queryFn: async (): Promise<CampaignDetail | null> => {
       if (kw == null || jahr == null) return null
       const campaigns = await queryRest<BackshopOfferCampaign[]>('backshop_offer_campaigns', {
-        select: 'id,kw_nummer,jahr,source_file_name,created_at',
+        select: 'id,kw_nummer,jahr,source_file_name,created_at,auslieferung_ab',
         kw_nummer: `eq.${kw}`,
         jahr: `eq.${jahr}`,
       })
       const c = campaigns?.[0]
       if (!c) return null
       const lines = await queryRest<BackshopOfferCampaignLine[]>('backshop_offer_campaign_lines', {
-        select: 'id,sort_index,plu,promo_price,origin,source_plu,source_artikel,source_art_nr',
+        select: 'id,sort_index,plu,promo_price,purchase_price,list_ek,list_vk,origin,source_plu,source_artikel,source_art_nr',
         campaign_id: `eq.${c.id}`,
         order: 'sort_index.asc',
       })
@@ -687,11 +738,15 @@ export function useBackshopOfferCampaignDetail(kw: number | null, jahr: number |
         jahr: c.jahr,
         source_file_name: c.source_file_name ?? null,
         created_at: c.created_at,
+        auslieferung_ab: c.auslieferung_ab ?? null,
         lines: (lines ?? []).map((l) => ({
           id: l.id,
           sort_index: l.sort_index,
           plu: l.plu,
           promo_price: Number(l.promo_price),
+          purchase_price: l.purchase_price != null ? Number(l.purchase_price) : null,
+          list_ek: l.list_ek != null ? Number(l.list_ek) : null,
+          list_vk: l.list_vk != null ? Number(l.list_vk) : null,
           origin: l.origin,
           source_plu: l.source_plu ?? null,
           source_artikel: l.source_artikel ?? null,
@@ -774,6 +829,7 @@ export function useUpdateObstOfferCampaignLines() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['obst-offer-campaign'] })
+      queryClient.invalidateQueries({ queryKey: ['obst-offer-campaign-slots'] })
       queryClient.invalidateQueries({ queryKey: ['obst-offer-campaigns-admin'] })
       queryClient.invalidateQueries({ queryKey: ['obst-offer-campaign-detail'] })
       toast.success('Werbung aktualisiert')
@@ -838,6 +894,9 @@ export function useUpdateBackshopOfferCampaignLines() {
         campaign_id: campaignId!,
         plu: l.plu,
         promo_price: l.promo_price,
+        purchase_price: l.purchase_price ?? null,
+        list_ek: l.list_ek ?? null,
+        list_vk: l.list_vk ?? null,
         sort_index: i,
         source_art_nr: l.source_art_nr ?? null,
         source_plu: l.source_plu ?? null,

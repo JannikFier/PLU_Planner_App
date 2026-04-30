@@ -1,16 +1,8 @@
-// RenameProductsDialog: Dialog „Produkte umbenennen“ – PLU-Liste mit Suche (Filter wie Ausgeblenden), Stift pro Zeile
-// Layout wie Masterliste: Zeilenweise / Spaltenweise (Zeitung bei Obst)
+// Vollseite / Picker: Produkte umbenennen – PLU-Liste mit Suche, Stift pro Zeile (Obst + Backshop)
 
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from 'react'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pencil, Search } from 'lucide-react'
@@ -26,11 +18,13 @@ import type { StoreBlockOrderRow } from '@/lib/block-override-utils'
 import { RenameDialog } from '@/components/plu/RenameDialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { MasterPLUItem, BackshopMasterPLUItem } from '@/types/database'
+import type { MasterPLUItem, BackshopMasterPLUItem, BackshopSource } from '@/types/database'
 import type { DisplayItem } from '@/types/plu'
 import { buildDialogPluLayout, type DialogPluFontSizes, type DialogFlatRow } from '@/lib/dialog-plu-layout'
 import { newspaperPageMinHeightPx, newspaperRowsToFlatRows } from '@/lib/newspaper-column-pages'
 import { PLU_TABLE_HEADER_GEWICHT_CLASS, PLU_TABLE_HEADER_STUECK_CLASS } from '@/lib/constants'
+import { BackshopSourceBadge } from '@/components/backshop/BackshopSourceBadge'
+import { isBackshopExcelSource } from '@/lib/backshop-sources'
 
 interface SearchableItem {
   id: string
@@ -39,6 +33,9 @@ interface SearchableItem {
   system_name: string
   item_type?: 'PIECE' | 'WEIGHT' | string | null
   block_id?: string | null
+  image_url?: string | null
+  source?: BackshopSource | null
+  is_market_custom?: boolean
 }
 
 type TableRow = { type: 'header'; label: string } | { type: 'row'; left?: SearchableItem; right?: SearchableItem }
@@ -46,19 +43,36 @@ type TableRow = { type: 'header'; label: string } | { type: 'row'; left?: Search
 const DEFAULT_FONT_OBST: DialogPluFontSizes = { header: 24, column: 16, product: 12 }
 const DEFAULT_FONT_BACKSHOP: DialogPluFontSizes = { header: 32, column: 18, product: 18 }
 
-/** Eine Spalte: PLU | Artikel + Stift */
+function RenamePickerThumb({ url }: { url: string | null | undefined }) {
+  if (!url) return <div className="h-9 w-9 shrink-0 rounded border bg-muted" aria-hidden />
+  return <img src={url} alt="" className="h-9 w-9 shrink-0 rounded border object-cover" loading="lazy" />
+}
+
+function RenamePickerBrandBadge({ item }: { item: SearchableItem }) {
+  if (item.is_market_custom) return null
+  const s = item.source
+  if (!s || s === 'manual' || !isBackshopExcelSource(s)) return null
+  return <BackshopSourceBadge source={s} variant="compact" className="shrink-0" />
+}
+
+/** Eine Spalte: optional Bild (Backshop) | PLU | Artikel + Stift */
 function RenameColumnTable({
   rows,
   deferredSearch,
   onRename,
+  listKind,
 }: {
   rows: DialogFlatRow<SearchableItem>[]
   deferredSearch: string
   onRename: (item: SearchableItem) => void
+  listKind: 'obst' | 'backshop'
 }) {
+  const showImg = listKind === 'backshop'
+  const colSpan = showImg ? 3 : 2
   return (
     <table className="w-full table-fixed flex-1 min-w-0">
       <colgroup>
+        {showImg ? <col className="w-[44px]" /> : null}
         <col className="w-[80px]" />
         <col />
       </colgroup>
@@ -68,7 +82,7 @@ function RenameColumnTable({
             return (
               <tr key={`rc-${i}`} className="border-b border-border">
                 <td
-                  colSpan={2}
+                  colSpan={colSpan}
                   className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm"
                 >
                   {row.label}
@@ -79,9 +93,23 @@ function RenameColumnTable({
           const item = row.item
           const match = itemMatchesSearch(item, deferredSearch)
           return (
-            <tr key={item.id} data-highlight={match ? 'true' : undefined} className={cn('border-b border-border', match && 'bg-primary/10')}>
-              <td className={cn('px-2 py-1 text-sm font-mono', match && 'bg-primary/10')}>{getDisplayPlu(item.plu)}</td>
-              <td className={cn('px-2 py-1 text-sm border-l border-border', match && 'bg-primary/10')}>
+            <tr
+              key={item.id}
+              data-highlight={match ? 'true' : undefined}
+              className={cn('border-b border-border', match && 'bg-primary/10')}
+            >
+              {showImg ? (
+                <td className={cn('px-1 py-1 align-middle', match && 'bg-primary/10')}>
+                  <RenamePickerThumb url={item.image_url} />
+                </td>
+              ) : null}
+              <td className={cn('px-2 py-1 text-sm font-mono align-middle', match && 'bg-primary/10')}>
+                <span className="inline-flex items-center gap-1 flex-wrap">
+                  {getDisplayPlu(item.plu)}
+                  <RenamePickerBrandBadge item={item} />
+                </span>
+              </td>
+              <td className={cn('px-2 py-1 text-sm border-l border-border align-middle', match && 'bg-primary/10')}>
                 <div className="flex items-center gap-1 min-w-0">
                   <span className="flex-1 min-w-0 break-words" title={item.display_name}>
                     {item.display_name}
@@ -148,9 +176,7 @@ function backshopMasterItemToDisplayItem(m: BackshopMasterPLUItem): DisplayItem 
 /** Globale Umbenennung (plu → display_name) für Backshop */
 export type RenamedItemOverride = { plu: string; display_name: string }
 
-export interface RenameProductsDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+export interface RenameProductsPickerContentProps {
   /** Obst/Gemüse: MasterPLUItem[]; Backshop: BackshopMasterPLUItem[] */
   searchableItems: MasterPLUItem[] | BackshopMasterPLUItem[]
   /** Bei 'backshop': Backshop-RPCs, RenameDialog mit Bild. */
@@ -169,17 +195,17 @@ export interface RenameProductsDialogProps {
   /** Wie Masterliste; Backshop-Standard: zeilenweise */
   flowDirection?: 'ROW_BY_ROW' | 'COLUMN_FIRST'
   fontSizes?: DialogPluFontSizes
-  /** Optional: Tutorial-Anker am Auswahl-DialogContent */
+  /** Optional: Tutorial-Anker am Seiten-Wrapper */
   dataTour?: string
   /** Optional: Tutorial-Anker am inneren RenameDialog DialogContent */
   renameDialogDataTour?: string
   /** Optional: Tutorial-Anker am inneren RenameDialog Speichern-Button */
   renameDialogSubmitDataTour?: string
+  /** Zurück zur Liste (Abbrechen / Fertig) */
+  onCancel: () => void
 }
 
-export function RenameProductsDialog({
-  open,
-  onOpenChange,
+export function RenameProductsPickerContent({
   searchableItems,
   listType = 'default',
   renamedOverrides = [],
@@ -190,7 +216,8 @@ export function RenameProductsDialog({
   dataTour,
   renameDialogDataTour,
   renameDialogSubmitDataTour,
-}: RenameProductsDialogProps) {
+  onCancel,
+}: RenameProductsPickerContentProps) {
   const listKind = listType === 'backshop' ? 'backshop' : 'obst'
   const flowDirection =
     flowDirectionProp ?? (listKind === 'backshop' ? 'ROW_BY_ROW' : 'COLUMN_FIRST')
@@ -212,7 +239,7 @@ export function RenameProductsDialog({
       searchableItems.map((m) => {
         const base = m as MasterPLUItem & BackshopMasterPLUItem
         const display = overrideByPlu.get(m.plu) ?? base.display_name ?? base.system_name
-        return {
+        const row: SearchableItem = {
           id: m.id,
           plu: m.plu,
           display_name: display,
@@ -220,8 +247,15 @@ export function RenameProductsDialog({
           item_type: 'item_type' in base ? base.item_type : undefined,
           block_id: 'block_id' in base ? base.block_id : undefined,
         }
+        if (listType === 'backshop') {
+          const bm = m as BackshopMasterPLUItem
+          row.image_url = bm.image_url
+          row.source = bm.source
+          row.is_market_custom = false
+        }
+        return row
       }),
-    [searchableItems, overrideByPlu],
+    [searchableItems, overrideByPlu, listType],
   )
 
   const filteredItems = useMemo(
@@ -263,10 +297,10 @@ export function RenameProductsDialog({
 
   const searchLower = deferredSearch.trim().toLowerCase()
   useEffect(() => {
-    if (!open || !searchLower || filteredItems.length === 0 || !scrollContainerRef.current) return
+    if (!searchLower || filteredItems.length === 0 || !scrollContainerRef.current) return
     const first = scrollContainerRef.current.querySelector('[data-highlight="true"]')
     if (first) first.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  }, [open, searchLower, filteredItems.length])
+  }, [searchLower, filteredItems.length])
 
   const handleRenameDialogClose = useCallback(
     (closed: boolean) => {
@@ -308,47 +342,40 @@ export function RenameProductsDialog({
     }
   }
 
-  const handleClose = (nextOpen: boolean) => {
-    if (!nextOpen) setSearchText('')
-    onOpenChange(nextOpen)
-  }
-
   return (
     <>
-      <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent
-          className="sm:max-w-[90vw] lg:max-w-5xl xl:max-w-7xl max-h-[90vh] flex flex-col min-h-0 overflow-hidden"
-          {...(dataTour ? { 'data-tour': dataTour } : {})}
-        >
-          <DialogHeader className="shrink-0">
-            <DialogTitle>Produkte umbenennen</DialogTitle>
-            <DialogDescription>
-              Suche nach PLU oder Name, dann klicke auf den Stift, um den Anzeigenamen zu ändern.
-            </DialogDescription>
-          </DialogHeader>
+      <div
+        className="flex flex-col min-h-0 flex-1 gap-4"
+        {...(dataTour ? { 'data-tour': dataTour } : {})}
+      >
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">Produkte umbenennen</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Suche nach PLU oder Name, dann klicke auf den Stift, um den Anzeigenamen zu ändern.
+          </p>
+        </div>
 
-          <div className="flex flex-1 min-h-0 flex-col gap-4 py-4 overflow-hidden">
-            <div className="relative shrink-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="PLU oder Name eingeben…"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="pl-9"
-                aria-label="Suche"
-              />
+        <div className="relative shrink-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="PLU oder Name eingeben…"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            className="pl-9"
+            aria-label="Suche"
+          />
+        </div>
+
+        <div className="border rounded-lg overflow-hidden flex flex-1 min-h-0 flex-col md:min-h-[400px]">
+          {filteredItems.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center p-8">
+              <p className="text-sm text-muted-foreground text-center">
+                {searchText.trim() ? 'Keine Treffer.' : 'Keine Produkte in dieser Version.'}
+              </p>
             </div>
-
-            <div className="border rounded-lg overflow-hidden flex flex-1 min-h-0 flex-col md:min-h-[400px]">
-              {filteredItems.length === 0 ? (
-                <div className="flex-1 flex items-center justify-center p-8">
-                  <p className="text-sm text-muted-foreground text-center">
-                    {searchText.trim() ? 'Keine Treffer.' : 'Keine Produkte in dieser Version.'}
-                  </p>
-                </div>
-              ) : (
-                <div ref={scrollContainerRef} className="overflow-auto flex-1 min-h-0">
+          ) : (
+            <div ref={scrollContainerRef} className="overflow-auto flex-1 min-h-0">
                   <ul className="md:hidden divide-y divide-border" data-testid="rename-products-dialog-mobile-list">
                     {layout.mobileRows.map((row, i) => {
                       if (row.type === 'section') {
@@ -383,8 +410,14 @@ export function RenameProductsDialog({
                           data-highlight={match ? 'true' : undefined}
                           className={cn('flex items-start gap-2 px-3 py-2', match && 'bg-primary/10')}
                         >
+                          {listKind === 'backshop' ? (
+                            <RenamePickerThumb url={item.image_url} />
+                          ) : null}
                           <div className="min-w-0 flex-1">
-                            <p className="font-mono text-sm">{getDisplayPlu(item.plu)}</p>
+                            <p className="font-mono text-sm inline-flex items-center gap-1 flex-wrap">
+                              {getDisplayPlu(item.plu)}
+                              <RenamePickerBrandBadge item={item} />
+                            </p>
                             <p className="text-sm break-words mt-0.5">{item.display_name}</p>
                           </div>
                           <Tooltip>
@@ -410,20 +443,33 @@ export function RenameProductsDialog({
                   {layout.mode === 'row_by_row' && (
                     <table className="hidden md:table w-full table-fixed border-collapse">
                       <colgroup>
+                        {listKind === 'backshop' ? <col className="w-[44px]" /> : null}
                         <col className="w-[80px]" />
                         <col />
+                        {listKind === 'backshop' ? <col className="w-[44px]" /> : null}
                         <col className="w-[80px]" />
                         <col />
                       </colgroup>
                       <thead className="sticky top-0 bg-background z-10">
                         <tr className="border-b-2 border-border">
+                          {listKind === 'backshop' ? (
+                            <th className="w-[44px] px-1 py-1.5" aria-hidden />
+                          ) : null}
                           <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]">
                             PLU
                           </th>
                           <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
                             Artikel
                           </th>
-                          <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px] border-l-2 border-border">
+                          {listKind === 'backshop' ? (
+                            <th className="w-[44px] px-1 py-1.5 border-l-2 border-border" aria-hidden />
+                          ) : null}
+                          <th
+                            className={cn(
+                              'px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[80px]',
+                              listKind === 'backshop' ? 'border-l border-border' : 'border-l-2 border-border',
+                            )}
+                          >
                             PLU
                           </th>
                           <th className="px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-l border-border">
@@ -433,11 +479,12 @@ export function RenameProductsDialog({
                       </thead>
                       <tbody>
                         {tableRows.map((row, i) => {
+                          const headerColSpan = listKind === 'backshop' ? 6 : 4
                           if (row.type === 'header') {
                             return (
                               <tr key={`h-${i}-${row.label}`} className="border-b border-border">
                                 <td
-                                  colSpan={4}
+                                  colSpan={headerColSpan}
                                   className="px-2 py-2 text-center font-bold text-muted-foreground tracking-widest uppercase bg-muted/50 text-sm"
                                 >
                                   {row.label}
@@ -457,8 +504,22 @@ export function RenameProductsDialog({
                                 highlightRow && 'bg-primary/10',
                               )}
                             >
-                              <td className="px-2 py-1 text-sm font-mono">{row.left ? getDisplayPlu(row.left.plu) : ''}</td>
-                              <td className="px-2 py-1 text-sm border-l border-border">
+                              {listKind === 'backshop' ? (
+                                <td className="px-1 py-1 align-middle">
+                                  {row.left ? <RenamePickerThumb url={row.left.image_url} /> : null}
+                                </td>
+                              ) : null}
+                              <td className="px-2 py-1 text-sm font-mono align-middle">
+                                {row.left ? (
+                                  <span className="inline-flex items-center gap-1 flex-wrap">
+                                    {getDisplayPlu(row.left.plu)}
+                                    <RenamePickerBrandBadge item={row.left} />
+                                  </span>
+                                ) : (
+                                  ''
+                                )}
+                              </td>
+                              <td className="px-2 py-1 text-sm border-l border-border align-middle">
                                 {row.left ? (
                                   <div className="flex items-center gap-1 min-w-0">
                                     <span className="flex-1 min-w-0 truncate" title={row.left.display_name}>
@@ -481,10 +542,27 @@ export function RenameProductsDialog({
                                   ''
                                 )}
                               </td>
-                              <td className="px-2 py-1 text-sm font-mono border-l-2 border-border">
-                                {row.right ? getDisplayPlu(row.right.plu) : ''}
+                              {listKind === 'backshop' ? (
+                                <td className="px-1 py-1 align-middle border-l-2 border-border">
+                                  {row.right ? <RenamePickerThumb url={row.right.image_url} /> : null}
+                                </td>
+                              ) : null}
+                              <td
+                                className={cn(
+                                  'px-2 py-1 text-sm font-mono align-middle',
+                                  listKind === 'backshop' ? 'border-l border-border' : 'border-l-2 border-border',
+                                )}
+                              >
+                                {row.right ? (
+                                  <span className="inline-flex items-center gap-1 flex-wrap">
+                                    {getDisplayPlu(row.right.plu)}
+                                    <RenamePickerBrandBadge item={row.right} />
+                                  </span>
+                                ) : (
+                                  ''
+                                )}
                               </td>
-                              <td className="px-2 py-1 text-sm border-l border-border">
+                              <td className="px-2 py-1 text-sm border-l border-border align-middle">
                                 {row.right ? (
                                   <div className="flex items-center gap-1 min-w-0">
                                     <span className="flex-1 min-w-0 truncate" title={row.right.display_name}>
@@ -587,11 +665,13 @@ export function RenameProductsDialog({
                                           rows={newspaperRowsToFlatRows(page.left)}
                                           deferredSearch={deferredSearch}
                                           onRename={handleOpenRename}
+                                          listKind={listKind}
                                         />
                                         <RenameColumnTable
                                           rows={newspaperRowsToFlatRows(page.right)}
                                           deferredSearch={deferredSearch}
                                           onRename={handleOpenRename}
+                                          listKind={listKind}
                                         />
                                       </div>
                                     </td>
@@ -610,6 +690,9 @@ export function RenameProductsDialog({
                     <div className="hidden md:block">
                       <div className="sticky top-0 z-10 bg-background border-b-2 border-border flex w-full">
                         <div className="flex-1 flex min-w-0 border-r border-border">
+                          {listKind === 'backshop' ? (
+                            <span className="w-[44px] shrink-0 px-1 py-1.5" aria-hidden />
+                          ) : null}
                           <span className="w-[80px] shrink-0 px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                             PLU
                           </span>
@@ -618,6 +701,9 @@ export function RenameProductsDialog({
                           </span>
                         </div>
                         <div className="flex-1 flex min-w-0">
+                          {listKind === 'backshop' ? (
+                            <span className="w-[44px] shrink-0 px-1 py-1.5" aria-hidden />
+                          ) : null}
                           <span className="w-[80px] shrink-0 px-2 py-1.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                             PLU
                           </span>
@@ -631,21 +717,26 @@ export function RenameProductsDialog({
                           rows={layout.leftFlat}
                           deferredSearch={deferredSearch}
                           onRename={handleOpenRename}
+                          listKind={listKind}
                         />
                         <RenameColumnTable
                           rows={layout.rightFlat}
                           deferredSearch={deferredSearch}
                           onRename={handleOpenRename}
+                          listKind={listKind}
                         />
                       </div>
                     </div>
                   )}
                 </div>
               )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+        <div className="flex justify-end pt-2 shrink-0">
+          <Button variant="outline" type="button" onClick={onCancel}>
+            Zurück zur Liste
+          </Button>
+        </div>
+      </div>
 
       <RenameDialog
         open={!!renameItem}

@@ -2,7 +2,7 @@
 // Liste, Aus Werbung entfernen, Produkte zur Werbung hinzufügen, Per Excel (Super-Admin)
 
 import { useMemo, useState, useRef, useCallback } from 'react'
-import { buildBackshopDisplayList } from '@/lib/layout-engine'
+import { buildBackshopDisplayList, toBackshopCustomProductInput } from '@/lib/layout-engine'
 import { buildOfferDisplayMap } from '@/lib/offer-display'
 import { effectiveHiddenPluSet } from '@/lib/hidden-visibility'
 import { useLocation } from 'react-router-dom'
@@ -210,14 +210,7 @@ export function BackshopOfferProductsPage() {
       offerDisplayByPlu,
       sortMode,
       blocks,
-      customProducts: customProducts.map((c) => ({
-        id: c.id,
-        plu: c.plu,
-        name: c.name,
-        image_url: c.image_url,
-        block_id: c.block_id,
-        created_at: c.created_at,
-      })),
+      customProducts: customProducts.map(toBackshopCustomProductInput),
       bezeichnungsregeln: activeRegeln,
       renamedItems,
       markYellowKwCount: markYellow,

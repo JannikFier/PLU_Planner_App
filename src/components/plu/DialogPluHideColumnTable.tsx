@@ -6,7 +6,7 @@ import type { DialogFlatRow } from '@/lib/dialog-plu-layout'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
 
-/** Minimalfelder pro Zeile (HideProductsDialog / AssignProductsToBlockDialog) */
+/** Minimalfelder pro Zeile (Ausblend-Picker / AssignProductsToBlockDialog) */
 export interface DialogPluHideColumnItem {
   id: string
   plu: string

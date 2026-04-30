@@ -1,6 +1,6 @@
 // Super-Admin: zentrale Werbung (Obst: Ordersatz Woche + 3-Tage; Backshop: Exit-Excel)
 
-import { useMemo, useState, useRef, useId } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -40,10 +40,17 @@ import {
 import { buildObstWerbungMatchRows, type ObstWerbungMatchRow } from '@/lib/obst-werbung-match-rows'
 import { rankExitRowMatches } from '@/lib/exit-offer-matching'
 import type { MasterPluCandidate } from '@/lib/exit-offer-matching'
-import { useSaveObstOfferCampaign, useSaveBackshopOfferCampaign } from '@/hooks/useCentralOfferCampaigns'
+import {
+  useBackshopOfferCampaignSlots,
+  useObstOfferCampaignSlots,
+  useSaveBackshopOfferCampaign,
+  useSaveObstOfferCampaign,
+} from '@/hooks/useCentralOfferCampaigns'
 import {
   getCampaignWeekSelectOptions,
   getDefaultCampaignTargetWeek,
+  maxIsoWeekAmongCampaignSlots,
+  pickCampaignTargetWeekFromOptions,
 } from '@/lib/date-kw-utils'
 import { formatKWLabel } from '@/lib/plu-helpers'
 import type { ParsedExitWerbungRow } from '@/types/plu'
@@ -207,8 +214,28 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
   }, [isObst, obstMasters, backshopMasters])
 
   const weekOptions = useMemo(() => getCampaignWeekSelectOptions(new Date()), [])
-  const defaultWeek = useMemo(() => getDefaultCampaignTargetWeek(), [])
-  const [targetWeek, setTargetWeek] = useState(defaultWeek)
+  const [targetWeek, setTargetWeek] = useState(() => getDefaultCampaignTargetWeek())
+  /** Sobald der User die KW manuell ändert, keine automatische Vorauswahl mehr überschreiben. */
+  const [weekManuallyPicked, setWeekManuallyPicked] = useState(false)
+  const appliedSlotDefaultRef = useRef(false)
+
+  const backshopSlotsQuery = useBackshopOfferCampaignSlots({ enabled: !isObst })
+  const obstSlotsQuery = useObstOfferCampaignSlots({ enabled: isObst })
+  const campaignSlotsQuery = isObst ? obstSlotsQuery : backshopSlotsQuery
+
+  useEffect(() => {
+    appliedSlotDefaultRef.current = false
+    setWeekManuallyPicked(false)
+  }, [isObst])
+
+  useEffect(() => {
+    if (appliedSlotDefaultRef.current || weekManuallyPicked) return
+    if (!campaignSlotsQuery.isSuccess) return
+    appliedSlotDefaultRef.current = true
+    const latest = maxIsoWeekAmongCampaignSlots(campaignSlotsQuery.data ?? [])
+    setTargetWeek(pickCampaignTargetWeekFromOptions(weekOptions, latest))
+  }, [campaignSlotsQuery.isSuccess, campaignSlotsQuery.data, weekManuallyPicked, weekOptions])
+
   const weekSelectId = useId()
 
   const selectedWeekKey = weekKey(targetWeek.kw, targetWeek.year)
@@ -226,6 +253,7 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
 
   const [backshopFileLabel, setBackshopFileLabel] = useState<string | null>(null)
   const [backshopMatchRows, setBackshopMatchRows] = useState<ExitMatchRow[]>([])
+  const [backshopAuslieferungAb, setBackshopAuslieferungAb] = useState<string | null>(null)
 
   const resetOrdWeekForm = () => {
     setOrdWeekUpload(null)
@@ -238,6 +266,7 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
   const resetBackshopForm = () => {
     setBackshopMatchRows([])
     setBackshopFileLabel(null)
+    setBackshopAuslieferungAb(null)
     if (backshopFileRef.current) backshopFileRef.current.value = ''
   }
 
@@ -334,6 +363,7 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
       })
       setBackshopMatchRows(rows)
       setBackshopFileLabel(parsed.fileName)
+      setBackshopAuslieferungAb(parsed.auslieferungAb)
       toast.success(`${rows.length} Zeilen aus Excel gelesen`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Excel konnte nicht gelesen werden')
@@ -375,6 +405,9 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
   const buildLinesFromExitRows = (rows: ExitMatchRow[]): Array<{
     plu: string | null
     promo_price: number
+    purchase_price: number | null
+    list_ek: number | null
+    list_vk: number | null
     source_art_nr: string | null
     source_plu: string | null
     source_artikel: string | null
@@ -384,6 +417,9 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
     const out: Array<{
       plu: string | null
       promo_price: number
+      purchase_price: number | null
+      list_ek: number | null
+      list_vk: number | null
       source_art_nr: string | null
       source_plu: string | null
       source_artikel: string | null
@@ -393,12 +429,22 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
       const source_artikel = r.parsed.artikel || null
       const source_art_nr = r.parsed.artNr || null
       const price = r.parsed.aktUvp
+      const purchaseRaw = r.parsed.purchasePrice
+      const purchase_price =
+        purchaseRaw != null && !Number.isNaN(Number(purchaseRaw)) ? Number(purchaseRaw) : null
+      const list_ek =
+        r.parsed.listEk != null && !Number.isNaN(Number(r.parsed.listEk)) ? Number(r.parsed.listEk) : null
+      const list_vk =
+        r.parsed.listVk != null && !Number.isNaN(Number(r.parsed.listVk)) ? Number(r.parsed.listVk) : null
       if (r.selectedPlu && price != null && !Number.isNaN(Number(price))) {
         if (seen.has(r.selectedPlu)) continue
         seen.add(r.selectedPlu)
         out.push({
           plu: r.selectedPlu,
           promo_price: Number(price),
+          purchase_price,
+          list_ek,
+          list_vk,
           source_art_nr,
           source_plu: null,
           source_artikel,
@@ -408,6 +454,9 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
         out.push({
           plu: null,
           promo_price: Number(price ?? 0),
+          purchase_price,
+          list_ek,
+          list_vk,
           source_art_nr,
           source_plu: null,
           source_artikel,
@@ -427,15 +476,23 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
       return
     }
     const lines = linesFromObstMatchRows(ordWeekUpload.matchRows)
+    const savedKw = targetWeek.kw
+    const savedYear = targetWeek.year
     saveObst.mutate(
       {
-        kwNummer: targetWeek.kw,
-        jahr: targetWeek.year,
+        kwNummer: savedKw,
+        jahr: savedYear,
         campaignKind: 'ordersatz_week',
         fileName: ordWeekUpload.fileName,
         lines,
       },
-      { onSuccess: () => resetOrdWeekForm() },
+      {
+        onSuccess: () => {
+          resetOrdWeekForm()
+          setWeekManuallyPicked(false)
+          setTargetWeek(pickCampaignTargetWeekFromOptions(weekOptions, { kw: savedKw, year: savedYear }))
+        },
+      },
     )
   }
 
@@ -445,15 +502,23 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
       return
     }
     const lines = linesFromObstMatchRows(ord3Upload.matchRows)
+    const savedKw = targetWeek.kw
+    const savedYear = targetWeek.year
     saveObst.mutate(
       {
-        kwNummer: targetWeek.kw,
-        jahr: targetWeek.year,
+        kwNummer: savedKw,
+        jahr: savedYear,
         campaignKind: 'ordersatz_3day',
         fileName: ord3Upload.fileName,
         lines,
       },
-      { onSuccess: () => resetOrd3Form() },
+      {
+        onSuccess: () => {
+          resetOrd3Form()
+          setWeekManuallyPicked(false)
+          setTargetWeek(pickCampaignTargetWeekFromOptions(weekOptions, { kw: savedKw, year: savedYear }))
+        },
+      },
     )
   }
 
@@ -463,14 +528,23 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
       return
     }
     const lines = buildLinesFromExitRows(backshopMatchRows)
+    const savedKw = targetWeek.kw
+    const savedYear = targetWeek.year
     saveBackshop.mutate(
       {
-        kwNummer: targetWeek.kw,
-        jahr: targetWeek.year,
+        kwNummer: savedKw,
+        jahr: savedYear,
         fileName: backshopFileLabel,
+        auslieferung_ab: backshopAuslieferungAb,
         lines,
       },
-      { onSuccess: () => resetBackshopForm() },
+      {
+        onSuccess: () => {
+          resetBackshopForm()
+          setWeekManuallyPicked(false)
+          setTargetWeek(pickCampaignTargetWeekFromOptions(weekOptions, { kw: savedKw, year: savedYear }))
+        },
+      },
     )
   }
 
@@ -526,8 +600,9 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
       <CardHeader>
         <CardTitle className="text-lg">Kalenderwoche</CardTitle>
         <CardDescription>
-          Nur ISO-KW im Bereich ±2 Wochen (wie bei Uploads). Vorauswahl: nächste KW. Eine bestehende Kampagne
-          desselben Typs für diese KW wird vollständig ersetzt.
+          ISO-KW bis 2 Wochen zurück und 4 Wochen voraus (relativ zu heute). Vorauswahl: nächste freie KW nach der
+          zuletzt gespeicherten Zentralwerbung (sonst nächste KW relativ zu heute). Eine bestehende Kampagne desselben
+          Typs für diese KW wird vollständig ersetzt.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-4 items-end">
@@ -537,7 +612,10 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
             value={selectedWeekKey}
             onValueChange={(v) => {
               const opt = weekOptions.find((o) => weekKey(o.kw, o.year) === v)
-              if (opt) setTargetWeek({ kw: opt.kw, year: opt.year })
+              if (opt) {
+                setWeekManuallyPicked(true)
+                setTargetWeek({ kw: opt.kw, year: opt.year })
+              }
             }}
           >
             <SelectTrigger id={weekSelectId} className="w-full min-w-[220px]">

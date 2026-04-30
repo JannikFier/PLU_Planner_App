@@ -10,6 +10,9 @@ import {
   weeksBetweenIsoWeeks,
   getCampaignWeekSelectOptions,
   getDefaultCampaignTargetWeek,
+  getNextIsoWeekAfter,
+  maxIsoWeekAmongCampaignSlots,
+  pickCampaignTargetWeekFromOptions,
   formatBackshopActiveListToolbarRange,
   formatIsoWeekMondayToSaturdayDe,
   formatKwLabelWithOptionalMonSatRange,
@@ -183,10 +186,9 @@ describe('date-kw-utils', () => {
   })
 
   describe('getCampaignWeekSelectOptions', () => {
-    it('liefert bis zu 5 eindeutige ISO-KW-Einträge (±2 Wochen)', () => {
+    it('liefert 7 eindeutige ISO-KW-Einträge (−2 … +4 Wochen)', () => {
       const opts = getCampaignWeekSelectOptions(new Date(2026, 2, 15))
-      expect(opts.length).toBeGreaterThanOrEqual(3)
-      expect(opts.length).toBeLessThanOrEqual(5)
+      expect(opts).toHaveLength(7)
       expect(opts[0]).toMatchObject({ kw: expect.any(Number), year: expect.any(Number), label: expect.any(String) })
     })
   })
@@ -196,6 +198,53 @@ describe('date-kw-utils', () => {
       const next = getDefaultCampaignTargetWeek()
       expect(next.kw).toBeGreaterThanOrEqual(1)
       expect(next.kw).toBeLessThanOrEqual(53)
+    })
+  })
+
+  describe('getNextIsoWeekAfter', () => {
+    it('liefert KW 1/2026 nach KW 52/2025', () => {
+      expect(getNextIsoWeekAfter(52, 2025)).toEqual({ kw: 1, year: 2026 })
+    })
+    it('liefert aufeinanderfolgende KW im gleichen Jahr', () => {
+      expect(getNextIsoWeekAfter(10, 2026)).toEqual({ kw: 11, year: 2026 })
+    })
+  })
+
+  describe('maxIsoWeekAmongCampaignSlots', () => {
+    it('liefert null für leeres Array', () => {
+      expect(maxIsoWeekAmongCampaignSlots([])).toBeNull()
+    })
+    it('findet Maximum bei unsortierter Liste', () => {
+      expect(
+        maxIsoWeekAmongCampaignSlots([
+          { kw: 10, jahr: 2026 },
+          { kw: 3, jahr: 2027 },
+          { kw: 52, jahr: 2026 },
+        ]),
+      ).toEqual({ kw: 3, year: 2027 })
+    })
+  })
+
+  describe('pickCampaignTargetWeekFromOptions', () => {
+    const opts = [
+      { kw: 18, year: 2026 },
+      { kw: 19, year: 2026 },
+      { kw: 20, year: 2026 },
+      { kw: 21, year: 2026 },
+    ]
+
+    it('wählt exakte nächste KW nach resumeAfter', () => {
+      expect(pickCampaignTargetWeekFromOptions(opts, { kw: 19, year: 2026 })).toEqual({ kw: 20, year: 2026 })
+    })
+    it('clampt auf früheste Option on-or-after wenn nächste KW außerhalb', () => {
+      expect(pickCampaignTargetWeekFromOptions(opts, { kw: 22, year: 2026 })).toEqual({ kw: 21, year: 2026 })
+    })
+    it('clampt auf späteste Option wenn nächste KW nach resumeAfter über alle Optionen hinausgeht', () => {
+      const early = [
+        { kw: 10, year: 2026 },
+        { kw: 11, year: 2026 },
+      ]
+      expect(pickCampaignTargetWeekFromOptions(early, { kw: 11, year: 2026 })).toEqual({ kw: 11, year: 2026 })
     })
   })
 

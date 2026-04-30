@@ -92,10 +92,16 @@ export function AuthPrefetch() {
     }
     else if (role === 'admin') void import('@/pages/AdminDashboard')
     else if (role === 'viewer') void import('@/pages/ViewerDashboard')
+    else if (role === 'kiosk') void import('@/pages/KioskLayout')
     else void import('@/pages/UserDashboard')
     // Chunk der aktuellen Route vorladen (Reload auf MasterList/BackshopList schneller)
     if (location.pathname.includes('/masterlist')) void import('@/pages/MasterList')
+    if (location.pathname.includes('/kiosk')) void import('@/pages/KioskLayout')
     if (location.pathname.includes('/backshop-list')) void import('@/pages/BackshopMasterList')
+    if (location.pathname.includes('pick-hide-obst')) void import('@/pages/PickHideObstPage')
+    if (location.pathname.includes('pick-hide-backshop')) void import('@/pages/PickHideBackshopPage')
+    if (location.pathname.includes('pick-rename-obst')) void import('@/pages/PickRenameObstPage')
+    if (location.pathname.includes('pick-rename-backshop')) void import('@/pages/PickRenameBackshopPage')
   }, [authLoading, user, mustChangePassword, profile?.role, location.pathname])
 
   return null

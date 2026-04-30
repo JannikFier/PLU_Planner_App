@@ -133,7 +133,7 @@ export function fuzzyOwnProductNameMatches(blob: string, query: string): boolean
   const maxDist = fuzzyMaxDistForQueryLen(q.length)
   const words = blob
     .toLowerCase()
-    .split(/[\s/|,.()+–\-]+/)
+    .split(/[\s/|,.()+–-]+/)
     .map((w) => w.replace(/^[★\s]+/, '').trim())
     .filter((w) => w.length >= 3)
   for (const w of words) {

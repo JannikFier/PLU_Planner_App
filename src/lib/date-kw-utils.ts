@@ -17,8 +17,10 @@ import { de } from 'date-fns/locale'
 /** Anzahl KWs vor/nach aktueller KW in der Upload-Auswahl */
 const KW_RANGE = 3
 
-/** Anzahl Kalenderwochen (±) für die Zentral-Werbungs-KW-Auswahl (5 Einträge: −2 … +2) */
-const CAMPAIGN_KW_RANGE_WEEKS = 2
+/** Kalenderwochen zurück für die Zentral-Werbungs-KW-Auswahl (relativ zu „heute“). */
+const CAMPAIGN_KW_PAST_WEEKS = 2
+/** Kalenderwochen voraus für die Zentral-Werbungs-KW-Auswahl (relativ zu „heute“). */
+const CAMPAIGN_KW_FUTURE_WEEKS = 4
 
 /** Anzahl Jahre vor/nach aktuellem Jahr in der Upload-Auswahl */
 const YEAR_RANGE = 1
@@ -249,13 +251,14 @@ export function weeksBetweenIsoWeeks(
 }
 
 /**
- * Fünf ISO-KW-Optionen: heute ±2 Kalenderwochen (eindeutig nach Jahr+KW).
+ * ISO-KW-Optionen: bis zu CAMPAIGN_KW_PAST_WEEKS zurück und CAMPAIGN_KW_FUTURE_WEEKS voraus
+ * (eindeutig nach Jahr+KW, Duplikate bei Jahresgrenze werden ausgelassen).
  * Für Dropdowns „Zentrale Werbung“ (kein freies Zahleneingabe-Feld).
  */
 export function getCampaignWeekSelectOptions(from: Date = new Date()): { kw: number; year: number; label: string }[] {
   const seen = new Set<string>()
   const out: { kw: number; year: number; label: string }[] = []
-  for (let d = -CAMPAIGN_KW_RANGE_WEEKS; d <= CAMPAIGN_KW_RANGE_WEEKS; d++) {
+  for (let d = -CAMPAIGN_KW_PAST_WEEKS; d <= CAMPAIGN_KW_FUTURE_WEEKS; d++) {
     const { kw, year } = getKWAndYearFromDate(addWeeks(from, d))
     const key = `${year}-${kw}`
     if (seen.has(key)) continue
@@ -268,6 +271,70 @@ export function getCampaignWeekSelectOptions(from: Date = new Date()): { kw: num
 /** Standard-Ziel-KW für neue Werbung: nächste ISO-KW (typisch: Vorbereitung für die kommende Woche). */
 export function getDefaultCampaignTargetWeek(): { kw: number; year: number } {
   return getKWAndYearFromDate(addWeeks(new Date(), 1))
+}
+
+/** ISO-Kalenderwoche direkt nach (kw, year) (Montag der Woche + 7 Tage). */
+export function getNextIsoWeekAfter(kw: number, year: number): { kw: number; year: number } {
+  const monday = startOfISOWeek(setISOWeek(setISOWeekYear(new Date(), year), kw))
+  return getKWAndYearFromDate(addWeeks(monday, 1))
+}
+
+/**
+ * Höchste ISO-KW unter gespeicherten Kampagnen-Slots (kw + ISO-Jahr).
+ * Leeres Array → `null`.
+ */
+export function maxIsoWeekAmongCampaignSlots(
+  slots: ReadonlyArray<{ kw: number; jahr: number }>,
+): { kw: number; year: number } | null {
+  if (slots.length === 0) return null
+  let best = { kw: slots[0].kw, year: slots[0].jahr }
+  for (let i = 1; i < slots.length; i++) {
+    const o = slots[i]
+    if (compareIsoWeekPair(o.kw, o.jahr, best.kw, best.year) > 0) {
+      best = { kw: o.kw, year: o.jahr }
+    }
+  }
+  return best
+}
+
+/**
+ * Ziel-KW für Zentral-Werbung-Upload: nächste KW nach `resumeAfter`, sonst nächste KW relativ zu heute;
+ * Ergebnis liegt immer in `weekOptions` (nächstgrößere erlaubte KW, sonst die späteste Option).
+ */
+export function pickCampaignTargetWeekFromOptions(
+  weekOptions: ReadonlyArray<{ kw: number; year: number }>,
+  /** `null`: wie {@link getDefaultCampaignTargetWeek}; sonst nächste KW nach diesem Stand. */
+  resumeAfter: { kw: number; year: number } | null,
+): { kw: number; year: number } {
+  const candidate =
+    resumeAfter != null
+      ? getNextIsoWeekAfter(resumeAfter.kw, resumeAfter.year)
+      : getDefaultCampaignTargetWeek()
+
+  if (weekOptions.length === 0) return candidate
+
+  const exact = weekOptions.find((o) => o.kw === candidate.kw && o.year === candidate.year)
+  if (exact) return { kw: exact.kw, year: exact.year }
+
+  let earliestOnOrAfter: { kw: number; year: number } | null = null
+  for (const o of weekOptions) {
+    if (compareIsoWeekPair(o.kw, o.year, candidate.kw, candidate.year) < 0) continue
+    if (
+      !earliestOnOrAfter ||
+      compareIsoWeekPair(o.kw, o.year, earliestOnOrAfter.kw, earliestOnOrAfter.year) < 0
+    ) {
+      earliestOnOrAfter = { kw: o.kw, year: o.year }
+    }
+  }
+  if (earliestOnOrAfter) return earliestOnOrAfter
+
+  let latestInList: { kw: number; year: number } | null = null
+  for (const o of weekOptions) {
+    if (!latestInList || compareIsoWeekPair(o.kw, o.year, latestInList.kw, latestInList.year) > 0) {
+      latestInList = { kw: o.kw, year: o.year }
+    }
+  }
+  return latestInList ?? candidate
 }
 
 /**

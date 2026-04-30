@@ -44,7 +44,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { UserPlus, KeyRound, Loader2, Copy, Check, Users, Trash2, Building2, Eye } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { UserPlus, KeyRound, Loader2, Copy, Check, Users, Trash2, Building2, Eye, ScanLine } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Profile } from '@/types/database'
 import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer, roleBadgeLabel, generateOneTimePassword } from '@/lib/profile-helpers'
@@ -53,9 +54,9 @@ import { useCompanyProfiles } from '@/hooks/useCompanyProfiles'
 import { useAllStores } from '@/hooks/useStores'
 import { useStoreAccessByUser, useAddUserToStore, useRemoveUserFromStore } from '@/hooks/useStoreAccess'
 import {
+  useStoreListAreaEnabled,
   useUserListVisibilityForUser,
   useUpdateUserListVisibility,
-  useStoreListAreaEnabled,
 } from '@/hooks/useStoreListVisibility'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
@@ -177,7 +178,8 @@ export function UserManagement() {
   const [visibilityDialogUser, setVisibilityDialogUser] = useState<Profile | null>(null)
   const { data: userVisibility } = useUserListVisibilityForUser(visibilityDialogUser?.id, defaultStoreId)
   const updateUserVisibility = useUpdateUserListVisibility()
-  const { obstGemuese: storeObstEnabled, backshop: storeBackshopEnabled } = useStoreListAreaEnabled(defaultStoreId)
+  const { obstGemuese: storeObstEnabled, backshop: storeBackshopEnabled, kiosk: storeKioskEnabled } =
+    useStoreListAreaEnabled(defaultStoreId)
   const userObstVisible = userVisibility?.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
   const userBackshopVisible = userVisibility?.find(v => v.list_type === 'backshop')?.is_visible ?? true
 
@@ -726,6 +728,25 @@ export function UserManagement() {
             )}
           </CardContent>
         </Card>
+
+        {storeKioskEnabled && (
+          <Card className="border-dashed">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ScanLine className="h-4 w-4 shrink-0" aria-hidden />
+                Kassen & QR
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                QR-Code drucken, Kassen anlegen und Passwörter für den Kassenmodus verwalten.
+              </p>
+              <Button variant="secondary" asChild className="shrink-0 self-start sm:self-auto">
+                <Link to="/admin/kassenmodus">Zum Kassenmodus</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Märkte-Zuordnung Dialog */}
         <Dialog open={!!storeDialogUser} onOpenChange={(open) => { if (!open) setStoreDialogUser(null) }}>

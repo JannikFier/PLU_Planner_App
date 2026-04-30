@@ -39,6 +39,8 @@ export function useAddBackshopCustomProduct() {
       name: string
       image_url: string
       block_id?: string | null
+      /** false = sofort fest; Standard true (Test / Angebotszettel) */
+      is_offer_sheet_test?: boolean
     }) => {
       if (!user) throw new Error('Nicht eingeloggt')
       if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
@@ -53,6 +55,7 @@ export function useAddBackshopCustomProduct() {
           created_by: user.id,
           store_id: currentStoreId,
           created_at: new Date().toISOString(),
+          is_offer_sheet_test: product.is_offer_sheet_test !== false,
         } as BackshopCustomProduct
         queryClient.setQueryData<BackshopCustomProduct[]>(
           ['backshop-custom-products', currentStoreId],
@@ -68,6 +71,7 @@ export function useAddBackshopCustomProduct() {
         block_id: product.block_id ?? null,
         created_by: user.id,
         store_id: currentStoreId,
+        is_offer_sheet_test: product.is_offer_sheet_test !== false,
       }
 
       const { data, error } = await supabase
@@ -102,6 +106,7 @@ export function useUpdateBackshopCustomProduct() {
       name?: string
       image_url?: string
       block_id?: string | null
+      is_offer_sheet_test?: boolean
     }) => {
       if (isTestModeActive()) {
         queryClient.setQueryData<BackshopCustomProduct[]>(
@@ -157,6 +162,42 @@ export function useDeleteBackshopCustomProduct() {
         queryClient.invalidateQueries({ queryKey: ['backshop-custom-products', currentStoreId] })
       }
       toast.success('Eigenes Produkt (Backshop) gelöscht')
+    },
+    onError: (error) => {
+      toast.error(`Fehler: ${error instanceof Error ? error.message : 'Unbekannt'}`)
+    },
+  })
+}
+
+/** Alle eigenen Backshop-Produkte im Markt von „Test“ (Angebotszettel) auf „fest“. */
+export function usePromoteAllBackshopOfferSheetTests() {
+  const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+
+      if (isTestModeActive()) {
+        queryClient.setQueryData<BackshopCustomProduct[]>(
+          ['backshop-custom-products', currentStoreId],
+          (old) => (old ?? []).map((p) => ({ ...p, is_offer_sheet_test: false })),
+        )
+        return
+      }
+
+      const { error } = await supabase
+        .from('backshop_custom_products')
+        .update({ is_offer_sheet_test: false } as never)
+        .eq('store_id', currentStoreId)
+        .eq('is_offer_sheet_test', true)
+
+      if (error) throw error
+    },
+    onSuccess: () => {
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['backshop-custom-products', currentStoreId] })
+      }
     },
     onError: (error) => {
       toast.error(`Fehler: ${error instanceof Error ? error.message : 'Unbekannt'}`)

@@ -7,8 +7,7 @@
 import type { DisplayItem, LayoutEngineInput, LayoutEngineOutput, PLUStatus } from '@/types/plu'
 import type { BackshopSource } from '@/types/database'
 import type { OfferDisplayInfo } from '@/lib/offer-display'
-import type { BackshopMasterPLUItem } from '@/types/database'
-import type { Block } from '@/types/database'
+import type { BackshopMasterPLUItem, BackshopCustomProduct, Block } from '@/types/database'
 import { nameContainsKeyword, normalizeKeywordInName } from '@/lib/keyword-rules'
 import { getKWAndYearFromDate, weeksBetweenIsoWeeks } from '@/lib/date-kw-utils'
 import {
@@ -228,7 +227,7 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
 // Backshop: Anzeigeliste (Master + Custom + Bezeichnungsregeln)
 // ============================================================
 
-/** Custom-Product-Eintrag für Backshop (id, plu, name, image_url, block_id) */
+/** Custom-Product-Eintrag für Backshop (id, plu, name, image_url, block_id, is_offer_sheet_test) */
 export type BackshopCustomProductInput = {
   id: string
   plu: string
@@ -236,6 +235,21 @@ export type BackshopCustomProductInput = {
   image_url: string
   block_id?: string | null
   created_at?: string
+  /** false = fest in Hauptliste; true = zusätzlich Block „Neue Produkte“ auf Angebots-PDF */
+  is_offer_sheet_test?: boolean
+}
+
+/** DB-Zeile → Eingabe für `buildBackshopDisplayList` (einheitlich alle Aufrufer). */
+export function toBackshopCustomProductInput(c: BackshopCustomProduct): BackshopCustomProductInput {
+  return {
+    id: c.id,
+    plu: c.plu,
+    name: c.name,
+    image_url: c.image_url,
+    block_id: c.block_id,
+    created_at: c.created_at,
+    is_offer_sheet_test: c.is_offer_sheet_test,
+  }
 }
 
 /** Minimale Regel für Anzeige (keyword, position, is_active) */
@@ -571,6 +585,7 @@ export function buildBackshopDisplayList(input: BackshopDisplayListInput): Layou
       const w = weeksBetweenIsoWeeks(currentKwNummer, currentJahr, addedKw, addedYear)
       const status: import('@/types/plu').PLUStatus =
         w < markYellowKwCount ? 'NEW_PRODUCT_YELLOW' : 'UNCHANGED'
+      const offerSheetTest = cp.is_offer_sheet_test === true
       items.push({
         id: cp.id,
         plu: cp.plu,
@@ -590,6 +605,7 @@ export function buildBackshopDisplayList(input: BackshopDisplayListInput): Layou
         offer_promo_price: off.offer_promo_price,
         offer_source_kind: off.offer_source_kind,
         offer_central_reference_price: off.offer_central_reference_price,
+        backshop_offer_sheet_test: offerSheetTest,
       })
     }
   }

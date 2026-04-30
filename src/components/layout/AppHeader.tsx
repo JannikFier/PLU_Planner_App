@@ -47,6 +47,7 @@ import {
   isSafeAdminBackToTarget,
   isSafeSuperAdminBackToTarget,
 } from '@/lib/admin-back-navigation'
+import { resolvePickerBackTarget } from '@/lib/picker-back-navigation'
 import { cn } from '@/lib/utils'
 import { useTutorialOrchestrator } from '@/hooks/useTutorialOrchestrator'
 import { TutorialChecklistPopover } from '@/components/tutorial/TutorialChecklistPopover'
@@ -107,14 +108,17 @@ export function AppHeader() {
   const USER_OBST_SUB = ['/user/custom-products', '/user/hidden-products', '/user/offer-products', '/user/renamed-products', '/user/hidden-items', '/user/obst-warengruppen']
   const ADMIN_OBST_SUB = ['/admin/custom-products', '/admin/hidden-products', '/admin/offer-products', '/admin/renamed-products', '/admin/hidden-items', '/admin/obst-warengruppen']
   // Backshop-Unter-Seiten → Zurück zur Backshop-Liste
-  const USER_BACKSHOP_SUB = ['/user/backshop-custom-products', '/user/backshop-hidden-products', '/user/backshop-offer-products', '/user/backshop-renamed-products', '/user/marken-auswahl']
-  const ADMIN_BACKSHOP_SUB = ['/admin/backshop-custom-products', '/admin/backshop-hidden-products', '/admin/backshop-offer-products', '/admin/backshop-renamed-products', '/admin/marken-auswahl']
+  const USER_BACKSHOP_SUB = ['/user/backshop-custom-products', '/user/backshop-hidden-products', '/user/backshop-offer-products', '/user/backshop-renamed-products', '/user/marken-auswahl', '/user/backshop-werbung']
+  const ADMIN_BACKSHOP_SUB = ['/admin/backshop-custom-products', '/admin/backshop-hidden-products', '/admin/backshop-offer-products', '/admin/backshop-renamed-products', '/admin/marken-auswahl', '/admin/backshop-werbung']
 
   /** Zurück-Ziel für User-Bereich (/user) – Obst-Unter-Seiten → Masterliste, Backshop-Unter-Seiten → Backshop-Liste, Masterliste/Liste → Dashboard */
   function getUserAreaBackTarget(path: string): string | null {
+    const pickerBack = resolvePickerBackTarget(path, location.state)
+    if (pickerBack) return pickerBack
     if (path === '/user') return null
     if (USER_OBST_SUB.includes(path)) return '/user/masterlist'
     if (path === '/user/masterlist') return '/user'
+    if (path.startsWith('/user/backshop-werbung/')) return '/user/backshop-werbung'
     if (USER_BACKSHOP_SUB.includes(path)) return '/user/backshop-list'
     if (path === '/user/backshop-list') return '/user'
     return '/user'
@@ -123,11 +127,15 @@ export function AppHeader() {
   /** Zurück-Ziel für Viewer-Bereich (/viewer) */
   function getViewerAreaBackTarget(path: string): string | null {
     if (path === '/viewer') return null
+    if (path.startsWith('/viewer/backshop-werbung/')) return '/viewer/backshop-werbung'
+    if (path === '/viewer/backshop-werbung') return '/viewer/backshop-list'
     return '/viewer'
   }
 
   /** Zurück-Ziel für Admin-Bereich – Hierarchie wie Super-Admin Markt: /admin → /admin/obst|backshop → Liste|Konfiguration */
   function getAdminAreaBackTarget(path: string): string | null {
+    const pickerBack = resolvePickerBackTarget(path, location.state)
+    if (pickerBack) return pickerBack
     if (path === '/admin') return null
 
     const adminStateBackTo = (location.state as { backTo?: string } | null)?.backTo
@@ -149,6 +157,8 @@ export function AppHeader() {
 
     if (path === '/admin/masterlist') return '/admin/obst'
     if (path === '/admin/backshop-list') return '/admin/backshop'
+    if (path.startsWith('/admin/backshop-werbung/')) return '/admin/backshop-werbung'
+    if (path === '/admin/backshop-werbung') return '/admin/backshop'
 
     if (
       path === '/admin/layout'
@@ -176,6 +186,8 @@ export function AppHeader() {
 
   /** Zurueck-Ziel fuer Super-Admin-Bereich – neue Hierarchie mit Upload/Firmen-Trennung */
   function getSuperAdminBackTarget(path: string): string | null {
+    const pickerBack = resolvePickerBackTarget(path, location.state)
+    if (pickerBack) return pickerBack
     // Backshop-Upload-Assistent (/backshop-upload/:quelle und Schritte) → Quellen-Übersicht
     // (vor backTo, sonst springt der Kopf-Pfeil z. B. zum Dashboard statt eine Ebene höher)
     if (path.startsWith('/super-admin/backshop-upload/')) {
@@ -206,7 +218,11 @@ export function AppHeader() {
       '/super-admin/backshop-gruppenregeln',
       '/super-admin/marken-auswahl',
       '/super-admin/backshop-product-groups',
+      '/super-admin/backshop-werbung',
     ]
+    if (path.startsWith('/super-admin/backshop-werbung/')) {
+      return '/super-admin/backshop-werbung'
+    }
     if (saBackshopMarktUnter.includes(path)) {
       const saStateBackTo = (location.state as { backTo?: string } | null)?.backTo
       const saQueryBackTo = new URLSearchParams(location.search).get('backTo')
@@ -218,6 +234,13 @@ export function AppHeader() {
         return '/super-admin/backshop'
       }
       return '/super-admin/backshop'
+    }
+
+    // Markt-Konfiguration-Hubs (vor generischem backTo-Block; ohne backTo nicht ins Leere)
+    if (path === '/super-admin/markt/obst/konfiguration' || path === '/super-admin/markt/backshop/konfiguration') {
+      const hubBack = new URLSearchParams(location.search).get('backTo')
+      if (hubBack && isSafeSuperAdminBackToTarget(hubBack)) return hubBack
+      return '/super-admin'
     }
 
     // Wurde von einer Markt-Detailseite hierher navigiert? state oder URL (bleibt nach Reload erhalten)

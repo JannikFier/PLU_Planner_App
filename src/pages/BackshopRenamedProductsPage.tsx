@@ -1,6 +1,7 @@
 // Backshop: Umbenannte Produkte (Admin/Super-Admin), inkl. Bild im Umbenennen-Dialog
 
 import { useMemo, useState, useCallback } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,7 +32,7 @@ import { useBackshopOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalP
 import { useBackshopRenamedItems } from '@/hooks/useBackshopRenamedItems'
 import { useResetBackshopProductName, useDeleteBackshopRenamedByPlu } from '@/hooks/useBackshopRename'
 import { useAuth } from '@/hooks/useAuth'
-import { buildBackshopDisplayList } from '@/lib/layout-engine'
+import { buildBackshopDisplayList, toBackshopCustomProductInput } from '@/lib/layout-engine'
 import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
 import {
   useStoreBackshopBlockOrder,
@@ -44,12 +45,11 @@ import { itemMatchesSearch } from '@/lib/plu-helpers'
 import { useListFindInPageSection } from '@/hooks/useListFindInPageSection'
 import { ListFindInPageToolbar } from '@/components/plu/ListFindInPageToolbar'
 import type { ListFindInPageBinding } from '@/components/plu/list-find-in-page-types'
-import { RenameProductsDialog } from '@/components/plu/RenameProductsDialog'
 import {
   RenamedProductsResponsiveList,
   type RenamedProductDisplayRow,
 } from '@/components/plu/RenamedProductsResponsiveList'
-import type { BackshopMasterPLUItem, BackshopSource, Block } from '@/types/database'
+import type { BackshopMasterPLUItem, BackshopSource } from '@/types/database'
 import { useStoreListCarryoverRows } from '@/hooks/useStoreListCarryover'
 import { carryoverBackshopRowToMasterItem } from '@/lib/carryover-master-snapshot'
 import { useBackshopLineVisibilityOverrides } from '@/hooks/useBackshopLineVisibilityOverrides'
@@ -61,7 +61,13 @@ import { scopeProductGroupsByEffectiveBlock } from '@/lib/backshop-product-group
 
 export function BackshopRenamedProductsPage() {
   useAuth()
-  const [showRenameDialog, setShowRenameDialog] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const pathPrefix =
+    location.pathname.startsWith('/super-admin') ? '/super-admin'
+    : location.pathname.startsWith('/admin') ? '/admin'
+    : location.pathname.startsWith('/viewer') ? '/viewer'
+    : '/user'
   const [resetConfirmItem, setResetConfirmItem] = useState<BackshopMasterPLUItem | null>(null)
 
   const { data: activeVersion } = useActiveBackshopVersion()
@@ -139,23 +145,6 @@ export function BackshopRenamedProductsPage() {
     }
   }, [productGroupsForStore, sourceChoices])
 
-  const renameDialogListLayout = useMemo(
-    () => ({
-      sortMode: (layoutSettings?.sort_mode ?? 'ALPHABETICAL') as 'ALPHABETICAL' | 'BY_BLOCK',
-      blocks: blocks as Block[],
-      storeBlockOrder: storeBackshopBlockOrder,
-      nameBlockOverrides,
-    }),
-    [layoutSettings?.sort_mode, blocks, storeBackshopBlockOrder, nameBlockOverrides],
-  )
-
-  const flowDirection = (layoutSettings?.flow_direction ?? 'ROW_BY_ROW') as 'ROW_BY_ROW' | 'COLUMN_FIRST'
-  const dialogFontSizes = {
-    header: layoutSettings?.font_header_px ?? 32,
-    column: layoutSettings?.font_column_px ?? 18,
-    product: layoutSettings?.font_product_px ?? 18,
-  }
-
   const { kw: currentKw, year: currentJahr } = getKWAndYearFromDate(new Date())
   const offerDisplayByPlu = useMemo(
     () =>
@@ -180,14 +169,7 @@ export function BackshopRenamedProductsPage() {
       offerDisplayByPlu,
       sortMode,
       blocks,
-      customProducts: customProducts.map((c) => ({
-        id: c.id,
-        plu: c.plu,
-        name: c.name,
-        image_url: c.image_url,
-        block_id: c.block_id,
-        created_at: c.created_at,
-      })),
+      customProducts: customProducts.map(toBackshopCustomProductInput),
       bezeichnungsregeln: activeRegeln,
       renamedItems: globalRenamed,
       markYellowKwCount: markYellow,
@@ -242,8 +224,6 @@ export function BackshopRenamedProductsPage() {
     }
     return m
   }, [masterItems, carryoverMastersIncluded])
-
-  const searchableItemsForRename = useMemo(() => Array.from(masterByPluForRenamed.values()), [masterByPluForRenamed])
 
   // Global umbenannt: Master ODER Carryover-Zeile
   const renamedItems = useMemo(() => {
@@ -350,7 +330,11 @@ export function BackshopRenamedProductsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowRenameDialog(true)}
+            onClick={() =>
+              navigate(`${pathPrefix}/pick-rename-backshop`, {
+                state: { backTo: `${location.pathname}${location.search ?? ''}` },
+              })
+            }
             data-tour="backshop-renamed-add-button"
           >
             <Pencil className="h-4 w-4 mr-2" />
@@ -398,20 +382,6 @@ export function BackshopRenamedProductsPage() {
             </CardContent>
           </Card>
         )}
-
-        <RenameProductsDialog
-          open={showRenameDialog}
-          onOpenChange={setShowRenameDialog}
-          searchableItems={searchableItemsForRename}
-          listType="backshop"
-          displayMode={(layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'}
-          renamedOverrides={globalRenamed.map((r) => ({ plu: r.plu, display_name: r.display_name }))}
-          listLayout={renameDialogListLayout}
-          flowDirection={flowDirection}
-          fontSizes={dialogFontSizes}
-          dataTour="backshop-renamed-add-dialog"
-          renameDialogSubmitDataTour="backshop-renamed-add-dialog-submit"
-        />
 
         <AlertDialog open={!!resetConfirmItem} onOpenChange={(open) => !open && setResetConfirmItem(null)}>
           <AlertDialogContent>

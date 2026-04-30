@@ -67,8 +67,24 @@ npm run dev
    supabase functions deploy create-user
    supabase functions deploy reset-password
    supabase functions deploy delete-user
+   # Kassenmodus (Kiosk) – zwingend für Kasse anlegen / Login:
+   supabase functions deploy create-kiosk-register
+   supabase functions deploy kiosk-login
+   supabase functions deploy update-kiosk-register
+   supabase functions deploy delete-kiosk-register
+   supabase functions deploy rotate-kiosk-entrance
+   ```
+   Oder alle Functions aus `supabase/functions/` in einem Schritt:
+   ```bash
+   npm run supabase:deploy:functions
    ```
    Den Project Ref findest du in Supabase unter Project Settings → General (z.B. `zjyolnnjlxyktdnfbzzs`).
+
+#### Lokale Supabase-CLI (`http://localhost:54321`)
+
+- Die App nutzt im **Vite Dev** (`npm run dev`) und bei **`npm run preview`** einen Proxy für `/functions/v1` (CORS und einheitliche URLs).
+- Ohne laufende Edge Functions liefert die lokale API **HTTP 404** auf z. B. `create-kiosk-register`. Im zweiten Terminal z. B. `supabase functions serve` starten oder die Supabase-Doku „Edge Functions – Local development“ befolgen.
+- Gegen ein **Remote-Projekt** weiterhin: `supabase functions deploy <name>` (u. a. `create-kiosk-register`, `kiosk-login`, …).
 
 ### Verfügbare Scripts
 
@@ -78,6 +94,7 @@ npm run dev
 | `npm run build` | Erstellt den Production Build in `dist/` |
 | `npm run preview` | Zeigt den Production Build lokal an |
 | `npm run lint` | Prüft den Code mit ESLint |
+| `npm run supabase:deploy:functions` | Deployt alle Edge Functions unter `supabase/functions/` (CLI: `supabase login` + `supabase link`) |
 | `npm run test` | Startet Unit-Tests im Watch-Modus |
 | `npm run test:run` | Führt Unit-Tests einmal aus (z.B. vor Push) |
 | `npm run test:e2e` | E2E-Tests (Playwright); Dev-Server wird bei Bedarf gestartet |

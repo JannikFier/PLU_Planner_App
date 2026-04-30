@@ -33,6 +33,7 @@ export const PERSIST_QUERY_KEY_PREFIXES: readonly string[] = [
   'backshop-offer-campaigns-admin',
   'backshop-offer-campaign-detail',
   'backshop-offer-store-disabled',
+  'backshop-werbung-weekday',
   'bezeichnungsregeln',
   'store-obst-block-order',
   'store-obst-name-block-override',

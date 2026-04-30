@@ -40,7 +40,7 @@ import { useBackshopOfferItems } from '@/hooks/useBackshopOfferItems'
 import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
 import { useBackshopBezeichnungsregeln } from '@/hooks/useBackshopBezeichnungsregeln'
 import { useBackshopRenamedItems } from '@/hooks/useBackshopRenamedItems'
-import { buildBackshopDisplayList } from '@/lib/layout-engine'
+import { buildBackshopDisplayList, toBackshopCustomProductInput } from '@/lib/layout-engine'
 import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
 import { scopeProductGroupsByEffectiveBlock } from '@/lib/backshop-product-groups-scope-by-effective-block'
 import {
@@ -95,12 +95,14 @@ export function BackshopMasterList() {
   const location = useLocation()
   const { versionId: snapshotVersionId } = useParams<{ versionId?: string }>()
   const isSnapshot = Boolean(snapshotVersionId)
-  const { isViewer, isSuperAdmin } = useAuth()
+  const { isViewer, isKiosk, isSuperAdmin } = useAuth()
+  const listReadOnly = isViewer || isKiosk
 
   const rolePrefix =
     location.pathname.startsWith('/super-admin') ? '/super-admin'
     : location.pathname.startsWith('/admin') ? '/admin'
     : location.pathname.startsWith('/viewer') ? '/viewer'
+    : location.pathname.startsWith('/kiosk') ? '/kiosk'
     : '/user'
 
   /** Zentrale SA-Ansicht: keine marktspezifischen eigenen Produkte (Markt-Flow: backTo zu …/stores/…). */
@@ -148,8 +150,14 @@ export function BackshopMasterList() {
 
   const { lineForceShowKeys: lineVisShowKeys, lineForceHideKeys: lineVisHideKeys } =
     useBackshopLineVisibilityOverrides()
-  const lineForceShowKeysForList = snapshotReadOnly ? new Set<string>() : lineVisShowKeys
-  const lineForceHideKeysForList = snapshotReadOnly ? new Set<string>() : lineVisHideKeys
+  const lineForceShowKeysForList = useMemo(
+    () => (snapshotReadOnly ? new Set<string>() : lineVisShowKeys),
+    [snapshotReadOnly, lineVisShowKeys],
+  )
+  const lineForceHideKeysForList = useMemo(
+    () => (snapshotReadOnly ? new Set<string>() : lineVisHideKeys),
+    [snapshotReadOnly, lineVisHideKeys],
+  )
 
   const [searchParams, setSearchParams] = useSearchParams()
   const snapshotSourceOnly: BackshopExcelSource | null = useMemo(() => {
@@ -186,7 +194,7 @@ export function BackshopMasterList() {
   const previewForCampaign = lockedSnapshotPreview ?? offerPreviewSelection
 
   const { data: offerSlotsData, isFetched: offerSlotsFetched } = useBackshopOfferCampaignSlots()
-  const offerSlots = offerSlotsData ?? []
+  const offerSlots = useMemo(() => offerSlotsData ?? [], [offerSlotsData])
 
   useEffect(() => {
     if (lockedSnapshotPreview) return
@@ -256,7 +264,10 @@ export function BackshopMasterList() {
   const { data: customProductsFetched = [] } = useBackshopCustomProducts({
     enabled: !isSuperAdminCentralBackshopMasterView,
   })
-  const customProducts = isSuperAdminCentralBackshopMasterView ? [] : customProductsFetched
+  const customProducts = useMemo(
+    () => (isSuperAdminCentralBackshopMasterView ? [] : customProductsFetched),
+    [isSuperAdminCentralBackshopMasterView, customProductsFetched],
+  )
   const { data: hiddenItems = [] } = useBackshopHiddenItems()
   const { data: renamedItems = [] } = useBackshopRenamedItems()
   const { data: offerItems = [] } = useBackshopOfferItems()
@@ -420,14 +431,7 @@ export function BackshopMasterList() {
       offerDisplayByPlu,
       sortMode,
       blocks,
-      customProducts: customProducts.map((c) => ({
-        id: c.id,
-        plu: c.plu,
-        name: c.name,
-        image_url: c.image_url,
-        block_id: c.block_id,
-        created_at: c.created_at,
-      })),
+      customProducts: customProducts.map(toBackshopCustomProductInput),
       bezeichnungsregeln,
       renamedItems,
       markYellowKwCount,
@@ -530,14 +534,7 @@ export function BackshopMasterList() {
       offerDisplayByPlu,
       sortMode,
       blocks,
-      customProducts: customProducts.map((c) => ({
-        id: c.id,
-        plu: c.plu,
-        name: c.name,
-        image_url: c.image_url,
-        block_id: c.block_id,
-        created_at: c.created_at,
-      })),
+      customProducts: customProducts.map(toBackshopCustomProductInput),
       bezeichnungsregeln,
       renamedItems,
       markYellowKwCount,
@@ -632,7 +629,7 @@ export function BackshopMasterList() {
 
   /** Schmale/mittlere Viewports (unter lg): Aktionen im Menü-Button (≡) */
   const backshopMobileMenuItems = useMemo((): PLUListPageActionMenuItem[] => {
-    if (isViewer) return []
+    if (listReadOnly) return []
     if (snapshotReadOnly) {
       return [
         {
@@ -695,12 +692,10 @@ export function BackshopMasterList() {
     )
     return items
   }, [
-    isViewer,
+    listReadOnly,
     snapshotReadOnly,
     isSuperAdmin,
     isSuperAdminCentralBackshopMasterView,
-    isLoading,
-    displayItems.length,
     location.pathname,
     location.search,
     rolePrefix,
@@ -711,7 +706,7 @@ export function BackshopMasterList() {
   ])
 
   return (
-    <DashboardLayout>
+    <DashboardLayout hideHeader={location.pathname.startsWith('/kiosk')}>
       <div className="space-y-4" data-tour="backshop-master-page">
         {/* === Header: Schmal – kurzer Titel + Aktionen-Menü === */}
         <div className="lg:hidden flex items-center justify-between gap-3 min-w-0">
@@ -822,7 +817,7 @@ export function BackshopMasterList() {
 
             {/* Zeile 2: Aktionen als Block rechtsbündig; ab lg (Handy/Tablet: Menü im Header) */}
             <div className="hidden w-full min-w-0 border-t border-border/60 pt-3 lg:flex lg:justify-end">
-              {!isViewer && !snapshotReadOnly && (
+              {!listReadOnly && !snapshotReadOnly && (
                 <div className="flex w-full min-w-0 max-w-full flex-wrap items-center justify-end gap-x-3 gap-y-2">
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     {!isSuperAdminCentralBackshopMasterView && (
@@ -921,7 +916,7 @@ export function BackshopMasterList() {
                   )}
                 </div>
               )}
-              {(!isViewer && snapshotReadOnly) && !hasNoVersion && (
+              {(!listReadOnly && snapshotReadOnly) && !hasNoVersion && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1121,7 +1116,7 @@ export function BackshopMasterList() {
           </div>
         )}
 
-        {showPdfDialog && (
+        {showPdfDialog && !isKiosk && (
           <Suspense fallback={null}>
             <ExportBackshopPDFDialog
             open={showPdfDialog}

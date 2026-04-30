@@ -143,8 +143,9 @@ test.describe('Tutorial PR 2.4 Anchors @extended', () => {
     if ((await addBtn.count()) > 0) {
       await expect(addBtn).toBeAttached()
       await addBtn.first().click()
+      await expect(page).toHaveURL(/pick-hide-backshop/, { timeout: 10_000 })
       await expect(page.locator('[data-tour="backshop-hidden-add-dialog"]')).toBeAttached({
-        timeout: 5_000,
+        timeout: 10_000,
       })
       await expect(
         page.locator('[data-tour="backshop-hidden-add-dialog-submit"]'),
@@ -197,8 +198,9 @@ test.describe('Tutorial PR 2.4 Anchors @extended', () => {
     }
 
     await page.locator('[data-tour="backshop-renamed-add-button"]').first().click()
+    await expect(page).toHaveURL(/pick-rename-backshop/, { timeout: 10_000 })
     await expect(page.locator('[data-tour="backshop-renamed-add-dialog"]')).toBeAttached({
-      timeout: 5_000,
+      timeout: 10_000,
     })
   })
 

@@ -830,6 +830,12 @@ function buildColumnRows(allRows: PDFRow[], startItem: number, endItem: number):
 
 // ========== Backshop-PDF (Bild → PLU → Name, Kopf „PLU-Liste Backshop“, gleicher Footer) ==========
 
+/** Zeilen mit Megaphon/Aktionspreis im Namensfeld (nicht für Block „Neue Produkte“ / Test-eigene). */
+function backshopItemUsesOfferNameLayout(item: DisplayItem): boolean {
+  if (item.is_custom && item.backshop_offer_sheet_test) return false
+  return Boolean(item.is_offer)
+}
+
 const BACKSHOP_ROW_HEIGHT = 22
 /** Bild-Spalte: etwas breiter für größere Produktbilder. */
 const BACKSHOP_IMAGE_SIZE = 22
@@ -897,15 +903,34 @@ export async function generateBackshopPDF(input: GenerateBackshopPDFInput): Prom
     exportMode = 'full_with_offers',
   } = input
   let items = rawItems
+  let offersOnlyPdfRows: PDFRow[] | null = null
+
   if (exportMode === 'offers_only') {
-    items = rawItems
-      .filter((i) => i.is_offer)
-      .sort((a, b) =>
-        getDisplayNameForItem(a.display_name, a.system_name, a.is_custom).localeCompare(
-          getDisplayNameForItem(b.display_name, b.system_name, b.is_custom),
-          'de',
-        ),
+    const sortDe = (a: DisplayItem, b: DisplayItem) =>
+      getDisplayNameForItem(a.display_name, a.system_name, a.is_custom).localeCompare(
+        getDisplayNameForItem(b.display_name, b.system_name, b.is_custom),
+        'de',
       )
+
+    const campaignOffers = rawItems
+      .filter((i) => Boolean(i.is_offer) && !(i.is_custom && i.backshop_offer_sheet_test))
+      .sort(sortDe)
+
+    const neueProdukteTest = rawItems
+      .filter((i) => Boolean(i.is_custom && i.backshop_offer_sheet_test))
+      .sort(sortDe)
+
+    items = [...campaignOffers, ...neueProdukteTest]
+
+    const rowsA = buildPDFRows(campaignOffers, sortMode, blocks)
+    const rowsB = buildPDFRows(neueProdukteTest, sortMode, blocks)
+    if (neueProdukteTest.length === 0) {
+      offersOnlyPdfRows = rowsA
+    } else if (campaignOffers.length === 0) {
+      offersOnlyPdfRows = [{ type: 'group', label: 'Neue Produkte' }, ...rowsB]
+    } else {
+      offersOnlyPdfRows = [...rowsA, { type: 'group', label: 'Neue Produkte' }, ...rowsB]
+    }
   }
   const showOfferHints = exportMode !== 'full_without_offers'
   // Titel 32pt, Warengruppen (z. B. Brot) 24pt, Spalten/Produkte 18pt
@@ -934,7 +959,7 @@ export async function generateBackshopPDF(input: GenerateBackshopPDFInput): Prom
     year: 'numeric',
   })
 
-  const pdfRows = buildPDFRows(items, sortMode, blocks)
+  const pdfRows = offersOnlyPdfRows ?? buildPDFRows(items, sortMode, blocks)
   const mainHeader =
     exportMode === 'offers_only' ? 'Aktuelle Angebote Backshop' : 'PLU-Liste Backshop'
   const megaphoneRaster = loadMegaphoneIconRaster()
@@ -952,6 +977,15 @@ export async function generateBackshopPDF(input: GenerateBackshopPDFInput): Prom
     showOfferHints,
   )
   return doc
+}
+
+/** Mindestens eine Zeile für Backshop-PDF „Nur Angebote“ (Kampagne oder Test-eigenes Produkt). */
+export function backshopPdfOffersOnlyHasRows(items: DisplayItem[]): boolean {
+  return items.some(
+    (i) =>
+      Boolean(i.is_custom && i.backshop_offer_sheet_test) ||
+      (Boolean(i.is_offer) && !(i.is_custom && i.backshop_offer_sheet_test)),
+  )
 }
 
 /** Rendert Backshop-Sektion: Header „PLU-Liste Backshop“, Zeilen Bild | PLU | Name, Footer. */
@@ -1167,7 +1201,7 @@ function renderBackshopSection(
     const displayName = getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)
     const displayPreis = getDisplayPreisForItem(item)
 
-    if (!item.is_offer || !showOfferHints) {
+    if (!showOfferHints || !backshopItemUsesOfferNameLayout(item)) {
       const nameToDraw = truncateWithBinarySearch(doc, displayName, nameTextW)
       doc.text(nameToDraw, nameStartX, y + layout.rowHeight / 2, { baseline: 'middle' })
     } else {
@@ -1225,8 +1259,10 @@ function renderBackshopSection(
     while (i < pdfRows.length) {
       const row = pdfRows[i]
       if (row.type === 'group') {
-        /** Bei Nur-Angebote: Warengruppen-Zeile ohne erneute „Bild / PLU / Name“-Kopfzeile (spart Platz, eine Seite möglich). */
-        const skipRepeatColHeaders = exportMode === 'offers_only' && groupIndex >= 1
+        /** Bei Nur-Angebote: Warengruppen-Zeile ohne erneute „Bild / PLU / Name“-Kopfzeile (spart Platz). Ausnahme: Block „Neue Produkte“ wieder mit Kopfzeile. */
+        const isNeueProdukteKopf = row.label === 'Neue Produkte'
+        const skipRepeatColHeaders =
+          exportMode === 'offers_only' && groupIndex >= 1 && !isNeueProdukteKopf
         const colHeadExtra = skipRepeatColHeaders ? 0 : layout.columnHeaderH + 1
         const spacingAfterGroup = skipRepeatColHeaders ? 0.8 : 1.5
         const pairRows = countItemPairRowsInGroupForward(pdfRows, i)

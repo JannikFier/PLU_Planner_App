@@ -39,9 +39,6 @@ import { usePLUData } from '@/hooks/usePLUData'
 import { useCustomProducts, useAddCustomProductsBatch, useDeleteCustomProduct } from '@/hooks/useCustomProducts'
 import { useBlocks } from '@/hooks/useBlocks'
 import { useLayoutSettings } from '@/hooks/useLayoutSettings'
-import { useCurrentStore } from '@/hooks/useCurrentStore'
-import { useStoreObstBlockOrder, useStoreObstNameBlockOverrides } from '@/hooks/useStoreObstBlockLayout'
-import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useEffectiveRouteRole } from '@/hooks/useEffectiveRouteRole'
 import { canManageMarketHiddenItems } from '@/lib/permissions'
@@ -70,7 +67,6 @@ import { toast } from 'sonner'
 import { CustomProductDialog } from '@/components/plu/CustomProductDialog'
 import { ObstCustomProductsList } from '@/components/plu/ObstCustomProductsList'
 import { ExcelPreviewBox } from '@/components/plu/ExcelPreviewBox'
-import { HideProductsDialog } from '@/components/plu/HideProductsDialog'
 import {
   HiddenProductsResponsiveList,
   type HiddenProductDisplayRow,
@@ -107,7 +103,6 @@ export function HiddenItems() {
     : '/user'
   const currentUserId = user?.id ?? null
   const [showCustomProductDialog, setShowCustomProductDialog] = useState(false)
-  const [showHideProductsDialog, setShowHideProductsDialog] = useState(false)
   const [productToDelete, setProductToDelete] = useState<CustomProduct | null>(null)
   const [excelParseResult, setExcelParseResult] = useState<CustomProductParseResult | null>(null)
   const [excelOverrides, setExcelOverrides] = useState<Record<number, { block_id?: string | null; item_type?: 'PIECE' | 'WEIGHT' }>>({})
@@ -127,18 +122,6 @@ export function HiddenItems() {
   const { data: customProducts = [], isLoading: customProductsLoading } = useCustomProducts()
   const { data: blocks = [] } = useBlocks()
   const { data: layoutSettings } = useLayoutSettings()
-  const { currentStoreId } = useCurrentStore()
-  const { data: storeObstBlockOrder = [] } = useStoreObstBlockOrder()
-  const { data: storeObstNameOverrides = [] } = useStoreObstNameBlockOverrides()
-  const hideDialogListLayout = useMemo(() => {
-    if (!currentStoreId) return undefined
-    return {
-      sortMode: (layoutSettings?.sort_mode ?? 'ALPHABETICAL') as 'ALPHABETICAL' | 'BY_BLOCK',
-      blocks,
-      storeBlockOrder: storeObstBlockOrder,
-      nameBlockOverrides: buildNameBlockOverrideMap(storeObstNameOverrides),
-    }
-  }, [currentStoreId, layoutSettings?.sort_mode, blocks, storeObstBlockOrder, storeObstNameOverrides])
   const addBatch = useAddCustomProductsBatch()
   const deleteProduct = useDeleteCustomProduct()
   const hideProduct = useHideProduct()
@@ -166,38 +149,7 @@ export function HiddenItems() {
     return new Set((obstCampaign?.lines ?? []).map((l) => l.plu))
   }, [obstCampaign])
 
-  // Suchbare Items: Master + Custom, noch nicht ausgeblendet
-  const hiddenPLUSet = useMemo(() => new Set(hiddenItems.map((h) => h.plu)), [hiddenItems])
   const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
-  const flowDirection = (layoutSettings?.flow_direction ?? 'COLUMN_FIRST') as 'ROW_BY_ROW' | 'COLUMN_FIRST'
-  const dialogFontSizes = {
-    header: layoutSettings?.font_header_px ?? 24,
-    column: layoutSettings?.font_column_px ?? 16,
-    product: layoutSettings?.font_product_px ?? 12,
-  }
-  const searchableItems = useMemo(() => {
-    const master = masterItems
-      .filter((m) => !hiddenPLUSet.has(m.plu))
-      .map((m) => ({
-        id: m.id,
-        plu: m.plu,
-        display_name: m.display_name ?? m.system_name,
-        system_name: m.system_name,
-        item_type: m.item_type as 'PIECE' | 'WEIGHT',
-        block_id: m.block_id,
-      }))
-    const custom = customProducts
-      .filter((c) => !hiddenPLUSet.has(c.plu))
-      .map((c) => ({
-        id: c.id,
-        plu: c.plu,
-        display_name: c.name,
-        system_name: c.name,
-        item_type: c.item_type as 'PIECE' | 'WEIGHT',
-        block_id: c.block_id,
-      }))
-    return [...master, ...custom]
-  }, [masterItems, customProducts, hiddenPLUSet])
   // Profile laden für "Ausgeblendet von" Anzeige
   const hiddenByIds = useMemo(
     () => [...new Set(hiddenItems.map((h) => h.hidden_by))],
@@ -669,7 +621,11 @@ export function HiddenItems() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowHideProductsDialog(true)}
+                    onClick={() =>
+                      navigate(`${pathPrefix}/pick-hide-obst`, {
+                        state: { backTo: `${location.pathname}${location.search ?? ''}` },
+                      })
+                    }
                   >
                     <EyeOff className="h-4 w-4 mr-2" />
                     Produkte ausblenden
@@ -762,18 +718,6 @@ export function HiddenItems() {
           existingPLUs={existingPLUs}
           blocks={blocks}
         />
-
-        {canManageHidden && (
-          <HideProductsDialog
-            open={showHideProductsDialog}
-            onOpenChange={setShowHideProductsDialog}
-            searchableItems={searchableItems}
-            displayMode={displayMode}
-            listLayout={hideDialogListLayout}
-            flowDirection={flowDirection}
-            fontSizes={dialogFontSizes}
-          />
-        )}
 
         <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
           <AlertDialogContent>

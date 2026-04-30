@@ -1805,21 +1805,29 @@ function ObstDroppableBlockRow({
       )}
     >
       {showReorderHandle ? (
-        <button
-          type="button"
-          ref={draggable.setNodeRef}
-          className={cn(
-            'mt-1 flex h-10 w-10 shrink-0 cursor-grab items-center justify-center rounded-md touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing',
-            isSelected && 'text-primary-foreground',
-          )}
-          aria-label="Warengruppen-Reihenfolge ändern"
-          title="Warengruppen-Reihenfolge ändern"
-          {...(handleDataTour ? { 'data-tour': handleDataTour } : {})}
-          {...draggable.attributes}
-          {...draggable.listeners}
-        >
-          <GripHorizontal className="h-4 w-4" aria-hidden />
-        </button>
+        <>
+          {/*
+           * @dnd-kit useDraggable: setNodeRef/attributes/listeners sind die offizielle API;
+           * react-hooks/refs meldet hier False Positives (Ref-Callbacks im Render).
+           */}
+          {/* eslint-disable react-hooks/refs */}
+          <button
+            type="button"
+            ref={draggable.setNodeRef}
+            className={cn(
+              'mt-1 flex h-10 w-10 shrink-0 cursor-grab items-center justify-center rounded-md touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing',
+              isSelected && 'text-primary-foreground',
+            )}
+            aria-label="Warengruppen-Reihenfolge ändern"
+            title="Warengruppen-Reihenfolge ändern"
+            {...(handleDataTour ? { 'data-tour': handleDataTour } : {})}
+            {...draggable.attributes}
+            {...draggable.listeners}
+          >
+            <GripHorizontal className="h-4 w-4" aria-hidden />
+          </button>
+          {/* eslint-enable react-hooks/refs */}
+        </>
       ) : null}
       <div
         role="button"

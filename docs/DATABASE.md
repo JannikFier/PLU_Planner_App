@@ -89,10 +89,10 @@ store_backshop_block_order, store_backshop_name_block_override – analog Obst
 |------|-----|-------------|
 | `id` | UUID (PK) | ID |
 | `store_id` | UUID (FK → stores) | Welcher Markt |
-| `list_type` | TEXT | `obst_gemuese` oder `backshop` |
-| `is_visible` | BOOLEAN | Liste fuer diesen Markt sichtbar? |
+| `list_type` | TEXT | `obst_gemuese`, `backshop` oder `kiosk` (Kassenmodus / QR nur Markt-Ebene) |
+| `is_visible` | BOOLEAN | Liste bzw. Kassenmodus für diesen Markt sichtbar bzw. aktiv? |
 
-**Frontend:** Oberes Gate – eine Liste ist fuer eingeloggte Nutzer nur nutzbar, wenn hier sichtbar **und** der passende Eintrag in `user_list_visibility` (bzw. Default) ebenfalls sichtbar ist.
+**Frontend:** Obst und Backshop: eine Liste ist für eingeloggte Nutzer nur nutzbar, wenn hier sichtbar **und** der passende Eintrag in `user_list_visibility` (bzw. Default) ebenfalls sichtbar ist. **Kassenmodus (`kiosk`):** nur diese Tabelle (kein `user_list_visibility`); ausgeschaltet sind QR-Login und RPC `kiosk_list_registers` leer bzw. Edge `kiosk-login` abgewiesen.
 
 ### user_list_visibility
 
@@ -140,14 +140,43 @@ Erweitert Supabase Auth um App-spezifische Daten.
 | `email` | TEXT | E-Mail-Adresse |
 | `personalnummer` | TEXT (UNIQUE) | 7-stellige Personalnummer |
 | `display_name` | TEXT | Anzeigename |
-| `role` | TEXT | `super_admin`, `admin`, `user` oder `viewer` |
+| `role` | TEXT | `super_admin`, `admin`, `user`, `viewer` oder `kiosk` |
 | `must_change_password` | BOOLEAN | Einmalpasswort-Flag |
 | `created_by` | UUID | Wer hat diesen User angelegt |
 | `created_at` | TIMESTAMPTZ | Erstellt am |
 | `last_login` | TIMESTAMPTZ | Letzter Login |
 | `current_store_id` | UUID (FK → stores) | Aktuell aktiver Markt des Users |
 
-**Trigger:** Bei neuem Auth-User wird automatisch ein Profil erstellt (`handle_new_user()`). Anonyme User werden ignoriert.
+**Trigger:** Bei neuem Auth-User wird automatisch ein Profil erstellt (`handle_new_user()`). Anonyme User werden ignoriert. E-Mail-Adressen `kiosk_reg_%@kiosk.pluplanner.invalid` erhalten automatisch `role = 'kiosk'` (Kassenkonten aus Edge Functions).
+
+### store_kiosk_entrances
+
+QR-/Link-Einstieg pro Markt (Token in der URL `/kasse/:token`).
+
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `id` | UUID (PK) | |
+| `store_id` | UUID (FK → stores) | Markt |
+| `token` | TEXT (UNIQUE) | Geheimer Einstiegs-Token |
+| `created_at` | TIMESTAMPTZ | |
+| `revoked_at` | TIMESTAMPTZ | gesetzt bei Rotation/Widerruf |
+
+**RLS:** Lesen/Schreiben für Super-Admin oder Admin mit Zugriff auf den Markt.
+
+### store_kiosk_registers
+
+Eine **Kasse** (Anzeigename, Reihenfolge) = ein `auth.users`-Konto (`auth_user_id`), Profil `kiosk`, Marktzugriff wie andere Nutzer.
+
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `id` | UUID (PK) | |
+| `store_id` | UUID (FK → stores) | |
+| `sort_order` | INT | Reihenfolge (eindeutig pro Markt) |
+| `display_label` | TEXT | z. B. „Kasse 1“ |
+| `auth_user_id` | UUID (FK → auth.users) | Login-Konto dieser Kasse |
+| `active` | BOOLEAN | |
+
+**RPC:** `kiosk_list_registers(p_token TEXT)` – liefert aktive Kassen für einen gültigen, nicht widerrufenen Einstiegs-Token (`SECURITY DEFINER`, `GRANT EXECUTE` für `anon` und `authenticated`).
 
 ### versions
 
@@ -334,6 +363,14 @@ Manuelle Werbung: Laufzeit in Wochen (1–4), Start = aktuelle KW beim Anlegen. 
 - UNIQUE-Schlüssel: `(campaign_id, sort_index)` statt `(campaign_id, plu)` – damit keine Konflikte bei null-PLU oder doppelten Source-PLUs entstehen.
 Lesen für die Marktlisten filtert Zeilen mit `plu IS NULL` bzw. `origin = 'unassigned'` raus; nur die Edit-Seite (Super-Admin) sieht sie.
 
+**Backshop – Erwerbspreis (Migration 071):** `backshop_offer_campaign_lines.purchase_price NUMERIC NULL` – Erwerb/EK aus der Exit-Excel, wenn eine passende Spalte per Header erkannt wurde (z. B. „Erwerb“, „Einkauf“, „EK“); sonst `NULL`. **`promo_price`** bleibt der aus der Spalte **„Akt. UVP“** ausgelesene zentrale Aktions-VK (wie bisher).
+
+**Backshop – Listen-EK / Listen-VK (Migration 073):** `backshop_offer_campaign_lines.list_ek`, `list_vk` optional – werden beim Exit-Upload aus erkannten Spalten befüllt (z. B. **„Listen-EK“**, **„Listen-VK“**, oder **„VK“**/**„UVP“** ohne „Akt.“).
+
+**Backshop – Auslieferung (Migration 074):** `backshop_offer_campaigns.auslieferung_ab DATE NULL` – aus der Exit-Spalte **„Auslieferung ab“** (z. B. `DD.MM.YY`); ein Kalenderdatum pro Kampagne. Anzeige auf **Werbung bestellen** (KW-Übersicht und KW-Detail) mit relativem Hinweis (z. B. „Noch n Tage“).
+
+**Backshop – Bestellmengen zur KW-Werbung (Migration 072):** `backshop_werbung_weekday_quantities` – pro Markt (`store_id`), KW (`kw_nummer`, `jahr`) und `plu` die Felder `qty_mo` … `qty_sa` (nullable), `updated_at`, `updated_by`. **UNIQUE** `(store_id, kw_nummer, jahr, plu)`. **RLS:** Lesen für Rollen mit Marktzugriff; Schreiben für User/Admin/Super-Admin; Viewer nur Lesen.
+
 **RLS:** Lesen für alle Auth-User; Einfügen/Löschen/Update nur für User, Admin, Super-Admin (nicht Viewer). Kampagnen: nur Super-Admin schreiben (siehe Migration 050).
 
 ### version_notifications (NEU – Runde 2)
@@ -372,7 +409,7 @@ Getrennte Tabellen für die zweite PLU-Liste „Backshop“. Keine Änderung an 
 | `backshop_blocks` | Warengruppen nur für Backshop |
 | `backshop_block_rules` | Zuweisungsregeln für backshop_blocks |
 | `backshop_master_plu_items` | PLU-Einträge pro Backshop-Version; **kein** item_type, dafür **image_url** (TEXT, Referenz auf Supabase Storage) |
-| `backshop_custom_products` | Eigene Produkte Backshop; **image_url NOT NULL** (Bild Pflicht) |
+| `backshop_custom_products` | Eigene Produkte Backshop; **image_url NOT NULL** (Bild Pflicht). Spalte **`is_offer_sheet_test`** (BOOLEAN, Default `true`): `true` = zusätzlich im PDF „Nur Angebote“ unter **Neue Produkte**; `false` = nur noch „fest“ wie übliches eigenes Produkt (Migration **075**). Bestehende Zeilen wurden bei Migration einmalig auf `false` gesetzt. |
 | `backshop_hidden_items` | Ausgeblendete PLUs Backshop |
 | `backshop_version_notifications` | Benachrichtigungen pro Backshop-Version |
 | `backshop_layout_settings` | Singleton Layout für Backshop (sort_mode, Schriftgrößen, Markierungs-Dauer, `show_week_mon_sat_in_labels` wie bei Obst) |
@@ -406,6 +443,7 @@ Getrennte Tabellen für die zweite PLU-Liste „Backshop“. Keine Änderung an 
 | `get_active_version()` | Gibt die aktive KW-Version (Obst/Gemüse) zurück |
 | `get_active_backshop_version()` | Gibt die aktive Backshop-Version zurück |
 | `handle_new_user()` | Trigger: erstellt automatisch Profil bei neuem Auth-User |
+| `kiosk_list_registers(p_token)` | Öffentliche Liste der Kassen-Labels/IDs für einen Einstiegs-Token (Kassenmodus) |
 
 ## SQL-Migrations
 
@@ -428,3 +466,5 @@ Die Datenbank wird über nummerierte SQL-Scripts aufgebaut:
 43. **043_profiles_update_allow_super_admin_store.sql** – profiles UPDATE: Super-Admins dürfen current_store_id auf beliebigen Markt setzen (sie haben oft keinen user_store_access; sonst 500 beim Markt-Wechsel).
 44. **059_backshop_multi_source.sql** – Backshop Multi-Source (Edeka/Harry/Aryzta): `source`-Spalte in `backshop_master_plu_items` (default `edeka`) + Unique `(version_id, source, plu)`; neue Tabellen `backshop_product_groups`, `backshop_product_group_members (group_id, plu, source)`, `backshop_source_choice_per_store (store_id, group_id, chosen_sources[])` und `backshop_source_rules_per_store (store_id, block_id, preferred_source)` inkl. RLS. Siehe [BACKSHOP_MULTI_SOURCE.md](BACKSHOP_MULTI_SOURCE.md).
 45. **060_publish_row_lock.sql** – Publish-Sperre: `acquire_publish_lock` / `release_publish_lock` nutzen die Tabelle `publish_connection_locks` (TTL 10 Minuten) statt Session-`pg_advisory_lock`, damit parallele HTTP-Requests über den PostgREST-Connection-Pool die Sperre zuverlässig freigeben (Migration 042 bleibt historisch; Funktionen werden ersetzt).
+46. **076_kiosk_mode.sql** – Rolle `kiosk`, Tabellen `store_kiosk_entrances` / `store_kiosk_registers`, RPC `kiosk_list_registers`, `is_viewer()` umfasst `kiosk`, Schreib-RLS wie für Viewer für `kiosk` geschlossen.
+47. **077_store_list_visibility_kiosk.sql** – `store_list_visibility.list_type = 'kiosk'` für alle Märkte; RPC `kiosk_list_registers` nur bei `is_visible`; bestehende Märkte erhalten Standard `kiosk` sichtbar.

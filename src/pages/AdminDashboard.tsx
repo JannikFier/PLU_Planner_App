@@ -6,10 +6,10 @@ import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { BereichsauswahlCard } from '@/components/layout/BereichsauswahlCard'
 import { usePrefetchForNavigation } from '@/hooks/usePrefetchForNavigation'
 import { useEffectiveListVisibility } from '@/hooks/useStoreListVisibility'
-import { Apple, Croissant, Users } from 'lucide-react'
+import { Apple, Croissant, Users, ScanLine } from 'lucide-react'
 
 /**
- * Admin-Dashboard – drei Einstiege wie Super-Admin Markt-Übersicht: Obst, Backshop, Benutzer.
+ * Admin-Dashboard – Einstiege wie Super-Admin Markt-Übersicht: Obst, Backshop, Benutzer, Kassenmodus.
  * Detailnavigation unter /admin/obst und /admin/backshop.
  */
 export function AdminDashboard() {
@@ -19,8 +19,12 @@ export function AdminDashboard() {
   const { currentStoreId } = useCurrentStore()
   usePrefetchForNavigation()
 
-  const { obstGemuese: obstVisible, backshop: backshopVisible, isLoading: visibilityLoading } =
-    useEffectiveListVisibility()
+  const {
+    obstGemuese: obstVisible,
+    backshop: backshopVisible,
+    kiosk: kioskVisible,
+    isLoading: visibilityLoading,
+  } = useEffectiveListVisibility()
 
   if (isSuperAdmin && !(isUserPreviewActive && preview?.simulatedRole === 'admin')) {
     return <Navigate to="/super-admin" replace />
@@ -56,7 +60,7 @@ export function AdminDashboard() {
           </p>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {obstVisible && (
             <BereichsauswahlCard
               title="Obst und Gemüse"
@@ -85,6 +89,16 @@ export function AdminDashboard() {
             variant="benutzer"
             dataTour="dashboard-card-users"
           />
+          {kioskVisible && (
+            <BereichsauswahlCard
+              title="Kassenmodus"
+              description="QR-Code, Kassen anlegen und Vorschau für die Kasse"
+              icon={ScanLine}
+              onClick={() => navigate('/admin/kassenmodus')}
+              variant="obst"
+              dataTour="dashboard-card-kiosk"
+            />
+          )}
         </div>
 
         {!obstVisible && !backshopVisible && (

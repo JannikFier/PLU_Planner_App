@@ -1,8 +1,8 @@
 # Rollen & Berechtigungen
 
-## Vier-Rollen-System
+## Fünf-Rollen-System
 
-Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
+Der PLU Planner unterscheidet fünf Rollen mit klar abgegrenzten Rechten (inkl. technischer Rolle **Kasse** für den Kassenmodus).
 
 ### Rechte-Matrix
 
@@ -36,6 +36,8 @@ Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
 | **Bereichs-Sichtbarkeit pro User** | ✅ | ✅ | ❌ | ❌ |
 | **Markt-Zuordnung aendern** | ✅ | ✅ (nur eigene Maerkte) | ❌ | ❌ |
 | **Testmodus starten** | ✅ | ✅ | ✅ | ❌ |
+
+**Kasse (`kiosk`):** Lesen der PLU-Listen wie Viewer, aber **ohne PDF** und nur unter **`/kiosk/*`**; keine Benutzerverwaltung, keine Bearbeitungs-Toolbar.
 
 ### Markt-Zugriff (Multi-Tenancy)
 
@@ -74,6 +76,11 @@ Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
 - Nur PLU-Liste ansehen sowie PDF herunterladen oder drucken
 - Keine Toolbar (keine Eigenen Produkte, Ausblenden, Umbenennen)
 - Keine Benutzerverwaltung
+
+**Kasse (Kassenmodus)** – `role: 'kiosk'`
+- Wird **nicht** in der Benutzerverwaltung als Rolle angelegt, sondern pro Markt als **Kasse** mit Passwort (Edge Functions `create-kiosk-register` / `update-kiosk-register`); zugehöriges Auth-Konto hat Profil-Rolle `kiosk`.
+- Nach Anmeldung über **`/kasse/:token`** nur die Routen **`/kiosk/obst`** und **`/kiosk/backshop`** (aktuelle KW, Suche); **kein PDF**, kein Marktwechsler, keine Admin-/User-Dashboards.
+- Leserechte in der Datenbank entsprechen weitgehend dem **Viewer** (`is_viewer()` schließt `kiosk` ein); Schreib- und Verwaltungs-Pfade bleiben für `kiosk` gesperrt.
 
 ### Backshop Multi-Source (Marken-Tinder)
 
@@ -162,9 +169,11 @@ Der PLU Planner unterscheidet vier Rollen mit klar abgegrenzten Rechten.
 | Route | Zugang |
 |-------|--------|
 | `/login` | Öffentlich |
+| `/kasse/:entranceToken` | Öffentlich (Kassenwahl + Passwort, kein normales Login) |
 | `/change-password` | Alle eingeloggten User |
-| `/user/*` | User (nicht Viewer) |
+| `/user/*` | User (nicht Viewer / nicht Kasse) |
 | `/viewer/*` | Nur Viewer |
+| `/kiosk/*` | Nur Rolle `kiosk` (andere Rollen werden umgeleitet) |
 | `/admin/*` | Admin + Super-Admin |
 | `/super-admin/*` | Nur Super-Admin |
 
@@ -180,8 +189,8 @@ Die Datenbank-Sicherheit wird durch PostgreSQL RLS Policies gewährleistet:
 - `custom_products` → alle lesen/einfügen; Ersteller oder Super-Admin updaten/löschen
 - `hidden_items` / `backshop_hidden_items` → Lesen für zugewiesene Märkte (Super-Admin liest alle); **Schreiben** nur wenn `store_id = profiles.current_store_id` (Migration 028/031/049). **Super-Admin** hat in der App **keine** Buttons zum Aus-/Einblenden (`canManageMarketHiddenItems`); die Marktrollen (user/admin) verwalten die Liste.
 - `version_notifications` → eigene lesen/updaten; Super-Admin einfügen
-- `master_plu_items` (Umbenennen): Alle Rollen außer Viewer über RPC `rename_master_plu_item` / `reset_master_plu_item_display_name` (Prüfung: `is_not_viewer()`, Migration 037)
+- `master_plu_items` (Umbenennen): Alle Rollen außer Viewer/Kasse über RPC `rename_master_plu_item` / `reset_master_plu_item_display_name` (Prüfung: `is_not_viewer()`, Migration 037; `kiosk` ist wie Viewer ausgeschlossen)
 - `user_list_visibility`: User liest eigene Einträge; Admin/Super-Admin liest/schreibt alle im eigenen Markt (Migration 038)
 - **stores / companies (anon):** Anonymes Lesen nur für Subdomain-Branding auf der Login-Seite (Migration 048). Anon darf aktive Stores mit Subdomain und deren Firmen lesen – Name, Logo für Markt-Branding.
 
-Die **Seite Umbenannte Produkte** und der Dialog **„Produkte umbenennen“** sind für User, Admin und Super-Admin erreichbar. Der **Umbenennen-Button** in der Masterliste wird für alle Rollen außer Viewer angezeigt (auch unter `/admin/masterlist`). Die **Vergleichslogik** beim Excel-Upload verwendet weiterhin den ursprünglichen Namen (`system_name`), nicht den Anzeigenamen (`display_name`). **Excel** für eigene Produkte (Eigene Produkte-Seite) ist nur für Super-Admin sichtbar; **Excel zum Ausblenden** von PLUs und die übrigen Ausblend-Aktionen sind für **user/admin** am Markt vorgesehen, nicht für Super-Admin (siehe oben).
+Die **Seite Umbenannte Produkte** und der Dialog **„Produkte umbenennen“** sind für User, Admin und Super-Admin erreichbar. Der **Umbenennen-Button** in der Masterliste wird für alle Rollen außer Viewer und Kasse angezeigt (auch unter `/admin/masterlist`). Die **Vergleichslogik** beim Excel-Upload verwendet weiterhin den ursprünglichen Namen (`system_name`), nicht den Anzeigenamen (`display_name`). **Excel** für eigene Produkte (Eigene Produkte-Seite) ist nur für Super-Admin sichtbar; **Excel zum Ausblenden** von PLUs und die übrigen Ausblend-Aktionen sind für **user/admin** am Markt vorgesehen, nicht für Super-Admin (siehe oben).

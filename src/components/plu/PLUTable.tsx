@@ -72,6 +72,20 @@ function BackshopSourceInlineBadge({ item, listType }: { item: DisplayItem; list
   )
 }
 
+/** Eigenes Produkt: noch „Test“ (erscheint unter „Neue Produkte“ auf Angebots-PDF). */
+function BackshopOfferSheetTestBadge({ item, listType }: { item: DisplayItem; listType: 'obst' | 'backshop' }) {
+  if (listType !== 'backshop' || !item.is_custom || !item.backshop_offer_sheet_test) return null
+  return (
+    <Badge
+      variant="secondary"
+      className="text-[10px] font-normal shrink-0 bg-sky-100 text-sky-900 border-0"
+      title="Auf dem PDF „Nur Angebote“ unter „Neue Produkte“"
+    >
+      Test
+    </Badge>
+  )
+}
+
 /** Kompakter Link zur Marken-Tinder-Gruppe (nur digital), wenn Teilmengen-Markenwahl. */
 function BackshopMarkenTinderHintLine({
   item,
@@ -447,6 +461,7 @@ function PLUColumn({
                         getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)
                       )}
                       <BackshopSourceInlineBadge item={item} listType={listType} />
+                      <BackshopOfferSheetTestBadge item={item} listType={listType} />
                       <OfferKindBadge item={item} />
                       {listType === 'backshop' && (
                         <BackshopMarkenTinderHintLine
@@ -578,6 +593,7 @@ function BackshopPLUMobileList({
                   getDisplayNameForItem(item.display_name, item.system_name, item.is_custom)
                 )}
                 <BackshopSourceInlineBadge item={item} listType="backshop" />
+                <BackshopOfferSheetTestBadge item={item} listType="backshop" />
                 <BackshopMarkenTinderHintLine item={item} hrefForGroup={backshopMarkenTinderHrefForGroup} />
               </div>
               <div>
@@ -783,6 +799,7 @@ function RowByRowTable({
                           getDisplayNameForItem(row.left.display_name, row.left.system_name, row.left.is_custom)
                         )}
                         <BackshopSourceInlineBadge item={row.left} listType={listType} />
+                        <BackshopOfferSheetTestBadge item={row.left} listType={listType} />
                         <OfferKindBadge item={row.left} />
                         {listType === 'backshop' && (
                           <BackshopMarkenTinderHintLine
@@ -864,6 +881,7 @@ function RowByRowTable({
                           getDisplayNameForItem(row.right.display_name, row.right.system_name, row.right.is_custom)
                         )}
                         <BackshopSourceInlineBadge item={row.right} listType={listType} />
+                        <BackshopOfferSheetTestBadge item={row.right} listType={listType} />
                         <OfferKindBadge item={row.right} />
                         {listType === 'backshop' && (
                           <BackshopMarkenTinderHintLine

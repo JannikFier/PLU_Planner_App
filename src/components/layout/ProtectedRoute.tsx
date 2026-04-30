@@ -52,9 +52,9 @@ export function ProtectedRoute({
   const { user, profile, isAdmin, isSuperAdmin, mustChangePassword, isLoading } = useAuth()
   const isChangePasswordPage = location.pathname === '/change-password'
 
-  // Viewer darf keine Admin/Super-Admin-Routen betreten
-  if ((requireAdmin || requireSuperAdmin) && profile?.role === 'viewer') {
-    return <Navigate to="/viewer" replace />
+  // Viewer und Kasse duerfen keine Admin/Super-Admin-Routen betreten
+  if ((requireAdmin || requireSuperAdmin) && (profile?.role === 'viewer' || profile?.role === 'kiosk')) {
+    return <Navigate to={profile?.role === 'kiosk' ? '/kiosk' : '/viewer'} replace />
   }
 
   if (isLoading) {
@@ -64,6 +64,18 @@ export function ProtectedRoute({
   // Nicht eingeloggt → Login-Seite (ursprüngliche Route merken für Redirect nach Login)
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  // Kassenmodus: nur /kiosk und /kasse (Anmelde-Flow), kein Zugriff auf normale App-Routen
+  if (profile?.role === 'kiosk') {
+    const path = location.pathname
+    const allowed =
+      path.startsWith('/kiosk') ||
+      path.startsWith('/kasse') ||
+      path === '/login'
+    if (!allowed) {
+      return <Navigate to="/kiosk" replace />
+    }
   }
 
   // Einmalpasswort: Muss zuerst Passwort ändern (außer wenn bereits auf der Seite)

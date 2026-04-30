@@ -2,12 +2,20 @@
 
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { getDisplayPlu } from '@/lib/plu-helpers'
 import { BackshopThumbnail } from '@/components/plu/BackshopThumbnail'
 import { cn } from '@/lib/utils'
 import { listFindInPageRowClassName, type ListFindInPageBinding } from '@/components/plu/list-find-in-page-types'
 import type { BackshopCustomProduct } from '@/types/database'
 import { Eye, EyeOff, Pencil, Trash2 } from 'lucide-react'
+import { useUpdateBackshopCustomProduct } from '@/hooks/useBackshopCustomProducts'
 
 const mobileIconBtnClass = 'h-10 w-10 shrink-0 md:h-8 md:w-8'
 
@@ -27,6 +35,10 @@ export interface BackshopCustomProductsListProps {
   findInPage?: ListFindInPageBinding
 }
 
+function offerSheetTestFromRow(cp: BackshopCustomProduct): boolean {
+  return cp.is_offer_sheet_test === true
+}
+
 export function BackshopCustomProductsList({
   products,
   blocks,
@@ -41,6 +53,7 @@ export function BackshopCustomProductsList({
   allowHideUnhide = true,
   findInPage,
 }: BackshopCustomProductsListProps) {
+  const updateProduct = useUpdateBackshopCustomProduct()
   const blockName = (blockId: string | null) => blocks.find((b) => b.id === blockId)?.name ?? '–'
 
   /** Desktop-Tabelle: große Vorschau (einheitlich mit anderen Backshop-Verwaltungslisten) */
@@ -68,6 +81,9 @@ export function BackshopCustomProductsList({
               <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[min(14rem,22%)]">
                 Warengruppe
               </th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[10rem] max-w-[14rem]">
+                Angebots-PDF
+              </th>
               <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[11rem]">
                 Aktionen
               </th>
@@ -90,6 +106,25 @@ export function BackshopCustomProductsList({
                   <td className="px-3 py-3 font-mono text-sm align-middle whitespace-nowrap">{getDisplayPlu(cp.plu)}</td>
                   <td className="px-3 py-3 text-sm align-middle min-w-0 break-words">{cp.name}</td>
                   <td className="px-3 py-3 text-sm text-muted-foreground align-middle">{blockName(cp.block_id)}</td>
+                  <td className="px-3 py-3 align-middle min-w-0">
+                    <Select
+                      value={offerSheetTestFromRow(cp) ? 'test' : 'firm'}
+                      onValueChange={(v) => {
+                        const next = v === 'test'
+                        if (next === offerSheetTestFromRow(cp)) return
+                        void updateProduct.mutateAsync({ id: cp.id, is_offer_sheet_test: next })
+                      }}
+                      disabled={updateProduct.isPending}
+                    >
+                      <SelectTrigger className="h-9 w-full max-w-[13rem] text-sm" aria-label="Status Angebots-PDF">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="test">Test (auf Angebotszettel)</SelectItem>
+                        <SelectItem value="firm">In Hauptliste fest</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </td>
                   <td className="px-3 py-3 text-right align-middle">
                     <div className="flex justify-end gap-1">
                       <Tooltip>
@@ -157,6 +192,25 @@ export function BackshopCustomProductsList({
                   <p className="font-mono text-sm">{getDisplayPlu(cp.plu)}</p>
                   <p className="text-sm font-medium break-words mt-0.5">{cp.name}</p>
                   <p className="text-xs text-muted-foreground mt-1 break-words">{blockName(cp.block_id)}</p>
+                  <div className="mt-2 max-w-full">
+                    <Select
+                      value={offerSheetTestFromRow(cp) ? 'test' : 'firm'}
+                      onValueChange={(v) => {
+                        const next = v === 'test'
+                        if (next === offerSheetTestFromRow(cp)) return
+                        void updateProduct.mutateAsync({ id: cp.id, is_offer_sheet_test: next })
+                      }}
+                      disabled={updateProduct.isPending}
+                    >
+                      <SelectTrigger className="h-9 w-full text-sm" aria-label="Status Angebots-PDF">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="test">Test (Angebotszettel)</SelectItem>
+                        <SelectItem value="firm">Fest in Hauptliste</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="flex shrink-0 gap-0.5 items-start pt-1">
                   <Tooltip>

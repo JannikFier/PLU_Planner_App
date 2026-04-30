@@ -111,7 +111,7 @@ export function useBackshopUpload(options: UseBackshopUploadOptions = {}) {
   const [imageUploadProgress, setImageUploadProgress] = useState<{ uploaded: number; total: number } | null>(null)
   const [publishResult, setPublishResult] = useState<{ itemCount: number } | null>(null)
   const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false)
-  const [replaceExistingVersion, setReplaceExistingVersion] = useState(false)
+  const [, setReplaceExistingVersion] = useState(false)
   const [unmatchedProducts, setUnmatchedProducts] = useState<UnmatchedProduct[]>([])
   const [lastUploadId, setLastUploadId] = useState('')
   const [lastXlsxIndex, setLastXlsxIndex] = useState(0)
@@ -476,7 +476,7 @@ export function useBackshopUpload(options: UseBackshopUploadOptions = {}) {
     } finally {
       setIsProcessing(false)
     }
-  }, [user, targetKW, targetJahr, comparison, replaceExistingVersion, queryClient, currentStoreId, source])
+  }, [user, targetKW, targetJahr, comparison, queryClient, currentStoreId, source])
 
   const assignImageToProduct = useCallback(async (plu: string, dataUrl: string) => {
     const url = await uploadManualImage(dataUrl, plu, lastUploadId, lastXlsxIndex)

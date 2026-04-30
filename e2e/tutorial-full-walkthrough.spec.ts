@@ -83,12 +83,68 @@ async function walkThrough(page: Page, pickModuleLabels: string[], deadline: num
       continue
     }
 
+    // 2b) Interaktiver Basics-/Modul-Coach (gleiche Reihenfolge wie tutorial-smoke)
+    const coachWeiter = page.locator('[data-testid="tutorial-coach-panel"]').getByRole('button', { name: 'Weiter' })
+    if (await isVisible(coachWeiter, 120)) {
+      await coachWeiter.click().catch(() => undefined)
+      await page.waitForTimeout(250)
+      continue
+    }
+
     // 3) driver.js „Weiter" / „Fertig"
     const driverNext = page.locator('.driver-popover-next-btn, .driver-popover-btn-next')
     if (await isVisible(driverNext, 120)) {
       await driverNext.click().catch(() => undefined)
       await page.waitForTimeout(150)
       continue
+    }
+
+    // 2c) basics-pick-area: Coach-Text im Panel + Kachel (data-tour bevorzugt), sonst hängt die Tour auf dem Dashboard.
+    const urlNow = page.url()
+    const pathNorm = new URL(urlNow).pathname.replace(/\/+$/, '') || '/'
+    const bareRoleDashboard = pathNorm === '/admin' || pathNorm === '/user' || pathNorm === '/viewer'
+    const coachPanel = page.locator('[data-testid="tutorial-coach-panel"]')
+    const pickCoachVisible =
+      bareRoleDashboard &&
+      ((await isVisible(coachPanel.getByText(/Wähle einen Bereich/), 120)) ||
+        (await isVisible(coachPanel.getByText(/Klicke auf eine Kachel/), 120)))
+    if (pickCoachVisible) {
+      const obstCard = page.locator('[data-tour="dashboard-card-obst"]')
+      const backshopCard = page.locator('[data-tour="dashboard-card-backshop"]')
+      const usersCard = page.locator('[data-tour="dashboard-card-users"]')
+      if (await isVisible(obstCard, 120)) {
+        await obstCard.click().catch(() => undefined)
+        await page.waitForTimeout(500)
+        continue
+      }
+      if (await isVisible(backshopCard, 120)) {
+        await backshopCard.click().catch(() => undefined)
+        await page.waitForTimeout(500)
+        continue
+      }
+      if (await isVisible(usersCard, 120)) {
+        await usersCard.click().catch(() => undefined)
+        await page.waitForTimeout(500)
+        continue
+      }
+      const obstHeading = page.getByRole('heading', { name: /^Obst und Gemüse$/, level: 3 })
+      const backshopHeading = page.getByRole('heading', { name: /^Backshop$/, level: 3 })
+      const usersHeading = page.getByRole('heading', { name: /^Benutzer$/, level: 3 })
+      if (await isVisible(obstHeading, 120)) {
+        await obstHeading.click().catch(() => undefined)
+        await page.waitForTimeout(500)
+        continue
+      }
+      if (await isVisible(backshopHeading, 120)) {
+        await backshopHeading.click().catch(() => undefined)
+        await page.waitForTimeout(500)
+        continue
+      }
+      if (await isVisible(usersHeading, 120)) {
+        await usersHeading.click().catch(() => undefined)
+        await page.waitForTimeout(500)
+        continue
+      }
     }
 
     // 4) Interaktive Coach-Tasks: Profilmenü / Testmodus / Zurück-Navigation

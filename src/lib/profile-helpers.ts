@@ -45,6 +45,7 @@ export function roleBadgeLabel(role: string): string {
     case 'super_admin': return 'Super-Admin'
     case 'admin': return 'Admin'
     case 'viewer': return 'Viewer'
+    case 'kiosk': return 'Kasse'
     default: return 'User'
   }
 }

@@ -69,6 +69,8 @@ export function BackshopCustomProductDialog({
   const [newBlockName, setNewBlockName] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [errorPopup, setErrorPopup] = useState<string | null>(null)
+  /** Test = auf PDF „Nur Angebote“ unter „Neue Produkte“; Standard beim Anlegen. */
+  const [offerSheetTest, setOfferSheetTest] = useState(true)
 
   /** Nur für Admins: „Neue Warengruppe“-Eingabe; ohne Effect (kein setState in useEffect). */
   const showNewBlockSection = isAdmin && showNewBlockInput
@@ -85,6 +87,7 @@ export function BackshopCustomProductDialog({
     setShowNewBlockInput(false)
     setNewBlockName('')
     setErrors({})
+    setOfferSheetTest(true)
   }, [])
 
   const handleClose = useCallback(() => {
@@ -176,12 +179,13 @@ export function BackshopCustomProductDialog({
         name: name.trim(),
         image_url: imageUrl,
         block_id: sortMode === 'BY_BLOCK' ? blockId || null : null,
+        is_offer_sheet_test: offerSheetTest,
       })
       handleClose()
     } catch (e) {
       setErrorPopup(e instanceof Error ? e.message : 'Unbekannter Fehler')
     }
-  }, [plu, name, imageFile, imagePreview, blockId, sortMode, existingPLUs, user, addProduct, handleClose])
+  }, [plu, name, imageFile, imagePreview, blockId, sortMode, existingPLUs, user, addProduct, handleClose, offerSheetTest])
 
   const pluError = (() => {
     if (plu.length === 0) return undefined
@@ -256,6 +260,26 @@ export function BackshopCustomProductDialog({
               className={errors.name ? 'border-destructive' : ''}
             />
             {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="backshop-offer-sheet-mode">Angebots-PDF</Label>
+            <Select
+              value={offerSheetTest ? 'test' : 'firm'}
+              onValueChange={(v) => setOfferSheetTest(v === 'test')}
+            >
+              <SelectTrigger id="backshop-offer-sheet-mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="test">Test (unter „Neue Produkte“ auf Angebots-PDF)</SelectItem>
+                <SelectItem value="firm">Sofort fest in der Hauptliste</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              „Test“: zusätzlich auf dem PDF „Nur Angebote“. Beim Export der vollen Liste kannst du alle Test-Artikel
+              auf einmal übernehmen.
+            </p>
           </div>
 
           <div className="space-y-2">

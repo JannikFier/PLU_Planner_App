@@ -52,6 +52,11 @@ export interface DisplayItem {
   backshop_other_group_sources_count?: number
   /** Backshop: Nur digital – `focusGroup` im Marken-Tinder verlinken. */
   backshop_tinder_group_id?: string
+  /**
+   * Backshop, nur eigene Produkte: „Test“ = zusätzlich im PDF „Nur Angebote“ unter „Neue Produkte“;
+   * `is_offer` bleibt unabhängig (Kampagne).
+   */
+  backshop_offer_sheet_test?: boolean
 }
 
 /** Geparste Zeile aus einer Excel-Datei */
@@ -113,6 +118,12 @@ export interface ParsedExitWerbungRow {
   artikel: string
   inhalt: string
   aktUvp: number | null
+  /** Erwerb/EK aus Excel, wenn Spalte erkannt (Aktions-EK) */
+  purchasePrice: number | null
+  /** Listen-EK, wenn Spalte z. B. „Listen-EK“ */
+  listEk: number | null
+  /** Listen-VK, wenn Spalte z. B. „Listen-VK“ oder „VK“ (ohne Akt.) */
+  listVk: number | null
   rowIndex: number
 }
 
@@ -121,6 +132,8 @@ export interface ExitWerbungParseResult {
   fileName: string
   totalRows: number
   skippedRows: number
+  /** Erstes erkanntes Datum aus Spalte „Auslieferung ab“ (ISO yyyy-MM-dd), sonst null */
+  auslieferungAb: string | null
 }
 
 /** Geparste Zeile aus Backshop-Excel (PLU, Name, optional Bild-Referenz) */

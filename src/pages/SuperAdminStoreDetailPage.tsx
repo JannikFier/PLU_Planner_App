@@ -5,7 +5,6 @@ import { invokeEdgeFunction } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { BereichsauswahlCard } from '@/components/layout/BereichsauswahlCard'
-import { DashboardGroupCard, type DashboardGroupCardItem } from '@/components/layout/DashboardCard'
 import { useStoreById, useUpdateStore, useDeleteStore } from '@/hooks/useStores'
 import {
   useStoreListVisibility,
@@ -39,61 +38,17 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import {
-  ClipboardList, Users, Settings, Trash2, Loader2,
+  ClipboardList, LayoutGrid, Megaphone, Users, Settings, Trash2, Loader2,
   Apple, Croissant, Eye, Globe, Home, UserPlus, KeyRound, Copy, Check, UserMinus,
-  Plus, EyeOff, Megaphone, Pencil, Palette, FileText, ListOrdered, ListFilter,
+  ScanLine,
 } from 'lucide-react'
 import { validateSubdomain } from '@/lib/subdomain'
 import { toast } from 'sonner'
 import type { Profile, UserListVisibility } from '@/types/database'
 import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer, roleBadgeLabel, generateOneTimePassword } from '@/lib/profile-helpers'
+import { AdminKassenmodusPage } from '@/pages/AdminKassenmodusPage'
 
-type Section = 'overview' | 'listen' | 'listen-obst' | 'listen-backshop' | 'benutzer' | 'einstellungen'
-
-function buildObstItems(backTo: string): DashboardGroupCardItem[] {
-  const s = { backTo }
-  const q = `?backTo=${encodeURIComponent(backTo)}`
-  return [
-    { title: 'Masterliste Obst/Gemüse', description: 'PLU-Liste anzeigen und bearbeiten', icon: ClipboardList, to: `/super-admin/masterlist${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { title: 'Eigene Produkte', description: 'Hinzufügen, bearbeiten, ausblenden', icon: Plus, to: `/super-admin/custom-products${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { title: 'Ausgeblendete', description: 'Einsehen und wieder einblenden', icon: EyeOff, to: `/super-admin/hidden-products${q}`, state: s, color: 'text-gray-600', bg: 'bg-gray-100' },
-    { title: 'Werbung', description: 'Angebote verwalten', icon: Megaphone, to: `/super-admin/offer-products${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { title: 'Umbenannte', description: 'Anzeigenamen anpassen', icon: Pencil, to: `/super-admin/renamed-products${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  ]
-}
-
-function buildObstConfigItems(backTo: string): DashboardGroupCardItem[] {
-  const s = { backTo }
-  const q = `?backTo=${encodeURIComponent(backTo)}`
-  return [
-    { title: 'Layout', description: 'Sortierung, Anzeige, Schriftgrößen', icon: Palette, to: `/super-admin/layout${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
-    { title: 'Inhalt & Regeln', description: 'Bezeichnungsregeln und Warengruppen', icon: FileText, to: `/super-admin/rules${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { title: 'Warengruppen (Obst & Gemüse)', description: 'Reihenfolge am Markt und Zuordnung', icon: ListOrdered, to: `/super-admin/obst-warengruppen${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
-  ]
-}
-
-function buildBackshopItems(backTo: string): DashboardGroupCardItem[] {
-  const s = { backTo }
-  const q = `?backTo=${encodeURIComponent(backTo)}`
-  return [
-    { title: 'Backshop-Liste', description: 'Liste mit Bild, PLU und Name', icon: ClipboardList, to: `/super-admin/backshop-list${q}`, state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
-    { title: 'Eigene Produkte (Backshop)', description: 'Eigene Backshop-Produkte anlegen', icon: Plus, to: `/super-admin/backshop-custom-products${q}`, state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
-    { title: 'Ausgeblendete (Backshop)', description: 'Ausgeblendete einblenden', icon: EyeOff, to: `/super-admin/backshop-hidden-products${q}`, state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
-    { title: 'Werbung (Backshop)', description: 'Angebote verwalten', icon: Megaphone, to: `/super-admin/backshop-offer-products${q}`, state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
-    { title: 'Umbenannte (Backshop)', description: 'Anzeigenamen anpassen', icon: Pencil, to: `/super-admin/backshop-renamed-products${q}`, state: s, color: 'text-slate-600', bg: 'bg-slate-100' },
-  ]
-}
-
-function buildBackshopConfigItems(backTo: string): DashboardGroupCardItem[] {
-  const s = { backTo }
-  const q = `?backTo=${encodeURIComponent(backTo)}`
-  return [
-    { title: 'Layout (Backshop)', description: 'Sortierung und Schriftgrößen', icon: Palette, to: `/super-admin/backshop-layout${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
-    { title: 'Inhalt & Regeln (Backshop)', description: 'Bezeichnungsregeln; Warengruppen unter Block-Sortierung', icon: FileText, to: `/super-admin/backshop-rules${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { title: 'Warengruppen (Backshop)', description: 'Zuordnung und Markt-Overrides', icon: ListOrdered, to: `/super-admin/backshop-block-sort${q}`, state: s, color: 'text-violet-600', bg: 'bg-violet-50' },
-    { title: 'Gruppenregeln (Backshop)', description: 'Bevorzugte Marke pro Warengruppe', icon: ListFilter, to: `/super-admin/backshop-gruppenregeln${q}`, state: s, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  ]
-}
+type Section = 'overview' | 'listen' | 'listen-obst' | 'listen-backshop' | 'benutzer' | 'einstellungen' | 'kassenmodus'
 
 export function SuperAdminStoreDetailPage() {
   const { companyId, storeId } = useParams<{ companyId: string; storeId: string }>()
@@ -155,8 +110,11 @@ export function SuperAdminStoreDetailPage() {
 
   const obstVisible = visibility?.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
   const backshopVisible = visibility?.find(v => v.list_type === 'backshop')?.is_visible ?? true
+  const kioskVisible = visibility?.find(v => v.list_type === 'kiosk')?.is_visible ?? true
 
-  const currentPath = `/super-admin/companies/${companyId}/stores/${storeId}?view=${view}`
+  const storeBasePath = `/super-admin/companies/${companyId}/stores/${storeId}`
+  const marktListenBackObst = `${storeBasePath}?view=listen-obst`
+  const marktListenBackBackshop = `${storeBasePath}?view=listen-backshop`
 
   // Benutzer erstellen (Edge Function)
   const createUserMutation = useMutation({
@@ -303,7 +261,7 @@ export function SuperAdminStoreDetailPage() {
 
         {/* === OVERVIEW: 3 Kacheln === */}
         {view === 'overview' && (
-          <div className="grid gap-6 sm:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <BereichsauswahlCard
               title="Listen"
               description={`Obst/Gemüse & Backshop für ${store.name}`}
@@ -324,6 +282,13 @@ export function SuperAdminStoreDetailPage() {
               icon={Settings}
               onClick={() => setView('einstellungen')}
               variant="backshop"
+            />
+            <BereichsauswahlCard
+              title="Kassenmodus"
+              description="QR-Code, Kassen anlegen, Vorschau"
+              icon={ScanLine}
+              onClick={() => setView('kassenmodus')}
+              variant="obst"
             />
           </div>
         )}
@@ -357,35 +322,75 @@ export function SuperAdminStoreDetailPage() {
           </div>
         )}
 
-        {/* === LISTEN-OBST: Marktspezifische Obst-Items === */}
+        {/* === LISTEN-OBST: wie Admin-Hub – PLU-Liste direkt, Konfiguration als eigener Hub === */}
         {view === 'listen-obst' && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <DashboardGroupCard
-              title="PLU-Listen (Obst/Gemüse)"
-              description="Masterliste, eigene und ausgeblendete Produkte"
-              items={buildObstItems(currentPath)}
-            />
-            <DashboardGroupCard
-              title="Konfiguration (Obst/Gemüse)"
-              description="Layout und Inhaltsregeln"
-              items={buildObstConfigItems(currentPath)}
-            />
+          <div className="space-y-8">
+            <div>
+              <h3 className="text-2xl font-bold tracking-tight text-emerald-800">Obst und Gemüse</h3>
+              <p className="text-muted-foreground">
+                PLU-Liste öffnen oder Darstellung und Regeln für diesen Markt anpassen.
+              </p>
+            </div>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <BereichsauswahlCard
+                title="PLU-Liste"
+                description="Masterliste, eigene Produkte, Ausgeblendete, Werbung, Umbenennungen – Aktionen in der Toolbar"
+                icon={ClipboardList}
+                onClick={() => navigate(`/super-admin/masterlist?backTo=${encodeURIComponent(marktListenBackObst)}`)}
+                variant="obst"
+              />
+              <BereichsauswahlCard
+                title="Konfiguration der Liste"
+                description="Layout, Bezeichnungsregeln und Warengruppen (Workbench)"
+                icon={LayoutGrid}
+                onClick={() => navigate(`/super-admin/markt/obst/konfiguration?backTo=${encodeURIComponent(marktListenBackObst)}`)}
+                variant="obst"
+              />
+            </div>
           </div>
         )}
 
-        {/* === LISTEN-BACKSHOP: Marktspezifische Backshop-Items === */}
+        {/* === LISTEN-BACKSHOP: wie Admin-Hub === */}
         {view === 'listen-backshop' && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <DashboardGroupCard
-              title="Backshop-Listen"
-              description="Liste, eigene und ausgeblendete Produkte"
-              items={buildBackshopItems(currentPath)}
-            />
-            <DashboardGroupCard
-              title="Konfiguration (Backshop)"
-              description="Layout und Inhaltsregeln"
-              items={buildBackshopConfigItems(currentPath)}
-            />
+          <div className="space-y-8">
+            <div>
+              <h3 className="text-2xl font-bold tracking-tight text-slate-800">Backshop</h3>
+              <p className="text-muted-foreground">
+                Backshop-Liste öffnen, Werbung nach Kalenderwoche bestellen oder Darstellung und Regeln für diesen Markt
+                anpassen.
+              </p>
+            </div>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <BereichsauswahlCard
+                title="PLU-Liste"
+                description="Backshop-Liste, eigene Produkte, Ausgeblendete, Werbung, Umbenennungen – Aktionen in der Toolbar"
+                icon={ClipboardList}
+                onClick={() => navigate(`/super-admin/backshop-list?backTo=${encodeURIComponent(marktListenBackBackshop)}`)}
+                variant="backshop"
+              />
+              <BereichsauswahlCard
+                title="Konfiguration der Liste"
+                description="Layout, Bezeichnungsregeln, Gruppenregeln und Warengruppen-Sortierung"
+                icon={LayoutGrid}
+                onClick={() => navigate(`/super-admin/markt/backshop/konfiguration?backTo=${encodeURIComponent(marktListenBackBackshop)}`)}
+                variant="backshop"
+              />
+              <BereichsauswahlCard
+                title="Werbung"
+                description="Kalenderwoche wählen: zentrale Werbung bestellen, Strichcodes, Mengen Mo–Sa"
+                icon={Megaphone}
+                onClick={() =>
+                  navigate(`/super-admin/backshop-werbung?backTo=${encodeURIComponent(marktListenBackBackshop)}`)
+                }
+                variant="backshop"
+              />
+            </div>
+          </div>
+        )}
+
+        {view === 'kassenmodus' && (
+          <div className="space-y-4">
+            <AdminKassenmodusPage embedded />
           </div>
         )}
 
@@ -529,6 +534,22 @@ export function SuperAdminStoreDetailPage() {
                     disabled={updateVisibility.isPending}
                     onCheckedChange={async (checked) => {
                       await updateVisibility.mutateAsync({ storeId: store.id, listType: 'backshop', isVisible: checked })
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Kassenmodus</p>
+                    <p className="text-xs text-muted-foreground">
+                      QR-Link und Kassen-Anmeldung für diesen Markt. Ausgeschaltet: kein Login, auch nicht mit gespeichertem
+                      QR-Code.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={kioskVisible}
+                    disabled={updateVisibility.isPending}
+                    onCheckedChange={async (checked) => {
+                      await updateVisibility.mutateAsync({ storeId: store.id, listType: 'kiosk', isVisible: checked })
                     }}
                   />
                 </div>
