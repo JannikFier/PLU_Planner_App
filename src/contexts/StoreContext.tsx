@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { supabase, getSessionDeduped } from '@/lib/supabase'
-import { extractSubdomain, isAdminSubdomain } from '@/lib/subdomain'
+import { extractSubdomain, isAdminSubdomain, normalizeViteAppDomain } from '@/lib/subdomain'
 import { useAuth } from '@/hooks/useAuth'
 import type { Profile } from '@/types/database'
 import { readUserPreviewState } from '@/lib/user-preview-session'
@@ -50,7 +50,7 @@ const StoreContext = createContext<StoreContextType>({
   reresolveStoreFromAuth: () => {},
 })
 
-const APP_DOMAIN = import.meta.env.VITE_APP_DOMAIN || 'localhost'
+const APP_DOMAIN = normalizeViteAppDomain(import.meta.env.VITE_APP_DOMAIN)
 
 interface StoreState {
   currentStoreId: string | null

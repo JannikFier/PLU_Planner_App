@@ -1,33 +1,23 @@
 // MasterList – Haupt-PLU-Tabelle mit Layout-Engine, Toolbar und globaler Liste
 
 import { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
-import { useNavigate, useLocation, useParams, Link } from 'react-router-dom'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { Card, CardContent } from '@/components/ui/card'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Button } from '@/components/ui/button'
-import {
-  AlertCircle,
-  Archive,
-  RefreshCw,
-  ListFilter,
-  Upload,
-  Plus,
-  EyeOff,
-  FileDown,
-  Pencil,
-  Megaphone,
-  LayoutGrid,
-  Info,
-} from 'lucide-react'
-
-// PLU-Komponenten
 import { MasterListPageHeader } from '@/components/plu/MasterListPageHeader'
 import { MasterListToolbar } from '@/components/plu/MasterListToolbar'
+import {
+  MasterListArchiveAlert,
+  MasterListEmptyDataCard,
+  MasterListLoadingSkeletonCard,
+  MasterListNoVersionCard,
+  MasterListPluErrorCard,
+  MasterListSnapshotInvalidCard,
+  MasterListWgSortHintAlert,
+} from '@/components/plu/MasterListPageStates'
 import type { PLUListPageActionMenuItem } from '@/components/plu/PLUListPageActionsMenu'
+import { Upload, Plus, EyeOff, FileDown, Pencil, Megaphone, LayoutGrid } from 'lucide-react'
 import { PLUTable, type PLUTableHandle } from '@/components/plu/PLUTable'
 import { PLUFooter } from '@/components/plu/PLUFooter'
 import { useRegisterKioskListFindInPage, useRegisterKioskListHeaderSummary, type KioskListHeaderSummary } from '@/contexts/KioskListFindContext'
@@ -38,6 +28,9 @@ const ExportPDFDialog = lazy(() =>
 
 // Hooks
 import { useMasterListRouteContext } from '@/hooks/useMasterListRouteContext'
+import { useMasterListDisplayList } from '@/hooks/useMasterListDisplayList'
+import { useMasterListPdfDisplayList } from '@/hooks/useMasterListPdfDisplayList'
+import { useMasterListPdfExportVersionSync } from '@/hooks/useMasterListPdfExportVersionSync'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
 import { useVersions } from '@/hooks/useVersions'
@@ -49,10 +42,8 @@ import { useOfferItems } from '@/hooks/useOfferItems'
 import { useRenamedItems } from '@/hooks/useRenamedItems'
 import { useBezeichnungsregeln } from '@/hooks/useBezeichnungsregeln'
 // Layout-Engine + Helpers
-import { buildDisplayList } from '@/lib/layout-engine'
 import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
 import { useStoreObstBlockOrder, useStoreObstNameBlockOverrides } from '@/hooks/useStoreObstBlockLayout'
-import type { PLUStats } from '@/lib/plu-helpers'
 import { formatKwLabelWithOptionalMonSatRange, getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import { buildOfferDisplayMap } from '@/lib/offer-display'
 import { effectiveHiddenPluSet } from '@/lib/hidden-visibility'
@@ -176,19 +167,13 @@ export function MasterList({ mode }: MasterListProps) {
   const [showPDFDialog, setShowPDFDialog] = useState(false)
   const [pdfExportVersionId, setPdfExportVersionId] = useState<string | undefined>(undefined)
 
-  useEffect(() => {
-    if (!showPDFDialog) {
-      setPdfExportVersionId(undefined)
-      return
-    }
-    if (isSnapshot && resolvedVersion?.id) {
-      setPdfExportVersionId((prev) => prev ?? resolvedVersion.id)
-      return
-    }
-    if (activeVersion?.id) {
-      setPdfExportVersionId((prev) => prev ?? activeVersion.id)
-    }
-  }, [showPDFDialog, isSnapshot, resolvedVersion?.id, activeVersion?.id])
+  useMasterListPdfExportVersionSync({
+    showPDFDialog,
+    isSnapshot,
+    resolvedVersionId: resolvedVersion?.id,
+    activeVersionId: activeVersion?.id,
+    setPdfExportVersionId,
+  })
 
   // PLU-Items für die gewählte Version laden
   const {
@@ -205,14 +190,6 @@ export function MasterList({ mode }: MasterListProps) {
   })
 
   const { data: pdfCarryoverRows = [] } = useStoreListCarryoverRows('obst', pdfExportVersionId)
-
-  const pdfVersion = useMemo(
-    () =>
-      (pdfExportVersionId ? versions.find((v) => v.id === pdfExportVersionId) : undefined)
-      ?? (isSnapshot ? listVersion : activeVersion)
-      ?? undefined,
-    [pdfExportVersionId, versions, isSnapshot, listVersion, activeVersion],
-  )
 
   const carryoverMasterForPdf = useMemo(() => {
     if (!pdfExportVersionId) return []
@@ -240,54 +217,7 @@ export function MasterList({ mode }: MasterListProps) {
     product: layoutSettings?.font_product_px ?? 12,
   }
 
-  // Layout-Engine: Finale Anzeigeliste bauen
-  const { displayItems, stats } = useMemo(() => {
-    // Nur aktive Regeln verwenden
-    const activeRegeln = regeln
-      .filter((r) => r.is_active)
-      .map((r) => ({
-        keyword: r.keyword,
-        position: r.position,
-        case_sensitive: r.case_sensitive,
-      }))
-
-    const version = listVersion
-    const now = new Date()
-    const result = buildDisplayList({
-      masterItems: rawItems,
-      carryoverMasterItems: carryoverMasterForActive,
-      customProducts,
-      hiddenPLUs: effectiveHiddenPLUs,
-      offerDisplayByPlu,
-      renamedItems: renamedItems.map((r) => ({ plu: r.plu, display_name: r.display_name, is_manually_renamed: r.is_manually_renamed })),
-      bezeichnungsregeln: activeRegeln,
-      blocks,
-      sortMode,
-      displayMode,
-      markRedKwCount: layoutSettings?.mark_red_kw_count ?? 0,
-      markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
-      versionKwNummer: version?.kw_nummer ?? 0,
-      versionJahr: version?.jahr ?? now.getFullYear(),
-      // Eigene Produkte: „Neu“-Dauer nach Kalender-KW, nicht nach Listen-KW (aktive Version kann schon KW+1 sein)
-      currentKwNummer: calendarKw,
-      currentJahr: calendarJahr,
-      nameBlockOverrides,
-      storeBlockOrder: storeObstBlockOrder,
-      obstPrevManualPluSet: obstPrevManualPluSetForLayout,
-    })
-
-    // Layout-Engine stats → PLUStats konvertieren
-    const pluStats: PLUStats = {
-      total: result.stats.total,
-      unchanged: result.stats.total - result.stats.newCount - result.stats.changedCount,
-      newCount: result.stats.newCount,
-      changedCount: result.stats.changedCount,
-      hidden: result.stats.hidden,
-      customCount: result.stats.customCount,
-    }
-
-    return { displayItems: result.items, stats: pluStats }
-  }, [
+  const { displayItems, stats } = useMasterListDisplayList({
     rawItems,
     carryoverMasterForActive,
     customProducts,
@@ -305,11 +235,37 @@ export function MasterList({ mode }: MasterListProps) {
     nameBlockOverrides,
     storeObstBlockOrder,
     obstPrevManualPluSetForLayout,
-  ])
+  })
 
   const currentVersion = listVersion
 
   const showWeekMonSat = layoutSettings?.show_week_mon_sat_in_labels ?? false
+
+  const { pdfDisplayItems, pdfStats, pdfExportKwLabel } = useMasterListPdfDisplayList({
+    pdfRawItems,
+    carryoverMasterForPdf,
+    customProducts,
+    effectiveHiddenPLUs,
+    offerDisplayByPlu,
+    renamedItems,
+    regeln,
+    blocks,
+    layoutSettings,
+    sortMode,
+    displayMode,
+    pdfExportVersionId,
+    versions,
+    isSnapshot,
+    listVersion,
+    activeVersion,
+    calendarKw,
+    calendarJahr,
+    nameBlockOverrides,
+    storeObstBlockOrder,
+    obstPrevManualPluSetForLayout,
+    showWeekMonSat,
+  })
+
   const versionDisplayKwLabel = useMemo(() => {
     if (!listVersion) return ''
     return formatKwLabelWithOptionalMonSatRange(
@@ -329,76 +285,6 @@ export function MasterList({ mode }: MasterListProps) {
   }, [currentVersion, versionDisplayKwLabel])
 
   useRegisterKioskListHeaderSummary(kioskHeaderSummary, mode === 'kiosk')
-
-  const { displayItems: pdfDisplayItems, stats: pdfStats } = useMemo(() => {
-    if (!pdfRawItems.length && !customProducts.length) {
-      return { displayItems: [] as ReturnType<typeof buildDisplayList>['items'], stats: { total: 0, unchanged: 0, newCount: 0, changedCount: 0, hidden: 0, customCount: 0 } as PLUStats }
-    }
-    const activeRegeln = regeln
-      .filter((r) => r.is_active)
-      .map((r) => ({ keyword: r.keyword, position: r.position, case_sensitive: r.case_sensitive }))
-    const now = new Date()
-    const result = buildDisplayList({
-      masterItems: pdfRawItems,
-      carryoverMasterItems: carryoverMasterForPdf,
-      customProducts,
-      hiddenPLUs: effectiveHiddenPLUs,
-      offerDisplayByPlu,
-      renamedItems: renamedItems.map((r) => ({ plu: r.plu, display_name: r.display_name, is_manually_renamed: r.is_manually_renamed })),
-      bezeichnungsregeln: activeRegeln,
-      blocks,
-      sortMode,
-      displayMode,
-      markRedKwCount: layoutSettings?.mark_red_kw_count ?? 0,
-      markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
-      versionKwNummer: pdfVersion?.kw_nummer ?? 0,
-      versionJahr: pdfVersion?.jahr ?? now.getFullYear(),
-      currentKwNummer: calendarKw,
-      currentJahr: calendarJahr,
-      nameBlockOverrides,
-      storeBlockOrder: storeObstBlockOrder,
-      obstPrevManualPluSet: obstPrevManualPluSetForLayout,
-    })
-    return {
-      displayItems: result.items,
-      stats: {
-        total: result.stats.total,
-        unchanged: result.stats.total - result.stats.newCount - result.stats.changedCount,
-        newCount: result.stats.newCount,
-        changedCount: result.stats.changedCount,
-        hidden: result.stats.hidden,
-        customCount: result.stats.customCount,
-      } as PLUStats,
-    }
-  }, [
-    pdfRawItems,
-    carryoverMasterForPdf,
-    customProducts,
-    effectiveHiddenPLUs,
-    offerDisplayByPlu,
-    renamedItems,
-    regeln,
-    blocks,
-    layoutSettings,
-    sortMode,
-    displayMode,
-    pdfVersion,
-    calendarKw,
-    calendarJahr,
-    nameBlockOverrides,
-    storeObstBlockOrder,
-    obstPrevManualPluSetForLayout,
-  ])
-
-  const pdfExportKwLabel = useMemo(() => {
-    if (!pdfVersion) return ''
-    return formatKwLabelWithOptionalMonSatRange(
-      pdfVersion.kw_label,
-      pdfVersion.kw_nummer,
-      pdfVersion.jahr,
-      showWeekMonSat,
-    )
-  }, [pdfVersion, showWeekMonSat])
 
   const snapshotReadOnly = isSnapshot && mode === 'admin'
 
@@ -558,38 +444,16 @@ export function MasterList({ mode }: MasterListProps) {
         />
 
         {isSnapshot && resolvedVersion && (
-          <Alert>
-            <Archive className="h-4 w-4" />
-            <AlertTitle>Archivansicht</AlertTitle>
-            <AlertDescription>
-              Liste und Werbung beziehen sich auf{' '}
-              <span className="font-medium text-foreground">{versionDisplayKwLabel}</span>. Bearbeiten ist hier
-              deaktiviert.
-            </AlertDescription>
-          </Alert>
+          <MasterListArchiveAlert kwLabel={versionDisplayKwLabel} />
         )}
 
         {snapshotInvalid && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center gap-4">
-              <AlertCircle className="h-10 w-10 text-muted-foreground" />
-              <div>
-                <h3 className="text-lg font-medium mb-1">Version nicht gefunden</h3>
-                <p className="text-sm text-muted-foreground max-w-md">
-                  Diese Version gibt es nicht oder wurde gelöscht.
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  closeObstListSearch()
-                  navigate('/super-admin/versions')
-                }}
-              >
-                Zurück zu Versionen
-              </Button>
-            </CardContent>
-          </Card>
+          <MasterListSnapshotInvalidCard
+            onBack={() => {
+              closeObstListSearch()
+              navigate('/super-admin/versions')
+            }}
+          />
         )}
 
         {/* === Toolbar (nicht Kiosk — Kontext steht in KioskLayout-Kopfzeile) === */}
@@ -618,105 +482,40 @@ export function MasterList({ mode }: MasterListProps) {
           !hasNoVersion &&
           storeObstNameOverrides.length > 0 &&
           sortMode === 'ALPHABETICAL' && (
-            <Alert data-testid="masterlist-wg-sort-hint">
-              <Info className="h-4 w-4" />
-              <AlertTitle>Markt-Zuordnungen zu Warengruppen</AlertTitle>
-              <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span>
-                  Für diesen Markt gibt es Zuordnungen aus der Warengruppen-Workbench. Bei Sortierung{' '}
-                  <strong>Alphabetisch (A–Z)</strong> erscheinen keine Warengruppen-Abschnitte – Artikel stehen nur
-                  alphabetisch. Stellen Sie in den Layout-Einstellungen (Obst) die Sortierung auf{' '}
-                  <strong>Nach Warengruppen</strong>, um Gruppen und Zuordnungen wie in der Workbench zu sehen.
-                </span>
-                {(rolePrefix === '/admin' || rolePrefix === '/super-admin') && !snapshotReadOnly ? (
-                  <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-center" asChild>
-                    <Link to={`${rolePrefix}/layout`} onClick={() => closeObstListSearch()}>
-                      Layout-Einstellungen (Obst)
-                    </Link>
-                  </Button>
-                ) : (
-                  <span className="text-sm text-muted-foreground shrink-0">
-                    Bitte eine Person mit Admin-Rechten: Sortierung „Nach Warengruppen“ im Layout (Obst) setzen.
-                  </span>
-                )}
-              </AlertDescription>
-            </Alert>
+            <MasterListWgSortHintAlert
+              showAdminLayoutLink={(rolePrefix === '/admin' || rolePrefix === '/super-admin') && !snapshotReadOnly}
+              layoutSettingsHref={`${rolePrefix}/layout`}
+              onBeforeNavigate={closeObstListSearch}
+            />
           )}
 
         {/* === Keine Version vorhanden === */}
         {hasNoVersion && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <ListFilter className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium mb-1">Keine Kalenderwoche vorhanden</h3>
-              <p className="text-sm text-muted-foreground max-w-md mb-4">
-                Es wurde noch keine PLU-Liste hochgeladen. Lade zuerst eine Excel-Datei über PLU Upload hoch.
-              </p>
-              {mode === 'admin' && (
-                <Button
-                  onClick={() => {
-                    closeObstListSearch()
-                    navigate('/super-admin/plu-upload')
-                  }}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Zum PLU Upload
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+          <MasterListNoVersionCard
+            showUploadButton={mode === 'admin'}
+            onUploadClick={() => {
+              closeObstListSearch()
+              navigate('/super-admin/plu-upload')
+            }}
+          />
         )}
 
         {/* === Loading State (inkl. Refetch nach transientem Fehler) === */}
         {(isLoading || (itemsError && itemsRefetching)) && !hasNoVersion && !snapshotInvalid && (
-          <Card>
-            <CardContent className="p-6 space-y-3">
-              <div className="flex gap-4">
-                <Skeleton className="h-5 w-[80px]" />
-                <Skeleton className="h-5 flex-1" />
-              </div>
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="flex gap-4">
-                  <Skeleton className="h-4 w-[70px]" />
-                  <Skeleton className="h-4 flex-1" />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <MasterListLoadingSkeletonCard />
         )}
 
         {/* === Error State – nur wenn nicht gerade Refetch (verhindert kurzes Aufblitzen bei transientem Fehler) === */}
         {itemsError && !isLoading && !itemsRefetching && !hasNoVersion && !snapshotInvalid && (
-          <Card>
-            <CardContent className="flex items-center gap-4 p-6">
-              <AlertCircle className="h-8 w-8 text-destructive shrink-0" />
-              <div className="flex-1">
-                <p className="font-medium">Fehler beim Laden der PLU-Daten</p>
-                <p className="text-sm text-muted-foreground">
-                  {itemsError instanceof Error ? itemsError.message : 'Unbekannter Fehler'}
-                </p>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => refetchItems()}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Erneut versuchen
-              </Button>
-            </CardContent>
-          </Card>
+          <MasterListPluErrorCard
+            message={itemsError instanceof Error ? itemsError.message : 'Unbekannter Fehler'}
+            onRetry={() => refetchItems()}
+          />
         )}
 
         {/* === Leerer Zustand === */}
         {!isLoading && !itemsError && !hasNoVersion && !snapshotInvalid && displayItems.length === 0 && rawItems.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <ListFilter className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium mb-1">Keine PLU-Daten vorhanden</h3>
-              <p className="text-sm text-muted-foreground max-w-md">
-                {mode === 'admin'
-                  ? 'Lade eine Excel-Datei hoch, um die PLU-Liste für diese KW zu erstellen.'
-                  : 'Für diese Kalenderwoche wurden noch keine PLU-Daten hochgeladen.'}
-              </p>
-            </CardContent>
-          </Card>
+          <MasterListEmptyDataCard isAdminMode={mode === 'admin'} />
         )}
 
         {/* === PLU-Tabelle === */}

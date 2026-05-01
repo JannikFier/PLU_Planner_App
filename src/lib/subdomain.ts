@@ -7,6 +7,23 @@
 const RESERVED_SUBDOMAINS = new Set(['admin', 'app', 'api', 'www', 'mail'])
 
 /**
+ * VITE_APP_DOMAIN aus der Build-Konfiguration fuer Subdomain-Logik.
+ * Entfernt versehentlich eingetragenes Protokoll, Pfade und Ports im Host.
+ */
+export function normalizeViteAppDomain(raw: string | undefined | null): string {
+  const s = (raw ?? '').trim()
+  if (!s) return 'localhost'
+  try {
+    const href = /^[a-z][a-z0-9+.-]*:/i.test(s) ? s : `https://${s.replace(/^\/+/, '')}`
+    return new URL(href).hostname.toLowerCase()
+  } catch {
+    const hostOnly = s.replace(/^\/+|\/+$/g, '').split('/')[0] ?? ''
+    const lower = (hostOnly || 'localhost').toLowerCase()
+    return lower.replace(/:\d+$/, '')
+  }
+}
+
+/**
  * Extrahiert die Subdomain aus dem Hostnamen relativ zur App-Domain.
  * Gibt null zurueck wenn keine Subdomain vorhanden ist.
  */

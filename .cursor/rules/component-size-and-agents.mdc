@@ -43,6 +43,9 @@ Neue UI für die große PLU-Tabelle und die Kopf-/Toolbar-Zonen der Masterlisten
 | Nur URL-Prefix (geteilt mit Backshop) | [src/hooks/useRolePrefixFromLocation.ts](src/hooks/useRolePrefixFromLocation.ts) |
 | Seitenkopf + schmales Menü | [src/components/plu/MasterListPageHeader.tsx](src/components/plu/MasterListPageHeader.tsx) |
 | Toolbar (Suche, Kontextzeile, Aktionen) | [src/components/plu/MasterListToolbar.tsx](src/components/plu/MasterListToolbar.tsx) |
+| Display-Liste + Stats (`buildDisplayList`) | [src/hooks/useMasterListDisplayList.ts](src/hooks/useMasterListDisplayList.ts) |
+| PDF-Liste + Dialog-Version-Sync | [src/hooks/useMasterListPdfDisplayList.ts](src/hooks/useMasterListPdfDisplayList.ts), [src/hooks/useMasterListPdfExportVersionSync.ts](src/hooks/useMasterListPdfExportVersionSync.ts) |
+| Alerts / leere Zustände (Props-only) | [src/components/plu/MasterListPageStates.tsx](src/components/plu/MasterListPageStates.tsx) |
 
 **Backshop-Masterliste**
 
@@ -50,12 +53,16 @@ Neue UI für die große PLU-Tabelle und die Kopf-/Toolbar-Zonen der Masterlisten
 |-------|--------|
 | Seitenkopf | [src/components/plu/BackshopMasterListPageHeader.tsx](src/components/plu/BackshopMasterListPageHeader.tsx) |
 | Toolbar inkl. Werbungs-KW-Zeile (internes Dropdown) | [src/components/plu/BackshopMasterListToolbar.tsx](src/components/plu/BackshopMasterListToolbar.tsx) |
+| Display-Liste + Stats (`buildBackshopDisplayList`) | [src/hooks/useBackshopMasterListDisplayList.ts](src/hooks/useBackshopMasterListDisplayList.ts) |
+| PDF-Export-Liste + KW-Kontext | [src/hooks/useBackshopMasterListPdfExportList.ts](src/hooks/useBackshopMasterListPdfExportList.ts) |
+| Werbungs-KW-Vorschau (State/Effekte) | [src/hooks/useBackshopOfferPreviewUi.ts](src/hooks/useBackshopOfferPreviewUi.ts) |
+| Alerts / leere Zustände (Props-only) | [src/components/plu/BackshopMasterListPageStates.tsx](src/components/plu/BackshopMasterListPageStates.tsx) |
 
 `src/lib/plu-table-rows.ts` importiert **keine** React-Komponenten (nur Types/Helper), um Zyklen zu vermeiden.
 
 ## Performance-Stufen
 
-- **Virtualisierung** langer Listen und großes Splitten von `PLUTable.tsx` / Masterlisten-Seiten sind **eigenständige Projekte** mit Tests (Find-in-Page, Mobile) – nicht „nebenbei“ beim nächsten kleinen Feature.
+- **Virtualisierung** langer Listen und großes Splitten von `PLUTable.tsx` / Masterlisten-Seiten sind **eigenständige Projekte** mit Tests (Find-in-Page, Mobile); Konzept: [docs/VIRTUALISIERUNG_SPIKE.md](../../docs/VIRTUALISIERUNG_SPIKE.md) – nicht „nebenbei“ beim nächsten kleinen Feature.
 - Nach Änderungen: `npm run build`, `npm run test:run`; vor Release siehe [docs/TESTING.md](../../docs/TESTING.md).
 
 Ergänzt [code-quality.mdc](code-quality.mdc) (DRY, Ordnerzuordnung).

@@ -49,6 +49,8 @@ export default defineConfig(({ mode }) => {
     include: ['src/**/*.test.ts'],
   },
   build: {
+    // exceljs + jspdf liegen bewusst in eigenen Chunks; Gesamt > 500 kB ist erwartbar.
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
         manualChunks: {

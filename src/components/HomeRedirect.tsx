@@ -8,11 +8,11 @@ import { useAuth } from '@/hooks/useAuth'
 import { useUserPreview } from '@/contexts/UserPreviewContext'
 import { getHomeDashboardPath } from '@/lib/effective-route-prefix'
 import { LoadingSkeleton } from '@/components/layout/ProtectedRoute'
-import { extractSubdomain, isAdminSubdomain } from '@/lib/subdomain'
+import { extractSubdomain, isAdminSubdomain, normalizeViteAppDomain } from '@/lib/subdomain'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-const APP_DOMAIN = import.meta.env.VITE_APP_DOMAIN || 'localhost'
+const APP_DOMAIN = normalizeViteAppDomain(import.meta.env.VITE_APP_DOMAIN)
 
 export function HomeRedirect() {
   const { user, profile, isLoading } = useAuth()

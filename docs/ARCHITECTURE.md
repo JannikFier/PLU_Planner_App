@@ -125,6 +125,21 @@ MasterList-Seite
     └── PLUFooter                → Erweiterte Stats (Gesamt, Neu, Geändert, Eigene, Ausgeblendet)
 ```
 
+### Masterlisten – Orchestrierung (Stufe 3a)
+
+Die Seiten [`MasterList`](../src/pages/MasterList.tsx) und [`BackshopMasterList`](../src/pages/BackshopMasterList.tsx) halten weiterhin Queries und Routing; aufbereitete Listen und PDF-Zweige liegen in Domain-Hooks, Alerts/Karten in Props-only-Komponenten:
+
+| Bereich | Obst | Backshop |
+|---------|------|----------|
+| Display-Liste + Stats (aus `buildDisplayList` / `buildBackshopDisplayList`) | `useMasterListDisplayList` | `useBackshopMasterListDisplayList` |
+| PDF-Export-Liste / KW-Kontext | `useMasterListPdfDisplayList`, `useMasterListPdfExportVersionSync` | `useBackshopMasterListPdfExportList` |
+| Werbungs-KW-Vorschau (Toolbar) | — | `useBackshopOfferPreviewUi` |
+| Archiv-/Fehler-/Leer-Zustände | `MasterListPageStates.tsx` | `BackshopMasterListPageStates.tsx` |
+
+**Virtualisierung** der großen Tabelle ist bewusst **nicht** Teil dieser Strukturierung; siehe [VIRTUALISIERUNG_SPIKE.md](VIRTUALISIERUNG_SPIKE.md).
+
+Über die **weiteren Refactor-Stufen** (Stufe 4: übrige große Seiten, Stufe 5: Virtualisierung umsetzen) siehe [REFACTOR_ROADMAP_STUFEN.md](REFACTOR_ROADMAP_STUFEN.md).
+
 ## State Management
 
 **Grundregel: KEIN globaler Context fuer Daten.** Stattdessen TanStack Query fuer alles.
@@ -201,7 +216,9 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | `KWSelector` | Dropdown zur KW-Auswahl (shadcn Select) |
 | `PLUTable` | Zwei-Spalten-Tabelle mit DisplayItem[], Checkboxen, Custom-Indikator (aufgeteilt: Shell in `PLUTable.tsx`, Geometrie in `src/lib/plu-table-rows.ts`, Spalten/Mobile/Layouts in `PluTable*.tsx`, Badges in `plu-table-inline-badges.tsx`; Details in [.cursor/rules/component-size-and-agents.mdc](../.cursor/rules/component-size-and-agents.mdc)) |
 | `MasterListPageHeader` / `MasterListToolbar` | Kopfzeile und Aktionsleiste der Obst-Masterliste (nur Präsentation + Callbacks) |
+| `MasterListPageStates` | Archiv-/Snapshot-/WG-Hinweis-/Lade-/Fehler-/Leer-Zustände der Obst-Masterliste (Props-only) |
 | `BackshopMasterListPageHeader` / `BackshopMasterListToolbar` | Entsprechend für die Backshop-Masterliste |
+| `BackshopMasterListPageStates` | Entsprechende Zustandsbausteine für die Backshop-Masterliste (Props-only) |
 | `PLUFooter` | Erweiterte Stats (Gesamt, Neu, Geändert, Eigene, Ausgeblendet) |
 | `CustomProductDialog` | **NEU**: Dialog zum Hinzufügen eigener Produkte (Zod-Validierung) |
 | `ExportPDFDialog` | **NEU**: Dialog mit Vorschau-Infos vor PDF-Download |

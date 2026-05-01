@@ -1,17 +1,9 @@
 // BackshopMasterList – Backshop-PLU-Tabelle (Bild | PLU | Name)
 
 import { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
-import { useNavigate, useLocation, useParams, useSearchParams, Link } from 'react-router-dom'
+import { useNavigate, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { Card, CardContent } from '@/components/ui/card'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Button } from '@/components/ui/button'
 import {
-  Archive,
-  ListFilter,
-  RefreshCw,
-  AlertCircle,
   FileDown,
   Plus,
   EyeOff,
@@ -19,11 +11,20 @@ import {
   Megaphone,
   GitCompareArrows,
   LayoutGrid,
-  Info,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { BackshopMasterListPageHeader } from '@/components/plu/BackshopMasterListPageHeader'
 import { BackshopMasterListToolbar } from '@/components/plu/BackshopMasterListToolbar'
+import {
+  BackshopMasterListArchiveAlert,
+  BackshopMasterListEmptyDataCard,
+  BackshopMasterListItemsErrorCard,
+  BackshopMasterListLoadingSkeletonCard,
+  BackshopMasterListNoVersionCard,
+  BackshopMasterListSnapshotInvalidCard,
+  BackshopMasterListSourceFilterAlert,
+  BackshopMasterListWgSortHintAlert,
+} from '@/components/plu/BackshopMasterListPageStates'
 import type { PLUListPageActionMenuItem } from '@/components/plu/PLUListPageActionsMenu'
 import { PLUTable, type PLUTableHandle } from '@/components/plu/PLUTable'
 import { PLUFooter } from '@/components/plu/PLUFooter'
@@ -40,29 +41,24 @@ import { useBackshopOfferItems } from '@/hooks/useBackshopOfferItems'
 import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
 import { useBackshopBezeichnungsregeln } from '@/hooks/useBackshopBezeichnungsregeln'
 import { useBackshopRenamedItems } from '@/hooks/useBackshopRenamedItems'
-import { buildBackshopDisplayList, toBackshopCustomProductInput } from '@/lib/layout-engine'
 import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
 import { scopeProductGroupsByEffectiveBlock } from '@/lib/backshop-product-groups-scope-by-effective-block'
 import {
   useStoreBackshopBlockOrder,
   useStoreBackshopNameBlockOverrides,
 } from '@/hooks/useStoreBackshopBlockLayout'
-import type { PLUStats } from '@/lib/plu-helpers'
 import {
   compareIsoWeekPair,
-  formatBackshopWerbungContextPlainLabel,
   formatKwLabelWithOptionalMonSatRange,
   getBackshopToolbarWerbungLayout,
   getBackshopWerbungKwYearFromDate,
 } from '@/lib/date-kw-utils'
-import { writeBackshopOfferPreviewSelection } from '@/lib/backshop-master-offer-preview'
 import { buildOfferDisplayMap } from '@/lib/offer-display'
 import { effectiveHiddenPluSet } from '@/lib/hidden-visibility'
 import {
   useBackshopOfferCampaignSlots,
   useBackshopOfferCampaignWithPreview,
   useBackshopOfferStoreDisabled,
-  type BackshopOfferPreviewSelection,
 } from '@/hooks/useCentralOfferCampaigns'
 import { useBackshopOfferLocalPriceOverrides } from '@/hooks/useOfferStoreLocalPrices'
 import { useBackshopProductGroups } from '@/hooks/useBackshopProductGroups'
@@ -77,6 +73,9 @@ import { useBackshopLineVisibilityOverrides } from '@/hooks/useBackshopLineVisib
 import { useRegisterKioskListFindInPage, useRegisterKioskListHeaderSummary, type KioskListHeaderSummary } from '@/contexts/KioskListFindContext'
 import { BACKSHOP_SOURCES, BACKSHOP_SOURCE_META, type BackshopExcelSource } from '@/lib/backshop-sources'
 import { useRolePrefixFromLocation } from '@/hooks/useRolePrefixFromLocation'
+import { useBackshopOfferPreviewUi } from '@/hooks/useBackshopOfferPreviewUi'
+import { useBackshopMasterListDisplayList } from '@/hooks/useBackshopMasterListDisplayList'
+import { useBackshopMasterListPdfExportList } from '@/hooks/useBackshopMasterListPdfExportList'
 
 /**
  * Backshop-Masterliste: Tabelle mit Bild, PLU, Name.
@@ -158,66 +157,15 @@ export function BackshopMasterList() {
 
   const [showPdfDialog, setShowPdfDialog] = useState(false)
 
-  const [offerPreviewSelection, setOfferPreviewSelection] = useState<BackshopOfferPreviewSelection>({
-    mode: 'auto',
-  })
-
-  /** Bei jedem Betreten der Live-Liste: Werbung wieder auf automatische aktuelle KW. */
-  useEffect(() => {
-    if (isSnapshot) return
-    setOfferPreviewSelection({ mode: 'auto' })
-    writeBackshopOfferPreviewSelection({ mode: 'auto' })
-  }, [isSnapshot])
-
-  const lockedSnapshotPreview = useMemo((): BackshopOfferPreviewSelection | null => {
-    if (!isSnapshot || !resolvedBackshopVersion) return null
-    return {
-      mode: 'explicit',
-      kw: resolvedBackshopVersion.kw_nummer,
-      jahr: resolvedBackshopVersion.jahr,
-    }
-  }, [isSnapshot, resolvedBackshopVersion])
-
-  const previewForCampaign = lockedSnapshotPreview ?? offerPreviewSelection
-
   const { data: offerSlotsData, isFetched: offerSlotsFetched } = useBackshopOfferCampaignSlots()
   const offerSlots = useMemo(() => offerSlotsData ?? [], [offerSlotsData])
 
-  useEffect(() => {
-    if (lockedSnapshotPreview) return
-    if (!offerSlotsFetched) return
-    if (offerPreviewSelection.mode !== 'explicit') return
-    const ok = offerSlots.some(
-      (s) => s.kw === offerPreviewSelection.kw && s.jahr === offerPreviewSelection.jahr,
-    )
-    if (!ok) {
-      const next = { mode: 'auto' as const }
-      setOfferPreviewSelection(next)
-      writeBackshopOfferPreviewSelection(next)
-    }
-  }, [lockedSnapshotPreview, offerPreviewSelection, offerSlots, offerSlotsFetched])
-
-  useEffect(() => {
-    if (isSnapshot) return
-    writeBackshopOfferPreviewSelection(offerPreviewSelection)
-  }, [offerPreviewSelection, isSnapshot])
-
-  const offerPreviewSelectValue = useMemo(() => {
-    if (offerPreviewSelection.mode === 'auto') return 'auto'
-    return `${offerPreviewSelection.jahr}:${offerPreviewSelection.kw}`
-  }, [offerPreviewSelection])
-
-  const onOfferPreviewChange = (v: string) => {
-    if (v === 'auto') {
-      setOfferPreviewSelection({ mode: 'auto' })
-      return
-    }
-    const parts = v.split(':')
-    const jahr = Number(parts[0])
-    const kw = Number(parts[1])
-    if (!Number.isFinite(jahr) || !Number.isFinite(kw)) return
-    setOfferPreviewSelection({ mode: 'explicit', kw, jahr })
-  }
+  const { previewForCampaign, offerPreviewSelectValue, onOfferPreviewChange } = useBackshopOfferPreviewUi({
+    isSnapshot,
+    resolvedBackshopVersion,
+    offerSlots,
+    offerSlotsFetched,
+  })
 
   const {
     data: rawItems = [],
@@ -395,46 +343,7 @@ export function BackshopMasterList() {
     return groupBlockIdByGroupId
   }, [snapshotReadOnly, groupBlockIdByGroupId])
 
-  const { displayItems, stats } = useMemo(() => {
-    const result = buildBackshopDisplayList({
-      masterItems: masterScopeItems,
-      carryoverMasterItems: carryoverMasterScoped,
-      hiddenPLUs: effectiveHiddenPLUs,
-      offerDisplayByPlu,
-      sortMode,
-      blocks,
-      customProducts: customProducts.map(toBackshopCustomProductInput),
-      bezeichnungsregeln,
-      renamedItems,
-      markYellowKwCount,
-      // Eigene Produkte: „Neu“-Gelb nach Kalender-/Werbungs-Anker-KW, nicht nach reiner Listen-KW
-      currentKwNummer: calendarKw,
-      currentJahr: calendarJahr,
-      nameBlockOverrides,
-      storeBlockOrder: storeBackshopBlockOrder,
-      productGroupByPluSource,
-      memberSourcesByGroup,
-      chosenSourcesByGroup: layoutChosenSourcesForList,
-      productGroupNames,
-      blockPreferredSourceByBlockId: layoutBlockPreferredForList,
-      groupBlockIdByGroupId: layoutGroupBlockIdByGroupIdForList,
-      backshopPrevManualPluSet: backshopPrevManualPluSetForLayout,
-      lineForceShowKeys: lineForceShowKeysForList,
-      lineForceHideKeys: lineForceHideKeysForList,
-    })
-    const pluStats: PLUStats = {
-      total: result.stats.total,
-      unchanged: result.stats.total - result.stats.newCount - result.stats.changedCount,
-      newCount: result.stats.newCount,
-      changedCount: result.stats.changedCount,
-      hidden: result.stats.hidden,
-      customCount: result.stats.customCount,
-    }
-    return {
-      displayItems: result.items,
-      stats: pluStats,
-    }
-  }, [
+  const { displayItems, stats } = useBackshopMasterListDisplayList({
     masterScopeItems,
     carryoverMasterScoped,
     effectiveHiddenPLUs,
@@ -453,16 +362,47 @@ export function BackshopMasterList() {
     memberSourcesByGroup,
     layoutChosenSourcesForList,
     productGroupNames,
-    backshopPrevManualPluSetForLayout,
     layoutBlockPreferredForList,
     layoutGroupBlockIdByGroupIdForList,
+    backshopPrevManualPluSetForLayout,
     lineForceShowKeysForList,
     lineForceHideKeysForList,
-  ])
+  })
 
   const currentVersion = listVersion
 
   const showWeekMonSat = layoutSettings?.show_week_mon_sat_in_labels ?? false
+
+  const { pdfDisplayItems, pdfStats, pdfContextKwLabel } = useBackshopMasterListPdfExportList({
+    showPdfDialog,
+    masterScopeItems,
+    carryoverMasterScoped,
+    effectiveHiddenPLUs,
+    offerDisplayByPlu,
+    sortMode,
+    blocks,
+    customProducts,
+    bezeichnungsregeln,
+    renamedItems,
+    markYellowKwCount,
+    calendarKw,
+    calendarJahr,
+    nameBlockOverrides,
+    storeBackshopBlockOrder,
+    productGroupByPluSource,
+    memberSourcesByGroup,
+    layoutChosenSourcesForList,
+    productGroupNames,
+    layoutBlockPreferredForList,
+    layoutGroupBlockIdByGroupIdForList,
+    backshopPrevManualPluSetForLayout,
+    lineForceShowKeysForList,
+    lineForceHideKeysForList,
+    listVersion,
+    effectiveWerbungEndKw,
+    effectiveWerbungEndJahr,
+    showWeekMonSat,
+  })
 
   const werbungToolbarLayout = useMemo(() => {
     if (!currentVersion) return null
@@ -497,86 +437,6 @@ export function BackshopMasterList() {
   }, [currentVersion, versionDisplayKwLabelForPdf])
 
   useRegisterKioskListHeaderSummary(kioskBackshopHeaderSummary, isKiosk)
-
-  /** PDF-Titel/Dateiname: gleicher KW-Kontext wie Toolbar (inkl. gewählter Werbungs-KW). */
-  const pdfContextKwLabel = useMemo(() => {
-    if (!listVersion) return 'Backshop'
-    return formatBackshopWerbungContextPlainLabel(
-      listVersion.kw_nummer,
-      listVersion.jahr,
-      effectiveWerbungEndKw,
-      effectiveWerbungEndJahr,
-      showWeekMonSat,
-    )
-  }, [listVersion, effectiveWerbungEndKw, effectiveWerbungEndJahr, showWeekMonSat])
-
-  const pdfDisplayResult = useMemo(() => {
-    if (!showPdfDialog) return { items: [], stats: { total: 0, newCount: 0, changedCount: 0, hidden: 0, customCount: 0 } }
-    const r = buildBackshopDisplayList({
-      masterItems: masterScopeItems,
-      carryoverMasterItems: carryoverMasterScoped,
-      hiddenPLUs: effectiveHiddenPLUs,
-      offerDisplayByPlu,
-      sortMode,
-      blocks,
-      customProducts: customProducts.map(toBackshopCustomProductInput),
-      bezeichnungsregeln,
-      renamedItems,
-      markYellowKwCount,
-      currentKwNummer: calendarKw,
-      currentJahr: calendarJahr,
-      nameBlockOverrides,
-      storeBlockOrder: storeBackshopBlockOrder,
-      productGroupByPluSource,
-      memberSourcesByGroup,
-      chosenSourcesByGroup: layoutChosenSourcesForList,
-      productGroupNames,
-      blockPreferredSourceByBlockId: layoutBlockPreferredForList,
-      groupBlockIdByGroupId: layoutGroupBlockIdByGroupIdForList,
-      backshopPrevManualPluSet: backshopPrevManualPluSetForLayout,
-      lineForceShowKeys: lineForceShowKeysForList,
-      lineForceHideKeys: lineForceHideKeysForList,
-    })
-    // Für den PDF-Export werden Konflikt-Platzhalter nicht gedruckt.
-    return { ...r, items: r.items.filter((i) => !i.backshop_is_multi_source_placeholder) }
-  }, [
-    showPdfDialog,
-    masterScopeItems,
-    carryoverMasterScoped,
-    effectiveHiddenPLUs,
-    offerDisplayByPlu,
-    sortMode,
-    blocks,
-    customProducts,
-    bezeichnungsregeln,
-    renamedItems,
-    markYellowKwCount,
-    calendarKw,
-    calendarJahr,
-    nameBlockOverrides,
-    storeBackshopBlockOrder,
-    productGroupByPluSource,
-    memberSourcesByGroup,
-    layoutChosenSourcesForList,
-    productGroupNames,
-    backshopPrevManualPluSetForLayout,
-    layoutBlockPreferredForList,
-    layoutGroupBlockIdByGroupIdForList,
-    lineForceShowKeysForList,
-    lineForceHideKeysForList,
-  ])
-
-  const pdfStats: PLUStats = useMemo(
-    () => ({
-      total: pdfDisplayResult.stats.total,
-      unchanged: pdfDisplayResult.stats.total - pdfDisplayResult.stats.newCount - pdfDisplayResult.stats.changedCount,
-      newCount: pdfDisplayResult.stats.newCount,
-      changedCount: pdfDisplayResult.stats.changedCount,
-      hidden: pdfDisplayResult.stats.hidden,
-      customCount: pdfDisplayResult.stats.customCount,
-    }),
-    [pdfDisplayResult.stats],
-  )
 
   const pluTableRef = useRef<PLUTableHandle>(null)
   const openKioskBackshopFind = useCallback(() => {
@@ -708,38 +568,16 @@ export function BackshopMasterList() {
         />
 
         {isSnapshot && resolvedBackshopVersion && (
-          <Alert data-tour="backshop-master-version-banner">
-            <Archive className="h-4 w-4" />
-            <AlertTitle>Archivansicht</AlertTitle>
-            <AlertDescription>
-              Liste und Werbung beziehen sich auf{' '}
-              <span className="font-medium text-foreground">{versionDisplayKwLabelForPdf}</span>. Bearbeiten
-              ist hier deaktiviert.
-            </AlertDescription>
-          </Alert>
+          <BackshopMasterListArchiveAlert kwLabel={versionDisplayKwLabelForPdf} />
         )}
 
         {snapshotInvalid && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center gap-4">
-              <AlertCircle className="h-10 w-10 text-muted-foreground" />
-              <div>
-                <h3 className="text-lg font-medium mb-1">Version nicht gefunden</h3>
-                <p className="text-sm text-muted-foreground max-w-md">
-                  Diese Backshop-Version gibt es nicht oder wurde gelöscht.
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  closeBackshopListSearch()
-                  navigate('/super-admin/backshop-versions')
-                }}
-              >
-                Zurück zu Backshop-Versionen
-              </Button>
-            </CardContent>
-          </Card>
+          <BackshopMasterListSnapshotInvalidCard
+            onBack={() => {
+              closeBackshopListSearch()
+              navigate('/super-admin/backshop-versions')
+            }}
+          />
         )}
 
         {currentVersion && !isLoading && !hasNoVersion && !snapshotInvalid && !isKiosk && (
@@ -778,108 +616,42 @@ export function BackshopMasterList() {
           !hasNoVersion &&
           storeBackshopNameOverrides.length > 0 &&
           sortMode === 'ALPHABETICAL' && (
-            <Alert data-testid="backshop-masterlist-wg-sort-hint">
-              <Info className="h-4 w-4" />
-              <AlertTitle>Markt-Zuordnungen zu Warengruppen (Backshop)</AlertTitle>
-              <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span>
-                  Für diesen Markt gibt es Zuordnungen aus der Backshop-Warengruppen-Workbench. Bei Sortierung{' '}
-                  <strong>Alphabetisch (A–Z)</strong> erscheinen keine Warengruppen-Abschnitte. Stellen Sie in den
-                  Layout-Einstellungen (Backshop) die Sortierung auf <strong>Nach Warengruppen</strong>, um Gruppen
-                  sichtbar zu machen.
-                </span>
-                {(rolePrefix === '/admin' || rolePrefix === '/super-admin') && !snapshotReadOnly ? (
-                  <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-center" asChild>
-                    <Link to={`${rolePrefix}/backshop-layout`} onClick={() => closeBackshopListSearch()}>
-                      Layout-Einstellungen (Backshop)
-                    </Link>
-                  </Button>
-                ) : (
-                  <span className="text-sm text-muted-foreground shrink-0">
-                    Bitte eine Person mit Admin-Rechten: Sortierung „Nach Warengruppen“ im Layout (Backshop) setzen.
-                  </span>
-                )}
-              </AlertDescription>
-            </Alert>
+            <BackshopMasterListWgSortHintAlert
+              showAdminLayoutLink={(rolePrefix === '/admin' || rolePrefix === '/super-admin') && !snapshotReadOnly}
+              layoutSettingsHref={`${rolePrefix}/backshop-layout`}
+              onBeforeNavigate={closeBackshopListSearch}
+            />
           )}
 
-        {hasNoVersion && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <ListFilter className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium mb-1">Keine Backshop-Version vorhanden</h3>
-              <p className="text-sm text-muted-foreground max-w-md">
-                Es wurde noch keine Backshop-Liste hochgeladen. Nutze „Backshop Upload“ im Super-Admin-Bereich.
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        {hasNoVersion && <BackshopMasterListNoVersionCard />}
 
         {snapshotSourceOnly && !hasNoVersion && !snapshotInvalid && resolvedBackshopVersion && (
-          <Alert data-tour="backshop-master-source-filter">
-            <AlertTitle className="flex flex-wrap items-center gap-2">
-              Nur Quelle: {BACKSHOP_SOURCE_META[snapshotSourceOnly].label}
-              <span className="text-muted-foreground font-normal text-sm">
-                ({resolvedBackshopVersion.kw_label})
-              </span>
-            </AlertTitle>
-            <AlertDescription className="flex flex-wrap items-center gap-2 mt-2">
-              Es werden nur PLUs dieser Marke angezeigt.
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  closeBackshopListSearch()
-                  setSearchParams(
-                    (prev) => {
-                      const next = new URLSearchParams(prev)
-                      next.delete('source')
-                      return next
-                    },
-                    { replace: true },
-                  )
-                }}
-              >
-                Gesamte KW anzeigen
-              </Button>
-            </AlertDescription>
-          </Alert>
+          <BackshopMasterListSourceFilterAlert
+            sourceLabel={BACKSHOP_SOURCE_META[snapshotSourceOnly].label}
+            kwLabel={resolvedBackshopVersion.kw_label}
+            onClearSource={() => {
+              closeBackshopListSearch()
+              setSearchParams(
+                (prev) => {
+                  const next = new URLSearchParams(prev)
+                  next.delete('source')
+                  return next
+                },
+                { replace: true },
+              )
+            }}
+          />
         )}
 
         {(isLoading || (itemsError && itemsRefetching)) && !hasNoVersion && !snapshotInvalid && (
-          <Card>
-            <CardContent className="p-6 space-y-3">
-              <div className="flex gap-4">
-                <Skeleton className="h-5 w-[80px]" />
-                <Skeleton className="h-5 flex-1" />
-              </div>
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="flex gap-4">
-                  <Skeleton className="h-4 w-[70px]" />
-                  <Skeleton className="h-4 flex-1" />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <BackshopMasterListLoadingSkeletonCard />
         )}
 
         {itemsError && !isLoading && !itemsRefetching && !hasNoVersion && !snapshotInvalid && (
-          <Card>
-            <CardContent className="flex items-center gap-4 p-6">
-              <AlertCircle className="h-8 w-8 text-destructive shrink-0" />
-              <div className="flex-1">
-                <p className="font-medium">Fehler beim Laden der Backshop-Daten</p>
-                <p className="text-sm text-muted-foreground">
-                  {itemsError instanceof Error ? itemsError.message : 'Unbekannter Fehler'}
-                </p>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => refetchItems()}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Erneut versuchen
-              </Button>
-            </CardContent>
-          </Card>
+          <BackshopMasterListItemsErrorCard
+            message={itemsError instanceof Error ? itemsError.message : 'Unbekannter Fehler'}
+            onRetry={() => refetchItems()}
+          />
         )}
 
         {!isLoading &&
@@ -888,22 +660,12 @@ export function BackshopMasterList() {
           !snapshotInvalid &&
           displayItems.length === 0 &&
           masterScopeItems.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <ListFilter className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium mb-1">
-                {snapshotSourceOnly && rawItems.length > 0
-                  ? `Keine PLUs für ${BACKSHOP_SOURCE_META[snapshotSourceOnly].label}`
-                  : 'Keine Backshop-Daten für diese KW'}
-              </h3>
-              <p className="text-sm text-muted-foreground max-w-md">
-                {snapshotSourceOnly && rawItems.length > 0
-                  ? 'In dieser Kalenderwoche gibt es für diese Marke keine Master-PLU-Zeilen.'
-                  : 'Für diese Kalenderwoche wurden noch keine Backshop-PLU-Daten hochgeladen.'}
-              </p>
-            </CardContent>
-          </Card>
-        )}
+            <BackshopMasterListEmptyDataCard
+              snapshotSourceOnly={Boolean(snapshotSourceOnly)}
+              rawItemsLength={rawItems.length}
+              sourceLabel={snapshotSourceOnly ? BACKSHOP_SOURCE_META[snapshotSourceOnly].label : ''}
+            />
+          )}
 
         {!isLoading &&
           !itemsError &&
@@ -935,7 +697,7 @@ export function BackshopMasterList() {
             <ExportBackshopPDFDialog
             open={showPdfDialog}
             onOpenChange={setShowPdfDialog}
-            items={pdfDisplayResult.items}
+            items={pdfDisplayItems}
             stats={pdfStats}
             kwLabel={pdfContextKwLabel}
             sortMode={sortMode}

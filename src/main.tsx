@@ -6,6 +6,22 @@ import './index.css'
 
 initErrorReporting()
 
+// Web-App-Manifest nur einbinden, wenn die Datei erreichbar ist (z. B. Vercel
+// Deployment Protection auf *.vercel.app liefert sonst 401/403 und die Konsole
+// meldet „Manifest fetch failed“).
+void fetch('/site.webmanifest', { method: 'GET', cache: 'force-cache' })
+  .then((res) => {
+    if (!res.ok) return
+    if (document.querySelector('link[rel="manifest"]')) return
+    const link = document.createElement('link')
+    link.rel = 'manifest'
+    link.href = '/site.webmanifest'
+    document.head.appendChild(link)
+  })
+  .catch(() => {
+    /* ignorieren */
+  })
+
 // Supabase-Origin früh verbinden (weniger Latenz beim ersten RPC nach App-Start)
 try {
   const raw = import.meta.env.VITE_SUPABASE_URL as string | undefined

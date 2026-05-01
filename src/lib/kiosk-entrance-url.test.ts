@@ -17,6 +17,17 @@ describe('buildKioskEntranceUrl', () => {
     expect(r.url).toBe('https://angerbogen.example.com/kasse/abc-def')
   })
 
+  it('akzeptiert appDomain mit versehentlichem https-Prefix', () => {
+    const r = buildKioskEntranceUrl({
+      token: 'tok',
+      storeSubdomain: 'angerbogen',
+      appDomain: 'https://fier-hub.de/',
+      currentOrigin: 'https://www.fier-hub.de',
+    })
+    expect(r.usedSubdomainHost).toBe(true)
+    expect(r.url).toBe('https://angerbogen.fier-hub.de/kasse/tok')
+  })
+
   it('localhost: uebernimmt Dev-Port von currentOrigin (Vite)', () => {
     const r = buildKioskEntranceUrl({
       token: 'tok',

@@ -155,7 +155,7 @@ Automatisiert nicht vollständig abgedeckt (u. a. PDF-Inhalt, Excel-Upload –
 
 ### Virtualisierung langer Listen (bewusst zurückgestellt)
 
-**Listen-Virtualisierung** (nur sichtbare Zeilen im DOM) ist **kein aktuelles Lieferziel**: sie kann Find-in-Page, Scroll-Ziele, Kiosk und Export-Pfade beeinflussen. Falls später nötig: **eigenes Projekt** mit erweiterten Playwright-Schritten (Suche, Scroll, relevante Rollen) und ohne Vermischung mit reinem Design-Refactor.
+**Listen-Virtualisierung** (nur sichtbare Zeilen im DOM) ist **kein aktuelles Lieferziel**: sie kann Find-in-Page, Scroll-Ziele, Kiosk und Export-Pfade beeinflussen. Falls später nötig: **eigenes Projekt** mit erweiterten Playwright-Schritten (Suche, Scroll, relevante Rollen) und ohne Vermischung mit reinem Design-Refactor. Ausführliches Konzept (Risiken, Bibliothek, E2E-Plan): [VIRTUALISIERUNG_SPIKE.md](VIRTUALISIERUNG_SPIKE.md).
 
 ## Build
 

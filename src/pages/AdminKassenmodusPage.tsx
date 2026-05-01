@@ -10,6 +10,7 @@ import {
   isKioskEntranceUrlMisdeployedForHostname,
   kioskUrlSharesOriginWithPage,
 } from '@/lib/kiosk-entrance-url'
+import { normalizeViteAppDomain } from '@/lib/subdomain'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -64,7 +65,7 @@ function prefetchKioskRouteChunks() {
  */
 export function AdminKassenmodusPage({ embedded = false }: { embedded?: boolean }) {
   const { currentStoreId, subdomain } = useCurrentStore()
-  const appDomain = import.meta.env.VITE_APP_DOMAIN || 'localhost'
+  const appDomain = normalizeViteAppDomain(import.meta.env.VITE_APP_DOMAIN)
   const { kiosk: kioskModeStoreOn, isLoading: visibilityLoading } = useEffectiveListVisibility()
   const queryClient = useQueryClient()
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)

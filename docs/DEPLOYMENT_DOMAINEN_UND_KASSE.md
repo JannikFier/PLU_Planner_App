@@ -2,46 +2,90 @@
 
 Diese Anleitung setzt das Zielbild **„jeder Markt eigene Subdomain, QR führt zur Kasse“** in der Produktion um. Die App-Logik ist bereits vorhanden ([`buildKioskEntranceUrl`](../src/lib/kiosk-entrance-url.ts)); es geht um **Vercel**, **DNS**, **Build-Variable**, **Stammdaten** und **Supabase Auth**.
 
-## Kurzüberblick
+---
+
+## Vercel: Schritt für Schritt (wirklich jeden Klick)
+
+Ersetze in den Beispielen **`deine-domain.de`** durch deine echte Domain (z. B. die du bei Vercel gekauft hast, ohne `www`, wenn deine Markt-URLs so aussehen sollen: `angerbogen.deine-domain.de`).
+
+### Teil A – Variable setzen, damit der QR nicht mehr `localhost` zeigt
+
+1. Im Browser **`https://vercel.com`** öffnen und **einloggen** (gleiches Konto wie für das Projekt).
+2. Oben auf **„Dashboard“** (falls du nicht schon dort bist).
+3. **Falls du mehrere Teams hast:** Oben links oder in der Leiste das **Team** auswählen, in dem das Projekt liegt.
+4. In der Liste **auf die Kachel deines Projekts** klicken (der Name eurer PLU-Planner-App / wie das Repo in Vercel heißt).
+5. Oben in der **Projekt-Leiste** den Reiter **„Settings“** anklicken (nicht „Overview“ oder „Deployments“).
+6. **Links** in der Unternavigation runterscrollen und **„Environment Variables“** anklicken.
+7. Button **„Add Environment Variable“** (oder **„Add“** / **„Create“**) klicken.
+8. **Name (Key):** exakt so eintragen: `VITE_APP_DOMAIN`  
+   **Value:** nur deine Basis-Domain, z. B. `deine-domain.de`  
+   - **Kein** `https://` davor.  
+   - **Kein** `/` am Ende.  
+   - **Kein** `www.` – außer deine gesamte Strategie baut wirklich auf `www.deine-domain.de` als Basis (dann müsstest du das mit den Markt-Hosts abstimmen; Standard ist Apex ohne `www`).
+9. Unten bei **„Environments“** / **„Environment“** sicherstellen: **Production** ist angehakt (mindestens das). Preview nur anhaken, wenn du auch Preview-Deployments mit derselben Logik testen willst.
+10. **Save** / **Speichern** klicken.
+
+**Wichtig:** Die Variable steckt erst im **nächsten** Build. Ohne neuen Build ändert sich der QR-Link in der live App nicht.
+
+11. Oben wieder den Reiter **„Deployments“** anklicken.
+12. Den **obersten** Eintrag in der Liste nehmen, der **„Production“** ist (nicht „Preview“, falls mehrere da stehen).
+13. Rechts bei dieser Zeile auf die **drei Punkte** **„⋯“** klicken.
+14. **„Redeploy“** wählen.
+15. Im Dialog **bestätigen** (ggf. Häkchen „Use existing Build Cache“ **aus** lassen, damit wirklich frisch mit den neuen Variablen gebaut wird – bei Vercel heißt die Option sinngemäß „bestehenden Build-Cache verwenden“; für sicher lieber **ohne** Cache einmal neu bauen).
+16. Warten, bis der Deploy **grün / „Ready“** ist (ein bis zwei Minuten).
+
+**Kontrolle:** App im Browser unter eurer normalen Adresse öffnen → als Admin **„Administration → Kassenmodus“** → der angezeigte Link sollte mit **`https://`** und **`deine-domain.de`** (bzw. Markt-Subdomain davor) beginnen – **nicht** `localhost`.
+
+---
+
+### Teil B – Wildcard-Domain, damit `angerbogen.deine-domain.de` überhaupt erreichbar ist
+
+Ohne diesen Schritt zeigt der QR zwar die richtige Adresse, aber der Browser findet den Server für `markt.deine-domain.de` nicht.
+
+1. Wieder in **demselben Projekt** in Vercel.
+2. Reiter **„Settings“**.
+3. Links **„Domains“** anklicken.
+4. Im Eingabefeld für eine neue Domain **`*.deine-domain.de`** eintippen (Stern, Punkt, genau deine Basis-Domain).
+5. **„Add“** / **Hinzufügen** klicken.
+6. Vercel zeigt dir jetzt entweder **„Valid Configuration“** / grün – oder **DNS-Anweisungen** (Nameserver oder Records).
+
+**Wenn die Domain bei Vercel gekauft ist:** Oft richtet sich DNS weitgehend selbst ein. Dann nur warten, bis der Eintrag **valid** ist und ein **SSL-Zertifikat** aktiv ist (in der Domains-Liste steht meist etwas zu Certificate / HTTPS).
+
+**Wenn Vercel nach einem DNS-Record fragt:** Die angezeigte Anleitung **genau** befolgen (bei externem DNS-Anbieter den Record setzen; bei Vercel-Domains in den Vercel-Domain-Einstellungen nachsehen). Ohne korrekten DNS-Eintrag bleibt die Wildcard ungültig.
+
+7. Wiederholen für die **„nackte“** Domain **`deine-domain.de`** (ohne Stern), falls noch nicht drin – damit ihr die Hauptseite weiterhabt.
+8. Optional **`www.deine-domain.de`** als Redirect auf Apex, falls ihr `www` nutzt (Vercel bietet oft „Redirect“ an).
+
+**Kontrolle:** Im Browser testen: `https://test123.deine-domain.de` (irgendein erfundener Name) – es sollte **eure** App laden (ggf. Fehlerseite der App, aber **nicht** „Server nicht gefunden“ / DNS-Fehler).
+
+---
+
+### Teil C – Kurz: was du in der App und in Supabase noch tun musst (ohne Vercel)
+
+- **In der PLU-Planner-App** (als Super-Admin): Pro Markt unter Firmen & Märkte eine **Subdomain** eintragen (z. B. `angerbogen`). Kassenmodus in den Markt-Einstellungen **freischalten**.
+- **In Supabase** (Browser: `supabase.com` → dein Projekt): **Authentication** → **URL Configuration** → **Redirect URLs** so ergänzen, dass `https://deine-domain.de` und eure Markt-Hosts erlaubt sind (siehe Abschnitt 4 weiter unten).
+
+---
+
+### Wenn etwas hakt
+
+- **Roter Hinweis** auf der Kassenmodus-Seite in der App: meist fehlt `VITE_APP_DOMAIN` im **Production**-Build → Teil A wiederholen, **Redeploy ohne Cache**.
+- **„Nicht sicher“ / Zertifikat:** Teil B abwarten oder DNS korrigieren.
+- **Fragen zu Vercel-Oberfläche:** Vercel ändert ab und zu Bezeichnungen; gesucht sind immer **Projekt → Settings → Environment Variables** bzw. **Settings → Domains**.
+
+---
+
+## Kurzüberblick (zum Abhaken)
 
 | Schritt | Wo | Zweck |
 |--------|-----|--------|
-| 1 | Vercel → Environment Variables | `VITE_APP_DOMAIN` für Production-Build |
-| 2 | Vercel → Domains (+ DNS) | Wildcard `*.ihre-domain.de` → dieselbe App |
+| 1 | Vercel → Environment Variables + Redeploy | `VITE_APP_DOMAIN` für Production-Build (siehe **Teil A** oben) |
+| 2 | Vercel → Domains | Wildcard `*.deine-domain.de` (siehe **Teil B** oben) |
 | 3 | App: Super-Admin Stammdaten | Pro Markt eindeutige `subdomain` |
-| 4 | Supabase Dashboard | Auth-URLs für Apex- und Markt-Hosts |
+| 4 | Supabase Dashboard | Auth-URLs (siehe **Schritt für Schritt in Supabase** unten) |
 | 5 | Nach Deploy | QR testen, ggf. Token rotieren |
 
----
-
-## 1. `VITE_APP_DOMAIN` in Vercel (Production) und neu deployen
-
-**Warum:** Vite ersetzt `import.meta.env.VITE_APP_DOMAIN` beim **Build**. Ohne Wert fällt die App auf `localhost` zurück → QR/Link zeigen auf `https://markt.localhost/…` und sind auf echten Geräten nicht erreichbar.
-
-**Schritte:**
-
-1. Vercel → euer Projekt → **Settings** → **Environment Variables**.
-2. Variable **`VITE_APP_DOMAIN`** anlegen oder bearbeiten:
-   - **Wert:** nur die Basis-Domain, **ohne** `https://`, **ohne** Slash, z. B. `vierhub.de`.
-   - **Environment:** mindestens **Production** (bei Preview-Deploys ggf. auch Preview setzen und dort denselben oder passenden Wert verwenden).
-3. **Deployments** → letztes Production-Deployment → **Redeploy** (oder neu pushen), damit ein Build mit der Variable läuft.
-
-**Hinweis:** `www` vs. Apex: Die Subdomain-Logik in [`extractSubdomain`](../src/lib/subdomain.ts) behandelt `www` wie ohne Markt-Präfix. `VITE_APP_DOMAIN` sollte zur **gleichen** Basis passen, die ihr für Markt-Hosts nutzt (meist Apex `example.de`, nicht `www.example.de` als `VITE_APP_DOMAIN`, wenn Markt-URLs `markt.example.de` sein sollen).
-
----
-
-## 2. Wildcard-Domain `*.ihre-domain.de` in Vercel anbinden und SSL prüfen
-
-**Warum:** Kassen- und Markt-URLs haben die Form `https://{markt-subdomain}.{VITE_APP_DOMAIN}/kasse/...`. Jeder Hostname muss auf **dieselbe** Vercel-App zeigen; `vercel.json` liefert für alle Pfade die SPA (`index.html`).
-
-**Schritte:**
-
-1. Vercel → Projekt → **Settings** → **Domains**.
-2. **Add** → Wildcard eintragen: `*.ihre-domain.de` (ersetzt `ihre-domain.de` durch eure bei Vercel gekaufte/verknüpfte Domain).
-3. Vercel zeigt ggf. DNS-Hinweise. Wenn die Domain **bei Vercel** liegt, werden Einträge oft automatisch gesetzt.
-4. Warten, bis der Domain-Status **Valid** ist und **SSL Certificate** bereitsteht (sonst blockieren Browser den Aufruf).
-
-**Ohne Wildcard** funktionieren Markt-Hosts wie `angerbogen.deine-domain.de` nicht zuverlässig – nur die Apex-URL wäre erreichbar.
+**Hinweis `www`:** Die Subdomain-Logik in [`extractSubdomain`](../src/lib/subdomain.ts) behandelt `www` wie ohne Markt-Präfix. `VITE_APP_DOMAIN` sollte zur **gleichen** Basis passen wie eure Markt-Hosts (meist Apex `deine-domain.de`, nicht `www.deine-domain.de`, wenn Markt-URLs `markt.deine-domain.de` sein sollen).
 
 ---
 
@@ -49,12 +93,16 @@ Diese Anleitung setzt das Zielbild **„jeder Markt eigene Subdomain, QR führt 
 
 **Warum:** QR und kopierter Link nutzen `stores.subdomain` aus der Datenbank. Zwei aktive Märkte dürfen **nicht** dieselbe Subdomain haben.
 
-**Schritte:**
+**Schritte in der App:**
 
-1. Als Super-Admin: **Firmen & Märkte** → Markt öffnen.
-2. Feld **Subdomain** setzen (nur Kleinbuchstaben, Zahlen, Bindestrich; muss mit Buchstabe beginnen – Validierung in der App).
-3. **Keine** reservierten Namen verwenden (z. B. `admin`, `app`, `www` – siehe [`RESERVED_SUBDOMAINS`](../src/lib/subdomain.ts)).
-4. **Listen-Sichtbarkeit:** Kassenmodus (`kiosk`) für den Markt muss eingeschaltet sein, sonst ist die öffentliche Kasse gesperrt (Hinweis auf der Kassenmodus-Seite).
+1. Unter eurer **Produktions-URL** einloggen (Rolle **Super-Admin**).
+2. Im Menü **„Firmen & Märkte“** (bzw. den Eintrag, der zur Firmen-/Marktverwaltung führt) öffnen.
+3. Die **Firma** wählen → den **Markt** (die Filiale) anklicken, für den der QR gelten soll.
+4. Feld **„Subdomain“** (oder Bearbeiten-Dialog dafür) finden und ausfüllen, z. B. `angerbogen` (nur Kleinbuchstaben, Zahlen, Bindestrich; mit Buchstabe beginnen – die App zeigt sonst eine Fehlermeldung).
+5. **Speichern**.
+6. **Listen-Sichtbarkeit** des Markts öffnen (Einstellungen des Markts): **Kassenmodus** / **`kiosk`** für diesen Markt **einschalten**, sonst blockiert die App die öffentliche Kasse (Hinweis auch auf **Administration → Kassenmodus**).
+
+**Nicht verwenden** als Subdomain: `admin`, `app`, `www` und andere reservierte Namen (siehe [`RESERVED_SUBDOMAINS`](../src/lib/subdomain.ts)).
 
 ---
 
@@ -62,14 +110,18 @@ Diese Anleitung setzt das Zielbild **„jeder Markt eigene Subdomain, QR führt 
 
 **Warum:** Nutzer melden sich unter `https://ihre-domain.de` oder `https://markt.ihre-domain.de` an. Supabase muss diese Ursprünge für Redirects und Session erlauben.
 
-**Schritte:**
+### Schritt für Schritt in Supabase
 
-1. Supabase → **Authentication** → **URL Configuration**.
-2. **Site URL:** sinnvolle Haupt-URL (z. B. `https://ihre-domain.de` oder eure primäre App-URL).
-3. **Redirect URLs:** alle tatsächlich genutzten Origins eintragen, z. B.:
-   - `https://ihre-domain.de/**`
-   - `https://www.ihre-domain.de/**` (falls genutzt)
-   - `https://*.ihre-domain.de/**` (falls eure Supabase-Version Wildcards in Redirect URLs unterstützt; sonst wichtige Markt-Hosts **einzeln** ergänzen, z. B. `https://angerbogen.ihre-domain.de/**`).
+1. Browser: **`https://supabase.com`** → **einloggen**.
+2. **„Your projects“** / Dashboard → **auf dein Projekt** klicken (das zur App gehört).
+3. **Links** die Leiste: **„Authentication“** (Symbol oft ein Schloss) anklicken.
+4. Im Untermenü **„URL Configuration“** (oder unter Configuration **„URL Configuration“**) öffnen.
+5. **„Site URL“:** deine Haupt-Adresse der App eintragen, z. B. `https://deine-domain.de` (mit `https://`, ohne Pfad am Ende nötig).
+6. **„Redirect URLs“:** auf **„Add URL“** klicken und nacheinander (oder in einer Zeile, je nach Oberfläche) Einträge wie:
+   - `https://deine-domain.de/**`
+   - `https://www.deine-domain.de/**` (nur wenn du `www` wirklich nutzt)
+   - `https://*.deine-domain.de/**` (nur wenn Supabase Wildcards akzeptiert – sonst pro Markt eine Zeile, z. B. `https://angerbogen.deine-domain.de/**`)
+7. **Speichern** (falls ein Save-Button angezeigt wird).
 
 Bei Problemen mit OAuth/Magic-Link in der Supabase-Doku zu **Redirect URL Whitelist** nachlesen.
 
@@ -77,14 +129,30 @@ Bei Problemen mit OAuth/Magic-Link in der Supabase-Doku zu **Redirect URL Whitel
 
 ## 5. Rollout testen (Handy, neuer Tab), ggf. Token rotieren
 
-**Nach dem ersten erfolgreichen Deploy mit korrekter Domain:**
+**Wenn Teil A und B erledigt sind und der Markt eine Subdomain hat:**
 
-1. Im Browser die Verwaltung unter der **Produktions-URL** öffnen.
-2. **Administration → Kassenmodus:** prüfen, ob der angezeigte Link mit **`https://`** und eurer echten Domain beginnt (nicht `localhost`).
-3. **Vorschau (neuer Tab)** und **QR mit dem Handy** testen (gleiches WLAN oder Mobilfunk).
-4. Wenn zuvor falsche QR gedruckt wurden: **Neuen Link erzeugen** (rotiert den Einstiegs-Token) und **neuen QR** ausdrucken.
+1. Browser: **Produktions-URL** der App öffnen (z. B. `https://deine-domain.de`) und als Admin einloggen.
+2. Menü **„Administration“** → **„Kassenmodus“** öffnen.
+3. Prüfen: Der lange Link unter dem QR darf **nicht** `localhost` enthalten; er sollte mit `https://` und deiner Domain beginnen (z. B. `https://angerbogen.deine-domain.de/kasse/...`).
+4. Button **„Vorschau (neuer Tab)“** klicken – es muss die Kassen-Anmeldung erscheinen (nicht „Seite nicht erreichbar“).
+5. **Handy:** Kamera-App oder QR-Scanner – den **gedruckten oder Bildschirm-QR** scannen; gleicher Test wie Vorschau.
+6. Wenn noch ein alter QR im Umlauf ist: In der App **„Neuen Link erzeugen“** → **neuen QR** drucken oder PDF speichern (alter Token ist dann ungültig).
 
-**Hinweis:** Wenn die Oberfläche eine **rote Konfigurationswarnung** zum Kassen-Link zeigt, fehlt meist `VITE_APP_DOMAIN` im Production-Build oder die Domain passt nicht – erneut Schritt 1 prüfen und redeployen.
+**Hinweis:** Wenn die Oberfläche eine **rote Konfigurationswarnung** zum Kassen-Link zeigt, fehlt meist `VITE_APP_DOMAIN` im Production-Build oder der Redeploy war ohne die Variable – **Teil A** wiederholen, Redeploy **ohne** Build-Cache.
+
+---
+
+## Fehlersuche: Link sieht richtig aus, aber nicht erreichbar / 403
+
+| Symptom | Typische Ursache | Was tun |
+|--------|------------------|--------|
+| Im Kassenmodus steht z. B. `https://markt.fier-hub.de/kasse/…`, Browser: **nicht erreichbar** / DNS | **`*.fier-hub.de`** (Wildcard) fehlt in **Vercel → Settings → Domains** oder DNS zeigt nicht auf Vercel | Wildcard anlegen; Test: `https://test12345.fier-hub.de` muss dieselbe App laden (nicht DNS-Fehler). |
+| **403 Forbidden** (Vercel-Seite mit Fehler-ID) | **Deployment Protection** auf Preview-URLs; oder Domain gehört **einem anderen** Projekt | Kasse über **Production-Domain** (`https://www.fier-hub.de` …) testen. In Vercel prüfen: `www` und `*.fier-hub.de` diesem Projekt zugeordnet. |
+| Apex (`www.fier-hub.de`) geht, **Subdomain** nicht | Nur Apex angelegt, **kein** Wildcard | **`*.fier-hub.de`** ergänzen (Teil B). |
+| **Konsole:** 401 zu `site.webmanifest` | Geschütztes Preview-Deployment | Für den Login meist egal; Manifest wird nur eingebunden, wenn die Datei erreichbar ist ([`src/main.tsx`](../src/main.tsx)). |
+| Seite **„backt“** / hängt kurz | DNS-Propagation oder Zertifikat wird noch ausgestellt | Minuten warten; in Vercel **Domains** auf **Valid** / SSL warten. |
+
+**Hinweis:** Die App erzeugt nur die URL; **ob der Hostname im Internet existiert**, steuern **DNS und Vercel-Domains**.
 
 ---
 

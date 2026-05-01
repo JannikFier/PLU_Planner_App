@@ -9,7 +9,7 @@ import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useStoreAccessByUser } from '@/hooks/useStoreAccess'
 import { useAllStores } from '@/hooks/useStores'
 import { useCompanyById } from '@/hooks/useCompanies'
-import { buildStoreUrl } from '@/lib/subdomain'
+import { buildStoreUrl, normalizeViteAppDomain } from '@/lib/subdomain'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -90,7 +90,7 @@ export function AppHeader() {
   )
   const isSuperAdminGlobal = isSuperAdmin && !isSuperAdminStoreDetail && !isSuperAdminCompanyDetail
 
-  const appDomain = import.meta.env.VITE_APP_DOMAIN || 'localhost'
+  const appDomain = normalizeViteAppDomain(import.meta.env.VITE_APP_DOMAIN)
 
   // Verfuegbare Maerkte fuer den Markt-Switcher
   const accessibleStoreIds = userStoreAccess?.map(a => a.store_id) ?? []

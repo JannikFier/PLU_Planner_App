@@ -1,4 +1,4 @@
-import { buildStoreUrl, isReservedSubdomain, validateSubdomain } from '@/lib/subdomain'
+import { buildStoreUrl, isReservedSubdomain, normalizeViteAppDomain, validateSubdomain } from '@/lib/subdomain'
 
 /** Vite/Dev: buildStoreUrl liefert keinen Port — ohne :5173 schlaegt *.localhost fehl (Connection refused). */
 function mergePortFromCurrentOriginForLocalDev(marketBaseUrl: string, currentOrigin: string): string {
@@ -38,7 +38,8 @@ export function buildKioskEntranceUrl(params: {
   appDomain: string
   currentOrigin: string
 }): BuildKioskEntranceUrlResult {
-  const { token, storeSubdomain, appDomain, currentOrigin } = params
+  const { token, storeSubdomain, appDomain: rawAppDomain, currentOrigin } = params
+  const appDomain = normalizeViteAppDomain(rawAppDomain)
   const cleanToken = token.trim()
   if (!cleanToken) {
     return { url: '', usedSubdomainHost: false }
