@@ -9,7 +9,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   AlertCircle,
   Archive,
@@ -21,13 +20,14 @@ import {
   FileDown,
   Pencil,
   Megaphone,
-  Search,
   LayoutGrid,
   Info,
 } from 'lucide-react'
 
 // PLU-Komponenten
-import { PLUListPageActionsMenu, type PLUListPageActionMenuItem } from '@/components/plu/PLUListPageActionsMenu'
+import { MasterListPageHeader } from '@/components/plu/MasterListPageHeader'
+import { MasterListToolbar } from '@/components/plu/MasterListToolbar'
+import type { PLUListPageActionMenuItem } from '@/components/plu/PLUListPageActionsMenu'
 import { PLUTable, type PLUTableHandle } from '@/components/plu/PLUTable'
 import { PLUFooter } from '@/components/plu/PLUFooter'
 import { useRegisterKioskListFindInPage, useRegisterKioskListHeaderSummary, type KioskListHeaderSummary } from '@/contexts/KioskListFindContext'
@@ -37,6 +37,7 @@ const ExportPDFDialog = lazy(() =>
 )
 
 // Hooks
+import { useMasterListRouteContext } from '@/hooks/useMasterListRouteContext'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
 import { useVersions } from '@/hooks/useVersions'
@@ -84,18 +85,7 @@ export function MasterList({ mode }: MasterListProps) {
   const { versionId: snapshotVersionId } = useParams<{ versionId?: string }>()
   const isSnapshot = Boolean(snapshotVersionId)
   const queryClient = useQueryClient()
-  // Prefix aus aktueller URL (nicht aus Rolle), damit Super-Admin in User-Ansicht dort bleibt
-  const rolePrefix =
-    location.pathname.startsWith('/super-admin') ? '/super-admin'
-    : location.pathname.startsWith('/admin') ? '/admin'
-    : location.pathname.startsWith('/viewer') ? '/viewer'
-    : location.pathname.startsWith('/kiosk') ? '/kiosk'
-    : '/user'
-
-  const readOnlyListMode = mode === 'viewer' || mode === 'kiosk'
-
-  /** Kiosk nutzt nur die aktive KW (kein Archiv-URL): volle versions-Liste spart einen großen REST-Call. */
-  const kioskLiveSkipVersions = mode === 'kiosk' && !isSnapshot
+  const { rolePrefix, readOnlyListMode, kioskLiveSkipVersions } = useMasterListRouteContext(mode, isSnapshot)
 
   // Daten laden
   const { data: activeVersion, isLoading: versionLoading } = useActiveVersion()
@@ -553,65 +543,19 @@ export function MasterList({ mode }: MasterListProps) {
   return (
     <DashboardLayout hideHeader={mode === 'kiosk'}>
       <div className={mode === 'kiosk' ? 'space-y-2' : 'space-y-4'}>
-        {/* === Header: Schmal – kompakt (Titel | Aktionen-Menü) === */}
-        {mode !== 'kiosk' && (
-        <div className="lg:hidden flex items-center justify-between gap-3 min-w-0">
-          <h2
-            className="text-[15px] font-bold leading-snug tracking-tight min-w-0"
-            title="PLU Obst und Gemüse"
-          >
-            PLU Obst und Gemüse
-            {mode === 'admin' && (
-              <Badge variant="outline" className="ml-1.5 text-[10px] font-normal align-middle shrink-0">
-                {snapshotReadOnly ? 'Archiv' : 'Admin'}
-              </Badge>
-            )}
-          </h2>
-          {currentVersion && !isLoading && !hasNoVersion && !snapshotInvalid && (
-            <PLUListPageActionsMenu ariaLabel="Listen-Aktionen" items={obstMobileMenuItems} />
-          )}
-        </div>
-        )}
-
-        {/* === Header: Ab lg (breit) === */}
-        {mode !== 'kiosk' && (
-        <div className="hidden lg:flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">
-              PLU Obst und Gemüse
-              {mode === 'admin' && (
-                <Badge variant="outline" className="ml-2 text-xs font-normal align-middle">
-                  {snapshotReadOnly ? 'Archiv' : 'Admin'}
-                </Badge>
-              )}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {snapshotReadOnly
-                ? 'Eingespielter Listenstand dieser Kalenderwoche (nur Lesen).'
-                : `Aktuelle eingespielte Liste – ${
-                    mode === 'admin'
-                      ? 'verwalten und bearbeiten.'
-                      : 'deine PLU-Übersicht für Obst & Gemüse.'
-                  }`}
-            </p>
-          </div>
-
-          {mode === 'admin' && !snapshotReadOnly && (
-            <div className="flex shrink-0 items-center gap-2">
-              <Button
-                onClick={() => {
-                  closeObstListSearch()
-                  navigate('/super-admin/plu-upload')
-                }}
-                size="sm"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Neuer Upload
-              </Button>
-            </div>
-          )}
-        </div>
-        )}
+        <MasterListPageHeader
+          mode={mode}
+          snapshotReadOnly={snapshotReadOnly}
+          currentVersion={currentVersion}
+          isLoading={isLoading}
+          hasNoVersion={hasNoVersion}
+          snapshotInvalid={snapshotInvalid}
+          mobileMenuItems={obstMobileMenuItems}
+          onNeuerUploadClick={() => {
+            closeObstListSearch()
+            navigate('/super-admin/plu-upload')
+          }}
+        />
 
         {isSnapshot && resolvedVersion && (
           <Alert>
@@ -650,161 +594,22 @@ export function MasterList({ mode }: MasterListProps) {
 
         {/* === Toolbar (nicht Kiosk — Kontext steht in KioskLayout-Kopfzeile) === */}
         {currentVersion && !isLoading && !snapshotInvalid && mode !== 'kiosk' && (
-          <div
-            className="flex w-full flex-wrap items-center gap-2 lg:flex-nowrap lg:justify-between"
-            data-tour="obst-master-toolbar"
-          >
-            {/* Links: Suche + Infos (min-w-0 damit Text schrumpft statt Aktionen zu verdrängen) */}
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="shrink-0"
-                data-tour="masterlist-search"
-                data-plu-find-in-page-trigger
-                onClick={() => pluTableRef.current?.openFindInPage()}
-                aria-label="In Liste suchen"
-                title="In Liste suchen (PLU oder Name)"
-              >
-                <Search className="h-4 w-4" />
-              </Button>
-              {/* Anzeige-Infos: Sortierung, Darstellung (Stück/Gewicht), KW, Aktiv */}
-              <div
-                className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground lg:max-w-none"
-                data-tour="masterlist-context-line"
-              >
-                <ListFilter className="h-4 w-4 shrink-0" />
-                <span title="Layout-Sortierung">
-                  {sortMode === 'BY_BLOCK' ? 'Nach Warengruppen' : 'Alphabetisch (A–Z)'}
-                </span>
-                <span className="text-border">|</span>
-                <span title="Layout-Anzeige Stück/Gewicht">
-                  {displayMode === 'MIXED'
-                    ? 'Stück + Gewicht gemischt'
-                    : 'Nach Typ getrennt'}
-                </span>
-                <span className="text-border">|</span>
-                <span className="text-foreground font-medium" title="Stammdaten aus zuletzt eingespielter Liste (wechselt nur bei neuem Upload)">
-                  Liste {versionDisplayKwLabel}
-                </span>
-                {currentVersion.status === 'active' && (
-                  <Badge variant="default" className="text-xs">Aktiv</Badge>
-                )}
-                {currentVersion.status === 'frozen' && (
-                  <Badge variant="outline" className="text-xs">Archiv</Badge>
-                )}
-              </div>
-            </div>
-
-            {/* Rechts: Aktionen ab lg (eine Zeile, rechtsbündig) */}
-            <div className="hidden lg:flex shrink-0 flex-nowrap items-center gap-2" data-tour="masterlist-toolbar-actions">
-              {!readOnlyListMode && !snapshotReadOnly && (
-                <>
-                  {featuresCustomProducts && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    data-tour="masterlist-toolbar-eigene-produkte"
-                    onClick={() => {
-                      closeObstListSearch()
-                      const backTo = location.pathname + location.search
-                      navigate(`${rolePrefix}/custom-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Eigene Produkte
-                  </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    data-tour="masterlist-toolbar-ausgeblendete"
-                    onClick={() => {
-                      closeObstListSearch()
-                      const backTo = location.pathname + location.search
-                      navigate(`${rolePrefix}/hidden-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
-                    }}
-                  >
-                    <EyeOff className="h-4 w-4 mr-1" />
-                    Ausgeblendete
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    data-tour="masterlist-toolbar-werbung"
-                    onClick={() => {
-                      closeObstListSearch()
-                      const backTo = location.pathname + location.search
-                      navigate(`${rolePrefix}/offer-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
-                    }}
-                  >
-                    <Megaphone className="h-4 w-4 mr-1" />
-                    Werbung
-                  </Button>
-                </>
-              )}
-              {!readOnlyListMode && !snapshotReadOnly && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-tour="masterlist-toolbar-umbenennen"
-                  onClick={() => {
-                    closeObstListSearch()
-                    const backTo = location.pathname + location.search
-                    navigate(`${rolePrefix}/renamed-products?backTo=${encodeURIComponent(backTo)}`, { state: { backTo } })
-                  }}
-                >
-                  <Pencil className="h-4 w-4 mr-1" />
-                  Umbenennen
-                </Button>
-              )}
-              {sortMode === 'BY_BLOCK' && !readOnlyListMode && !snapshotReadOnly && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-tour="masterlist-toolbar-warengruppen"
-                    onClick={() => {
-                      closeObstListSearch()
-                      const backTo = location.pathname + location.search
-                      navigate(`${rolePrefix}/obst-warengruppen?backTo=${encodeURIComponent(backTo)}`, {
-                        state: { backTo },
-                      })
-                    }}
-                >
-                  <LayoutGrid className="h-4 w-4 mr-1" />
-                  Warengruppen
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                data-tour="masterlist-toolbar-pdf"
-                onClick={() => {
-                  closeObstListSearch()
-                  setShowPDFDialog(true)
-                }}
-              >
-                <FileDown className="h-4 w-4 mr-1" />
-                PDF
-              </Button>
-            </div>
-            {/* Viewer: PDF auf dem Handy ohne ⋮-Menü */}
-            {mode === 'viewer' && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0 lg:hidden"
-                onClick={() => {
-                  closeObstListSearch()
-                  setShowPDFDialog(true)
-                }}
-              >
-                <FileDown className="h-4 w-4 mr-1" />
-                PDF
-              </Button>
-            )}
-          </div>
+          <MasterListToolbar
+            mode={mode}
+            currentVersion={currentVersion}
+            sortMode={sortMode}
+            displayMode={displayMode}
+            versionDisplayKwLabel={versionDisplayKwLabel}
+            readOnlyListMode={readOnlyListMode}
+            snapshotReadOnly={snapshotReadOnly}
+            featuresCustomProducts={featuresCustomProducts}
+            rolePrefix={rolePrefix}
+            backTo={location.pathname + location.search}
+            navigate={navigate}
+            pluTableRef={pluTableRef}
+            onBeforeNavigate={closeObstListSearch}
+            onOpenPdfDialog={() => setShowPDFDialog(true)}
+          />
         )}
 
         {currentVersion &&

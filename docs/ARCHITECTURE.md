@@ -172,6 +172,7 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | `comparison-logic.ts` | KW-Vergleich (UNCHANGED, NEW, CHANGED, CONFLICT) |
 | `publish-version.ts` | Version veröffentlichen (freeze, insert, activate, version_notifications erstellen) |
 | `layout-engine.ts` | DisplayItem-Liste (Master + Custom − Hidden + Regeln); berücksichtigt **Markt-Overrides** (`nameBlockOverrides`, `storeBlockOrder`) |
+| `plu-table-rows.ts` | Reine Hilfen für die PLUTable-Zeilengeometrie (FlatRow, Buchstaben-/Block-Gruppen → Tabellenzeilen; kein React) |
 | `block-override-utils.ts` | Normalisierung `system_name`, effektive `block_id`, Sortierung Blöcke mit optionaler Markt-Reihenfolge |
 | `pdf-generator.ts` | **NEU (Runde 2)**: PDF-Export mit jsPDF (A4, Zwei-Spalten, Farben, Footer) |
 | `plu-helpers.ts` | PLU-spezifische Helper (Gruppierung, Block-Gruppierung, Statistiken) – jetzt generisch mit PLUItemBase |
@@ -198,7 +199,9 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 |-----------|-------------|
 | `StatusBadge` | PLU-Zelle mit farbigem Hintergrund je nach Status |
 | `KWSelector` | Dropdown zur KW-Auswahl (shadcn Select) |
-| `PLUTable` | Zwei-Spalten-Tabelle mit DisplayItem[], Checkboxen, Custom-Indikator |
+| `PLUTable` | Zwei-Spalten-Tabelle mit DisplayItem[], Checkboxen, Custom-Indikator (aufgeteilt: Shell in `PLUTable.tsx`, Geometrie in `src/lib/plu-table-rows.ts`, Spalten/Mobile/Layouts in `PluTable*.tsx`, Badges in `plu-table-inline-badges.tsx`; Details in [.cursor/rules/component-size-and-agents.mdc](../.cursor/rules/component-size-and-agents.mdc)) |
+| `MasterListPageHeader` / `MasterListToolbar` | Kopfzeile und Aktionsleiste der Obst-Masterliste (nur Präsentation + Callbacks) |
+| `BackshopMasterListPageHeader` / `BackshopMasterListToolbar` | Entsprechend für die Backshop-Masterliste |
 | `PLUFooter` | Erweiterte Stats (Gesamt, Neu, Geändert, Eigene, Ausgeblendet) |
 | `CustomProductDialog` | **NEU**: Dialog zum Hinzufügen eigener Produkte (Zod-Validierung) |
 | `ExportPDFDialog` | **NEU**: Dialog mit Vorschau-Infos vor PDF-Download |
@@ -234,7 +237,7 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | `src/pages/` | Seiten-Komponenten (1 Datei pro Route) |
 | `src/components/ui/` | shadcn/ui Basis-Komponenten (generiert, nicht manuell ändern) |
 | `src/components/layout/` | Layout-Wrapper (Header, Dashboard, ProtectedRoute) |
-| `src/components/plu/` | PLU-spezifische Komponenten (Tabelle, Dialoge, Upload) |
+| `src/components/plu/` | PLU-spezifische Komponenten (Tabelle, Dialoge, Upload); große Tabelle und Masterlisten-Toolbars sind in mehrere Dateien zerlegt (siehe [.cursor/rules/component-size-and-agents.mdc](../.cursor/rules/component-size-and-agents.mdc) Abschnitt „PLU-Tabelle und Masterlisten-Chrome“) |
 | `src/hooks/` | Custom Hooks (TanStack Query Wrapper) |
 | `src/contexts/` | AuthProvider – gemeinsamer Auth-State für die App |
 | `src/lib/` | Business-Logik, Helper-Funktionen, Konstanten |
@@ -256,3 +259,4 @@ Das Projekt wird auf **Vercel** gehostet:
 - Environment Variables werden in Vercel Settings gesetzt
 - Build-Befehl: `npm run build` → Output: `dist/`
 - Supabase Edge Functions werden separat über Supabase CLI deployed
+- **Markt-Subdomains, Wildcard-DNS, Kassen-QR und Supabase Redirect-URLs:** [DEPLOYMENT_DOMAINEN_UND_KASSE.md](DEPLOYMENT_DOMAINEN_UND_KASSE.md)

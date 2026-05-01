@@ -66,6 +66,28 @@ export function buildKioskEntranceUrl(params: {
   return { url: `${origin}${path}`, usedSubdomainHost: false }
 }
 
+/**
+ * true, wenn die Kassen-URL noch localhost / *.localhost als Host nutzt,
+ * die aktuelle Seite aber offenbar nicht lokal geladen wird.
+ * Typischer Grund: VITE_APP_DOMAIN fehlt im Production-Build (Fallback auf localhost).
+ */
+export function isKioskEntranceUrlMisdeployedForHostname(
+  entranceUrl: string,
+  pageHostname: string,
+): boolean {
+  if (!entranceUrl.trim()) return false
+  const host = pageHostname.toLowerCase()
+  const pageLooksLocal =
+    host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')
+  if (pageLooksLocal) return false
+  try {
+    const h = new URL(entranceUrl).hostname.toLowerCase()
+    return h === 'localhost' || h === '127.0.0.1' || h.endsWith('.localhost')
+  } catch {
+    return false
+  }
+}
+
 /** true, wenn Kassen-URL und aktuelle Seite dieselbe Origin haben (Session wird geteilt). */
 export function kioskUrlSharesOriginWithPage(kioskUrl: string, pageOrigin: string): boolean {
   if (!kioskUrl || !pageOrigin) return true

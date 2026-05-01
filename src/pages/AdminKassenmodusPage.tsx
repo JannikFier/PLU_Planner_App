@@ -5,7 +5,11 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useEffectiveListVisibility } from '@/hooks/useStoreListVisibility'
 import { supabase, invokeEdgeFunction } from '@/lib/supabase'
-import { buildKioskEntranceUrl, kioskUrlSharesOriginWithPage } from '@/lib/kiosk-entrance-url'
+import {
+  buildKioskEntranceUrl,
+  isKioskEntranceUrlMisdeployedForHostname,
+  kioskUrlSharesOriginWithPage,
+} from '@/lib/kiosk-entrance-url'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -301,6 +305,11 @@ export function AdminKassenmodusPage({ embedded = false }: { embedded?: boolean 
 
   const canUsePublicKiosk = kioskModeStoreOn && !visibilityLoading
 
+  const kioskUrlMisdeployed =
+    typeof window !== 'undefined' &&
+    Boolean(entranceUrl) &&
+    isKioskEntranceUrlMisdeployedForHostname(entranceUrl, window.location.hostname)
+
   const mainContent = (
     <div className="space-y-8 max-w-3xl">
         <div>
@@ -335,6 +344,21 @@ export function AdminKassenmodusPage({ embedded = false }: { embedded?: boolean 
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             ) : entranceQuery.data?.token ? (
               <>
+                {kioskUrlMisdeployed && (
+                  <Alert className="border-destructive/50 bg-destructive/10 text-destructive [&>svg]:text-destructive">
+                    <CircleAlert className="h-4 w-4" />
+                    <AlertTitle>Kassen-Link passt nicht zur Live-Domain</AlertTitle>
+                    <AlertDescription className="text-sm text-destructive/95 [&_strong]:text-destructive">
+                      Der Link nutzt noch <code className="rounded bg-background/80 px-1">localhost</code> – QR und
+                      Vorschau sind auf anderen Geräten nicht erreichbar. In{' '}
+                      <strong>Vercel → Environment Variables</strong> für Production{' '}
+                      <code className="rounded bg-background/80 px-1">VITE_APP_DOMAIN</code> auf eure Basis-Domain
+                      setzen (ohne <code className="rounded bg-background/80 px-1">https://</code>) und{' '}
+                      <strong>neu deployen</strong>. Wildcard-Domain und Supabase-URLs: siehe{' '}
+                      <span className="font-medium">docs/DEPLOYMENT_DOMAINEN_UND_KASSE.md</span> im Repository.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={copyUrl} disabled={!canUsePublicKiosk}>
                     <Copy className="h-4 w-4 mr-1" />

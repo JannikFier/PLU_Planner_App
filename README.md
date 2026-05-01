@@ -20,6 +20,7 @@ Webbasierte Verwaltung von wöchentlichen **Preis-Look-Up (PLU) Listen** für Ob
 - **`VITE_APP_DOMAIN`** (siehe `.env.example`): Basis-Domain ohne Protokoll (z. B. `example.com` oder für lokale Subdomain-Tests `localhost`). Mit **Markt-Subdomain** in der Datenbank bauen QR und Link `https://{subdomain}.{VITE_APP_DOMAIN}/kasse/{token}` – andere Origin als z. B. `https://app.example.com`, damit Kiosk-Login den Admin-Tab nicht ersetzt.
 - **DNS:** Wildcard `*.ihre-domain.de` auf dasselbe Deployment legen.
 - Ohne nutzbare Subdomain: Link nutzt die aktuelle Seiten-Adresse (gleiche Origin → Session teilt sich zwischen Tabs).
+- **Vercel / Produktion:** Schritt-für-Schritt-Anleitung in [docs/DEPLOYMENT_DOMAINEN_UND_KASSE.md](docs/DEPLOYMENT_DOMAINEN_UND_KASSE.md) (Umgebungsvariable, Wildcard-Domain, Stammdaten, Supabase Auth, Tests).
 
 ## Features
 

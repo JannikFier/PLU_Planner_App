@@ -18,6 +18,41 @@ Ziel: Neue Features sollen **nicht** unkontrolliert zu **Riesendateien** in `src
 - Vorschau-Bilder in **Listen, Tabellen, Raster** mit externen URLs: **`BackshopThumbnail`** ([src/components/plu/BackshopThumbnail.tsx](src/components/plu/BackshopThumbnail.tsx)) oder **`PluTableBackshopThumbnail`** ([src/components/plu/PluTableBackshopThumbnail.tsx](src/components/plu/PluTableBackshopThumbnail.tsx)) für die PLU-Tabelle – **keine** kopierten Roh-`<img>`-Blöcke für dasselbe Muster.
 - Ausnahmen: **LCP-kritische** Einzelbilder (z. B. Login-Markenlogo, Header-Logo) bewusst ohne `lazy` lassen – dort keine Listen-Thumbnails nachbauen.
 
+## PLU-Tabelle und Masterlisten-Chrome (nach Stufe 2)
+
+Neue UI für die große PLU-Tabelle und die Kopf-/Toolbar-Zonen der Masterlisten **nicht** wieder als Monolith in eine Datei schreiben. Stattdessen:
+
+**PLU-Tabelle (`PLUTable`)**
+
+| Thema | Datei |
+|-------|--------|
+| Shell (Find-in-Page, SEPARATED/MIXED, Orchestrierung) | [src/components/plu/PLUTable.tsx](src/components/plu/PLUTable.tsx) |
+| Öffentliche Typen (`FontSizes`, …) | [src/components/plu/plu-table-types.ts](src/components/plu/plu-table-types.ts) |
+| Reine Tabellen-Geometrie (FlatRow, buildFlatRows…, `isFlatRowMatch`) | [src/lib/plu-table-rows.ts](src/lib/plu-table-rows.ts) |
+| Inline-Badges / Hilfstexte | [src/components/plu/plu-table-inline-badges.tsx](src/components/plu/plu-table-inline-badges.tsx) |
+| Spalten-Rendering | [src/components/plu/PluTableColumn.tsx](src/components/plu/PluTableColumn.tsx) |
+| Mobile Backshop-Liste | [src/components/plu/PluTableBackshopMobileList.tsx](src/components/plu/PluTableBackshopMobileList.tsx) |
+| Row-by-Row-Tabelle | [src/components/plu/PluTableRowByRow.tsx](src/components/plu/PluTableRowByRow.tsx) |
+| Zwei-Spalten-Layout | [src/components/plu/PluTableTwoColumnLayout.tsx](src/components/plu/PluTableTwoColumnLayout.tsx) |
+
+**Obst-Masterliste (Seite bleibt dünn)**
+
+| Thema | Datei |
+|-------|--------|
+| Route-Kontext (`rolePrefix`, Lesemodus, Kiosk-Versions-Skip) | [src/hooks/useMasterListRouteContext.ts](src/hooks/useMasterListRouteContext.ts) |
+| Nur URL-Prefix (geteilt mit Backshop) | [src/hooks/useRolePrefixFromLocation.ts](src/hooks/useRolePrefixFromLocation.ts) |
+| Seitenkopf + schmales Menü | [src/components/plu/MasterListPageHeader.tsx](src/components/plu/MasterListPageHeader.tsx) |
+| Toolbar (Suche, Kontextzeile, Aktionen) | [src/components/plu/MasterListToolbar.tsx](src/components/plu/MasterListToolbar.tsx) |
+
+**Backshop-Masterliste**
+
+| Thema | Datei |
+|-------|--------|
+| Seitenkopf | [src/components/plu/BackshopMasterListPageHeader.tsx](src/components/plu/BackshopMasterListPageHeader.tsx) |
+| Toolbar inkl. Werbungs-KW-Zeile (internes Dropdown) | [src/components/plu/BackshopMasterListToolbar.tsx](src/components/plu/BackshopMasterListToolbar.tsx) |
+
+`src/lib/plu-table-rows.ts` importiert **keine** React-Komponenten (nur Types/Helper), um Zyklen zu vermeiden.
+
 ## Performance-Stufen
 
 - **Virtualisierung** langer Listen und großes Splitten von `PLUTable.tsx` / Masterlisten-Seiten sind **eigenständige Projekte** mit Tests (Find-in-Page, Mobile) – nicht „nebenbei“ beim nächsten kleinen Feature.

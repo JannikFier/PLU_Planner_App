@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { buildKioskEntranceUrl, kioskUrlSharesOriginWithPage } from '@/lib/kiosk-entrance-url'
+import {
+  buildKioskEntranceUrl,
+  isKioskEntranceUrlMisdeployedForHostname,
+  kioskUrlSharesOriginWithPage,
+} from '@/lib/kiosk-entrance-url'
 
 describe('buildKioskEntranceUrl', () => {
   it('nutzt Markt-Host bei gueltiger Subdomain', () => {
@@ -44,6 +48,35 @@ describe('buildKioskEntranceUrl', () => {
     })
     expect(r.usedSubdomainHost).toBe(false)
     expect(r.url).toBe('https://localhost:5173/kasse/x')
+  })
+})
+
+describe('isKioskEntranceUrlMisdeployedForHostname', () => {
+  it('true wenn Seite Production-artig aber URL *.localhost', () => {
+    expect(
+      isKioskEntranceUrlMisdeployedForHostname(
+        'http://angerbogen.localhost/kasse/tok',
+        'vierhub.de',
+      ),
+    ).toBe(true)
+  })
+
+  it('false wenn Seite lokal und URL localhost', () => {
+    expect(
+      isKioskEntranceUrlMisdeployedForHostname(
+        'http://angerbogen.localhost:5173/kasse/tok',
+        'localhost',
+      ),
+    ).toBe(false)
+  })
+
+  it('false wenn URL echte Domain', () => {
+    expect(
+      isKioskEntranceUrlMisdeployedForHostname(
+        'https://angerbogen.example.com/kasse/tok',
+        'app.vercel.app',
+      ),
+    ).toBe(false)
   })
 })
 
