@@ -1593,7 +1593,22 @@ export interface Database {
       }
       kiosk_list_registers: {
         Args: { p_token: string }
-        Returns: { id: string; display_label: string; sort_order: number }[]
+        Returns: {
+          id: string
+          display_label: string
+          sort_order: number
+          store_id: string
+          store_name: string
+          company_name: string
+        }[]
+      }
+      kiosk_resolve_register_auth: {
+        Args: { p_token: string; p_register_id: string }
+        Returns: { email: string }[]
+      }
+      kiosk_finalize_entrance_session: {
+        Args: { p_token: string }
+        Returns: undefined
       }
     }
     Enums: Record<string, never>

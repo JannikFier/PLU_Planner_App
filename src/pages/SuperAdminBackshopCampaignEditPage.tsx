@@ -6,6 +6,15 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Loader2, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -15,12 +24,17 @@ import {
 import {
   useBackshopOfferCampaignDetail,
   useUpdateBackshopOfferCampaignLines,
+  useDeleteBackshopOfferCampaign,
   type SaveCampaignLineInput,
 } from '@/hooks/useCentralOfferCampaigns'
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
 import type { MasterPluCandidate } from '@/lib/exit-offer-matching'
 import { formatKWLabel } from '@/lib/plu-helpers'
+import {
+  CENTRAL_OFFER_ADMIN_DELETE_DIALOG_TITLE,
+  centralOfferAdminDeleteDialogDescription,
+} from '@/lib/central-offer-admin-copy'
 
 type EditableRow = CampaignReviewRow & {
   createdManually: boolean
@@ -63,8 +77,10 @@ export function SuperAdminBackshopCampaignEditPage() {
     Number.isFinite(jahr) ? jahr : null,
   )
   const updateMutation = useUpdateBackshopOfferCampaignLines()
+  const deleteMutation = useDeleteBackshopOfferCampaign()
 
   const [rows, setRows] = useState<EditableRow[]>([])
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [prices, setPrices] = useState<Record<string, number>>({})
   const [purchasePrices, setPurchasePrices] = useState<Record<string, number | null>>({})
 
@@ -250,12 +266,12 @@ export function SuperAdminBackshopCampaignEditPage() {
               onChangePurchasePrice={onChangePurchasePrice}
               onAddRow={onAddRow}
               onRemoveRow={onRemoveRow}
-              disabled={updateMutation.isPending}
+              disabled={updateMutation.isPending || deleteMutation.isPending}
               emptyMessage={'Keine Zeilen – füge welche über „Zeile hinzufügen" hinzu.'}
             />
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={handleSave} disabled={updateMutation.isPending}>
+              <Button onClick={handleSave} disabled={updateMutation.isPending || deleteMutation.isPending}>
                 {updateMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -271,13 +287,61 @@ export function SuperAdminBackshopCampaignEditPage() {
               <Button
                 variant="outline"
                 onClick={() => navigate('/super-admin/backshop-versions')}
-                disabled={updateMutation.isPending}
+                disabled={updateMutation.isPending || deleteMutation.isPending}
               >
                 Abbrechen
               </Button>
+              {detail ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="ml-auto sm:ml-0"
+                  disabled={updateMutation.isPending || deleteMutation.isPending}
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  Diese Werbung löschen
+                </Button>
+              ) : null}
             </div>
           </CardContent>
         </Card>
+
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{CENTRAL_OFFER_ADMIN_DELETE_DIALOG_TITLE}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {centralOfferAdminDeleteDialogDescription(title)}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleteMutation.isPending}>Abbrechen</AlertDialogCancel>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deleteMutation.isPending}
+                onClick={async () => {
+                  try {
+                    await deleteMutation.mutateAsync({ kwNummer: kw, jahr })
+                    setDeleteDialogOpen(false)
+                    navigate('/super-admin/backshop-versions')
+                  } catch {
+                    /* Fehler-Toast in der Mutation */
+                  }
+                }}
+              >
+                {deleteMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 inline animate-spin" />
+                    Löschen…
+                  </>
+                ) : (
+                  'Löschen'
+                )}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   )

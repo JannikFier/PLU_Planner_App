@@ -338,6 +338,27 @@ export function pickCampaignTargetWeekFromOptions(
 }
 
 /**
+ * Stellt sicher, dass (kw, year) in der erlaubten Upload-KW-Liste vorkommt.
+ * Exakter Treffer bevorzugt; sonst die späteste Option in der Liste (wie pickCampaignTargetWeekFromOptions-Fallback).
+ */
+export function clampCampaignWeekToOptions(
+  weekOptions: ReadonlyArray<{ kw: number; year: number }>,
+  kw: number,
+  year: number,
+): { kw: number; year: number } {
+  if (weekOptions.length === 0) return { kw, year }
+  const exact = weekOptions.find((o) => o.kw === kw && o.year === year)
+  if (exact) return { kw: exact.kw, year: exact.year }
+  let latestInList: { kw: number; year: number } | null = null
+  for (const o of weekOptions) {
+    if (!latestInList || compareIsoWeekPair(o.kw, o.year, latestInList.kw, latestInList.year) > 0) {
+      latestInList = { kw: o.kw, year: o.year }
+    }
+  }
+  return latestInList ?? { kw, year }
+}
+
+/**
  * Kurzlabel für die **aktuelle ISO-Kalenderwoche** (Werbung, Angebote, „heute“).
  * Unabhängig davon, in welcher KW die PLU-Liste zuletzt eingespielt wurde.
  */

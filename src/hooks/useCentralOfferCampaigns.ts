@@ -266,6 +266,38 @@ export async function fetchBackshopOfferCampaignSlots(): Promise<Array<{ kw: num
   return out
 }
 
+/** Obst: Wochenwerbung + 3-Tagespreis für die KW jeweils mit mind. einer zugeordneten PLU (nicht nur unassigned). */
+export async function obstCentralOrdersatzPackageCompleteForKwYear(
+  kw: number,
+  jahr: number,
+): Promise<boolean> {
+  const kinds = ['ordersatz_week', 'ordersatz_3day'] as const
+  for (const campaign_kind of kinds) {
+    const camps = await queryRest<ObstOfferCampaign[]>(`obst_offer_campaigns`, {
+      select: 'id',
+      kw_nummer: `eq.${kw}`,
+      jahr: `eq.${jahr}`,
+      campaign_kind: `eq.${campaign_kind}`,
+      limit: '1',
+    })
+    const id = camps?.[0]?.id
+    if (!id) return false
+    const lines = await queryRest<Array<{ plu: string | null; origin: string | null }>>(
+      `obst_offer_campaign_lines`,
+      {
+        select: 'plu,origin',
+        campaign_id: `eq.${id}`,
+        limit: '8000',
+      },
+    )
+    const hasAssigned = (lines ?? []).some(
+      (l) => l.plu != null && String(l.plu).trim() !== '' && l.origin !== 'unassigned',
+    )
+    if (!hasAssigned) return false
+  }
+  return true
+}
+
 /** Distinct KW/Jahr mit Obst-Zentralwerbung (leichtgewichtig für Upload-Vorauswahl). */
 export async function fetchObstOfferCampaignSlots(): Promise<Array<{ kw: number; jahr: number }>> {
   const rows = await queryRest<Array<{ kw_nummer: number; jahr: number }>>('obst_offer_campaigns', {
@@ -443,6 +475,66 @@ export function useSaveObstOfferCampaign() {
       queryClient.invalidateQueries({ queryKey: ['obst-offer-campaigns-admin'] })
       queryClient.invalidateQueries({ queryKey: ['obst-offer-campaign-detail'] })
       toast.success('Zentrale Werbung (Obst/Gemüse) gespeichert')
+    },
+    onError: (err) => {
+      toast.error(`Fehler: ${formatError(err)}`)
+    },
+  })
+}
+
+/** Nur Upload-UI-Kampagnenarten (kein exit). */
+export type DeletableObstCentralCampaignKind = 'ordersatz_week' | 'ordersatz_3day'
+
+/** Super-Admin: eine Obst-Zentralwerbung (Woche oder 3-Tage) für KW komplett löschen. */
+export function useDeleteObstOfferCampaign() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (payload: {
+      kwNummer: number
+      jahr: number
+      campaignKind: DeletableObstCentralCampaignKind
+    }) => {
+      const { error } = await supabase
+        .from('obst_offer_campaigns')
+        .delete()
+        .eq('kw_nummer', payload.kwNummer)
+        .eq('jahr', payload.jahr)
+        .eq('campaign_kind', payload.campaignKind)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['obst-offer-campaign'] })
+      queryClient.invalidateQueries({ queryKey: ['obst-offer-campaign-slots'] })
+      queryClient.invalidateQueries({ queryKey: ['obst-offer-campaigns-admin'] })
+      queryClient.invalidateQueries({ queryKey: ['obst-offer-campaign-detail'] })
+      toast.success('Werbung gelöscht')
+    },
+    onError: (err) => {
+      toast.error(`Fehler: ${formatError(err)}`)
+    },
+  })
+}
+
+/** Super-Admin: Backshop-Zentralwerbung für eine KW komplett löschen (eine Kampagne pro KW). */
+export function useDeleteBackshopOfferCampaign() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (payload: { kwNummer: number; jahr: number }) => {
+      const { error } = await supabase
+        .from('backshop_offer_campaigns')
+        .delete()
+        .eq('kw_nummer', payload.kwNummer)
+        .eq('jahr', payload.jahr)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaign'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaign-slots'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaigns-admin'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaign-detail'] })
+      toast.success('Werbung gelöscht')
     },
     onError: (err) => {
       toast.error(`Fehler: ${formatError(err)}`)
@@ -783,6 +875,19 @@ export function useUpdateObstOfferCampaignLines() {
       })
       let campaignId = existing?.[0]?.id ?? null
 
+      if (payload.lines.length === 0) {
+        if (campaignId) {
+          const { error: delLines } = await supabase
+            .from('obst_offer_campaign_lines')
+            .delete()
+            .eq('campaign_id', campaignId)
+          if (delLines) throw delLines
+          const { error: delCamp } = await supabase.from('obst_offer_campaigns').delete().eq('id', campaignId)
+          if (delCamp) throw delCamp
+        }
+        return
+      }
+
       if (campaignId) {
         const { error: delErr } = await supabase
           .from('obst_offer_campaign_lines')
@@ -812,8 +917,6 @@ export function useUpdateObstOfferCampaignLines() {
         campaignId = (camp as { id: string }).id
       }
 
-      if (payload.lines.length === 0) return
-
       const lineRows = payload.lines.map((l, i) => ({
         campaign_id: campaignId!,
         plu: l.plu,
@@ -827,12 +930,12 @@ export function useUpdateObstOfferCampaignLines() {
       const { error: lineErr } = await supabase.from('obst_offer_campaign_lines').insert(lineRows as never[])
       if (lineErr) throw lineErr
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['obst-offer-campaign'] })
       queryClient.invalidateQueries({ queryKey: ['obst-offer-campaign-slots'] })
       queryClient.invalidateQueries({ queryKey: ['obst-offer-campaigns-admin'] })
       queryClient.invalidateQueries({ queryKey: ['obst-offer-campaign-detail'] })
-      toast.success('Werbung aktualisiert')
+      toast.success(variables.lines.length === 0 ? 'Werbung entfernt' : 'Werbung aktualisiert')
     },
     onError: (err) => {
       toast.error(`Fehler: ${formatError(err)}`)

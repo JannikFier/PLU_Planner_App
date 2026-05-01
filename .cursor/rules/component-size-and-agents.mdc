@@ -1,0 +1,26 @@
+---
+description: Seitengröße, Vermeidung von Monolithen, zentrale Bild-Thumbnails – Konventionen für neue Features und Agenten
+alwaysApply: true
+---
+
+# Komponenten-Größe und nachhaltige Struktur
+
+Ziel: Neue Features sollen **nicht** unkontrolliert zu **Riesendateien** in `src/pages/` oder `src/components/plu/` anwachsen.
+
+## Seiten (`src/pages/*.tsx`)
+
+- **Nur Orchestrierung:** Daten-Hooks einbinden, Unterkomponenten zusammensetzen, **keine** neue Business-Logik (die gehört nach `src/lib/`).
+- **Größen-Leitplanken:** Liegt eine Seite **deutlich über ~400–500 Zeilen** oder enthält mehrere unabhängige UI-Blöcke → **Hooks** nach `src/hooks/` auslagern, **Ansichtsteile** nach `src/components/`.
+- **Keine neuen Monolithen:** Keine **600+ Zeilen** in einer neuen Datei ohne vorherige Aufteilung; lieber **mehrere kleine Änderungen** mit Review.
+
+## Listen und Backshop-Bilder
+
+- Vorschau-Bilder in **Listen, Tabellen, Raster** mit externen URLs: **`BackshopThumbnail`** ([src/components/plu/BackshopThumbnail.tsx](src/components/plu/BackshopThumbnail.tsx)) oder **`PluTableBackshopThumbnail`** ([src/components/plu/PluTableBackshopThumbnail.tsx](src/components/plu/PluTableBackshopThumbnail.tsx)) für die PLU-Tabelle – **keine** kopierten Roh-`<img>`-Blöcke für dasselbe Muster.
+- Ausnahmen: **LCP-kritische** Einzelbilder (z. B. Login-Markenlogo, Header-Logo) bewusst ohne `lazy` lassen – dort keine Listen-Thumbnails nachbauen.
+
+## Performance-Stufen
+
+- **Virtualisierung** langer Listen und großes Splitten von `PLUTable.tsx` / Masterlisten-Seiten sind **eigenständige Projekte** mit Tests (Find-in-Page, Mobile) – nicht „nebenbei“ beim nächsten kleinen Feature.
+- Nach Änderungen: `npm run build`, `npm run test:run`; vor Release siehe [docs/TESTING.md](docs/TESTING.md).
+
+Erganzt [code-quality.mdc](code-quality.mdc) (DRY, Ordnerzuordnung).

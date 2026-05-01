@@ -21,6 +21,10 @@ import { Label } from '@/components/ui/label'
 import { BackshopSourceBadge } from '@/components/backshop/BackshopSourceBadge'
 import { isBackshopExcelSource } from '@/lib/backshop-sources'
 import type { BackshopSource } from '@/types/database'
+import {
+  PICKER_STICKY_ACTION_BAR_BOTTOM_PADDING,
+  PickerStickyActionBar,
+} from '@/components/plu/PickerStickyActionBar'
 
 export interface HideBackshopPickerRow {
   id: string
@@ -170,7 +174,13 @@ export function HideBackshopPickerContent({
   }
 
   return (
-    <div className="flex flex-col min-h-0 flex-1 gap-4" data-tour="backshop-hidden-add-dialog">
+    <div
+      className={cn(
+        'flex min-h-0 flex-1 flex-col gap-4',
+        PICKER_STICKY_ACTION_BAR_BOTTOM_PADDING,
+      )}
+      data-tour="backshop-hidden-add-dialog"
+    >
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Produkte ausblenden (Backshop)</h2>
         <p className="text-sm text-muted-foreground mt-1">
@@ -419,7 +429,7 @@ export function HideBackshopPickerContent({
         )}
       </div>
 
-      <div className="flex flex-wrap justify-end gap-2 shrink-0 pt-2">
+      <PickerStickyActionBar>
         <Button variant="outline" type="button" onClick={onCancel}>
           Abbrechen
         </Button>
@@ -434,7 +444,7 @@ export function HideBackshopPickerContent({
             ? 'Wird ausgeblendet…'
             : `${selectedPLUs.size} Produkt${selectedPLUs.size !== 1 ? 'e' : ''} ausblenden`}
         </Button>
-      </div>
+      </PickerStickyActionBar>
     </div>
   )
 }

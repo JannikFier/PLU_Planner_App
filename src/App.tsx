@@ -26,6 +26,7 @@ import { CACHE_MAX_AGE_MS, queryClient } from '@/lib/query-client'
 import { shouldPersistQuery } from '@/lib/query-persist-allowlist'
 import { APP_BRAND_NAME } from '@/lib/brand'
 import { AppBrandLogo } from '@/components/layout/AppBrandLogo'
+import { KasseEntrancePage } from '@/pages/KasseEntrancePage'
 
 // Seiten – lazy geladen
 const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })))
@@ -67,9 +68,6 @@ const PickRenameObstPage = lazy(() => import('@/pages/PickRenameObstPage').then(
 const UserManagement = lazy(() => import('@/pages/UserManagement').then((m) => ({ default: m.UserManagement })))
 const AdminKassenmodusPage = lazy(() =>
   import('@/pages/AdminKassenmodusPage').then((m) => ({ default: m.AdminKassenmodusPage })),
-)
-const KasseEntrancePage = lazy(() =>
-  import('@/pages/KasseEntrancePage').then((m) => ({ default: m.KasseEntrancePage })),
 )
 const KioskLayout = lazy(() => import('@/pages/KioskLayout').then((m) => ({ default: m.KioskLayout })))
 const NotFound = lazy(() => import('@/pages/NotFound').then((m) => ({ default: m.NotFound })))

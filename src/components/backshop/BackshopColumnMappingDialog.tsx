@@ -104,6 +104,8 @@ function PreviewCell({
           src={imageUrl}
           alt=""
           className="max-h-16 max-w-[120px] rounded border border-border bg-muted/30 object-contain"
+          loading="lazy"
+          decoding="async"
         />
         {hasCellText(raw) ? <div className="min-w-0 break-words">{text}</div> : null}
       </div>

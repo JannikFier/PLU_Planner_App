@@ -159,6 +159,8 @@ export function ImageAssignmentDialog({
                               src={img.dataUrl}
                               alt={`Bild Zeile ${img.row}, Spalte ${img.col}`}
                               className="w-full aspect-square object-contain rounded"
+                              loading="lazy"
+                              decoding="async"
                             />
                             <span className="absolute bottom-0.5 right-0.5 text-[10px] text-muted-foreground bg-background/80 rounded px-0.5">
                               Z{img.row}S{img.col}

@@ -47,6 +47,7 @@ import { Badge } from '@/components/ui/badge'
 import { PreisBadge } from './PreisBadge'
 import { StatusBadge } from './StatusBadge'
 import { HighlightedSearchText } from './HighlightedSearchText'
+import { BACKSHOP_IMAGE_COL, PluTableBackshopThumbnail } from './PluTableBackshopThumbnail'
 import { BackshopSourceBadge } from '@/components/backshop/BackshopSourceBadge'
 import type { Block, StoreObstBlockOrder } from '@/types/database'
 import { sortBlocksWithStoreOrder } from '@/lib/block-override-utils'
@@ -143,44 +144,6 @@ export interface FontSizes {
 }
 
 const DEFAULT_FONT_SIZES: FontSizes = { header: 24, column: 16, product: 12 }
-
-/** Backshop: Bildspalte – auf schmalen Screens kleiner, damit PLU/Artikel/Preis nicht überlappen */
-const BACKSHOP_IMAGE_COL = 'w-[72px] sm:w-[96px] md:w-[128px]'
-const BACKSHOP_IMAGE_SIZE = 'h-14 w-14 sm:h-20 sm:w-20 md:h-24 md:w-24'
-/** object-contain = nichts abschneiden; crisp-edges = schärfere Skalierung */
-const BACKSHOP_IMAGE_CLASS = 'object-contain rounded border border-border [image-rendering:crisp-edges]'
-
-/** Mobile Backshop-Kartenliste (lg:hidden wenn breite Tabelle erst ab lg): größeres Bild ab sm/md */
-const BACKSHOP_IMAGE_SIZE_LIST = 'h-24 w-24'
-
-/** Zeigt Backshop-Bild oder Platzhalter; bei Lade fehler (kaputte URL) ebenfalls Platzhalter statt Broken-Icon. */
-function BackshopImage({ src, size = 'default' }: { src: string | null | undefined; size?: 'default' | 'list' }) {
-  const [loadFailed, setLoadFailed] = useState(false)
-  const showPlaceholder = !src || loadFailed
-  const box = size === 'list' ? BACKSHOP_IMAGE_SIZE_LIST : BACKSHOP_IMAGE_SIZE
-  if (showPlaceholder) {
-    return (
-      <span
-        className={cn(
-          'inline-flex items-center justify-center rounded border border-border bg-muted/50 text-muted-foreground text-xs',
-          box,
-        )}
-        data-tour="backshop-master-thumbnail"
-      >
-        –
-      </span>
-    )
-  }
-  return (
-    <img
-      src={src}
-      alt=""
-      className={cn(box, BACKSHOP_IMAGE_CLASS)}
-      data-tour="backshop-master-thumbnail"
-      onError={() => setLoadFailed(true)}
-    />
-  )
-}
 
 interface PLUTableProps {
   items: DisplayItem[]
@@ -427,7 +390,7 @@ function PLUColumn({
                 )}
                 {showImageColumn && (
                   <td className="px-1 py-1 align-middle border-l border-r border-border">
-                    <BackshopImage src={item.image_url} />
+                    <PluTableBackshopThumbnail src={item.image_url} />
                   </td>
                 )}
                 <td className="px-2" style={{ fontSize: fonts.product + 'px', paddingTop: '0.25em', paddingBottom: '0.25em' }}>
@@ -576,7 +539,7 @@ function BackshopPLUMobileList({
               </div>
             )}
             <div className="shrink-0 self-start">
-              <BackshopImage src={item.image_url} size="list" />
+              <PluTableBackshopThumbnail src={item.image_url} size="list" />
             </div>
             {/* Reihenfolge: Name → PLU → (Angebot + Preis eine Zeile) – nur mobile Kartenliste */}
             <div className="min-w-0 flex-1 flex flex-col gap-1">
@@ -767,7 +730,7 @@ function RowByRowTable({
                       className={cn('px-1 py-1 align-middle border-l border-r border-border', hlLeft && findHL)}
                       {...(!selectionMode && absLeft !== undefined && { 'data-row-index': absLeft })}
                     >
-                      <BackshopImage src={row.left.image_url} />
+                      <PluTableBackshopThumbnail src={row.left.image_url} />
                     </td>
                   )}
                   <td
@@ -845,7 +808,7 @@ function RowByRowTable({
                       className={cn('px-1 py-1 align-middle border-l-2 border-r border-border', hlRight && findHL)}
                       {...(!selectionMode && absRight !== undefined && { 'data-row-index': absRight })}
                     >
-                      <BackshopImage src={row.right.image_url} />
+                      <PluTableBackshopThumbnail src={row.right.image_url} />
                     </td>
                   )}
                   <td

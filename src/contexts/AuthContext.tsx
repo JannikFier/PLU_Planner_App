@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { toast } from 'sonner'
-import { supabase, clearSupabaseAuthStorage } from '@/lib/supabase'
+import { supabase, clearSupabaseAuthStorage, getSessionDeduped } from '@/lib/supabase'
 import { queryClient } from '@/lib/query-client'
 import { isAbortError } from '@/lib/error-utils'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
@@ -168,7 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const runGetSessionAndContinue = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session } } = await getSessionDeduped()
 
         if (session?.user && mounted) {
           const userId = session.user.id
@@ -203,9 +203,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               isLoading: false,
               error: null,
             }))
-          }
-
-          if (!displayedFromCacheRef.current) {
+            // Profil aus sessionStorage bereits angezeigt: Netz-Refresh darf Init nicht blockieren (sonst ~FETCH_PROFILE_TIMEOUT)
+            if (!displayedFromCacheRef.current) {
+              void fetchProfile(userId).then((fresh) => {
+                if (!mounted || !fresh) return
+                clearProfileErrorToast()
+                setState((prev) => ({
+                  ...prev,
+                  ...authReducer(session.user, session, fresh),
+                  isLoading: false,
+                  error: null,
+                }))
+              })
+            }
+          } else if (!displayedFromCacheRef.current) {
             let profile = await fetchProfile(userId)
             if (!profile) {
               try {

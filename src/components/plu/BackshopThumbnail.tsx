@@ -47,6 +47,8 @@ export function BackshopThumbnail({ src, size = 'md', className }: BackshopThumb
           src={src!}
           alt=""
           className="h-full w-full object-contain p-0.5 [image-rendering:crisp-edges]"
+          loading="lazy"
+          decoding="async"
           onError={() => setLoadFailed(true)}
         />
       ) : null}

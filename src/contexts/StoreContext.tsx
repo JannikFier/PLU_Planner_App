@@ -8,7 +8,7 @@ import {
   useMemo,
   type ReactNode,
 } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getSessionDeduped } from '@/lib/supabase'
 import { extractSubdomain, isAdminSubdomain } from '@/lib/subdomain'
 import { useAuth } from '@/hooks/useAuth'
 import type { Profile } from '@/types/database'
@@ -150,7 +150,7 @@ function storeRowToState(s: StoreRow): StoreState {
 /** Schreibt current_store_id in die DB (fire-and-forget). Fehler werden ignoriert – UI-State ist bereits gesetzt. */
 async function syncCurrentStoreToDb(storeId: string) {
   try {
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { session } } = await getSessionDeduped()
     if (!session?.user) return
 
     const { error } = await supabase
@@ -340,7 +340,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }))
         resolvedBySubdomain.current = true
         // Admin-Subdomain: Store wird durch Auth-basierten useEffect aufgeloest (user + profile)
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session } } = await getSessionDeduped()
         if (!session?.user) {
           setState(prev => ({ ...prev, isLoading: false }))
         }
@@ -414,7 +414,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       return
     }
-    if (resolvedBySubdomain.current && !state.isAdminDomain) return
+    // Subdomain hat den Markt gesetzt: Auth-Fallback nur ueberspringen, wenn der Client-State noch einen Markt hat.
+    // Sonst bleibt nach Logout (State-Reset) + Kiosk-Login currentStoreId leer → falsche/fehlende Listen-Sortierung.
+    if (resolvedBySubdomain.current && !state.isAdminDomain && state.currentStoreId) return
     if (fallbackTriggered.current && state.currentStoreId) return
     if (!resolvedBySubdomain.current || (state.isAdminDomain && !state.currentStoreId)) {
       fallbackTriggered.current = true

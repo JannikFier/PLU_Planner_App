@@ -1,7 +1,8 @@
 // Zentrale Excel-Lesehilfe mit ExcelJS (ersetzt xlsx für Tabellen-Lesen)
 // Liefert dasselbe Format wie früher sheet_to_json(..., { header: 1, defval: '' })
+// ExcelJS wird per dynamischem import() erst beim Einlesen einer Datei geladen (kleinere initiale Chunks).
 
-import ExcelJS from 'exceljs'
+import type { Cell, CellValue, Row, Worksheet } from 'exceljs'
 
 /**
  * Excel-Dateien können einen riesigen „Used Range“ (Formatierung bis Zeile 1M+) haben.
@@ -18,7 +19,7 @@ const LOAD_EXCEL_MAX_COLS = 96
  * RichText-Objekt, Hyperlink, Error). Ein stringifiziertes `{ formula: '...', result: 42 }`
  * würde sonst als `"[object Object]"` in Parser und Dialog-Vorschau landen. Daher hier zentral robust machen.
  */
-function normalizeCellValue(value: ExcelJS.CellValue): string {
+function normalizeCellValue(value: CellValue): string {
   if (value == null) return ''
   if (value instanceof Date) return value.toISOString()
   if (typeof value !== 'object') return String(value)
@@ -32,7 +33,7 @@ function normalizeCellValue(value: ExcelJS.CellValue): string {
   }
   // Formel / Shared-Formel: { formula|sharedFormula, result, ... } – Ergebnis bevorzugen
   if ('result' in obj && obj.result != null) {
-    return normalizeCellValue(obj.result as ExcelJS.CellValue)
+    return normalizeCellValue(obj.result as CellValue)
   }
   // Hyperlink: { hyperlink, text }
   if (typeof obj.text === 'string') return obj.text
@@ -49,13 +50,13 @@ function normalizeCellValue(value: ExcelJS.CellValue): string {
  * - Formeln: falls `value` kein Ergebnis liefert, ExcelJS-Getter `result` nutzen.
  * - Barcode-/Sonderdarstellung: Fallback auf `cell.text`, wenn `value` leer bleibt.
  */
-function cellToReadableString(cell: ExcelJS.Cell): string {
+function cellToReadableString(cell: Cell): string {
   const model = cell.master
   let s = normalizeCellValue(model.value)
   if (!s) {
     const res = model.result
     if (res !== undefined && res !== null) {
-      s = normalizeCellValue(res as ExcelJS.CellValue)
+      s = normalizeCellValue(res as CellValue)
     }
   }
   if (!s && typeof model.text === 'string') {
@@ -70,7 +71,7 @@ function cellToReadableString(cell: ExcelJS.Cell): string {
  * Nur Spalten 1…LOAD_EXCEL_MAX_COLS per `findCell` (legt keine neuen Zellen an).
  * `eachCell`/`forEach` über `_cells` kann bei sehr breiten Zeilen weiter extrem langsam sein.
  */
-function rowToCellValues(row: ExcelJS.Row): unknown[] {
+function rowToCellValues(row: Row): unknown[] {
   const cellValues: unknown[] = []
   let maxCol = 0
   for (let col = 1; col <= LOAD_EXCEL_MAX_COLS; col++) {
@@ -96,7 +97,7 @@ type WorksheetMerges = Record<string, { top: number; left: number; bottom: numbe
  * typisch bei horizontal gemergten Namens-Zellen (z. B. Z:AA), dann findet der Kassenblatt-Parser keinen Namen.
  * Nur leere Zielzellen werden befüllt, damit echte Nachbar-Inhalte nicht überschrieben werden.
  */
-function applyWorksheetMergesToRows(sheet: ExcelJS.Worksheet, rows: string[][]): void {
+function applyWorksheetMergesToRows(sheet: Worksheet, rows: string[][]): void {
   const merges = (sheet as unknown as { _merges?: WorksheetMerges })._merges
   if (!merges || typeof merges !== 'object') return
 
@@ -141,6 +142,7 @@ function applyWorksheetMergesToRows(sheet: ExcelJS.Worksheet, rows: string[][]):
  * Leere Zellen werden als '' geliefert. Kompatibel mit der bisherigen xlsx-basierten Parser-Logik.
  */
 export async function loadExcelSheetAsRows(file: File): Promise<unknown[][]> {
+  const { default: ExcelJS } = await import('exceljs')
   const arrayBuffer = await file.arrayBuffer()
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.load(arrayBuffer as never)

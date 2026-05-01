@@ -26,3 +26,9 @@ AuthProvider → StoreProvider (Store braucht Auth)
 
 - Login-Fehler: Echte Ursache anzeigen oder loggen, nicht immer „Zugangsdaten falsch“.
 - Logout: Optimistisch – sofort UI zurücksetzen, signOut im Hintergrund.
+
+## Kiosk und mehrere Browser-Tabs
+
+- **Auth-Speicher:** Der Browser-Client persistiert Supabase-JWTs in **`sessionStorage`** (nicht `localStorage`). **Tab schließen** = Session lokal weg; **neuer Tab** = eigenes `sessionStorage`, oft erneuter Login. Parallele Tabs teilen die Session nicht automatisch.
+- **Kasse vs. Verwaltung auf demselben Host:** Kassen-Anmeldung betrifft nur den jeweiligen Tab-Kontext; gleicher Host wie die Verwaltung bleibt möglich, aber getrennte Hosts sind klarer.
+- **Empfohlen:** Kassen-QR auf **Markt-Subdomain-URL** (`buildKioskEntranceUrl` in `src/lib/kiosk-entrance-url.ts`) und Verwaltung auf **anderem Host** (z. B. `app.…`) – getrennte Origins, getrenntes Storage pro Host, Admin-Alltag unabhängig vom Kassen-Tab.

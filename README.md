@@ -15,6 +15,12 @@ Webbasierte Verwaltung von wöchentlichen **Preis-Look-Up (PLU) Listen** für Ob
 | **Excel** | xlsx (SheetJS) |
 | **Hosting** | Vercel |
 
+### Kassenmodus und Markt-URLs
+
+- **`VITE_APP_DOMAIN`** (siehe `.env.example`): Basis-Domain ohne Protokoll (z. B. `example.com` oder für lokale Subdomain-Tests `localhost`). Mit **Markt-Subdomain** in der Datenbank bauen QR und Link `https://{subdomain}.{VITE_APP_DOMAIN}/kasse/{token}` – andere Origin als z. B. `https://app.example.com`, damit Kiosk-Login den Admin-Tab nicht ersetzt.
+- **DNS:** Wildcard `*.ihre-domain.de` auf dasselbe Deployment legen.
+- Ohne nutzbare Subdomain: Link nutzt die aktuelle Seiten-Adresse (gleiche Origin → Session teilt sich zwischen Tabs).
+
 ## Features
 
 - **Excel-Upload & KW-Vergleich** – Automatischer Abgleich neuer PLU-Daten mit der Vorwoche
@@ -67,8 +73,9 @@ npm run dev
    supabase functions deploy create-user
    supabase functions deploy reset-password
    supabase functions deploy delete-user
-   # Kassenmodus (Kiosk) – zwingend für Kasse anlegen / Login:
+   # Kassenmodus (Kiosk) – zwingend für Kasse anlegen; Login läuft per DB-RPC + Auth (Migration 082):
    supabase functions deploy create-kiosk-register
+   # kiosk-login: optional (Frontend nutzt RPCs); deploy nur falls ihr die Edge-Route noch braucht
    supabase functions deploy kiosk-login
    supabase functions deploy update-kiosk-register
    supabase functions deploy delete-kiosk-register

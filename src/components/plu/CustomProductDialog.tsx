@@ -388,13 +388,15 @@ export function CustomProductDialog({
                   )}
                 </>
               ) : (
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="z.B. Bohnen"
-                    value={newBlockName}
-                    onChange={(e) => setNewBlockName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateBlock()}
-                  />
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="min-w-0 flex-1 basis-full sm:basis-0">
+                    <Input
+                      placeholder="z.B. Bohnen"
+                      value={newBlockName}
+                      onChange={(e) => setNewBlockName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleCreateBlock()}
+                    />
+                  </div>
                   <Button
                     type="button"
                     size="sm"

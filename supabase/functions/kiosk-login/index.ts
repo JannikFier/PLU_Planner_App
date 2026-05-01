@@ -1,5 +1,6 @@
 // Oeffentlicher Kassen-Login: Einstiegs-Token + Kasse + Passwort → Supabase-Session (JWT).
-// Rate-Limit pro IP + Einstiegs-Token (einfacher In-Memory-Zaehler, pro Edge-Instanz).
+// HINWEIS (2026): Die App nutzt Client-seitig RPC kiosk_resolve_register_auth + signInWithPassword
+// (siehe Migration 082). Diese Edge Function bleibt optional fuer Rate-Limits/Monitoring; nicht mehr vom Frontend aufgerufen.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -78,13 +79,24 @@ serve(async (req) => {
       )
     }
 
-    const { data: kioskVis } = await supabaseAdmin
-      .from('store_list_visibility')
-      .select('is_visible')
-      .eq('store_id', entrance.store_id)
-      .eq('list_type', 'kiosk')
-      .maybeSingle()
+    const storeId = entrance.store_id as string
 
+    const [kioskVisRes, regRes] = await Promise.all([
+      supabaseAdmin
+        .from('store_list_visibility')
+        .select('is_visible')
+        .eq('store_id', storeId)
+        .eq('list_type', 'kiosk')
+        .maybeSingle(),
+      supabaseAdmin
+        .from('store_kiosk_registers')
+        .select('id, store_id, auth_user_id, active')
+        .eq('id', registerId)
+        .eq('store_id', storeId)
+        .maybeSingle(),
+    ])
+
+    const kioskVis = kioskVisRes.data
     if (kioskVis && kioskVis.is_visible === false) {
       return new Response(
         JSON.stringify({ error: 'Kassenmodus ist für diesen Markt nicht freigeschaltet.' }),
@@ -92,12 +104,7 @@ serve(async (req) => {
       )
     }
 
-    const { data: reg, error: rErr } = await supabaseAdmin
-      .from('store_kiosk_registers')
-      .select('id, store_id, auth_user_id, active')
-      .eq('id', registerId)
-      .eq('store_id', entrance.store_id)
-      .maybeSingle()
+    const { data: reg, error: rErr } = regRes
 
     if (rErr || !reg || !reg.active) {
       return new Response(
@@ -134,6 +141,12 @@ serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
+
+    // Markt der Einstiegs-URL immer im Profil setzen (RLS get_current_store_id + Client-Queries).
+    await supabaseAdmin
+      .from('profiles')
+      .update({ current_store_id: storeId })
+      .eq('id', reg.auth_user_id)
 
     return new Response(
       JSON.stringify({

@@ -36,7 +36,8 @@ sequenceDiagram
 
 **Was heute passiert:**
 
-1. **Auth:** Wenn beim Reload ein gültiges Profil + Session im `sessionStorage` liegen (`PROFILE_CACHE_KEY`, `SESSION_CACHE_KEY`), setzt der AuthContext sofort `isLoading: false` und zeigt die App mit gecachtem User/Profil. Der echte Session-Check (`getSession`) läuft danach (120ms oder `requestIdleCallback`). **Ohne** Cache: erst `getSession()`, dann `fetchProfile()` → spürbare Verzögerung und Fullscreen-Spinner.
+1. **Auth:** Wenn beim Reload ein gültiges Profil + Session im `sessionStorage` liegen (`PROFILE_CACHE_KEY`, `SESSION_CACHE_KEY`), setzt der AuthContext sofort `isLoading: false` und zeigt die App mit gecachtem User/Profil. Der echte Session-Check (`getSession`) läuft danach (120ms oder `requestIdleCallback`). **Ohne** Cache: erst `getSession()`, dann `fetchProfile()` → spürbare Verzögerung und Fullscreen-Spinner. Das **Supabase-JWT** liegt ebenfalls in `sessionStorage` (wie der Auth-UI-Cache): Reload **im selben Tab** behält die Anmeldung; **Tab schließen** beendet sie lokal.
+
 
 2. **Query-Cache:** Der TanStack-Query-Cache wird über `PersistQueryClientProvider` + `createSyncStoragePersister` in `sessionStorage` persistiert. Die **Wiederherstellung** (`persistQueryClientRestore`) läuft **asynchron** im `useEffect`. Bis sie fertig ist, haben Queries ggf. noch keine Daten → Komponenten zeigen Loading/Skeletons. Danach: Cache gefüllt, UI aktualisiert.
 
@@ -46,7 +47,9 @@ sequenceDiagram
 
 3. **Routen:** Die meisten Seiten sind per `lazy()` geladen. Beim ersten Aufruf einer Route wird der zugehörige JS-Chunk nachgeladen → zusätzliche kurze Verzögerung.
 
-4. **Prefetch:** `AuthPrefetch` startet nach erfolgreicher Auth (inkl. Cache-Pfad) Prefetch für MasterList, Layout, für **Admin** die Benutzerliste (`all-profiles`), für **Super-Admin** bei gesetztem Firmenkontext `company-profiles`, und für **Super-Admin** zusätzlich die **Firmenliste** (`companies`, `runSuperAdminCompaniesPrefetch`) sowie den Chunk `SuperAdminCompaniesPage`. Nützt nur, wenn Auth schnell „fertig“ ist und der Nutzer nicht schon auf eine leere/loading-Seite starrt.
+4. **Schwere Bibliotheken (PDF/Excel):** `jspdf` wird in `pdf-generator.ts` per dynamischem `import()` erst beim Erzeugen eines PDFs geladen; **ExcelJS** erst beim tatsächlichen Einlesen (`excel-read-helper`, `extractImagesFromBackshopExcel`). Dadurch bleibt der **erste** Download kleiner; beim ersten PDF/Excel kommt ein zusätzlicher Chunk (einmalig).
+
+5. **Prefetch:** `AuthPrefetch` startet nach erfolgreicher Auth (inkl. Cache-Pfad) Prefetch für MasterList, Layout, für **Admin** die Benutzerliste (`all-profiles`), für **Super-Admin** bei gesetztem Firmenkontext `company-profiles`, und für **Super-Admin** zusätzlich die **Firmenliste** (`companies`, `runSuperAdminCompaniesPrefetch`) sowie den Chunk `SuperAdminCompaniesPage`. Nützt nur, wenn Auth schnell „fertig“ ist und der Nutzer nicht schon auf eine leere/loading-Seite starrt.
 
 ---
 

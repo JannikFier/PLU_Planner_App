@@ -240,6 +240,10 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | `src/lib/` | Business-Logik, Helper-Funktionen, Konstanten |
 | `src/types/` | TypeScript Type-Definitionen |
 
+## Konventionen zu Dateigröße und neuen Features
+
+Damit die Codebasis wartbar bleibt und Agenten nicht wieder nur „alles in eine Datei“ packen: Leitplanken zu **Seitengröße**, **keinen Monolithen** und **zentrale Thumbnail-Komponenten** für Listen – siehe [.cursor/rules/component-size-and-agents.mdc](../.cursor/rules/component-size-and-agents.mdc). Kurz: Seiten nur verdrahten; Logik nach `src/lib/`; große Seiten in Hooks/Komponenten teilen; Backshop-Listenbilder über `BackshopThumbnail` / `PluTableBackshopThumbnail`.
+
 ## Reload und Ladeverhalten
 
 Damit Reloads (Command-R) schnell und flüssig wirken, gibt es einen eigenen Plan für Auth-Cache, Query-Persistenz, Prefetch und App-Shell: [RELOAD_UND_LAADEVERHALTEN.md](RELOAD_UND_LAADEVERHALTEN.md).

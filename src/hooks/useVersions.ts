@@ -9,14 +9,21 @@ import type { Version } from '@/types/database'
 
 const TOAST_DELAY_MS = 1500
 
+export interface UseVersionsOptions {
+  /** false z. B. Kiosk-Livemodus: nutzt nur version/active, spart große Liste. */
+  enabled?: boolean
+}
+
 /**
  * Lädt ALLE Versionen, sortiert nach Jahr + KW absteigend (neueste zuerst).
  * Nutzt queryRest (direkter REST-Call) statt supabase.from() um Hanging zu vermeiden.
  */
-export function useVersions() {
+export function useVersions(options?: UseVersionsOptions) {
+  const { enabled = true } = options ?? {}
   const result = useQuery<Version[]>({
     queryKey: ['versions'],
     staleTime: 2 * 60_000,
+    enabled,
     queryFn: async () => {
       const data = await queryRest<Version[]>('versions', {
         select: '*',

@@ -28,6 +28,8 @@ function TileImageArea({
           src={displaySrc!}
           alt=""
           className="absolute inset-0 m-auto h-full w-full max-h-full max-w-full object-contain p-2 [image-rendering:crisp-edges]"
+          loading="lazy"
+          decoding="async"
           onError={() => {
             if (!triedPreviewFallback && tile.previewThumbUrl && displaySrc !== tile.previewThumbUrl) {
               setDisplaySrc(tile.previewThumbUrl)

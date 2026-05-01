@@ -138,7 +138,7 @@ Erweitert Supabase Auth um App-spezifische Daten.
 |------|-----|-------------|
 | `id` | UUID (PK) | Referenz auf auth.users(id) |
 | `email` | TEXT | E-Mail-Adresse |
-| `personalnummer` | TEXT (UNIQUE) | 7-stellige Personalnummer |
+| `personalnummer` | TEXT (UNIQUE) | Reguläre Nutzer: Personalnummer; **Kiosk-Konten:** synthetisch `kiosk_<UUID ohne Bindestriche>` (Migration 079), damit UNIQUE nicht mit mehreren leeren Werten kollidiert |
 | `display_name` | TEXT | Anzeigename |
 | `role` | TEXT | `super_admin`, `admin`, `user`, `viewer` oder `kiosk` |
 | `must_change_password` | BOOLEAN | Einmalpasswort-Flag |
@@ -147,7 +147,7 @@ Erweitert Supabase Auth um App-spezifische Daten.
 | `last_login` | TIMESTAMPTZ | Letzter Login |
 | `current_store_id` | UUID (FK → stores) | Aktuell aktiver Markt des Users |
 
-**Trigger:** Bei neuem Auth-User wird automatisch ein Profil erstellt (`handle_new_user()`). Anonyme User werden ignoriert. E-Mail-Adressen `kiosk_reg_%@kiosk.pluplanner.invalid` erhalten automatisch `role = 'kiosk'` (Kassenkonten aus Edge Functions).
+**Trigger:** Bei neuem Auth-User wird automatisch ein Profil erstellt (`handle_new_user()`). Anonyme User werden ignoriert. E-Mail-Adressen, die dem Muster `kiosk_reg_<32hex>@example.com` (bzw. historisch `kiosk_reg_%@kiosk.pluplanner.invalid`) entsprechen, erhalten automatisch `role = 'kiosk'` und eine eindeutige `personalnummer` (Kassenkonten aus Edge Function `create-kiosk-register`).
 
 ### store_kiosk_entrances
 
@@ -176,7 +176,9 @@ Eine **Kasse** (Anzeigename, Reihenfolge) = ein `auth.users`-Konto (`auth_user_i
 | `auth_user_id` | UUID (FK → auth.users) | Login-Konto dieser Kasse |
 | `active` | BOOLEAN | |
 
-**RPC:** `kiosk_list_registers(p_token TEXT)` – liefert aktive Kassen für einen gültigen, nicht widerrufenen Einstiegs-Token (`SECURITY DEFINER`, `GRANT EXECUTE` für `anon` und `authenticated`).
+**RPC:** `kiosk_list_registers(p_token TEXT)` – liefert aktive Kassen inkl. **store_id** (Prefetch nach Login), **Markt- und Firmenname** (Anzeige auf `/kasse`) für einen gültigen, nicht widerrufenen Einstiegs-Token (`SECURITY DEFINER`, `GRANT EXECUTE` für `anon` und `authenticated`).
+
+**RPC (Anmeldung ohne Edge):** `kiosk_resolve_register_auth(p_token, p_register_id)` – liefert die **Profil-E-Mail** der Kasse für gültiges Token + Register (`anon`). `kiosk_finalize_entrance_session(p_token)` – setzt nach Login `profiles.current_store_id` aus dem Token, nur wenn `auth.uid()` eine aktive Kasse dieses Tokens ist (`authenticated`).
 
 ### versions
 
@@ -443,7 +445,9 @@ Getrennte Tabellen für die zweite PLU-Liste „Backshop“. Keine Änderung an 
 | `get_active_version()` | Gibt die aktive KW-Version (Obst/Gemüse) zurück |
 | `get_active_backshop_version()` | Gibt die aktive Backshop-Version zurück |
 | `handle_new_user()` | Trigger: erstellt automatisch Profil bei neuem Auth-User |
-| `kiosk_list_registers(p_token)` | Öffentliche Liste der Kassen-Labels/IDs für einen Einstiegs-Token (Kassenmodus) |
+| `kiosk_list_registers(p_token)` | Öffentliche Liste der Kassen (id, Label, Sortierung, **store_id**, **store_name**, **company_name**) für den Einstiegs-Token (Kassenmodus) |
+| `kiosk_resolve_register_auth(p_token, p_register_id)` | Interne Login-Mail für gültiges Token + Kasse (`anon`) – danach `signInWithPassword` im Client |
+| `kiosk_finalize_entrance_session(p_token)` | Nach Login: `current_store_id` aus Token setzen (`authenticated`) |
 
 ## SQL-Migrations
 
@@ -468,3 +472,8 @@ Die Datenbank wird über nummerierte SQL-Scripts aufgebaut:
 45. **060_publish_row_lock.sql** – Publish-Sperre: `acquire_publish_lock` / `release_publish_lock` nutzen die Tabelle `publish_connection_locks` (TTL 10 Minuten) statt Session-`pg_advisory_lock`, damit parallele HTTP-Requests über den PostgREST-Connection-Pool die Sperre zuverlässig freigeben (Migration 042 bleibt historisch; Funktionen werden ersetzt).
 46. **076_kiosk_mode.sql** – Rolle `kiosk`, Tabellen `store_kiosk_entrances` / `store_kiosk_registers`, RPC `kiosk_list_registers`, `is_viewer()` umfasst `kiosk`, Schreib-RLS wie für Viewer für `kiosk` geschlossen.
 47. **077_store_list_visibility_kiosk.sql** – `store_list_visibility.list_type = 'kiosk'` für alle Märkte; RPC `kiosk_list_registers` nur bei `is_visible`; bestehende Märkte erhalten Standard `kiosk` sichtbar.
+48. **078_kiosk_internal_email_example_com.sql** – Kiosk-E-Mail `@example.com`; `handle_new_user` per Regex.
+49. **079_kiosk_personalnummer_unique.sql** – Kiosk: eindeutige `personalnummer` (`kiosk_<uuid>`), behebt UNIQUE-Konflikt bei mehreren Kassen.
+50. **080_kiosk_list_registers_store_company.sql** – RPC `kiosk_list_registers` liefert zusätzlich `store_name` und `company_name` (Join auf `stores` / `companies`).
+51. **081_kiosk_list_registers_store_id.sql** – RPC liefert zusätzlich `store_id` (Client-Prefetch nach Kiosk-Login).
+52. **082_kiosk_client_auth_rpc.sql** – Index auf `store_kiosk_entrances(token)`; RPCs `kiosk_resolve_register_auth`, `kiosk_finalize_entrance_session` (Anmeldung ohne Edge Function).

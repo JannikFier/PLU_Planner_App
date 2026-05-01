@@ -85,7 +85,7 @@ export function ExportPDFDialog({
     setIsGenerating(true)
 
     try {
-      const doc = generatePDF({
+      const doc = await generatePDF({
         items,
         kwLabel,
         displayMode,
@@ -129,7 +129,7 @@ export function ExportPDFDialog({
     setIsGenerating(true)
 
     try {
-      const doc = generatePDF({
+      const doc = await generatePDF({
         items,
         kwLabel,
         displayMode,

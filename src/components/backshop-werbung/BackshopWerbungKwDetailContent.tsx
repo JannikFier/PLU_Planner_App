@@ -12,6 +12,7 @@ import type { BackshopWerbungWeekdayQuantity } from '@/types/database'
 import {
   useUpsertBackshopWerbungWeekdayQuantities,
 } from '@/hooks/useBackshopWerbungWeekdayQuantities'
+import { cn } from '@/lib/utils'
 
 function formatOptionalEur(v: number | null | undefined): string {
   if (v == null || Number.isNaN(Number(v))) return '—'
@@ -69,9 +70,18 @@ interface ArticleWeekdayEditorProps {
   plu: string
   stored: BackshopWerbungWeekdayQuantity | undefined
   readOnly: boolean
+  /** In breiter Desktop-Tabelle: festes 3×2-Raster statt 6 Spalten (verhindert gequetschte Mo–Sa-Zelle). */
+  layout?: 'responsive' | 'tableGrid'
 }
 
-function ArticleWeekdayEditor({ kw, jahr, plu, stored, readOnly }: ArticleWeekdayEditorProps) {
+function ArticleWeekdayEditor({
+  kw,
+  jahr,
+  plu,
+  stored,
+  readOnly,
+  layout = 'responsive',
+}: ArticleWeekdayEditorProps) {
   const mutation = useUpsertBackshopWerbungWeekdayQuantities()
   const [values, setValues] = useState<Record<WeekdayField, string>>({
     qty_mo: '',
@@ -121,16 +131,37 @@ function ArticleWeekdayEditor({ kw, jahr, plu, stored, readOnly }: ArticleWeekda
     setValues((prev) => ({ ...prev, [key]: raw }))
   }
 
+  const gridClass =
+    layout === 'tableGrid'
+      ? 'grid grid-cols-3 gap-2 w-full'
+      : 'grid grid-cols-3 sm:grid-cols-6 gap-1.5 sm:gap-2 w-full'
+
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 sm:gap-2 w-full">
+    <div className={gridClass}>
       {WEEKDAYS.map(({ key, label }) => (
-        <label key={key} className="flex flex-col gap-0.5 text-xs w-14 max-w-[4rem]">
-          <span className="text-muted-foreground font-medium text-center sm:text-left">{label}</span>
+        <label
+          key={key}
+          className={cn(
+            'flex flex-col gap-0.5 text-xs',
+            layout === 'tableGrid' ? 'min-w-0' : 'w-14 max-w-[4rem]',
+          )}
+        >
+          <span
+            className={cn(
+              'text-muted-foreground font-medium',
+              layout === 'tableGrid' ? 'text-center' : 'text-center sm:text-left',
+            )}
+          >
+            {label}
+          </span>
           <input
             type="text"
             inputMode="decimal"
             disabled={readOnly}
-            className="h-9 w-full max-w-[3.75rem] rounded-md border border-input bg-background px-1.5 text-sm text-center sm:text-left disabled:opacity-60"
+            className={cn(
+              'h-9 w-full rounded-md border border-input bg-background px-1.5 text-sm disabled:opacity-60',
+              layout === 'tableGrid' ? 'text-center min-w-0' : 'max-w-[3.75rem] text-center sm:text-left',
+            )}
             value={values[key]}
             onChange={(e) => onChange(key, e.target.value)}
             onBlur={() => persist()}
@@ -177,9 +208,9 @@ export function BackshopWerbungKwDetailContent({
 
   return (
     <>
-      {/* Desktop */}
-      <div className="hidden md:block overflow-x-auto rounded-lg border w-full" data-testid="backshop-werbung-detail-table-wrap">
-        <table className="w-full text-sm border-collapse">
+      {/* Breite Tabelle erst ab lg – darunter Karten (vermeidet „Zwickel“ zwischen Handy und Desktop). */}
+      <div className="hidden lg:block overflow-x-auto rounded-lg border w-full" data-testid="backshop-werbung-detail-table-wrap">
+        <table className="w-full min-w-[56rem] text-sm border-collapse">
           <thead>
             <tr className="border-b border-border/60 bg-muted/25">
               <th
@@ -226,7 +257,7 @@ export function BackshopWerbungKwDetailContent({
               </th>
               <th
                 rowSpan={2}
-                className="px-2 py-2 text-left font-medium align-middle min-w-[10.5rem] border-b border-border/80"
+                className="px-2 py-2 text-left font-medium align-middle w-[15rem] min-w-[15rem] border-b border-border/80"
               >
                 Mo–Sa
               </th>
@@ -294,13 +325,14 @@ export function BackshopWerbungKwDetailContent({
                 <td className={tdPrice('liste', 'second')}>{formatOptionalEur(line.list_vk)}</td>
                 <td className={tdPrice('aktion', 'first')}>{formatOptionalEur(line.purchase_price)}</td>
                 <td className={tdPrice('aktion', 'second')}>{formatOptionalEur(line.promo_price)}</td>
-                <td className="px-2 py-2 align-middle min-w-0">
+                <td className="px-2 py-2 align-middle w-[15rem] min-w-[15rem]">
                   <ArticleWeekdayEditor
                     kw={kw}
                     jahr={jahr}
                     plu={line.plu}
                     stored={weekdayMap.get(line.plu)}
                     readOnly={readOnlyWeekdays}
+                    layout="tableGrid"
                   />
                 </td>
                 <td className="px-2 py-2 align-middle text-center">
@@ -323,8 +355,8 @@ export function BackshopWerbungKwDetailContent({
         </table>
       </div>
 
-      {/* Mobile / Tablet */}
-      <div className="md:hidden space-y-4" data-testid="backshop-werbung-detail-cards">
+      {/* Tablet & schmaler Desktop bis lg: Kartenlayout */}
+      <div className="lg:hidden space-y-4" data-testid="backshop-werbung-detail-cards">
         {lines.map((line) => (
           <Card key={line.lineId} className="overflow-hidden shadow-sm">
             <CardContent className="p-4 space-y-3">
@@ -335,6 +367,8 @@ export function BackshopWerbungKwDetailContent({
                       src={line.image_url}
                       alt=""
                       className="max-h-full max-w-full w-auto h-auto object-contain [image-rendering:crisp-edges]"
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <ImageIcon className="h-10 w-10 text-muted-foreground" aria-hidden />

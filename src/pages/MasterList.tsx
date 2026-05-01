@@ -30,6 +30,7 @@ import {
 import { PLUListPageActionsMenu, type PLUListPageActionMenuItem } from '@/components/plu/PLUListPageActionsMenu'
 import { PLUTable, type PLUTableHandle } from '@/components/plu/PLUTable'
 import { PLUFooter } from '@/components/plu/PLUFooter'
+import { useRegisterKioskListFindInPage, useRegisterKioskListHeaderSummary, type KioskListHeaderSummary } from '@/contexts/KioskListFindContext'
 
 const ExportPDFDialog = lazy(() =>
   import('@/components/plu/ExportPDFDialog').then((m) => ({ default: m.ExportPDFDialog })),
@@ -93,9 +94,14 @@ export function MasterList({ mode }: MasterListProps) {
 
   const readOnlyListMode = mode === 'viewer' || mode === 'kiosk'
 
+  /** Kiosk nutzt nur die aktive KW (kein Archiv-URL): volle versions-Liste spart einen großen REST-Call. */
+  const kioskLiveSkipVersions = mode === 'kiosk' && !isSnapshot
+
   // Daten laden
   const { data: activeVersion, isLoading: versionLoading } = useActiveVersion()
-  const { data: versions = [], isLoading: versionsLoading } = useVersions()
+  const { data: versions = [], isLoading: versionsLoading } = useVersions({
+    enabled: !kioskLiveSkipVersions,
+  })
 
   const resolvedVersion = useMemo(
     () => (snapshotVersionId ? versions.find((v) => v.id === snapshotVersionId) : undefined),
@@ -153,8 +159,7 @@ export function MasterList({ mode }: MasterListProps) {
       : !isSnapshot && activeVersion
         ? activeVersion.jahr
         : calendarJahr
-  const currentKw = offerKw
-  const currentJahr = offerJahr
+
   const rawHiddenPluSet = useMemo(
     () => new Set(hiddenItems.map((h) => h.plu)),
     [hiddenItems],
@@ -273,8 +278,9 @@ export function MasterList({ mode }: MasterListProps) {
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
       versionKwNummer: version?.kw_nummer ?? 0,
       versionJahr: version?.jahr ?? now.getFullYear(),
-      currentKwNummer: currentKw,
-      currentJahr,
+      // Eigene Produkte: „Neu“-Dauer nach Kalender-KW, nicht nach Listen-KW (aktive Version kann schon KW+1 sein)
+      currentKwNummer: calendarKw,
+      currentJahr: calendarJahr,
       nameBlockOverrides,
       storeBlockOrder: storeObstBlockOrder,
       obstPrevManualPluSet: obstPrevManualPluSetForLayout,
@@ -304,8 +310,8 @@ export function MasterList({ mode }: MasterListProps) {
     sortMode,
     displayMode,
     listVersion,
-    currentKw,
-    currentJahr,
+    calendarKw,
+    calendarJahr,
     nameBlockOverrides,
     storeObstBlockOrder,
     obstPrevManualPluSetForLayout,
@@ -323,6 +329,16 @@ export function MasterList({ mode }: MasterListProps) {
       showWeekMonSat,
     )
   }, [listVersion, showWeekMonSat])
+
+  const kioskHeaderSummary = useMemo((): KioskListHeaderSummary | null => {
+    if (!currentVersion || !versionDisplayKwLabel.trim()) return null
+    return {
+      kwLine: versionDisplayKwLabel,
+      listStatus: currentVersion.status === 'frozen' ? 'frozen' : 'active',
+    }
+  }, [currentVersion, versionDisplayKwLabel])
+
+  useRegisterKioskListHeaderSummary(kioskHeaderSummary, mode === 'kiosk')
 
   const { displayItems: pdfDisplayItems, stats: pdfStats } = useMemo(() => {
     if (!pdfRawItems.length && !customProducts.length) {
@@ -347,8 +363,8 @@ export function MasterList({ mode }: MasterListProps) {
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
       versionKwNummer: pdfVersion?.kw_nummer ?? 0,
       versionJahr: pdfVersion?.jahr ?? now.getFullYear(),
-      currentKwNummer: currentKw,
-      currentJahr,
+      currentKwNummer: calendarKw,
+      currentJahr: calendarJahr,
       nameBlockOverrides,
       storeBlockOrder: storeObstBlockOrder,
       obstPrevManualPluSet: obstPrevManualPluSetForLayout,
@@ -377,8 +393,8 @@ export function MasterList({ mode }: MasterListProps) {
     sortMode,
     displayMode,
     pdfVersion,
-    currentKw,
-    currentJahr,
+    calendarKw,
+    calendarJahr,
     nameBlockOverrides,
     storeObstBlockOrder,
     obstPrevManualPluSetForLayout,
@@ -404,11 +420,16 @@ export function MasterList({ mode }: MasterListProps) {
 
   // Keine Version? Kurz-Hinweis statt endlos warten (nur Live-Liste)
   const hasNoVersion =
-    !isSnapshot && !versionLoading && !versionsLoading && !activeVersion && versions.length === 0
+    !isSnapshot &&
+    !versionLoading &&
+    (kioskLiveSkipVersions
+      ? !activeVersion
+      : !versionsLoading && !activeVersion && versions.length === 0)
 
   // Wenn Versionen existieren, aber keine aktive: neueste automatisch auf active setzen
   useEffect(() => {
     if (isSnapshot) return
+    if (kioskLiveSkipVersions) return
     if (versionLoading || versionsLoading || versions.length === 0) return
     const hasActive = versions.some((v) => v.status === 'active')
     if (hasActive) return
@@ -420,11 +441,15 @@ export function MasterList({ mode }: MasterListProps) {
         }
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : 'Aktive Version setzen fehlgeschlagen'))
-  }, [isSnapshot, versionLoading, versionsLoading, versions, queryClient])
+  }, [isSnapshot, kioskLiveSkipVersions, versionLoading, versionsLoading, versions, queryClient])
 
   // Tab wurde sichtbar: Browser throttelt Hintergrund-Tabs – Re-Render erzwingen,
   // damit bereits geladene Daten sofort angezeigt werden (sonst erst nach Klick).
   const pluTableRef = useRef<PLUTableHandle>(null)
+  const openKioskFindInPage = useCallback(() => {
+    pluTableRef.current?.openFindInPage()
+  }, [])
+  useRegisterKioskListFindInPage(openKioskFindInPage, mode === 'kiosk')
 
   /** Find-in-Page-Leiste schließen (z. B. vor Navigation oder PDF), Ref kann null sein. */
   const closeObstListSearch = useCallback(() => {
@@ -527,8 +552,9 @@ export function MasterList({ mode }: MasterListProps) {
 
   return (
     <DashboardLayout hideHeader={mode === 'kiosk'}>
-      <div className="space-y-4">
+      <div className={mode === 'kiosk' ? 'space-y-2' : 'space-y-4'}>
         {/* === Header: Schmal – kompakt (Titel | Aktionen-Menü) === */}
+        {mode !== 'kiosk' && (
         <div className="lg:hidden flex items-center justify-between gap-3 min-w-0">
           <h2
             className="text-[15px] font-bold leading-snug tracking-tight min-w-0"
@@ -545,8 +571,10 @@ export function MasterList({ mode }: MasterListProps) {
             <PLUListPageActionsMenu ariaLabel="Listen-Aktionen" items={obstMobileMenuItems} />
           )}
         </div>
+        )}
 
         {/* === Header: Ab lg (breit) === */}
+        {mode !== 'kiosk' && (
         <div className="hidden lg:flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
@@ -583,6 +611,7 @@ export function MasterList({ mode }: MasterListProps) {
             </div>
           )}
         </div>
+        )}
 
         {isSnapshot && resolvedVersion && (
           <Alert>
@@ -619,8 +648,8 @@ export function MasterList({ mode }: MasterListProps) {
           </Card>
         )}
 
-        {/* === Toolbar === */}
-        {currentVersion && !isLoading && !snapshotInvalid && (
+        {/* === Toolbar (nicht Kiosk — Kontext steht in KioskLayout-Kopfzeile) === */}
+        {currentVersion && !isLoading && !snapshotInvalid && mode !== 'kiosk' && (
           <div
             className="flex w-full flex-wrap items-center gap-2 lg:flex-nowrap lg:justify-between"
             data-tour="obst-master-toolbar"
@@ -747,7 +776,6 @@ export function MasterList({ mode }: MasterListProps) {
                   Warengruppen
                 </Button>
               )}
-              {mode !== 'kiosk' && (
               <Button
                 variant="outline"
                 size="sm"
@@ -760,7 +788,6 @@ export function MasterList({ mode }: MasterListProps) {
                 <FileDown className="h-4 w-4 mr-1" />
                 PDF
               </Button>
-              )}
             </div>
             {/* Viewer: PDF auf dem Handy ohne ⋮-Menü */}
             {mode === 'viewer' && (

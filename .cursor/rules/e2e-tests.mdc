@@ -9,6 +9,7 @@ alwaysApply: true
 
 - **Standard** (`npm run test:e2e`): Nur @smoke – Login, Redirects. Schnell, ohne .env.e2e. Für jeden Commit.
 - **Vollständig** (`npm run test:e2e:full`): Alle Tests inkl. @extended (Desktop-Chromium + `mobile-layout.spec.ts` auf **mobile-chromium** und **tablet-chromium**). Braucht .env.e2e. Vor Publish ausführen.
+- **Vollständig seriell** (`npm run test:e2e:full:serial`): wie oben, aber `--workers=1` – weniger parallele Supabase-Logins; bei „manuell ok, E2E hängt auf /login“ zum Gegencheck.
 - **Optional nur Mobile-Layout:** `npm run test:e2e:mobile` – Projekte `mobile-chromium` (iPhone 13) und `tablet-chromium` (iPad Pro 11), gleiche Scrollbreiten-Checks.
 
 ## Bei neuen Features

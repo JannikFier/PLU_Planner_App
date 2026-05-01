@@ -9,6 +9,7 @@ Diese Datei dient als zentrale Übersicht aller App-Bereiche und als Checkliste 
 - [ ] **E2E Standard:** `npm run test:e2e` – Smoke-Tests (Login, Redirects), ohne .env.e2e
 - [ ] **E2E Full (empfohlen vor Publish):** `npm run test:e2e:full` – alle Journeys, braucht .env.e2e mit Test-Accounts
 - [ ] **Manuelle Checkliste** unten pro Rolle durchgehen (mindestens Smoke)
+- [ ] **Nach Optimierungs-PRs** (Listen, PLU-Tabelle, Thumbnails, Scroll): kurz Obst- + Backshop-Liste scrollen; optional PDF-Stichprobe – siehe [TESTING.md – Optimierung und Regression vermeiden](TESTING.md#optimierung-und-regression-vermeiden)
 
 ---
 

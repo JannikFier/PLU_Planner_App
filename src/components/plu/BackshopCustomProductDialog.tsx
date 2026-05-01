@@ -25,6 +25,7 @@ import { useBackshopLayoutSettings } from '@/hooks/useBackshopLayoutSettings'
 import { useCreateBackshopBlock } from '@/hooks/useBackshopBlocks'
 import { useAuth } from '@/hooks/useAuth'
 import { uploadBackshopImage } from '@/lib/backshop-storage'
+import { toUserErrorMessage } from '@/lib/error-message'
 import { toast } from 'sonner'
 import { X, ArrowLeftRight, Camera } from 'lucide-react'
 import type { BackshopBlock } from '@/types/database'
@@ -162,8 +163,8 @@ export function BackshopCustomProductDialog({
       return
     }
 
+    let imageUrl: string
     try {
-      let imageUrl: string
       if (imageFile) {
         imageUrl = await uploadBackshopImage(imageFile, `custom/${user.id}`)
       } else if (imagePreview) {
@@ -173,7 +174,13 @@ export function BackshopCustomProductDialog({
         setErrorPopup('Bild ist Pflicht.')
         return
       }
+    } catch (e) {
+      console.error('[BackshopCustomProductDialog] Bild-Upload', e)
+      setErrorPopup(toUserErrorMessage(e))
+      return
+    }
 
+    try {
       await addProduct.mutateAsync({
         plu: plu.trim(),
         name: name.trim(),
@@ -182,8 +189,8 @@ export function BackshopCustomProductDialog({
         is_offer_sheet_test: offerSheetTest,
       })
       handleClose()
-    } catch (e) {
-      setErrorPopup(e instanceof Error ? e.message : 'Unbekannter Fehler')
+    } catch {
+      // Fehlermeldung: toast im Hook useAddBackshopCustomProduct (onError)
     }
   }, [plu, name, imageFile, imagePreview, blockId, sortMode, existingPLUs, user, addProduct, handleClose, offerSheetTest])
 
@@ -405,13 +412,15 @@ export function BackshopCustomProductDialog({
                   )}
                 </>
               ) : (
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="z.B. Brötchen"
-                    value={newBlockName}
-                    onChange={(e) => setNewBlockName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateBlock()}
-                  />
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="min-w-0 flex-1 basis-full sm:basis-0">
+                    <Input
+                      placeholder="z.B. Brötchen"
+                      value={newBlockName}
+                      onChange={(e) => setNewBlockName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleCreateBlock()}
+                    />
+                  </div>
                   <Button
                     type="button"
                     size="sm"

@@ -84,6 +84,7 @@ import { useStoreListCarryoverRows } from '@/hooks/useStoreListCarryover'
 import { carryoverBackshopRowToMasterItem } from '@/lib/carryover-master-snapshot'
 import { useBackshopPrevManualSupplementPluSet } from '@/hooks/usePrevManualSupplementPluSet'
 import { useBackshopLineVisibilityOverrides } from '@/hooks/useBackshopLineVisibilityOverrides'
+import { useRegisterKioskListFindInPage, useRegisterKioskListHeaderSummary, type KioskListHeaderSummary } from '@/contexts/KioskListFindContext'
 import { BACKSHOP_SOURCES, BACKSHOP_SOURCE_META, type BackshopExcelSource } from '@/lib/backshop-sources'
 
 /**
@@ -355,21 +356,6 @@ export function BackshopMasterList() {
   const effectiveWerbungEndJahr =
     previewForCampaign.mode === 'explicit' ? previewForCampaign.jahr : calendarJahr
 
-  const offerKw =
-    isSnapshot && resolvedBackshopVersion
-      ? resolvedBackshopVersion.kw_nummer
-      : !isSnapshot && activeVersion
-        ? activeVersion.kw_nummer
-        : calendarKw
-  const offerJahr =
-    isSnapshot && resolvedBackshopVersion
-      ? resolvedBackshopVersion.jahr
-      : !isSnapshot && activeVersion
-        ? activeVersion.jahr
-        : calendarJahr
-  const currentKw = offerKw
-  const currentJahr = offerJahr
-
   /** Nur KW nach der aktuellen Kalenderwoche, für die eine Werbung existiert (nach vorne wählen). */
   const forwardWerbungSlots = useMemo(() => {
     const filtered = offerSlots.filter(
@@ -435,8 +421,9 @@ export function BackshopMasterList() {
       bezeichnungsregeln,
       renamedItems,
       markYellowKwCount,
-      currentKwNummer: currentKw,
-      currentJahr,
+      // Eigene Produkte: „Neu“-Gelb nach Kalender-/Werbungs-Anker-KW, nicht nach reiner Listen-KW
+      currentKwNummer: calendarKw,
+      currentJahr: calendarJahr,
       nameBlockOverrides,
       storeBlockOrder: storeBackshopBlockOrder,
       productGroupByPluSource,
@@ -472,8 +459,8 @@ export function BackshopMasterList() {
     bezeichnungsregeln,
     renamedItems,
     markYellowKwCount,
-    currentKw,
-    currentJahr,
+    calendarKw,
+    calendarJahr,
     nameBlockOverrides,
     storeBackshopBlockOrder,
     productGroupByPluSource,
@@ -513,6 +500,18 @@ export function BackshopMasterList() {
     )
   }, [listVersion, showWeekMonSat])
 
+  const kioskBackshopHeaderSummary = useMemo((): KioskListHeaderSummary | null => {
+    if (!currentVersion) return null
+    const kw = versionDisplayKwLabelForPdf.trim()
+    if (!kw) return null
+    return {
+      kwLine: versionDisplayKwLabelForPdf,
+      listStatus: currentVersion.status === 'frozen' ? 'frozen' : 'active',
+    }
+  }, [currentVersion, versionDisplayKwLabelForPdf])
+
+  useRegisterKioskListHeaderSummary(kioskBackshopHeaderSummary, isKiosk)
+
   /** PDF-Titel/Dateiname: gleicher KW-Kontext wie Toolbar (inkl. gewählter Werbungs-KW). */
   const pdfContextKwLabel = useMemo(() => {
     if (!listVersion) return 'Backshop'
@@ -538,8 +537,8 @@ export function BackshopMasterList() {
       bezeichnungsregeln,
       renamedItems,
       markYellowKwCount,
-      currentKwNummer: currentKw,
-      currentJahr,
+      currentKwNummer: calendarKw,
+      currentJahr: calendarJahr,
       nameBlockOverrides,
       storeBlockOrder: storeBackshopBlockOrder,
       productGroupByPluSource,
@@ -566,8 +565,8 @@ export function BackshopMasterList() {
     bezeichnungsregeln,
     renamedItems,
     markYellowKwCount,
-    currentKw,
-    currentJahr,
+    calendarKw,
+    calendarJahr,
     nameBlockOverrides,
     storeBackshopBlockOrder,
     productGroupByPluSource,
@@ -594,6 +593,10 @@ export function BackshopMasterList() {
   )
 
   const pluTableRef = useRef<PLUTableHandle>(null)
+  const openKioskBackshopFind = useCallback(() => {
+    pluTableRef.current?.openFindInPage()
+  }, [])
+  useRegisterKioskListFindInPage(openKioskBackshopFind, isKiosk)
 
   const closeBackshopListSearch = useCallback(() => {
     pluTableRef.current?.closeFindInPage()
@@ -707,8 +710,9 @@ export function BackshopMasterList() {
 
   return (
     <DashboardLayout hideHeader={location.pathname.startsWith('/kiosk')}>
-      <div className="space-y-4" data-tour="backshop-master-page">
+      <div className={isKiosk ? 'space-y-2' : 'space-y-4'} data-tour="backshop-master-page">
         {/* === Header: Schmal – kurzer Titel + Aktionen-Menü === */}
+        {!isKiosk && (
         <div className="lg:hidden flex items-center justify-between gap-3 min-w-0">
           <h2 className="text-base font-bold leading-snug tracking-tight min-w-0" title="PLU-Liste Backshop">
             PLU Backshop
@@ -717,8 +721,10 @@ export function BackshopMasterList() {
             <PLUListPageActionsMenu ariaLabel="Listen-Aktionen" items={backshopMobileMenuItems} />
           )}
         </div>
+        )}
 
         {/* === Header: Ab lg (breit) === */}
+        {!isKiosk && (
         <div className="hidden lg:block space-y-1">
           <h2 className="text-2xl font-bold tracking-tight">PLU-Liste Backshop</h2>
           <p className="text-sm text-muted-foreground">
@@ -737,6 +743,7 @@ export function BackshopMasterList() {
             )}
           </p>
         </div>
+        )}
 
         {isSnapshot && resolvedBackshopVersion && (
           <Alert data-tour="backshop-master-version-banner">
@@ -773,11 +780,12 @@ export function BackshopMasterList() {
           </Card>
         )}
 
-        {/* === Toolbar: Zeile 1 Kontext, Zeile 2 Aktionen (≥ sm) === */}
-        {currentVersion && !isLoading && !hasNoVersion && !snapshotInvalid && (
+        {/* === Toolbar (nicht Kiosk) === */}
+        {currentVersion && !isLoading && !hasNoVersion && !snapshotInvalid && !isKiosk && (
           <div className="space-y-3" data-tour="backshop-master-toolbar">
             {/* Zeile 1: Liste, Werbung/KW, Status – eine klare Kontextzeile */}
             <div className="flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 lg:flex-nowrap lg:items-center lg:gap-2">
+              {!isKiosk && (
               <Button
                 type="button"
                 variant="outline"
@@ -791,6 +799,7 @@ export function BackshopMasterList() {
               >
                 <Search className="h-4 w-4" />
               </Button>
+              )}
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground lg:flex-nowrap lg:items-center lg:gap-x-2 lg:gap-y-0">
                 <ListFilter className="h-4 w-4 shrink-0" aria-hidden />
                 {werbungToolbarLayout && currentVersion ? (

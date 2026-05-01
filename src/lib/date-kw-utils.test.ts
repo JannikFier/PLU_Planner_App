@@ -13,6 +13,7 @@ import {
   getNextIsoWeekAfter,
   maxIsoWeekAmongCampaignSlots,
   pickCampaignTargetWeekFromOptions,
+  clampCampaignWeekToOptions,
   formatBackshopActiveListToolbarRange,
   formatIsoWeekMondayToSaturdayDe,
   formatKwLabelWithOptionalMonSatRange,
@@ -245,6 +246,20 @@ describe('date-kw-utils', () => {
         { kw: 11, year: 2026 },
       ]
       expect(pickCampaignTargetWeekFromOptions(early, { kw: 11, year: 2026 })).toEqual({ kw: 11, year: 2026 })
+    })
+  })
+
+  describe('clampCampaignWeekToOptions', () => {
+    const opts = [
+      { kw: 18, year: 2026 },
+      { kw: 19, year: 2026 },
+      { kw: 20, year: 2026 },
+    ]
+    it('gibt exakte KW zurück wenn in der Liste', () => {
+      expect(clampCampaignWeekToOptions(opts, 19, 2026)).toEqual({ kw: 19, year: 2026 })
+    })
+    it('gibt die späteste Option zurück wenn KW nicht in der Liste', () => {
+      expect(clampCampaignWeekToOptions(opts, 25, 2026)).toEqual({ kw: 20, year: 2026 })
     })
   })
 

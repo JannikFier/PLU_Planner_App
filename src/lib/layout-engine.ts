@@ -96,7 +96,7 @@ export function buildDisplayList(input: LayoutEngineInput): LayoutEngineOutput {
   const customWithImage = customProducts as Array<{ image_url?: string | null } & (typeof customProducts)[number]>
   customProducts.forEach((cp, idx) => {
     if (!masterPLUs.has(cp.plu)) {
-      // Status kalenderwochenbasiert (wie Master): Hinzugefüge-KW aus created_at, dann wie viele KW vergangen
+      // Neu-Gelb: Hinzufüge-KW aus created_at vs. Kalender-Referenz (currentKwNummer), markYellowKwCount
       const createdDate = new Date(cp.created_at)
       const { kw: addedKw, year: addedYear } = getKWAndYearFromDate(createdDate)
       const weeksSinceAdded = weeksBetweenIsoWeeks(
@@ -281,7 +281,7 @@ export interface BackshopDisplayListInput {
   bezeichnungsregeln?: BackshopBezeichnungsregelInput[]
   /** Globale Umbenennungen (überschreiben display_name, is_manually_renamed, image_url aus Master) */
   renamedItems?: BackshopRenamedItemInput[]
-  /** „Neu“-Gelb: Dauer an Kalender-KW ab created_at (Master + Eigene) */
+  /** „Neu“-Gelb für eigene Produkte: Dauer ab created_at; `currentKwNummer`/`currentJahr` = Kalender-Referenz (nicht Listen-KW). */
   markYellowKwCount: number
   currentKwNummer: number
   currentJahr: number

@@ -26,25 +26,8 @@ export default defineConfig(({ mode }) => {
       }
     : undefined
 
-  if (!supabaseTarget) {
-    console.warn(
-      '\n[Vite] VITE_SUPABASE_URL ist leer: Edge-Function-Proxy (/functions/v1) ist aus — POSTs liefern 404.\n',
-    )
-  }
-
   return {
-  plugins: [
-    react(),
-    tailwindcss(),
-    {
-      name: 'plu-log-functions-proxy',
-      configureServer() {
-        if (supabaseTarget) {
-          console.info(`[Vite] Edge-Functions-Proxy: /functions/v1 → ${supabaseTarget}`)
-        }
-      },
-    },
-  ],
+  plugins: [react(), tailwindcss()],
   server: {
     host: true,
     // Edge Functions: gleiche Origin wie die App → kein CORS; Weiterleitung an VITE_SUPABASE_URL

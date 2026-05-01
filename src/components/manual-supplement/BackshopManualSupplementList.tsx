@@ -174,6 +174,8 @@ export function BackshopManualSupplementList() {
                             src={row.image_url}
                             alt=""
                             className="h-10 w-10 rounded border object-contain bg-muted/30"
+                            loading="lazy"
+                            decoding="async"
                           />
                         ) : (
                           <span className="inline-flex h-10 w-10 items-center justify-center rounded border bg-muted/50 text-muted-foreground">

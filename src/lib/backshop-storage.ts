@@ -1,6 +1,7 @@
 // Backshop: Einzelbild-Upload in Storage (Eigene Produkte, Umbenennen)
 
 import { supabase } from '@/lib/supabase'
+import { normalizeImageFileForBackshopUpload } from '@/lib/image-exif-orientation'
 
 const BUCKET = 'backshop-images'
 /** Gültigkeit signierter URLs (1 Jahr) */
@@ -21,7 +22,8 @@ const EXT_BY_MIME: Record<string, string> = {
  * @returns Öffentliche oder signierte URL des hochgeladenen Bildes
  */
 export async function uploadBackshopImage(file: File, pathPrefix: string): Promise<string> {
-  const mime = file.type?.toLowerCase()
+  const toUpload = await normalizeImageFileForBackshopUpload(file)
+  const mime = (toUpload.type ?? '').toLowerCase()
   if (!ALLOWED_TYPES.includes(mime)) {
     throw new Error('Nur Bilddateien (JPEG, PNG, WebP, GIF) sind erlaubt.')
   }
@@ -29,7 +31,7 @@ export async function uploadBackshopImage(file: File, pathPrefix: string): Promi
   const unique = crypto.randomUUID()
   const path = `${pathPrefix}/${unique}.${ext}`
 
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+  const { error } = await supabase.storage.from(BUCKET).upload(path, toUpload, {
     contentType: mime,
     upsert: true,
   })

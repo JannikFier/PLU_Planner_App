@@ -5,6 +5,7 @@ import { supabase, queryRest, isTestModeActive } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { toast } from 'sonner'
+import { toUserErrorMessage } from '@/lib/error-message'
 import type { BackshopCustomProduct, Database } from '@/types/database'
 
 /** Alle Backshop-Custom-Products laden */
@@ -89,6 +90,10 @@ export function useAddBackshopCustomProduct() {
       }
       toast.success('Eigenes Produkt (Backshop) hinzugefügt')
     },
+    onError: (error) => {
+      console.error('[useAddBackshopCustomProduct]', error)
+      toast.error(`Fehler: ${toUserErrorMessage(error)}`)
+    },
   })
 }
 
@@ -130,7 +135,7 @@ export function useUpdateBackshopCustomProduct() {
       toast.success('Produkt aktualisiert')
     },
     onError: (error) => {
-      toast.error(`Fehler: ${error instanceof Error ? error.message : 'Unbekannt'}`)
+      toast.error(`Fehler: ${toUserErrorMessage(error)}`)
     },
   })
 }
@@ -164,7 +169,7 @@ export function useDeleteBackshopCustomProduct() {
       toast.success('Eigenes Produkt (Backshop) gelöscht')
     },
     onError: (error) => {
-      toast.error(`Fehler: ${error instanceof Error ? error.message : 'Unbekannt'}`)
+      toast.error(`Fehler: ${toUserErrorMessage(error)}`)
     },
   })
 }
@@ -200,7 +205,7 @@ export function usePromoteAllBackshopOfferSheetTests() {
       }
     },
     onError: (error) => {
-      toast.error(`Fehler: ${error instanceof Error ? error.message : 'Unbekannt'}`)
+      toast.error(`Fehler: ${toUserErrorMessage(error)}`)
     },
   })
 }

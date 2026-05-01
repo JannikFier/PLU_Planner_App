@@ -33,6 +33,7 @@ import type {
   StoreBackshopNameBlockOverride,
   BackshopBezeichnungsregel,
   Company,
+  StoreListVisibility,
 } from '@/types/database'
 
 /** Liest aktive Version-ID aus Cache (version/active oder aus versions-Liste). */
@@ -71,7 +72,12 @@ export function runMasterListPrefetch(queryClient: QueryClient): void {
       if (versionId) {
         void queryClient.prefetchQuery({
           queryKey: ['plu-items', versionId],
-          queryFn: () => queryRest<MasterPLUItem[]>('master_plu_items', { select: '*', version_id: `eq.${versionId}` }),
+          queryFn: () =>
+            queryRest<MasterPLUItem[]>('master_plu_items', {
+              select: '*',
+              version_id: `eq.${versionId}`,
+              order: 'system_name.asc',
+            }),
         })
       }
     })
@@ -79,6 +85,26 @@ export function runMasterListPrefetch(queryClient: QueryClient): void {
 
 /** Prefetch fuer marktspezifische Daten, sobald currentStoreId verfuegbar ist. */
 export function runStorePrefetch(queryClient: QueryClient, storeId: string): void {
+  void queryClient.prefetchQuery({
+    queryKey: ['store-list-visibility', storeId],
+    queryFn: async () => {
+      const data = await queryRest<StoreListVisibility[]>('store_list_visibility', {
+        select: '*',
+        store_id: `eq.${storeId}`,
+      })
+      return data ?? []
+    },
+  })
+  void queryClient.prefetchQuery({
+    queryKey: ['obst-offer-store-disabled', storeId],
+    queryFn: async () => {
+      const rows = await queryRest<{ plu: string }[]>('obst_offer_store_disabled', {
+        select: 'plu',
+        store_id: `eq.${storeId}`,
+      })
+      return (rows ?? []).map((r) => r.plu)
+    },
+  })
   void queryClient.prefetchQuery({
     queryKey: ['custom-products', storeId],
     queryFn: () => queryRest<CustomProduct[]>('custom_products', { select: '*', store_id: `eq.${storeId}` }),
@@ -233,6 +259,15 @@ export function runBackshopStorePrefetch(queryClient: QueryClient, storeId: stri
         store_id: `eq.${storeId}`,
       }),
   })
+}
+
+/**
+ * Nach erfolgreichem Kiosk setSession: Masterliste + Markt-Daten parallel in den Query-Cache legen,
+ * damit /kiosk/obst nicht erst alle REST-Calls sequentiell startet.
+ */
+export function runKioskPostLoginPrefetch(queryClient: QueryClient, storeId: string): void {
+  runMasterListPrefetch(queryClient)
+  runStorePrefetch(queryClient, storeId)
 }
 
 /** Prefetch für Benutzerverwaltung (nur Admin). RLS liefert nur Firmenkollegen; Super-Admin nutzt firmenbezogenen Prefetch in AuthPrefetch. */

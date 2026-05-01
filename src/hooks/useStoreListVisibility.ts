@@ -74,7 +74,7 @@ export function useUpdateStoreListVisibility() {
 
 /** Lädt die Bereichs-Sichtbarkeit für den aktuell eingeloggten User im aktuellen Store */
 export function useUserListVisibility() {
-  const { user } = useAuth()
+  const { user, isKiosk } = useAuth()
   const { currentStoreId } = useCurrentStore()
 
   return useQuery({
@@ -89,7 +89,8 @@ export function useUserListVisibility() {
       if (error) throw error
       return data as unknown as UserListVisibility[]
     },
-    enabled: !!user?.id && !!currentStoreId,
+    // Kiosk: keine per-User-Bereichszeilen in der DB → Request spart Latenz und „hängendes“ Layout.
+    enabled: !!user?.id && !!currentStoreId && !isKiosk,
     staleTime: 5 * 60_000,
   })
 }

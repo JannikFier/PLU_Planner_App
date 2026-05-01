@@ -22,6 +22,10 @@ import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { DialogPluHideColumnTable } from '@/components/plu/DialogPluHideColumnTable'
+import {
+  PICKER_STICKY_ACTION_BAR_BOTTOM_PADDING,
+  PickerStickyActionBar,
+} from '@/components/plu/PickerStickyActionBar'
 
 type TableRow = { type: 'header'; label: string } | { type: 'row'; left?: SearchableItem; right?: SearchableItem }
 
@@ -151,7 +155,10 @@ export function HideObstPickerContent({
 
   return (
     <div
-      className="flex flex-col min-h-0 flex-1 gap-4"
+      className={cn(
+        'flex min-h-0 flex-1 flex-col gap-4',
+        PICKER_STICKY_ACTION_BAR_BOTTOM_PADDING,
+      )}
       {...(dataTour ? { 'data-tour': dataTour } : {})}
     >
       <div>
@@ -514,7 +521,7 @@ export function HideObstPickerContent({
         )}
       </div>
 
-      <div className="flex flex-wrap justify-end gap-2 shrink-0 pt-2">
+      <PickerStickyActionBar>
         <Button variant="outline" type="button" onClick={onCancel}>
           Abbrechen
         </Button>
@@ -529,7 +536,7 @@ export function HideObstPickerContent({
             ? 'Wird ausgeblendet...'
             : `${selectedPLUs.size} Produkt${selectedPLUs.size === 1 ? '' : 'e'} ausblenden`}
         </Button>
-      </div>
+      </PickerStickyActionBar>
     </div>
   )
 }

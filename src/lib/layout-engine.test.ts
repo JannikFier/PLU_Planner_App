@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { buildBackshopDisplayList } from '@/lib/layout-engine'
+import { setISOWeek, setISOWeekYear, startOfISOWeek } from 'date-fns'
+import { buildBackshopDisplayList, buildDisplayList } from '@/lib/layout-engine'
 import type { BackshopMasterPLUItem } from '@/types/database'
 import type { OfferDisplayInfo } from '@/lib/offer-display'
 
@@ -323,5 +324,54 @@ describe('buildBackshopDisplayList line visibility overrides', () => {
 
     const keys = items.filter((i) => !i.is_custom).map((i) => `${i.plu}|${i.backshop_source ?? 'edeka'}`)
     expect(keys).not.toContain('1001|harry')
+  })
+})
+
+describe('buildDisplayList Obst: Neu-Gelb eigene Produkte vs. Referenz-KW', () => {
+  const mondayKw18_2026 = startOfISOWeek(setISOWeek(setISOWeekYear(new Date(2026, 3, 1), 2026), 18))
+
+  const customCreatedKw18 = {
+    id: 'c-neu-gelb',
+    plu: '99901',
+    name: 'Eigenes Testprodukt',
+    item_type: 'PIECE' as const,
+    preis: null,
+    block_id: null,
+    created_by: 'user-1',
+    created_at: mondayKw18_2026.toISOString(),
+    updated_at: mondayKw18_2026.toISOString(),
+    store_id: 'store-1',
+  }
+
+  const obstBase = {
+    masterItems: [],
+    customProducts: [customCreatedKw18],
+    hiddenPLUs: new Set<string>(),
+    bezeichnungsregeln: [] as { keyword: string; position: 'PREFIX' | 'SUFFIX'; case_sensitive: boolean }[],
+    blocks: [],
+    sortMode: 'ALPHABETICAL' as const,
+    displayMode: 'MIXED' as const,
+    markRedKwCount: 0,
+    markYellowKwCount: 1,
+    versionKwNummer: 19,
+    versionJahr: 2026,
+  }
+
+  it('Kalender-Referenz KW 18: gelb trotz Versions-KW 19 und mark_yellow_kw_count 1', () => {
+    const { items } = buildDisplayList({
+      ...obstBase,
+      currentKwNummer: 18,
+      currentJahr: 2026,
+    })
+    expect(items.find((i) => i.plu === '99901')?.status).toBe('NEW_PRODUCT_YELLOW')
+  })
+
+  it('Listen-KW 19 als Referenz mit markYellow 1: kein Gelb (früherer Fehler bei aktiver KW+1)', () => {
+    const { items } = buildDisplayList({
+      ...obstBase,
+      currentKwNummer: 19,
+      currentJahr: 2026,
+    })
+    expect(items.find((i) => i.plu === '99901')?.status).toBe('UNCHANGED')
   })
 })

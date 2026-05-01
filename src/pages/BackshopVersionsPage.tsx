@@ -29,7 +29,14 @@ import {
 import { Eye, Trash2, Loader2, ChevronRight, ChevronDown } from 'lucide-react'
 
 import { useBackshopVersions } from '@/hooks/useBackshopVersions'
-import { useBackshopOfferCampaignsAdminList } from '@/hooks/useCentralOfferCampaigns'
+import {
+  useBackshopOfferCampaignsAdminList,
+  useDeleteBackshopOfferCampaign,
+} from '@/hooks/useCentralOfferCampaigns'
+import {
+  CENTRAL_OFFER_ADMIN_DELETE_DIALOG_TITLE,
+  centralOfferAdminDeleteDialogDescription,
+} from '@/lib/central-offer-admin-copy'
 import {
   useBackshopVersionSourcePublish,
   indexBackshopSourcePublishByVersionAndSource,
@@ -446,14 +453,34 @@ export function BackshopVersionsPage() {
 function BackshopCampaignsCard() {
   const navigate = useNavigate()
   const { data: campaigns = [], isLoading } = useBackshopOfferCampaignsAdminList()
+  const deleteBackshopCampaign = useDeleteBackshopOfferCampaign()
+  const [campaignToDelete, setCampaignToDelete] = useState<{
+    kw: number
+    jahr: number
+    label: string
+  } | null>(null)
+
+  const handleDeleteCampaignConfirm = async () => {
+    if (!campaignToDelete) return
+    try {
+      await deleteBackshopCampaign.mutateAsync({
+        kwNummer: campaignToDelete.kw,
+        jahr: campaignToDelete.jahr,
+      })
+      setCampaignToDelete(null)
+    } catch (err) {
+      toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
+    }
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Alle Werbungen</CardTitle>
         <CardDescription>
-          Zentral hochgeladene Backshop-Werbungen pro Kalenderwoche. Hier kannst du nachträglich PLUs
-          korrigieren, „keine Zuordnung" setzen oder eigene Zeilen ergänzen.
+          Zentral hochgeladene Backshop-Werbungen pro Kalenderwoche. PLUs korrigieren, „keine Zuordnung“
+          setzen oder ergänzen; vorhandene Werbung kannst du hier auch vollständig löschen (Marktlisten und
+          PDFs ohne diese Markierung).
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -471,7 +498,7 @@ function BackshopCampaignsCard() {
             <TableHeader>
               <TableRow>
                 <TableHead>KW</TableHead>
-                <TableHead>Werbung</TableHead>
+                <TableHead>Wochenwerbung</TableHead>
                 <TableHead>Zuletzt aktualisiert</TableHead>
               </TableRow>
             </TableHeader>
@@ -480,18 +507,36 @@ function BackshopCampaignsCard() {
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{formatKWLabel(c.kw_nummer, c.jahr)}</TableCell>
                   <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        navigate(`/super-admin/backshop-versions/werbung/${c.kw_nummer}/${c.jahr}`)
-                      }
-                    >
-                      {c.assigned_lines} Artikel ansehen
-                      {c.total_lines > c.assigned_lines
-                        ? ` (+${c.total_lines - c.assigned_lines} offen)`
-                        : ''}
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          navigate(`/super-admin/backshop-versions/werbung/${c.kw_nummer}/${c.jahr}`)
+                        }
+                      >
+                        {c.assigned_lines} Artikel ansehen
+                        {c.total_lines > c.assigned_lines
+                          ? ` (+${c.total_lines - c.assigned_lines} offen)`
+                          : ''}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Wochenwerbung löschen"
+                        aria-label="Wochenwerbung löschen"
+                        disabled={deleteBackshopCampaign.isPending}
+                        onClick={() =>
+                          setCampaignToDelete({
+                            kw: c.kw_nummer,
+                            jahr: c.jahr,
+                            label: `Backshop-Wochenwerbung ${formatKWLabel(c.kw_nummer, c.jahr)}`,
+                          })
+                        }
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDate(c.created_at)}
@@ -501,6 +546,30 @@ function BackshopCampaignsCard() {
             </TableBody>
           </Table>
         )}
+        <AlertDialog
+          open={!!campaignToDelete}
+          onOpenChange={(open) => !open && setCampaignToDelete(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{CENTRAL_OFFER_ADMIN_DELETE_DIALOG_TITLE}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {campaignToDelete
+                  ? centralOfferAdminDeleteDialogDescription(campaignToDelete.label)
+                  : ''}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteCampaignConfirm}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Löschen
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   )

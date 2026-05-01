@@ -1,16 +1,44 @@
 import { readFileSync, existsSync } from 'node:fs'
+import { availableParallelism } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, devices } from '@playwright/test'
+
+/**
+ * Lokal: begrenzte Worker-Zahl → weniger gleichzeitige Supabase-Logins (Rate-Limits).
+ * Überschreiben: PLAYWRIGHT_WORKERS=<positive Zahl>. CI: immer 1.
+ */
+function resolvePlaywrightWorkers(): number {
+  if (process.env.CI) return 1
+  const raw = process.env.PLAYWRIGHT_WORKERS
+  if (raw !== undefined && raw.trim() !== '') {
+    const n = Number.parseInt(raw, 10)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  const cores = availableParallelism()
+  return Math.min(3, Math.max(1, cores))
+}
 
 // Optionale .env.e2e laden (Test-Accounts), siehe .env.e2e.example
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const envPath = join(__dirname, '.env.e2e')
 if (existsSync(envPath)) {
-  const content = readFileSync(envPath, 'utf8')
+  // UTF-8-BOM entfernen (sonst scheitert die erste Zeile beim Regex).
+  const content = readFileSync(envPath, 'utf8').replace(/^\uFEFF/, '')
   for (const line of content.split('\n')) {
-    const m = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/)
-    if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '').trim()
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const m = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/)
+    if (!m) continue
+    let value = m[2].trim()
+    const quoted = /^["']/.test(value)
+    value = value.replace(/^["']|["']$/g, '').trim()
+    // Wie dotenv: Nur unquoted: trailing ` # Kommentar` abschneiden (nicht `foo#bar` ohne Leerzeichen).
+    if (!quoted) {
+      const commentIdx = value.search(/\s+#/)
+      if (commentIdx !== -1) value = value.slice(0, commentIdx).trim()
+    }
+    process.env[m[1]] = value
   }
 }
 
@@ -24,7 +52,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: resolvePlaywrightWorkers(),
   reporter: 'html',
   webServer: {
     command: 'npm run dev',

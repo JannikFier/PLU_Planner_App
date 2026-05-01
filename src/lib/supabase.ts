@@ -43,7 +43,27 @@ function supabaseClientFetch(input: RequestInfo | URL, init?: RequestInit): Prom
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   global: { fetch: supabaseClientFetch },
+  // Tab schließen = Session weg (Shared-PC); Reload im selben Tab bleibt eingeloggt.
+  auth: {
+    storage: window.sessionStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+  },
 })
+
+type GetSessionResult = Awaited<ReturnType<typeof supabase.auth.getSession>>
+
+/** Parallele getSession-Aufrufe teilen eine Promise (Auth + Store + Strict Mode) – mindert Mehrfach-Refresh/Warteschlange. */
+let getSessionInFlight: Promise<GetSessionResult> | null = null
+
+export function getSessionDeduped(): Promise<GetSessionResult> {
+  if (!getSessionInFlight) {
+    getSessionInFlight = supabase.auth.getSession().finally(() => {
+      getSessionInFlight = null
+    })
+  }
+  return getSessionInFlight
+}
 
 /**
  * Testmodus: siehe _testModeActive oben; invokeEdgeFunction / mutateRest → fruehzeitiger Return;
@@ -76,32 +96,44 @@ export function setTestModeFlag(active: boolean) {
   }
 }
 
+/** Keys fuer Supabase-JWT (gleiches Muster wie @supabase/supabase-js). */
+function listSupabaseAuthTokenKeys(storage: Storage): string[] {
+  try {
+    return Object.keys(storage).filter(
+      k => k.startsWith('sb-') && k.endsWith('-auth-token'),
+    )
+  } catch {
+    return []
+  }
+}
+
 /**
- * Loescht Supabase-Auth-Daten aus localStorage.
+ * Loescht Supabase-Auth-Tokens aus sessionStorage (aktiver Speicher) und localStorage (Legacy).
  * Wird bei Logout-Fehler aufgerufen, damit der Nutzer nach Reload nicht wieder eingeloggt ist.
  */
 export function clearSupabaseAuthStorage(): void {
   try {
-    const keys = Object.keys(localStorage).filter(
-      k => k.startsWith('sb-') && k.endsWith('-auth-token'),
-    )
-    keys.forEach(k => localStorage.removeItem(k))
+    for (const k of listSupabaseAuthTokenKeys(sessionStorage)) {
+      sessionStorage.removeItem(k)
+    }
+    for (const k of listSupabaseAuthTokenKeys(localStorage)) {
+      localStorage.removeItem(k)
+    }
   } catch {
     // ignorieren
   }
 }
 
 /**
- * Liest das aktuelle JWT direkt aus localStorage (umgeht den Supabase-Client).
+ * Liest das aktuelle JWT direkt aus sessionStorage (umgeht den Supabase-Client).
  * Zuverlaessiger als supabase.auth.getSession() bei Cold-Start-Szenarien.
  */
 function getAccessTokenFromStorage(): string | null {
   try {
-    const key = Object.keys(localStorage).find(
-      k => k.startsWith('sb-') && k.endsWith('-auth-token'),
-    )
+    const keys = listSupabaseAuthTokenKeys(sessionStorage)
+    const key = keys[0]
     if (!key) return null
-    const raw = JSON.parse(localStorage.getItem(key) || '{}')
+    const raw = JSON.parse(sessionStorage.getItem(key) || '{}')
     return raw?.access_token || null
   } catch {
     return null
@@ -163,7 +195,7 @@ function isLocalSupabaseApiUrl(): boolean {
  * Edge-Aufrufe sollen nur dort ueber die Vite-Origin laufen, wo server.preview.proxy
  * wirklich existiert (Vite dev / Vite preview), nicht z. B. bei `serve dist` auf Port 3000.
  */
-function useEdgeFunctionsViteProxy(): boolean {
+function edgeFunctionsShouldUseViteProxyOrigin(): boolean {
   if (import.meta.env.DEV) return true
   if (typeof window === 'undefined') return false
   if (!isLocalSupabaseApiUrl()) return false
@@ -183,7 +215,7 @@ function useEdgeFunctionsViteProxy(): boolean {
 function getEdgeFunctionsOrigin(): string {
   const base = supabaseUrl.replace(/\/$/, '')
   if (typeof window === 'undefined') return base
-  if (useEdgeFunctionsViteProxy()) return window.location.origin
+  if (edgeFunctionsShouldUseViteProxyOrigin()) return window.location.origin
   return base
 }
 
@@ -193,6 +225,17 @@ function supabaseConfiguredHost(): string {
   } catch {
     return '(ungültige VITE_SUPABASE_URL)'
   }
+}
+
+/** Fehlermeldung aus typischen Edge- / Gateway-JSON-Formen. */
+function edgeFunctionErrorMessageFromJson(json: unknown, status: number): string {
+  if (json && typeof json === 'object') {
+    const o = json as Record<string, unknown>
+    if (typeof o.error === 'string' && o.error.trim()) return o.error
+    if (typeof o.message === 'string' && o.message.trim()) return o.message
+    if (typeof o.msg === 'string' && o.msg.trim()) return o.msg
+  }
+  return `Edge Function Fehler: ${status}`
 }
 
 function edgeFunctionNotFoundHint(functionName: string): string {
@@ -284,7 +327,7 @@ export async function invokeEdgeFunction<T = Record<string, unknown>>(
     if (resp.status === 404) {
       throw new Error(edgeFunctionNotFoundHint(functionName))
     }
-    throw new Error(json.error || `Edge Function Fehler: ${resp.status}`)
+    throw new Error(edgeFunctionErrorMessageFromJson(json, resp.status))
   }
   if (json.error) throw new Error(json.error)
 
@@ -329,7 +372,7 @@ export async function invokeEdgeFunctionAnon<T = Record<string, unknown>>(
       if (resp.status === 404) {
         throw new Error(edgeFunctionNotFoundHint(functionName))
       }
-      throw new Error(json.error || `Edge Function Fehler: ${resp.status}`)
+      throw new Error(edgeFunctionErrorMessageFromJson(json, resp.status))
     }
     if (json.error) throw new Error(json.error)
 

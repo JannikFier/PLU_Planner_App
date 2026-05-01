@@ -1,7 +1,13 @@
 // PDF-Generator: Erstellt ein PDF-Dokument aus DisplayItem[]
-// Nutzt jsPDF für ein Zwei-Spalten-Layout im A4-Format
+// jsPDF wird per dynamischem import() erst beim PDF-Erzeugen geladen (kleinere initiale Chunks).
 
-import jsPDF from 'jspdf'
+/** Instanz-Typ ohne statischen jspdf-Import (Runtime erst bei generate*). */
+type JsPDFDoc = InstanceType<(typeof import('jspdf'))['default']>
+
+async function loadJsPDFConstructor(): Promise<(typeof import('jspdf'))['default']> {
+  const { default: Ctor } = await import('jspdf')
+  return Ctor
+}
 import type { DisplayItem } from '@/types/plu'
 import type { Block, StoreObstBlockOrder } from '@/types/database'
 import { sortBlocksWithStoreOrder } from '@/lib/block-override-utils'
@@ -27,6 +33,7 @@ import {
 } from '@/lib/newspaper-column-pages'
 import type { MegaphonePdfRaster } from '@/lib/pdf-megaphone-raster'
 import { loadMegaphoneIconRaster } from '@/lib/pdf-megaphone-raster'
+import { blobToOrientationCorrectedPngDataUrl } from '@/lib/image-exif-orientation'
 
 /** 1 pt → mm (PDF) */
 const PT_TO_MM = 25.4 / 72
@@ -42,7 +49,7 @@ function getMegaphoneIconWidthMm(heightMm: number): number {
  * Reine jsPDF-Linien sind in manchen Viewern unsichtbar oder fehlerhaft.
  */
 function drawMegaphoneIcon(
-  doc: jsPDF,
+  doc: JsPDFDoc,
   leftMm: number,
   centerYMm: number,
   heightMm: number,
@@ -78,7 +85,7 @@ function drawMegaphoneIcon(
 }
 
 /** Kuerzt einen Text mit binaerer Suche, sodass er inkl. Ellipsis in maxWidth passt. */
-function truncateWithBinarySearch(doc: jsPDF, text: string, maxWidth: number): string {
+function truncateWithBinarySearch(doc: JsPDFDoc, text: string, maxWidth: number): string {
   const ellipsis = '…'
   if (doc.getTextWidth(text) <= maxWidth) return text
   let lo = 0
@@ -225,7 +232,8 @@ function shouldInsertPageBeforeBackshopGroup(params: {
  * Erzeugt ein PDF-Dokument mit der PLU-Liste.
  * Zwei-Spalten-Layout, Farbmarkierungen, Seitenumbrüche, Footer.
  */
-export function generatePDF(input: PDFGeneratorInput): jsPDF {
+export async function generatePDF(input: PDFGeneratorInput): Promise<JsPDFDoc> {
+  const JSPDF = await loadJsPDFConstructor()
   const megaphoneRaster = loadMegaphoneIconRaster()
   const {
     items: rawItems,
@@ -258,7 +266,7 @@ export function generatePDF(input: PDFGeneratorInput): jsPDF {
         group: Math.max(6, Math.min(36, pxToPt(inputFonts.column))),
       }
     : { ...DEFAULT_PDF_FONTS, group: 9 } as PDFFontSizes & { group: number }
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const doc = new JSPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   // Datum für Footer
   const dateStr = new Date().toLocaleDateString('de-DE', {
@@ -345,7 +353,7 @@ type FontSizes = PDFFontSizes & { group: number }
 
 /** Rendert eine Sektion (alle Zeilen) und gibt die Anzahl genutzter Seiten zurück */
 function renderSection(
-  doc: jsPDF,
+  doc: JsPDFDoc,
   pdfRows: PDFRow[],
   title: string,
   dateStr: string,
@@ -869,20 +877,7 @@ async function loadImageWithDimensions(url: string): Promise<{ dataUrl: string; 
     const res = await fetch(url, { mode: 'cors', credentials: 'omit' })
     if (!res.ok) return null
     const blob = await res.blob()
-    const dataUrl = await new Promise<string | null>((resolve) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result as string | null)
-      reader.onerror = () => resolve(null)
-      reader.readAsDataURL(blob)
-    })
-    if (!dataUrl) return null
-    const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-      const img = new Image()
-      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
-      img.onerror = () => reject(new Error('Image load failed'))
-      img.src = dataUrl
-    })
-    return { dataUrl, width, height }
+    return await blobToOrientationCorrectedPngDataUrl(blob)
   } catch {
     return null
   }
@@ -892,7 +887,8 @@ async function loadImageWithDimensions(url: string): Promise<{ dataUrl: string; 
  * Erzeugt ein PDF für die Backshop-Liste: Reihenfolge Bild → PLU → Name,
  * Kopf „PLU-Liste Backshop“, Footer wie Obst/Gemüse.
  */
-export async function generateBackshopPDF(input: GenerateBackshopPDFInput): Promise<jsPDF> {
+export async function generateBackshopPDF(input: GenerateBackshopPDFInput): Promise<JsPDFDoc> {
+  const jspdfPromise = loadJsPDFConstructor()
   const {
     items: rawItems,
     kwLabel,
@@ -952,7 +948,8 @@ export async function generateBackshopPDF(input: GenerateBackshopPDFInput): Prom
     }),
   )
 
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const JSPDF = await jspdfPromise
+  const doc = new JSPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const dateStr = new Date().toLocaleDateString('de-DE', {
     day: '2-digit',
     month: '2-digit',
@@ -990,7 +987,7 @@ export function backshopPdfOffersOnlyHasRows(items: DisplayItem[]): boolean {
 
 /** Rendert Backshop-Sektion: Header „PLU-Liste Backshop“, Zeilen Bild | PLU | Name, Footer. */
 function renderBackshopSection(
-  doc: jsPDF,
+  doc: JsPDFDoc,
   pdfRows: PDFRow[],
   dateStr: string,
   kwLabel: string,

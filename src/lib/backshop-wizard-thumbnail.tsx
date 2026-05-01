@@ -18,6 +18,8 @@ export function BackshopThumbnail({ src, size = 48 }: { src: string | null | und
       alt=""
       className={cls}
       style={{ width: size, height: size, minWidth: size, minHeight: size }}
+      loading="lazy"
+      decoding="async"
     />
   )
 }

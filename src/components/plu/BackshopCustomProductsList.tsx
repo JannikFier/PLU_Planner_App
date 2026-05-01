@@ -112,7 +112,7 @@ export function BackshopCustomProductsList({
                       onValueChange={(v) => {
                         const next = v === 'test'
                         if (next === offerSheetTestFromRow(cp)) return
-                        void updateProduct.mutateAsync({ id: cp.id, is_offer_sheet_test: next })
+                        updateProduct.mutate({ id: cp.id, is_offer_sheet_test: next })
                       }}
                       disabled={updateProduct.isPending}
                     >
@@ -198,7 +198,7 @@ export function BackshopCustomProductsList({
                       onValueChange={(v) => {
                         const next = v === 'test'
                         if (next === offerSheetTestFromRow(cp)) return
-                        void updateProduct.mutateAsync({ id: cp.id, is_offer_sheet_test: next })
+                        updateProduct.mutate({ id: cp.id, is_offer_sheet_test: next })
                       }}
                       disabled={updateProduct.isPending}
                     >

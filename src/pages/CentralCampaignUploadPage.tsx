@@ -41,12 +41,14 @@ import { buildObstWerbungMatchRows, type ObstWerbungMatchRow } from '@/lib/obst-
 import { rankExitRowMatches } from '@/lib/exit-offer-matching'
 import type { MasterPluCandidate } from '@/lib/exit-offer-matching'
 import {
+  obstCentralOrdersatzPackageCompleteForKwYear,
   useBackshopOfferCampaignSlots,
   useObstOfferCampaignSlots,
   useSaveBackshopOfferCampaign,
   useSaveObstOfferCampaign,
 } from '@/hooks/useCentralOfferCampaigns'
 import {
+  clampCampaignWeekToOptions,
   getCampaignWeekSelectOptions,
   getDefaultCampaignTargetWeek,
   maxIsoWeekAmongCampaignSlots,
@@ -233,8 +235,33 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
     if (!campaignSlotsQuery.isSuccess) return
     appliedSlotDefaultRef.current = true
     const latest = maxIsoWeekAmongCampaignSlots(campaignSlotsQuery.data ?? [])
-    setTargetWeek(pickCampaignTargetWeekFromOptions(weekOptions, latest))
-  }, [campaignSlotsQuery.isSuccess, campaignSlotsQuery.data, weekManuallyPicked, weekOptions])
+    if (!isObst) {
+      setTargetWeek(pickCampaignTargetWeekFromOptions(weekOptions, latest))
+      return
+    }
+    if (!latest) {
+      setTargetWeek(pickCampaignTargetWeekFromOptions(weekOptions, null))
+      return
+    }
+    let cancelled = false
+    void obstCentralOrdersatzPackageCompleteForKwYear(latest.kw, latest.year).then((complete) => {
+      if (cancelled) return
+      if (complete) {
+        setTargetWeek(pickCampaignTargetWeekFromOptions(weekOptions, latest))
+      } else {
+        setTargetWeek(clampCampaignWeekToOptions(weekOptions, latest.kw, latest.year))
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [
+    isObst,
+    campaignSlotsQuery.isSuccess,
+    campaignSlotsQuery.data,
+    weekManuallyPicked,
+    weekOptions,
+  ])
 
   const weekSelectId = useId()
 
@@ -487,10 +514,15 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
         lines,
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           resetOrdWeekForm()
           setWeekManuallyPicked(false)
-          setTargetWeek(pickCampaignTargetWeekFromOptions(weekOptions, { kw: savedKw, year: savedYear }))
+          const complete = await obstCentralOrdersatzPackageCompleteForKwYear(savedKw, savedYear)
+          if (complete) {
+            setTargetWeek(pickCampaignTargetWeekFromOptions(weekOptions, { kw: savedKw, year: savedYear }))
+          } else {
+            setTargetWeek(clampCampaignWeekToOptions(weekOptions, savedKw, savedYear))
+          }
         },
       },
     )
@@ -513,10 +545,15 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
         lines,
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           resetOrd3Form()
           setWeekManuallyPicked(false)
-          setTargetWeek(pickCampaignTargetWeekFromOptions(weekOptions, { kw: savedKw, year: savedYear }))
+          const complete = await obstCentralOrdersatzPackageCompleteForKwYear(savedKw, savedYear)
+          if (complete) {
+            setTargetWeek(pickCampaignTargetWeekFromOptions(weekOptions, { kw: savedKw, year: savedYear }))
+          } else {
+            setTargetWeek(clampCampaignWeekToOptions(weekOptions, savedKw, savedYear))
+          }
         },
       },
     )
@@ -600,9 +637,11 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
       <CardHeader>
         <CardTitle className="text-lg">Kalenderwoche</CardTitle>
         <CardDescription>
-          ISO-KW bis 2 Wochen zurück und 4 Wochen voraus (relativ zu heute). Vorauswahl: nächste freie KW nach der
-          zuletzt gespeicherten Zentralwerbung (sonst nächste KW relativ zu heute). Eine bestehende Kampagne desselben
-          Typs für diese KW wird vollständig ersetzt.
+          ISO-KW bis 2 Wochen zurück und 4 Wochen voraus (relativ zu heute). Obst: Nach dem Speichern springt die
+          Vorauswahl nur dann eine KW weiter, wenn für dieselbe KW Wochenwerbung und 3-Tagespreis mit je mindestens
+          einer zugeordneten PLU vorliegen – sonst bleibt die KW erhalten. Beim ersten Öffnen gilt dieselbe Logik für
+          die höchste KW mit Werbung. Eine bestehende Kampagne desselben Typs für diese KW wird beim Speichern
+          vollständig ersetzt.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-4 items-end">

@@ -237,7 +237,13 @@ export function SuperAdminBackshopProductGroupsPage() {
                         className="flex items-center gap-2 rounded-md border bg-muted/30 p-2"
                       >
                         {it.image_url ? (
-                          <img src={it.image_url} alt="" className="h-12 w-12 rounded object-contain bg-background border" />
+                          <img
+                            src={it.image_url}
+                            alt=""
+                            className="h-12 w-12 rounded object-contain bg-background border"
+                            loading="lazy"
+                            decoding="async"
+                          />
                         ) : (
                           <div className="h-12 w-12 rounded bg-muted flex items-center justify-center border">
                             <ImageIcon className="h-4 w-4 text-muted-foreground" />

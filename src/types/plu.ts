@@ -300,7 +300,7 @@ export interface LayoutEngineInput {
   /** KW der angezeigten Version (wann die Master-Items „dazukamen“) */
   versionKwNummer: number
   versionJahr: number
-  /** Aktuelle Kalenderwoche/Jahr (heute) – für „wie lange als neu anzeigen“ */
+  /** Kalender-KW/Jahr (heute): nur für „Neu“-Dauer eigener Produkte; nicht die Listen-/Versions-KW verwenden. */
   currentKwNummer: number
   currentJahr: number
   /** Markt: normalisierter system_name → block_id (optional) */

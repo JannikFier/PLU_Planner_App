@@ -29,10 +29,14 @@ import {
 import { Eye, Trash2, Loader2 } from 'lucide-react'
 
 import { useVersions } from '@/hooks/useVersions'
-import { useObstOfferCampaignsAdminList } from '@/hooks/useCentralOfferCampaigns'
+import { useObstOfferCampaignsAdminList, useDeleteObstOfferCampaign } from '@/hooks/useCentralOfferCampaigns'
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/types/database'
 import { formatKWLabel } from '@/lib/plu-helpers'
+import {
+  CENTRAL_OFFER_ADMIN_DELETE_DIALOG_TITLE,
+  centralOfferAdminDeleteDialogDescription,
+} from '@/lib/central-offer-admin-copy'
 
 /** Hook: Version löschen (inkl. aktive – dann wird die nächste zur aktiven) */
 function useDeleteVersion() {
@@ -233,6 +237,27 @@ export function VersionsPage() {
 function ObstCampaignsCard() {
   const navigate = useNavigate()
   const { data: campaigns = [], isLoading } = useObstOfferCampaignsAdminList()
+  const deleteObstCampaign = useDeleteObstOfferCampaign()
+  const [campaignToDelete, setCampaignToDelete] = useState<{
+    kw: number
+    jahr: number
+    campaignKind: 'ordersatz_week' | 'ordersatz_3day'
+    label: string
+  } | null>(null)
+
+  const handleDeleteCampaignConfirm = async () => {
+    if (!campaignToDelete) return
+    try {
+      await deleteObstCampaign.mutateAsync({
+        kwNummer: campaignToDelete.kw,
+        jahr: campaignToDelete.jahr,
+        campaignKind: campaignToDelete.campaignKind,
+      })
+      setCampaignToDelete(null)
+    } catch (err) {
+      toast.error(`Fehler: ${err instanceof Error ? err.message : 'Unbekannt'}`)
+    }
+  }
 
   type Row = {
     key: string
@@ -264,8 +289,8 @@ function ObstCampaignsCard() {
       <CardHeader>
         <CardTitle>Alle Werbungen</CardTitle>
         <CardDescription>
-          Zentral hochgeladene Werbungen pro Kalenderwoche. Hier kannst du nachträglich PLUs
-          korrigieren, „keine Zuordnung" setzen oder eigene Zeilen ergänzen.
+          Zentral hochgeladene Werbungen pro Kalenderwoche. PLUs korrigieren, „keine Zuordnung“ setzen oder ergänzen;
+          vorhandene Werbung kannst du hier auch vollständig löschen (Marktlisten und PDFs ohne diese Markierung).
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -298,40 +323,78 @@ function ObstCampaignsCard() {
                     <TableCell className="font-medium">{formatKWLabel(r.kw, r.jahr)}</TableCell>
                     <TableCell>
                       {r.week ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            navigate(
-                              `/super-admin/versions/werbung/obst/${r.kw}/${r.jahr}/wochenwerbung`,
-                            )
-                          }
-                        >
-                          {r.week.assigned} Artikel ansehen
-                          {r.week.total > r.week.assigned
-                            ? ` (+${r.week.total - r.week.assigned} offen)`
-                            : ''}
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              navigate(
+                                `/super-admin/versions/werbung/obst/${r.kw}/${r.jahr}/wochenwerbung`,
+                              )
+                            }
+                          >
+                            {r.week.assigned} Artikel ansehen
+                            {r.week.total > r.week.assigned
+                              ? ` (+${r.week.total - r.week.assigned} offen)`
+                              : ''}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Wochenwerbung löschen"
+                            aria-label="Wochenwerbung löschen"
+                            disabled={deleteObstCampaign.isPending}
+                            onClick={() =>
+                              setCampaignToDelete({
+                                kw: r.kw,
+                                jahr: r.jahr,
+                                campaignKind: 'ordersatz_week',
+                                label: `Wochenwerbung ${formatKWLabel(r.kw, r.jahr)}`,
+                              })
+                            }
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       ) : (
                         <span className="text-sm text-muted-foreground">nicht hochgeladen</span>
                       )}
                     </TableCell>
                     <TableCell>
                       {r.threeDay ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            navigate(
-                              `/super-admin/versions/werbung/obst/${r.kw}/${r.jahr}/dreitagespreis`,
-                            )
-                          }
-                        >
-                          {r.threeDay.assigned} Artikel ansehen
-                          {r.threeDay.total > r.threeDay.assigned
-                            ? ` (+${r.threeDay.total - r.threeDay.assigned} offen)`
-                            : ''}
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              navigate(
+                                `/super-admin/versions/werbung/obst/${r.kw}/${r.jahr}/dreitagespreis`,
+                              )
+                            }
+                          >
+                            {r.threeDay.assigned} Artikel ansehen
+                            {r.threeDay.total > r.threeDay.assigned
+                              ? ` (+${r.threeDay.total - r.threeDay.assigned} offen)`
+                              : ''}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="3-Tagespreis löschen"
+                            aria-label="3-Tagespreis löschen"
+                            disabled={deleteObstCampaign.isPending}
+                            onClick={() =>
+                              setCampaignToDelete({
+                                kw: r.kw,
+                                jahr: r.jahr,
+                                campaignKind: 'ordersatz_3day',
+                                label: `3-Tagespreis ${formatKWLabel(r.kw, r.jahr)}`,
+                              })
+                            }
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       ) : (
                         <span className="text-sm text-muted-foreground">nicht hochgeladen</span>
                       )}
@@ -345,6 +408,30 @@ function ObstCampaignsCard() {
             </TableBody>
           </Table>
         )}
+        <AlertDialog
+          open={!!campaignToDelete}
+          onOpenChange={(open) => !open && setCampaignToDelete(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{CENTRAL_OFFER_ADMIN_DELETE_DIALOG_TITLE}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {campaignToDelete
+                  ? centralOfferAdminDeleteDialogDescription(campaignToDelete.label)
+                  : ''}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteCampaignConfirm}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Löschen
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   )

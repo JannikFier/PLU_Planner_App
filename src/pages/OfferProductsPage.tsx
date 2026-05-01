@@ -161,8 +161,8 @@ export function OfferProductsPage() {
       markYellowKwCount: layoutSettings?.mark_yellow_kw_count ?? 4,
       versionKwNummer: version?.kw_nummer ?? 0,
       versionJahr: version?.jahr ?? now.getFullYear(),
-      currentKwNummer: listKw,
-      currentJahr: listJahr,
+      currentKwNummer: calendarKw,
+      currentJahr: calendarJahr,
       nameBlockOverrides,
       storeBlockOrder: storeObstBlockOrder,
     })
@@ -192,8 +192,8 @@ export function OfferProductsPage() {
     blocks,
     layoutSettings,
     activeVersion,
-    listKw,
-    listJahr,
+    calendarKw,
+    calendarJahr,
     nameBlockOverrides,
     storeObstBlockOrder,
   ])

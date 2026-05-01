@@ -93,7 +93,17 @@ export function MarkenKarteDesktop({
         )}
       </div>
       <div className="relative aspect-[4/3] w-full overflow-hidden rounded border border-stone-200 bg-stone-50/80">
-        {imageUrl ? <img src={imageUrl} alt="" className="h-full w-full object-contain" /> : PLACEHOLDER_SVG}
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt=""
+            className="h-full w-full object-contain"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          PLACEHOLDER_SVG
+        )}
       </div>
       <div className="mt-2 flex items-center justify-between gap-2">
         <MarkenQuellBadge source={source} size="md" dimmed={zustand === 'dimmed'} dataTour={badgeDataTour} />
@@ -152,7 +162,17 @@ export function MarkenKarteMobileRow({
       {...(dataTour ? { 'data-tour': dataTour } : {})}
     >
       <div className="h-16 w-16 shrink-0 overflow-hidden rounded border border-stone-200 bg-stone-50/80 self-center">
-        {imageUrl ? <img src={imageUrl} alt="" className="h-full w-full object-contain" /> : PLACEHOLDER_SVG}
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt=""
+            className="h-full w-full object-contain"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          PLACEHOLDER_SVG
+        )}
       </div>
       <div className="min-w-0 flex-1 flex flex-col justify-center">
         <div className="flex items-center gap-2 flex-wrap">

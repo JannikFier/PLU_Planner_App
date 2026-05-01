@@ -97,6 +97,12 @@ npm run test:e2e:ui
 
 Playwright startet den Dev-Server automatisch, sofern noch keiner auf Port 5173 läuft (`reuseExistingServer: true`).
 
+### Parallele Worker und Auth-Rate-Limits
+
+Lokal setzt [playwright.config.ts](../playwright.config.ts) die Worker-Zahl auf **maximal 3** (bzw. `min(3, availableParallelism())`), damit nicht zu viele Tests gleichzeitig bei Supabase **anmelden** – sonst kann die Login-Seite u. a. „Zu viele Anmeldeversuche“ anzeigen und URL-Erwartungen (`/user`, `/admin`) fehlschlagen. **CI:** weiterhin **1 Worker**.
+
+**Überschreiben:** Umgebungsvariable **`PLAYWRIGHT_WORKERS`** mit einer positiven ganzen Zahl (z. B. `PLAYWRIGHT_WORKERS=6 npm run test:e2e:full`). Maximale Stabilität bei Limits weiterhin: **`npm run test:e2e:full:serial`**.
+
 ### Playwright: „Executable doesn't exist“ / falscher Ordner `mac-x64` vs. `mac-arm64`
 
 **Symptom:** Fehler wie `browserType.launch: Executable doesn't exist at …/chrome-headless-shell-mac-arm64/…`, obwohl `npx playwright install` gelaufen ist.
@@ -122,7 +128,34 @@ Die Journey-Tests (viewer, user, admin, super_admin) benötigen echte Supabase-A
 
 **User direkt in Supabase anlegen:** Wenn du „Add user“ im Supabase Dashboard nutzt, muss **User Metadata** gesetzt werden, sonst schlägt die Erstellung mit „Database error creating new user“ fehl (personalnummer ist UNIQUE, Standardwert `""` kollidiert bei mehreren Usern). Beispiel: `{"personalnummer": "e2e-admin-1", "role": "admin"}`. Super-Admin: Nach Erstellung in `profiles` die Spalte `role` auf `super_admin` setzen.
 
+**Manueller Login ok, E2E bleibt auf `/login`?** Dann liegt es oft **nicht** an falschen Passwörtern im Browser, sondern an (a) **vielen parallelen Logins** (`npm run test:e2e:full` nutzt mehrere Worker → viele gleichzeitige `signIn`-Aufrufe; Rate-Limits oder Instabilität). Abhilfe: **`npm run test:e2e:full:serial`** (`--workers=1`) ausprobieren. (b) **`.env.e2e`-Zeilen** mit Kommentar am Zeilenende ohne Anführungszeichen (`PASS=geheim # staging`) – der Wert würde falsch geparst; Passwort mit Sonderzeichen in **Anführungszeichen** setzen oder Kommentar in eigene Zeile. (c) **UTF-8-BOM** am Dateianfang – wird in `playwright.config.ts` beim Einlesen entfernt.
+
 Details und manuelle Checkliste vor Release: [TEST_UND_RELEASE.md](TEST_UND_RELEASE.md).
+
+## Optimierung und Regression vermeiden
+
+Änderungen an Performance, Listen oder PLU-Tabelle sollen **klein und ein Thema pro PR** bleiben (siehe Projektplan „Optimierung ohne Regressionen“).
+
+### Gates nach jeder Merge-Einheit (lokal oder CI)
+
+1. `npm run build`
+2. `npm run test:run`
+
+### Vor Publish
+
+Wie in [TEST_UND_RELEASE.md](TEST_UND_RELEASE.md): **`npm run test:e2e:full`** (inkl. Mobile-/Tablet-Layout, wo konfiguriert) plus die dortige **manuelle Checkliste**.
+
+### Kurz manuell nach Listen-/Thumbnail-/Scroll-Touches
+
+Automatisiert nicht vollständig abgedeckt (u. a. PDF-Inhalt, Excel-Upload – siehe Abschnitt „Nicht automatisiert“ oben). Nach entsprechenden Code-Änderungen zusätzlich **Stichproben**:
+
+- Obst-Masterliste und Backshop-Liste: scrollen, Darstellung ok
+- Optional: „In Liste suchen“ / Springen zur Trefferzeile (betrifft [`find-in-page-scroll`](../src/lib/find-in-page-scroll.ts))
+- PDF-Export einmal auslösen und kurz prüfen (nicht jedes Layout)
+
+### Virtualisierung langer Listen (bewusst zurückgestellt)
+
+**Listen-Virtualisierung** (nur sichtbare Zeilen im DOM) ist **kein aktuelles Lieferziel**: sie kann Find-in-Page, Scroll-Ziele, Kiosk und Export-Pfade beeinflussen. Falls später nötig: **eigenes Projekt** mit erweiterten Playwright-Schritten (Suche, Scroll, relevante Rollen) und ohne Vermischung mit reinem Design-Refactor.
 
 ## Build
 

@@ -1,6 +1,6 @@
 // Backshop: Bilder aus Excel extrahieren (ExcelJS, Fallback: ZIP/XML für MS-Excel-Dateien)
+// ExcelJS wird in extractImagesFromBackshopExcel per dynamischem import() geladen.
 
-import ExcelJS from 'exceljs'
 import JSZip from 'jszip'
 import { supabase } from '@/lib/supabase'
 import type { BackshopDuplicateDetail, ParsedBackshopRow } from '@/types/plu'
@@ -407,6 +407,7 @@ export async function extractImagesFromBackshopExcel(
   file: File,
   parsedRows?: ParsedBackshopRow[]
 ): Promise<ExtractedImage[]> {
+  const { default: ExcelJS } = await import('exceljs')
   const arrayBuffer = await file.arrayBuffer()
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.load(arrayBuffer as never)

@@ -173,7 +173,7 @@ serve(async (req) => {
     const displayLabel = `Kasse ${sortOrder}`
 
     const regId = crypto.randomUUID().replace(/-/g, '')
-    const email = `kiosk_reg_${regId}@kiosk.pluplanner.invalid`
+    const email = `kiosk_reg_${regId}@example.com`
 
     const { data: created, error: cErr } = await supabaseAdmin.auth.admin.createUser({
       email,
