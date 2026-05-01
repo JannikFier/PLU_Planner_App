@@ -36,3 +36,7 @@ const label = formatKWLabel(kw, jahr);
 - npm run build → Muss ohne Fehler laufen
 - Neue/geänderte Features → docs/ Dateien aktualisieren
 - Neue Patterns/Regeln → .cursor/rules/ aktualisieren
+
+## Große Seiten und Listen (Agenten / nachhaltige Struktur)
+
+Siehe [.cursor/rules/component-size-and-agents.mdc](component-size-and-agents.mdc): Seiten nicht zur Monolith-Datei anwachsen lassen; Backshop-Thumbnails in Listen zentral nutzen.

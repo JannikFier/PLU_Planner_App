@@ -12,6 +12,8 @@ alwaysApply: true
 - **Vollständig seriell** (`npm run test:e2e:full:serial`): wie oben, aber `--workers=1` – weniger parallele Supabase-Logins; bei „manuell ok, E2E hängt auf /login“ zum Gegencheck.
 - **Optional nur Mobile-Layout:** `npm run test:e2e:mobile` – Projekte `mobile-chromium` (iPhone 13) und `tablet-chromium` (iPad Pro 11), gleiche Scrollbreiten-Checks.
 
+**Lokal:** Standard in `playwright.config.ts` sind maximal **3 Worker** (weniger gleichzeitige Logins → weniger Supabase Rate-Limits). Überschreiben: **`PLAYWRIGHT_WORKERS`**. Details: [docs/TESTING.md](../../docs/TESTING.md).
+
 ## Bei neuen Features
 
 - **Größere Features** (neue Seite, neuer Flow, neue Rolle): E2E-Test hinzufügen oder erweitern.

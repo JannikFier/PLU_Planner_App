@@ -21,6 +21,6 @@ Ziel: Neue Features sollen **nicht** unkontrolliert zu **Riesendateien** in `src
 ## Performance-Stufen
 
 - **Virtualisierung** langer Listen und großes Splitten von `PLUTable.tsx` / Masterlisten-Seiten sind **eigenständige Projekte** mit Tests (Find-in-Page, Mobile) – nicht „nebenbei“ beim nächsten kleinen Feature.
-- Nach Änderungen: `npm run build`, `npm run test:run`; vor Release siehe [docs/TESTING.md](docs/TESTING.md).
+- Nach Änderungen: `npm run build`, `npm run test:run`; vor Release siehe [docs/TESTING.md](../../docs/TESTING.md).
 
-Erganzt [code-quality.mdc](code-quality.mdc) (DRY, Ordnerzuordnung).
+Ergänzt [code-quality.mdc](code-quality.mdc) (DRY, Ordnerzuordnung).
