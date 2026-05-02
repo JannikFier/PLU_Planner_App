@@ -129,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
       if (error) {
         const err = error as { message?: string; cause?: unknown }
@@ -138,6 +138,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           scheduleProfileErrorToast('Profil laden fehlgeschlagen: ' + (error?.message ?? 'Unbekannter Fehler'))
         }
         throw error
+      }
+      if (!data) {
+        scheduleProfileErrorToast(
+          'Kein Profil gefunden. Bitte Administrator kontaktieren oder erneut anmelden.',
+        )
+        return null
       }
       const profile = data as Profile
       try {

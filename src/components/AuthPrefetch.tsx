@@ -74,8 +74,9 @@ export function AuthPrefetch() {
           .from('stores' as never)
           .select('*')
           .eq('id', storeIdFromPath)
-          .single()
+          .maybeSingle()
         if (error) throw error
+        if (!data) throw new Error('Markt nicht gefunden.')
         return data as unknown as Store
       },
     })

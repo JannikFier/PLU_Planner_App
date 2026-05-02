@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, Eye, EyeOff } from 'lucide-react'
+import { Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { APP_BRAND_NAME } from '@/lib/brand'
 import { AppBrandLogo } from '@/components/layout/AppBrandLogo'
@@ -270,14 +270,55 @@ export function LoginPage() {
   )
 }
 
+/** Warten auf Profil nach Session: danach Hilfe statt endlos Spinner (ms). */
+const POST_LOGIN_PROFILE_WAIT_MS = 14_000
+
 /** Nach erfolgreichem Login: ggf. voller Host-Wechsel (Cookies), sonst <Navigate>. */
 function LoginPostLoginRedirect() {
   const location = useLocation()
-  const { profile } = useAuth()
+  const { user, profile, logout } = useAuth()
   const { preview } = useUserPreview()
   const { subdomain, isLoading: storeLoading, isAdminDomain } = useCurrentStore()
+  const [profileWaitTimedOut, setProfileWaitTimedOut] = useState(false)
+
+  useEffect(() => {
+    if (profile) {
+      setProfileWaitTimedOut(false)
+      return
+    }
+    const id = window.setTimeout(() => setProfileWaitTimedOut(true), POST_LOGIN_PROFILE_WAIT_MS)
+    return () => window.clearTimeout(id)
+  }, [profile])
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
 
   if (!profile) {
+    if (profileWaitTimedOut) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 px-4">
+          <Card className="w-full max-w-md shadow-xl border-0 bg-card/80 backdrop-blur-sm">
+            <CardHeader>
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-5 w-5 shrink-0" aria-hidden />
+                <CardTitle className="text-lg">Profil konnte nicht geladen werden</CardTitle>
+              </div>
+              <CardDescription className="text-base text-foreground/90">
+                Die Anmeldung war technisch möglich, aber dein Profil fehlt oder ist nicht lesbar
+                (Netzwerk, Rechte oder fehlende Datenbank-Zeile). Bitte Administrator informieren oder
+                erneut versuchen.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => void logout()}>
+                Abmelden
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 px-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden />

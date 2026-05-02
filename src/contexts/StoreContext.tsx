@@ -123,7 +123,7 @@ async function loadStoreRow(storeId: string): Promise<StoreRow | null> {
     .from('stores' as never)
     .select('id, company_id, name, subdomain, logo_url, is_active')
     .eq('id', storeId)
-    .single()
+    .maybeSingle()
 
   if (error || !store) return null
 
@@ -177,7 +177,7 @@ function loadCompanyInBackground(
         .from('companies' as never)
         .select('id, name, logo_url')
         .eq('id', companyId)
-        .single()
+        .maybeSingle()
       const c = data as { id: string; name: string; logo_url: string | null } | null
       if (c) {
         setState(prev => ({ ...prev, companyName: c.name, companyLogo: c.logo_url }))
@@ -287,7 +287,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           .eq('is_active', true)
           .order('created_at', { ascending: true })
           .limit(1)
-          .single()
+          .maybeSingle()
 
         const firstStoreId = (firstStore as { id: string } | null)?.id
         if (firstStoreId) {
@@ -351,7 +351,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         .from('stores' as never)
         .select('id, company_id, name, subdomain, logo_url, is_active')
         .eq('subdomain', subdomain)
-        .single()
+        .maybeSingle()
 
       if (error || !store) {
         resolvedBySubdomain.current = true
