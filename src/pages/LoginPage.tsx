@@ -5,6 +5,7 @@ import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useUserPreview } from '@/contexts/UserPreviewContext'
 import { getHomeDashboardPath } from '@/lib/effective-route-prefix'
 import { pickSafePostLoginPath, getPostLoginCanonicalRedirectUrl } from '@/lib/canonical-host-redirect'
+import { getAccessTokenFromStorage } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -281,14 +282,46 @@ function LoginPostLoginRedirect() {
   const { subdomain, isLoading: storeLoading, isAdminDomain } = useCurrentStore()
   const [profileWaitTimedOut, setProfileWaitTimedOut] = useState(false)
 
+  const from = (location.state as { from?: { pathname?: string } })?.from?.pathname
+
+  // canonicalUrl wird auch ohne profile berechnet (gibt dann null) – damit useLayoutEffect
+  // ohne early returns davor stehen kann (rules-of-hooks).
+  const canonicalUrl =
+    typeof window !== 'undefined' && profile
+      ? getPostLoginCanonicalRedirectUrl({
+          appDomain: import.meta.env.VITE_APP_DOMAIN ?? '',
+          hostname: window.location.hostname,
+          profileRole: profile.role,
+          storeSubdomain: subdomain,
+          storeLoading,
+          isAdminDomain,
+          preview,
+          fromPathname: from,
+        })
+      : null
+
   useEffect(() => {
-    if (profile) {
-      setProfileWaitTimedOut(false)
-      return
-    }
+    if (profile) return
     const id = window.setTimeout(() => setProfileWaitTimedOut(true), POST_LOGIN_PROFILE_WAIT_MS)
     return () => window.clearTimeout(id)
   }, [profile])
+
+  useLayoutEffect(() => {
+    if (!canonicalUrl) return
+    let cancelled = false
+    void (async () => {
+      // Cookie-Sync absichern: bis zu 3× 200 ms warten, sonst trotzdem assignen.
+      // Verhindert, dass auf der Ziel-Subdomain der Re-Login getriggert wird,
+      // weil die Cookies noch nicht propagiert sind.
+      for (let i = 0; i < 3; i++) {
+        if (getAccessTokenFromStorage()) break
+        await new Promise(r => setTimeout(r, 200))
+      }
+      if (cancelled) return
+      window.location.assign(canonicalUrl)
+    })()
+    return () => { cancelled = true }
+  }, [canonicalUrl])
 
   if (!user) {
     return <Navigate to="/login" replace />
@@ -327,27 +360,6 @@ function LoginPostLoginRedirect() {
     )
   }
 
-  const from = (location.state as { from?: { pathname?: string } })?.from?.pathname
-  const homePath = getHomeDashboardPath(profile.role, preview)
-
-  const canonicalUrl =
-    typeof window !== 'undefined'
-      ? getPostLoginCanonicalRedirectUrl({
-          appDomain: import.meta.env.VITE_APP_DOMAIN ?? '',
-          hostname: window.location.hostname,
-          profileRole: profile.role,
-          storeSubdomain: subdomain,
-          storeLoading,
-          isAdminDomain,
-          preview,
-          fromPathname: from,
-        })
-      : null
-
-  useLayoutEffect(() => {
-    if (canonicalUrl) window.location.assign(canonicalUrl)
-  }, [canonicalUrl])
-
   if (canonicalUrl) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 px-4">
@@ -357,6 +369,7 @@ function LoginPostLoginRedirect() {
     )
   }
 
+  const homePath = getHomeDashboardPath(profile.role, preview)
   const path = pickSafePostLoginPath(profile.role, from, homePath)
   return <Navigate to={path} replace />
 }

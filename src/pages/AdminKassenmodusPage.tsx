@@ -67,6 +67,7 @@ export function AdminKassenmodusPage({ embedded = false }: { embedded?: boolean 
     setDeleteTarget,
     entranceBuild,
     entranceUrl,
+    entranceExpiry,
     rotateMutation,
     createRegisterMutation,
     updateRegisterMutation,
@@ -275,6 +276,29 @@ export function AdminKassenmodusPage({ embedded = false }: { embedded?: boolean 
                     </Alert>
                   )}
                   <p className="rounded-md bg-muted/50 p-2 font-mono text-sm break-all">{entranceUrl}</p>
+                  {entranceExpiry && (
+                    entranceExpiry.isExpired ? (
+                      <Alert className="border-destructive/50 bg-destructive/10 text-destructive [&>svg]:text-destructive">
+                        <CircleAlert className="h-4 w-4" />
+                        <AlertTitle className="text-sm">Einstiegs-Link ist abgelaufen</AlertTitle>
+                        <AlertDescription className="text-sm text-destructive/90">
+                          Der Link ist seit dem {entranceExpiry.formatted} ungültig. Bitte einen neuen Link erzeugen und den QR-Code an der Kasse austauschen.
+                        </AlertDescription>
+                      </Alert>
+                    ) : entranceExpiry.isExpiringSoon ? (
+                      <Alert className="border-amber-500/40 bg-amber-50 text-amber-950">
+                        <CircleAlert className="h-4 w-4 text-amber-700" />
+                        <AlertTitle className="text-sm">Einstiegs-Link läuft bald ab</AlertTitle>
+                        <AlertDescription className="text-sm text-amber-950/90">
+                          Gültig bis {entranceExpiry.formatted} (noch {entranceExpiry.daysUntil} {entranceExpiry.daysUntil === 1 ? 'Tag' : 'Tage'}). Rechtzeitig einen neuen Link erzeugen und an der Kasse austauschen.
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Gültig bis {entranceExpiry.formatted}.
+                      </p>
+                    )
+                  )}
                 </div>
                 <div
                   id="kassenmodus-qr"

@@ -18,6 +18,7 @@ export type KioskEntrance = {
   token: string
   created_at: string
   revoked_at: string | null
+  expires_at: string
 }
 
 export type KioskRegister = {
@@ -119,6 +120,22 @@ export function useAdminKassenmodusPage() {
   }, [entranceQuery.data?.token, subdomain, appDomain])
 
   const entranceUrl = entranceBuild.url
+
+  const entranceExpiry = useMemo(() => {
+    const iso = entranceQuery.data?.expires_at
+    if (!iso) return null
+    const expiresAt = new Date(iso)
+    if (Number.isNaN(expiresAt.getTime())) return null
+    const msUntil = expiresAt.getTime() - Date.now()
+    const daysUntil = Math.floor(msUntil / 86_400_000)
+    return {
+      expiresAt,
+      daysUntil,
+      isExpired: msUntil <= 0,
+      isExpiringSoon: msUntil > 0 && daysUntil <= 30,
+      formatted: expiresAt.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    }
+  }, [entranceQuery.data?.expires_at])
 
   useEffect(() => {
     let cancelled = false
@@ -305,6 +322,7 @@ export function useAdminKassenmodusPage() {
     setDeleteTarget,
     entranceBuild,
     entranceUrl,
+    entranceExpiry,
     rotateMutation,
     createRegisterMutation,
     updateRegisterMutation,

@@ -1,11 +1,12 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { toast } from 'sonner'
-import { supabase, clearSupabaseAuthStorage, getSessionDeduped } from '@/lib/supabase'
+import { supabase, clearSupabaseAuthStorage, getSessionDeduped, getAccessTokenFromStorage } from '@/lib/supabase'
 import { queryClient } from '@/lib/query-client'
 import { isAbortError } from '@/lib/error-utils'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
 import { clearDeferReplayWelcome } from '@/lib/tutorial-replay-session'
 import { loginEmailSchema, loginPersonalnummerSchema } from '@/lib/validation'
+import { normalizeViteAppDomain } from '@/lib/subdomain'
 import type { User, Session } from '@supabase/supabase-js'
 import type { Database, Profile } from '@/types/database'
 
@@ -292,7 +293,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const runGetSessionAndContinue = async () => {
       try {
-        const { data: { session } } = await getSessionDeduped()
+        let { data: { session } } = await getSessionDeduped()
+
+        // Cookie-Sync-Race nach Cross-Subdomain-Redirect: Wenn getSession leer ist, aber
+        // ein Auth-Token im Storage liegt, kurz warten und nochmal probieren.
+        // Verhindert spurious Re-Login auf der Ziel-Subdomain.
+        if (!session?.user && getAccessTokenFromStorage()) {
+          console.warn('[Auth] Session-Restore-Race: Cookie da, getSession leer – retry in 250ms')
+          await new Promise(r => setTimeout(r, 250))
+          const retry = await getSessionDeduped()
+          session = retry.data.session
+        }
 
         if (session?.user && mounted) {
           const userId = session.user.id
@@ -724,6 +735,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
+    // Rolle vor dem State-Reset zwischenspeichern (Kiosk soll auf Markt-Subdomain bleiben)
+    const wasKiosk = state.profile?.role === 'kiosk'
     // Sofort: UI zuruecksetzen (optimistisches Logout)
     setLoggedOutAndClearCache()
     const LOGOUT_TIMEOUT_MS = 5000
@@ -738,7 +751,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // signOut fehlgeschlagen (Netzwerk, Timeout) – Auth-Daten lokal loeschen
       clearSupabaseAuthStorage()
     }
-  }, [setLoggedOutAndClearCache])
+    // Nach Logout zur Root-Domain (www) — ausser Kiosk (bleibt auf Markt-Subdomain) oder localhost.
+    if (wasKiosk) return
+    const appDomain = normalizeViteAppDomain(import.meta.env.VITE_APP_DOMAIN)
+    if (appDomain === 'localhost') return
+    const wantHost = `www.${appDomain}`
+    if (window.location.hostname.toLowerCase() === wantHost.toLowerCase()) return
+    window.location.assign(`https://${wantHost}/login`)
+  }, [setLoggedOutAndClearCache, state.profile?.role])
 
   const refreshProfile = useCallback(async () => {
     const uid = state.user?.id

@@ -357,13 +357,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         .maybeSingle()
 
       if (error || !store) {
+        // Anonymer Zugriff hat kein Ergebnis. Das ist KEIN End-Zustand:
+        // der Auth-Fallback feuert sofort wenn user+session da sind und versucht es authentifiziert.
+        // Daher hier KEIN error setzen und isLoading=true lassen.
+        // Subdomain merken; falls ALLE Wege scheitern, setzt resolveByProfileFromAuth den Error.
         resolvedBySubdomain.current = true
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          error: `Markt "${subdomain}" wurde nicht gefunden.`,
-          subdomain,
-        }))
+        setState(prev => ({ ...prev, subdomain }))
         return
       }
 

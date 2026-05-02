@@ -142,13 +142,29 @@ export function clearSupabaseAuthStorage(): void {
  * Liest das aktuelle JWT direkt aus sessionStorage (umgeht den Supabase-Client).
  * Zuverlaessiger als supabase.auth.getSession() bei Cold-Start-Szenarien.
  */
-function getAccessTokenFromStorage(): string | null {
+export function getAccessTokenFromStorage(): string | null {
   try {
     const keys = listSupabaseAuthBaseKeys(supabaseAuthStorage)
     const key = keys[0]
     if (!key) return null
     const raw = JSON.parse(supabaseAuthStorage.getItem(key) || '{}')
     return raw?.access_token || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * JWT robust beschaffen: erst aus Storage (sync, schnell), dann Fallback auf
+ * supabase.auth.getSession() (in-memory). Behandelt die Race direkt nach Login,
+ * wenn Cookie-Storage-Write noch nicht propagiert ist.
+ */
+async function getAccessToken(): Promise<string | null> {
+  const fromStorage = getAccessTokenFromStorage()
+  if (fromStorage) return fromStorage
+  try {
+    const { data: { session } } = await getSessionDeduped()
+    return session?.access_token ?? null
   } catch {
     return null
   }
@@ -287,7 +303,7 @@ export async function invokeEdgeFunction<T = Record<string, unknown>>(
   if (_testModeActive) return { success: true } as T
 
   const doRequest = async (): Promise<Response> => {
-    const jwt = getAccessTokenFromStorage()
+    const jwt = await getAccessToken()
     if (!jwt) throw new Error('Nicht angemeldet.')
 
     const controller = new AbortController()
@@ -412,7 +428,7 @@ export async function queryRest<T = unknown[]>(
   options?: { signal?: AbortSignal; /** Wenn Tabelle fehlt (Migration noch nicht ausgefuehrt): leeres Ergebnis statt Fehler */ onMissingRelation?: 'empty' },
 ): Promise<T> {
   const doRequest = async () => {
-    const jwt = getAccessTokenFromStorage()
+    const jwt = await getAccessToken()
     if (!jwt) throw new Error('Nicht angemeldet.')
 
     const url = new URL(`${supabaseUrl}/rest/v1/${table}`)
@@ -465,7 +481,7 @@ export async function queryRestCount(
   params: Record<string, string> = {},
 ): Promise<number> {
   const doRequest = async () => {
-    const jwt = getAccessTokenFromStorage()
+    const jwt = await getAccessToken()
     if (!jwt) throw new Error('Nicht angemeldet.')
 
     const url = new URL(`${supabaseUrl}/rest/v1/${table}`)
@@ -514,7 +530,7 @@ export async function mutateRest(
   if (_testModeActive) return
 
   const doRequest = async () => {
-    const jwt = getAccessTokenFromStorage()
+    const jwt = await getAccessToken()
     if (!jwt) throw new Error('Nicht angemeldet.')
 
     const url = new URL(`${supabaseUrl}/rest/v1/${table}`)

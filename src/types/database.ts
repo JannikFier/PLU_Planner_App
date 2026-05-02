@@ -170,6 +170,7 @@ export interface Database {
           token: string
           created_at: string
           revoked_at: string | null
+          expires_at: string
         }
         Insert: {
           id?: string
@@ -177,9 +178,11 @@ export interface Database {
           token: string
           created_at?: string
           revoked_at?: string | null
+          expires_at?: string
         }
         Update: {
           revoked_at?: string | null
+          expires_at?: string
         }
       }
       store_kiosk_registers: {

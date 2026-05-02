@@ -99,6 +99,7 @@ serve(async (req) => {
     }
 
     // Admin darf nur Rollen von Benutzern derselben Firma aendern (RPC braucht User-JWT fuer auth.uid())
+    // Super-Admin agiert global (by design) - hier KEIN Same-Company-Check, dafür Audit-Log unten.
     if (callerProfile.role === 'admin') {
       const supabaseUser = createClient(
         Deno.env.get('SUPABASE_URL')!,
@@ -116,6 +117,8 @@ serve(async (req) => {
       }
     }
 
+    const oldRole = targetProfile.role as string
+
     const { error } = await supabaseAdmin
       .from('profiles')
       .update({ role: newRole })
@@ -126,6 +129,45 @@ serve(async (req) => {
         JSON.stringify({ error: error.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Audit-Log: Companies via aktuellem Markt jedes Users ableiten (current_store_id → stores.company_id).
+    // Best-Effort: Fehler beim Logging brechen die Operation NICHT ab.
+    try {
+      const [actorStoreRes, targetStoreRes] = await Promise.all([
+        supabaseAdmin.from('profiles').select('current_store_id').eq('id', caller.id).maybeSingle(),
+        supabaseAdmin.from('profiles').select('current_store_id').eq('id', userId).maybeSingle(),
+      ])
+      const actorStoreId = (actorStoreRes.data as { current_store_id: string | null } | null)?.current_store_id ?? null
+      const targetStoreId = (targetStoreRes.data as { current_store_id: string | null } | null)?.current_store_id ?? null
+
+      const storeIds = [actorStoreId, targetStoreId].filter((s): s is string => Boolean(s))
+      let actorCompanyId: string | null = null
+      let targetCompanyId: string | null = null
+      if (storeIds.length > 0) {
+        const { data: storeRows } = await supabaseAdmin
+          .from('stores')
+          .select('id, company_id')
+          .in('id', storeIds)
+        const byId = new Map((storeRows ?? []).map((r: { id: string; company_id: string }) => [r.id, r.company_id]))
+        actorCompanyId = actorStoreId ? byId.get(actorStoreId) ?? null : null
+        targetCompanyId = targetStoreId ? byId.get(targetStoreId) ?? null : null
+      }
+
+      const crossCompany = Boolean(actorCompanyId && targetCompanyId && actorCompanyId !== targetCompanyId)
+
+      await supabaseAdmin.from('role_change_audit').insert({
+        actor_user_id: caller.id,
+        actor_role: callerProfile.role,
+        actor_company_id: actorCompanyId,
+        target_user_id: userId,
+        target_company_id: targetCompanyId,
+        old_role: oldRole,
+        new_role: newRole,
+        cross_company: crossCompany,
+      })
+    } catch (auditErr) {
+      console.error('[update-user-role] audit log failed:', auditErr)
     }
 
     return new Response(

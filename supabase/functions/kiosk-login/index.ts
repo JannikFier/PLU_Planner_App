@@ -67,14 +67,15 @@ serve(async (req) => {
 
     const { data: entrance, error: eErr } = await supabaseAdmin
       .from('store_kiosk_entrances')
-      .select('id, store_id')
+      .select('id, store_id, expires_at')
       .eq('token', entranceToken)
       .is('revoked_at', null)
+      .gt('expires_at', new Date().toISOString())
       .maybeSingle()
 
     if (eErr || !entrance) {
       return new Response(
-        JSON.stringify({ error: 'Ungültiger oder widerrufener Einstiegs-Link.' }),
+        JSON.stringify({ error: 'Einstiegs-Link ungültig, widerrufen oder abgelaufen.' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
