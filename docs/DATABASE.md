@@ -151,6 +151,12 @@ Erweitert Supabase Auth um App-spezifische Daten.
 
 **RPC `get_my_profile()`** (Migration 083): Gibt die eigene `profiles`-Zeile als `jsonb` zurück (`SECURITY DEFINER`, nur `WHERE id = auth.uid()`). Die Web-App ruft das nach der Anmeldung auf, damit das Profil auch dann geladen wird, wenn der erste direkte `SELECT` unter RLS/Cookie-Timing kurz keine Zeile liefert. Ausführung: Migration in Supabase anwenden; ohne Migration fällt die App auf den bisherigen Tabellen-Select zurück.
 
+**Produktions-Checkliste (Login / Profil):**
+
+1. Migration **`083_get_my_profile_rpc.sql`** im Supabase-Projekt ausführen (SQL-Editor oder `supabase db push`), das Frontend mit passendem Build deployen.
+2. **`VITE_APP_DOMAIN`** in der Build-Umgebung: Basisdomain **ohne** `www` (z. B. `example.de`), passend zu Cookies und Host-Wechsel.
+3. Bei Testproblemen: Browser-Cookies/Site-Daten für die App-Domain löschen, Hard-Reload; in den DevTools **Netzwerk** (hängende `supabase.co`-Requests) und **Konsole** prüfen.
+
 ### store_kiosk_entrances
 
 QR-/Link-Einstieg pro Markt (Token in der URL `/kasse/:token`).

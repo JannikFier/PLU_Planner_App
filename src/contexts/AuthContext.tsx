@@ -94,6 +94,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const PROFILE_FETCH_EMPTY_DELAY_MS = 200
   /** true wenn wir in diesem Init bereits aus Cache angezeigt haben – dann getSession-Update minimal halten */
   const displayedFromCacheRef = useRef(false)
+  /** Während Passwort-Login: SIGNED_IN nicht erneut setSession/fetchProfile ausfuehren (Doppelarbeit). */
+  const emailPasswordLoginInProgressRef = useRef(false)
   /** Timeout für verzögerten Profil-Fehler-Toast; wird gecleart sobald ein Profil gesetzt wird */
   const profileErrorToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -391,6 +393,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!mounted) return
         try {
           if (event === 'SIGNED_IN' && session?.user) {
+            if (emailPasswordLoginInProgressRef.current) {
+              return
+            }
             const userId = session.user.id
             if (session.access_token && session.refresh_token) {
               const { error: setErr } = await supabase.auth.setSession({
@@ -501,8 +506,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
+    emailPasswordLoginInProgressRef.current = true
 
-    const LOGIN_TIMEOUT = 15000
+    /** Nur signIn + setSession; Profil asynchron (Login-Button blockiert nicht auf fetchProfile). */
+    const LOGIN_TIMEOUT = 25_000
     const loginTask = async () => {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -518,18 +525,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (setSessionError) {
         console.error('[Auth] setSession nach Login:', setSessionError)
       }
-      let profile = await fetchProfile(data.session.user.id)
-      if (!profile) {
-        try {
-          const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
-          if (raw) {
-            const parsed = JSON.parse(raw) as { userId: string; profile: Profile }
-            if (parsed.userId === data.session.user.id && parsed.profile) profile = parsed.profile
-          }
-        } catch {
-          /* Cache ungültig */
+      const uid = data.session.user.id
+      let profile: Profile | null = null
+      try {
+        const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
+        if (raw) {
+          const parsed = JSON.parse(raw) as { userId: string; profile: Profile }
+          if (parsed.userId === uid && parsed.profile) profile = parsed.profile
         }
+      } catch {
+        /* Cache ungueltig */
       }
+
+      void fetchProfile(uid).then((fresh) => {
+        if (!fresh) return
+        setState((prev) => {
+          if (prev.user?.id !== uid) return prev
+          clearProfileErrorToast()
+          return {
+            ...prev,
+            ...authReducer(prev.user!, prev.session!, fresh),
+            isLoading: false,
+            error: null,
+          }
+        })
+      })
+
       return { session: data.session, user: data.session.user, profile }
     }
 
@@ -584,6 +605,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: userMessage,
       }))
       throw new Error(userMessage)
+    } finally {
+      emailPasswordLoginInProgressRef.current = false
     }
   }, [fetchProfile, clearProfileErrorToast])
 

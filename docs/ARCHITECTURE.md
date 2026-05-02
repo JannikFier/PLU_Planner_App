@@ -81,6 +81,8 @@ Auth-Persistenz (Supabase JWT):
                        siehe src/lib/canonical-host-redirect.ts, LoginPage, AppHeader Marktwechsel
 ```
 
+Passwort-Login (`loginWithEmail`): Nach `signInWithPassword` und `setSession` wird das **Profil nicht mehr blockierend** bis zum Ende des Button-Klicks abgewartet; `fetchProfile` (RPC `get_my_profile` mit Fallback) läuft **asynchron**. Parallel feuert Supabase `SIGNED_IN` – der Handler überspringt doppeltes Profil-Laden, solange der Passwort-Login läuft. Details: [`AuthContext.tsx`](../src/contexts/AuthContext.tsx), Migration 083 in [`docs/DATABASE.md`](DATABASE.md).
+
 ### Testmodus
 
 ```
