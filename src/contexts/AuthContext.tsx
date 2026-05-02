@@ -94,6 +94,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const PROFILE_FETCH_EMPTY_DELAY_MS = 200
   /** true wenn wir in diesem Init bereits aus Cache angezeigt haben – dann getSession-Update minimal halten */
   const displayedFromCacheRef = useRef(false)
+  /** Während Passwort-Login: SIGNED_IN-Handler nicht parallel setSession/fetchProfile feuern lassen (Lock-Contention im Supabase-Client). */
+  const emailPasswordLoginInProgressRef = useRef(false)
   /** Timeout für verzögerten Profil-Fehler-Toast; wird gecleart sobald ein Profil gesetzt wird */
   const profileErrorToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -432,10 +434,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!mounted) return
         try {
           if (event === 'SIGNED_IN' && session?.user) {
+            // Während aktivem Passwort-Login uebernimmt loginWithEmail setSession + fetchProfile.
+            // Doppel-Aufrufe wuerden im Supabase-Client zu Lock-Contention fuehren (Login haengt).
+            if (emailPasswordLoginInProgressRef.current) {
+              return
+            }
             const userId = session.user.id
 
-            // Idempotenz: wenn loginWithEmail das Profil fuer diesen User gerade gesetzt
-            // hat (Cache-Hit), nur Session nachziehen statt Doppel-Fetch.
+            // Idempotenz: wenn das Profil fuer diesen User schon im Cache liegt,
+            // nur Session nachziehen statt Doppel-Fetch.
             let cachedProfile: Profile | null = null
             try {
               const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
@@ -554,6 +561,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
+    emailPasswordLoginInProgressRef.current = true
 
     const LOGIN_TIMEOUT = 25_000
     const loginTask = async () => {
@@ -640,6 +648,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: userMessage,
       }))
       throw new Error(userMessage)
+    } finally {
+      emailPasswordLoginInProgressRef.current = false
     }
   }, [fetchProfile, clearProfileErrorToast])
 
