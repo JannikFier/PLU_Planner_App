@@ -9,7 +9,7 @@ import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useStoreAccessByUser } from '@/hooks/useStoreAccess'
 import { useAllStores } from '@/hooks/useStores'
 import { useCompanyById } from '@/hooks/useCompanies'
-import { buildStoreUrl, normalizeViteAppDomain } from '@/lib/subdomain'
+import { getStoreSwitchHostRedirectUrl, isSuperAdminManagementPath } from '@/lib/canonical-host-redirect'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -71,7 +71,7 @@ export function AppHeader() {
     availableModules: tutorialModules,
     replayModule: tutorialReplayModule,
   } = useTutorialOrchestrator()
-  const { storeName, isAdminDomain, currentStoreId } = useCurrentStore()
+  const { storeName, isAdminDomain, currentStoreId, setActiveStore } = useCurrentStore()
   const { data: userStoreAccess } = useStoreAccessByUser(user?.id)
   const { data: allStores } = useAllStores()
   const navigate = useNavigate()
@@ -89,8 +89,6 @@ export function AppHeader() {
     isSuperAdmin && companyId && !storeId && location.pathname.startsWith(`/super-admin/companies/${companyId}`)
   )
   const isSuperAdminGlobal = isSuperAdmin && !isSuperAdminStoreDetail && !isSuperAdminCompanyDetail
-
-  const appDomain = normalizeViteAppDomain(import.meta.env.VITE_APP_DOMAIN)
 
   // Verfuegbare Maerkte fuer den Markt-Switcher
   const accessibleStoreIds = userStoreAccess?.map(a => a.store_id) ?? []
@@ -579,8 +577,24 @@ export function AppHeader() {
                         key={store.id}
                         disabled={store.id === currentStoreId}
                         onClick={() => {
-                          const url = buildStoreUrl(store.subdomain, appDomain)
-                          window.location.href = url
+                          void (async () => {
+                            await setActiveStore(store.id)
+                            const superAdminNoHostSwitch =
+                              isSuperAdmin &&
+                              !inSuperAdminPreview &&
+                              isSuperAdminManagementPath(location.pathname)
+                            if (superAdminNoHostSwitch) return
+                            const redirectUrl = getStoreSwitchHostRedirectUrl({
+                              appDomain: import.meta.env.VITE_APP_DOMAIN ?? '',
+                              newStoreSubdomain: store.subdomain,
+                              profileRole: profile?.role,
+                              preview,
+                              currentHostname: window.location.hostname,
+                            })
+                            if (redirectUrl) {
+                              window.location.assign(redirectUrl)
+                            }
+                          })()
                         }}
                       >
                         {store.name}

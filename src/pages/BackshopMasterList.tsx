@@ -28,9 +28,6 @@ import {
 import type { PLUListPageActionMenuItem } from '@/components/plu/PLUListPageActionsMenu'
 import { PLUTable, type PLUTableHandle } from '@/components/plu/PLUTable'
 import { PLUFooter } from '@/components/plu/PLUFooter'
-const ExportBackshopPDFDialog = lazy(() =>
-  import('@/components/plu/ExportBackshopPDFDialog').then((m) => ({ default: m.ExportBackshopPDFDialog })),
-)
 import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useBackshopVersions } from '@/hooks/useBackshopVersions'
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
@@ -76,6 +73,10 @@ import { useRolePrefixFromLocation } from '@/hooks/useRolePrefixFromLocation'
 import { useBackshopOfferPreviewUi } from '@/hooks/useBackshopOfferPreviewUi'
 import { useBackshopMasterListDisplayList } from '@/hooks/useBackshopMasterListDisplayList'
 import { useBackshopMasterListPdfExportList } from '@/hooks/useBackshopMasterListPdfExportList'
+
+const ExportBackshopPDFDialog = lazy(() =>
+  import('@/components/plu/ExportBackshopPDFDialog').then((m) => ({ default: m.ExportBackshopPDFDialog })),
+)
 
 /**
  * Backshop-Masterliste: Tabelle mit Bild, PLU, Name.

@@ -21,12 +21,6 @@ import { Upload, Plus, EyeOff, FileDown, Pencil, Megaphone, LayoutGrid } from 'l
 import { PLUTable, type PLUTableHandle } from '@/components/plu/PLUTable'
 import { PLUFooter } from '@/components/plu/PLUFooter'
 import { useRegisterKioskListFindInPage, useRegisterKioskListHeaderSummary, type KioskListHeaderSummary } from '@/contexts/KioskListFindContext'
-
-const ExportPDFDialog = lazy(() =>
-  import('@/components/plu/ExportPDFDialog').then((m) => ({ default: m.ExportPDFDialog })),
-)
-
-// Hooks
 import { useMasterListRouteContext } from '@/hooks/useMasterListRouteContext'
 import { useMasterListDisplayList } from '@/hooks/useMasterListDisplayList'
 import { useMasterListPdfDisplayList } from '@/hooks/useMasterListPdfDisplayList'
@@ -56,6 +50,10 @@ import { ensureActiveVersion } from '@/lib/ensure-active-version'
 import { useStoreListCarryoverRows } from '@/hooks/useStoreListCarryover'
 import { carryoverObstRowToMasterItem } from '@/lib/carryover-master-snapshot'
 import { useObstPrevManualSupplementPluSet } from '@/hooks/usePrevManualSupplementPluSet'
+
+const ExportPDFDialog = lazy(() =>
+  import('@/components/plu/ExportPDFDialog').then((m) => ({ default: m.ExportPDFDialog })),
+)
 
 interface MasterListProps {
   mode: 'user' | 'admin' | 'viewer' | 'kiosk'

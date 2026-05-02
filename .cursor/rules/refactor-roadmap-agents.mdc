@@ -1,0 +1,33 @@
+---
+description: Refactor-Stufen 4/5 – Doku-Sync, Slice vs. strikt fertig, keine Virtualisierung ohne M0
+alwaysApply: true
+---
+
+# Refactor-Roadmap (Stufe 4 / 5) und Agenten
+
+## Wo steht die Wahrheit?
+
+- **Stufe 4 im Detail** (Umsetzungsstand, Arbeitspakete 4.1–4.10, Tabellen): [docs/REFACTOR_STUFE_4_AGENT_PLAN.md](../../docs/REFACTOR_STUFE_4_AGENT_PLAN.md)
+- **Kurzüberblick** (Tabelle Stufe 2–5): [docs/REFACTOR_ROADMAP_STUFEN.md](../../docs/REFACTOR_ROADMAP_STUFEN.md)
+- **Stufe 5 / Virtualisierung**: [docs/REFACTOR_STUFE_5_AGENT_PLAN.md](../../docs/REFACTOR_STUFE_5_AGENT_PLAN.md); Schwelle **M0**: [docs/STUFE_5_M0_CHECKLIST.md](../../docs/STUFE_5_M0_CHECKLIST.md)
+
+**Sync-Regel:** Änderst du den **Umsetzungsstand** oder die **Tabelle 4.5–4.10** im Stufe‑4‑Agent-Plan → in **derselben** Änderung die **Stufe‑4‑Zeile** in `REFACTOR_ROADMAP_STUFEN.md` anpassen (und umgekehrt bei Statusänderungen nur in der Roadmap).
+
+## Begriffe
+
+- **Slice erledigt:** Konkrete Auslagerung (Hook, Lib, Props-only-Komponente); `npm run build` und `npm run test:run` grün. Das ist **nicht** automatisch „die ganze Page optimiert“.
+- **Arbeitspaket 4.x strikt abgeschlossen:** Nur wenn explizit vereinbart (z. B. Page unter Leitplanke ~400–500 Zeilen, alle großen Blöcke ausgelagert). Sonst gilt: weiteres Follow-up möglich.
+
+## Verbotene Kurzschlüsse
+
+- **Keine** Virtualisierung der PLU-Hauptlisten ohne erfülltes **M0** und dokumentiertes **Go** ([STUFE_5_M0_CHECKLIST.md](../../docs/STUFE_5_M0_CHECKLIST.md)).
+- **Kein** großes Mischen: Virtualisierung (Stufe 5) nicht parallel zur gleichen Woche wie ein großer Refactor an `PLUTable` / gleicher Listen-Schicht – siehe [REFACTOR_STUFE_5_AGENT_PLAN.md](../../docs/REFACTOR_STUFE_5_AGENT_PLAN.md).
+
+## E2E nach Refactor-Touches
+
+- Listen-Flows, Navigation, Kiosk, Ausblenden: siehe [.cursor/rules/e2e-tests.mdc](e2e-tests.mdc) und [docs/TESTING.md](../../docs/TESTING.md).
+- Laufen E2E in einer Umgebung **ohne** installierte Playwright-Browser → im Chat/PR **vermerken**; Nachweis mindestens Build + Unit-Tests; E2E lokal oder in CI nachziehen.
+
+## Abschluss in der Antwort
+
+Nach Refactor-/Roadmap-Arbeit kurz angeben: **„Roadmap-Zeile Stufe 4 und REFACTOR_STUFE_4_AGENT_PLAN synchronisiert: ja/nein.“**

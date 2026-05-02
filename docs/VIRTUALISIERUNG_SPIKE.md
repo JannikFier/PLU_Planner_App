@@ -1,6 +1,6 @@
 # Virtualisierung der PLU-Masterlisten – Spike & Konzept
 
-**Status:** Konzept (Stufe 3b). Keine Implementierung in Stufe 3a.  
+**Status:** Konzept (Stufe 3b / Stufe 5). Keine Implementierung in Stufe 3a. **Operativer Projektplan:** [REFACTOR_STUFE_5_AGENT_PLAN.md](REFACTOR_STUFE_5_AGENT_PLAN.md).  
 **Ziel:** Nur bei nachgewiesenem Performance-Bedarf (Profiler, große Listen) angehen – nicht „nebenbei“ beim nächsten UI-Refactor.
 
 ## Problemstellung

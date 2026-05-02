@@ -66,6 +66,13 @@ Sonderfaelle:
   admin.domain.de    → isAdminDomain = true (Superadmin-Modus)
   ?store=angerbogen  → Dev-Override (nur im DEV-Modus)
   Kein Subdomain     → Root-Domain, kein Store geladen
+
+Auth-Persistenz (Supabase JWT):
+  localhost          → sessionStorage (Tab schliessen = Session weg)
+  Produktion         → HTTP-Cookies mit Domain=.<VITE_APP_DOMAIN> (www + Markt-Hosts teilen Session)
+                       siehe src/lib/supabase-auth-cookie-storage.ts
+  Nach Login         → kanonischer Host (www fuer super_admin, Markt-Host fuer Personal)
+                       siehe src/lib/canonical-host-redirect.ts, LoginPage, AppHeader Marktwechsel
 ```
 
 ### Testmodus
@@ -138,7 +145,7 @@ Die Seiten [`MasterList`](../src/pages/MasterList.tsx) und [`BackshopMasterList`
 
 **Virtualisierung** der großen Tabelle ist bewusst **nicht** Teil dieser Strukturierung; siehe [VIRTUALISIERUNG_SPIKE.md](VIRTUALISIERUNG_SPIKE.md).
 
-Über die **weiteren Refactor-Stufen** (Stufe 4: übrige große Seiten, Stufe 5: Virtualisierung umsetzen) siehe [REFACTOR_ROADMAP_STUFEN.md](REFACTOR_ROADMAP_STUFEN.md).
+Über die **weiteren Refactor-Stufen** (Stufe 4: übrige große Seiten, Stufe 5: Virtualisierung umsetzen) siehe [REFACTOR_ROADMAP_STUFEN.md](REFACTOR_ROADMAP_STUFEN.md). **Agent-Pläne:** Stufe 4 – [REFACTOR_STUFE_4_AGENT_PLAN.md](REFACTOR_STUFE_4_AGENT_PLAN.md); Stufe 5 – [REFACTOR_STUFE_5_AGENT_PLAN.md](REFACTOR_STUFE_5_AGENT_PLAN.md).
 
 ## State Management
 
@@ -177,6 +184,7 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | `useBezeichnungsregeln()` | Keyword-Regeln (CRUD + Apply) | Implementiert |
 | `useApplyAllRules()` | Regeln anwenden: nur marktspezifische `renamed_items`-Updates, keine zentralen Master-Schreibzugriffe | Implementiert |
 | `usePLUUpload()` | 4-Schritt Excel-Upload (Dateien, Vergleich, Konflikte, Publish) | Implementiert |
+| `useBackshopHiddenProductsPageModel()` | Orchestrierung der Ableitungen für „Ausgeblendete Produkte“ (Backshop); Page nur noch Layout/Dialoge | Implementiert (Stufe 4.3) |
 
 ## Lib-Module (`src/lib/`)
 
@@ -188,6 +196,7 @@ Jede Datendomäne hat ihren eigenen Custom Hook:
 | `publish-version.ts` | Version veröffentlichen (freeze, insert, activate, version_notifications erstellen) |
 | `layout-engine.ts` | DisplayItem-Liste (Master + Custom − Hidden + Regeln); berücksichtigt **Markt-Overrides** (`nameBlockOverrides`, `storeBlockOrder`) |
 | `plu-table-rows.ts` | Reine Hilfen für die PLUTable-Zeilengeometrie (FlatRow, Buchstaben-/Block-Gruppen → Tabellenzeilen; kein React) |
+| `backshop-hidden-products-page-utils.ts` | Konstanten und `orderBlockKeys` für die Seite „Backshop ausgeblendete Produkte“ (ohne React) |
 | `block-override-utils.ts` | Normalisierung `system_name`, effektive `block_id`, Sortierung Blöcke mit optionaler Markt-Reihenfolge |
 | `pdf-generator.ts` | **NEU (Runde 2)**: PDF-Export mit jsPDF (A4, Zwei-Spalten, Farben, Footer) |
 | `plu-helpers.ts` | PLU-spezifische Helper (Gruppierung, Block-Gruppierung, Statistiken) – jetzt generisch mit PLUItemBase |

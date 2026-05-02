@@ -62,7 +62,8 @@ Ohne diesen Schritt zeigt der QR zwar die richtige Adresse, aber der Browser fin
 
 ### Teil C – Kurz: was du in der App und in Supabase noch tun musst (ohne Vercel)
 
-- **In der PLU-Planner-App** (als Super-Admin): Pro Markt unter Firmen & Märkte eine **Subdomain** eintragen (z. B. `angerbogen`). Kassenmodus in den Markt-Einstellungen **freischalten**.
+- **In der PLU-Planner-App** (als Super-Admin): Pro Markt unter Firmen & Märkte eine **Subdomain** eintragen (z. B. `angerbogen`). In den **Markt-Einstellungen** den Button **„Kopieren“** nutzen, um den **Markt-Login-Link** `https://{subdomain}.{VITE_APP_DOMAIN}/login` ans Personal zu geben. Kassenmodus in den Markt-Einstellungen **freischalten**.
+- **Auth auf Produktion:** Die App speichert Supabase-JWT in **Cookies** mit `Domain=.<VITE_APP_DOMAIN>` (nicht `localhost`), damit **`www`** und **Markt-Subdomains** dieselbe Session nutzen. Nach dem Login: **Super-Admin** wird auf **`https://www.{DOMAIN}/super-admin`** geleitet (bzw. sichere `from`-Route); **Personal** auf den **Markt-Host** mit Rolle (`/user`, `/admin`, `/viewer`). **Marktwechsel** im Header: Markt wird gespeichert und bei anderer Subdomain folgt ein **voller Seitenwechsel** zum Dashboard auf dem neuen Host – außer **Super-Admin** bleibt ohne User-Vorschau auf Routen unter **`/super-admin/...`** (nur Kontextwechsel, kein Host-Sprung). Logik: [`canonical-host-redirect.ts`](src/lib/canonical-host-redirect.ts).
 - **In Supabase** (Browser: `supabase.com` → dein Projekt): **Authentication** → **URL Configuration** → **Redirect URLs** so ergänzen, dass `https://deine-domain.de` und eure Markt-Hosts erlaubt sind (siehe Abschnitt 4 weiter unten).
 
 ---
@@ -159,6 +160,9 @@ Bei Problemen mit OAuth/Magic-Link in der Supabase-Doku zu **Redirect URL Whitel
 ## Referenz im Code
 
 - Kassen-URL: [`src/lib/kiosk-entrance-url.ts`](../src/lib/kiosk-entrance-url.ts)
+- Markt-Login-URL (`/login`): [`src/lib/subdomain.ts`](../src/lib/subdomain.ts) (`buildMarketLoginUrl`), UI: [`src/pages/SuperAdminStoreDetailPage.tsx`](../src/pages/SuperAdminStoreDetailPage.tsx)
+- Auth-Cookies (Produktion): [`src/lib/supabase-auth-cookie-storage.ts`](../src/lib/supabase-auth-cookie-storage.ts), Client: [`src/lib/supabase.ts`](../src/lib/supabase.ts)
+- Kanonische Hosts nach Login / Marktwechsel: [`src/lib/canonical-host-redirect.ts`](../src/lib/canonical-host-redirect.ts), [`src/pages/LoginPage.tsx`](../src/pages/LoginPage.tsx), [`src/components/layout/AppHeader.tsx`](../src/components/layout/AppHeader.tsx)
 - Markt aus Hostname: [`src/contexts/StoreContext.tsx`](../src/contexts/StoreContext.tsx) (`resolveBySubdomain`)
 - Kassenmodus UI: [`src/pages/AdminKassenmodusPage.tsx`](../src/pages/AdminKassenmodusPage.tsx)
 

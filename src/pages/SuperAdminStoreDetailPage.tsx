@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { invokeEdgeFunction } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { BereichsauswahlCard } from '@/components/layout/BereichsauswahlCard'
@@ -42,10 +40,11 @@ import {
   Apple, Croissant, Eye, Globe, Home, UserPlus, KeyRound, Copy, Check, UserMinus,
   ScanLine,
 } from 'lucide-react'
-import { validateSubdomain } from '@/lib/subdomain'
+import { buildMarketLoginUrl, normalizeViteAppDomain, validateSubdomain } from '@/lib/subdomain'
 import { toast } from 'sonner'
 import type { Profile, UserListVisibility } from '@/types/database'
-import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer, roleBadgeLabel, generateOneTimePassword } from '@/lib/profile-helpers'
+import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer, roleBadgeLabel } from '@/lib/profile-helpers'
+import { useSuperAdminStoreDetailUserMutations } from '@/hooks/useSuperAdminStoreDetailUserMutations'
 import { AdminKassenmodusPage } from '@/pages/AdminKassenmodusPage'
 
 type Section = 'overview' | 'listen' | 'listen-obst' | 'listen-backshop' | 'benutzer' | 'einstellungen' | 'kassenmodus'
@@ -54,7 +53,6 @@ export function SuperAdminStoreDetailPage() {
   const { companyId, storeId } = useParams<{ companyId: string; storeId: string }>()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const queryClient = useQueryClient()
   const { isSuperAdmin, user: currentUser } = useAuth()
   const { setActiveStore } = useCurrentStore()
 
@@ -116,78 +114,30 @@ export function SuperAdminStoreDetailPage() {
   const marktListenBackObst = `${storeBasePath}?view=listen-obst`
   const marktListenBackBackshop = `${storeBasePath}?view=listen-backshop`
 
-  // Benutzer erstellen (Edge Function)
-  const createUserMutation = useMutation({
-    mutationFn: async () => {
-      if (!store) throw new Error('Kein Markt ausgewählt.')
-      const pw = generateOneTimePassword()
-      await invokeEdgeFunction('create-user', {
-        email: newEmail.trim() || undefined,
-        password: pw,
-        personalnummer: newPersonalnummer.trim() || undefined,
-        displayName: newDisplayName,
-        role: isSuperAdmin ? newRole : 'user',
-        home_store_id: store.id,
-        additional_store_ids: [],
-      })
-      return { oneTimePassword: pw }
-    },
-    onSuccess: (result) => {
-      setGeneratedPassword(result.oneTimePassword)
-      setShowCreateUser(false)
-      setShowPasswordDialog(true)
-      queryClient.invalidateQueries({ queryKey: ['company-profiles', companyId] })
-      queryClient.invalidateQueries({ queryKey: ['store-user-profiles'] })
-      setNewDisplayName(''); setNewEmail(''); setNewPersonalnummer(''); setNewRole('user')
-      toast.success('Benutzer angelegt und diesem Markt zugewiesen!')
-    },
-    onError: (e: Error) => toast.error(e.message),
-  })
-
-  // Passwort zurücksetzen (Edge Function)
-  const resetPasswordMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const pw = generateOneTimePassword()
-      await invokeEdgeFunction('reset-password', { userId, newPassword: pw })
-      return pw
-    },
-    onSuccess: (pw) => {
-      setShowResetConfirm(false)
-      setGeneratedPassword(pw)
-      setShowPasswordDialog(true)
-      toast.success('Passwort wurde zurückgesetzt!')
-    },
-    onError: (e: Error) => toast.error(e.message),
-  })
-
-  // Benutzer endgueltig loeschen (Edge Function)
-  const deleteUserMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      await invokeEdgeFunction('delete-user', { userId })
-    },
-    onSuccess: () => {
-      setShowDeleteUserConfirm(false)
-      setSelectedUser(null)
-      queryClient.invalidateQueries({ queryKey: ['company-profiles', companyId] })
-      queryClient.invalidateQueries({ queryKey: ['store-user-profiles'] })
-      queryClient.invalidateQueries({ queryKey: ['store-access'] })
-      toast.success('Benutzer wurde endgültig gelöscht.')
-    },
-    onError: (e: Error) => toast.error(e.message),
-  })
-
-  // Rolle aendern (Edge Function)
-  const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, newRole: role }: { userId: string; newRole: string }) => {
-      await invokeEdgeFunction('update-user-role', { userId, newRole: role })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['store-user-profiles'] })
-      queryClient.invalidateQueries({ queryKey: ['company-profiles', companyId] })
-      toast.success('Rolle wurde geändert.')
-    },
-    onError: (e: Error) => toast.error(e.message),
-  })
+  const { createUserMutation, resetPasswordMutation, deleteUserMutation, updateRoleMutation } =
+    useSuperAdminStoreDetailUserMutations({
+      companyId,
+      homeStoreId: store?.id,
+      isSuperAdmin: !!isSuperAdmin,
+      onCreateSuccess: (pw) => {
+        setGeneratedPassword(pw)
+        setShowCreateUser(false)
+        setShowPasswordDialog(true)
+        setNewDisplayName('')
+        setNewEmail('')
+        setNewPersonalnummer('')
+        setNewRole('user')
+      },
+      onResetSuccess: (pw) => {
+        setShowResetConfirm(false)
+        setGeneratedPassword(pw)
+        setShowPasswordDialog(true)
+      },
+      onDeleteUserSuccess: () => {
+        setShowDeleteUserConfirm(false)
+        setSelectedUser(null)
+      },
+    })
 
   const copyPassword = async () => {
     try {
@@ -199,6 +149,29 @@ export function SuperAdminStoreDetailPage() {
       }
       setCopied(true); setTimeout(() => setCopied(false), 2000)
     } catch { toast.error('Kopieren fehlgeschlagen.') }
+  }
+
+  const appDomain = normalizeViteAppDomain(import.meta.env.VITE_APP_DOMAIN)
+
+  const copyMarketLoginUrl = async () => {
+    if (!store?.subdomain) return
+    const url = buildMarketLoginUrl(store.subdomain, appDomain)
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url)
+      else {
+        const ta = document.createElement('textarea')
+        ta.value = url
+        ta.style.position = 'absolute'
+        ta.style.left = '-9999px'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+      toast.success('Markt-Login-Link kopiert')
+    } catch {
+      toast.error('Kopieren fehlgeschlagen.')
+    }
   }
 
   // Firmeninterne Benutzer die noch NICHT diesem Markt zugewiesen sind
@@ -574,14 +547,20 @@ export function SuperAdminStoreDetailPage() {
                     Ändern
                   </Button>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">Subdomain</p>
-                    <p className="text-sm text-muted-foreground">{store.subdomain}</p>
+                    <p className="text-sm text-muted-foreground break-words">{store.subdomain}</p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => { setEditValue(store.subdomain); setShowEditSubdomain(true) }}>
-                    Ändern
-                  </Button>
+                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                    <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => void copyMarketLoginUrl()}>
+                      <Copy className="h-3.5 w-3.5" />
+                      Kopieren
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => { setEditValue(store.subdomain); setShowEditSubdomain(true) }}>
+                      Ändern
+                    </Button>
+                  </div>
                 </div>
                 <div className="flex justify-end pt-4 border-t">
                   <Button variant="destructive" size="sm" className="gap-1" onClick={() => setShowDelete(true)}>
@@ -743,7 +722,14 @@ export function SuperAdminStoreDetailPage() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowCreateUser(false)}>Abbrechen</Button>
               <Button
-                onClick={() => createUserMutation.mutate()}
+                onClick={() =>
+                  createUserMutation.mutate({
+                    newEmail,
+                    newPersonalnummer,
+                    newDisplayName,
+                    newRole,
+                  })
+                }
                 disabled={!(newPersonalnummer.trim() || newEmail.trim()) || createUserMutation.isPending}
               >
                 {createUserMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Wird erstellt...</> : 'Benutzer erstellen'}

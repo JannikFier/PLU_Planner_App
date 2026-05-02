@@ -103,3 +103,14 @@ export function buildStoreUrl(subdomain: string, appDomain: string): string {
   const protocol = appDomain.includes('localhost') ? 'http' : 'https'
   return `${protocol}://${subdomain}.${appDomain}`
 }
+
+/** Vollständige URL zur Markt-Anmeldung (Personal / Markt-Host). */
+export function buildMarketLoginUrl(subdomain: string, appDomain: string): string {
+  return `${buildStoreUrl(subdomain, appDomain)}/login`
+}
+
+/** Kanonischer Super-Admin-Host: immer www + Basisdomain (nicht localhost). */
+export function buildSuperAdminCanonicalOrigin(appDomain: string): string | null {
+  if (!appDomain || appDomain === 'localhost') return null
+  return `https://www.${appDomain}`
+}

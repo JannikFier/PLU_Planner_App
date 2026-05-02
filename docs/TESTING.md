@@ -45,6 +45,10 @@ npm run test:run
 
 User-Journeys (Login, Navigation, Rollen-Redirects) werden mit **Playwright** in `e2e/*.spec.ts` abgedeckt.
 
+**Voraussetzung lokal / CI:** Nach `npm install` müssen die Browser einmal installiert sein: `npx playwright install` (bzw. nur Chromium: `npx playwright install chromium`). Ohne diese Binaries schlagen alle E2E-Läufe mit „Executable doesn't exist“ fehl – das ist eine **Umgebungsfrage**, kein Anwendungsfehler.
+
+**Agent-/Sandbox-Läufe:** Wenn ein automatischer Lauf **keine** Playwright-Browsers hat, reicht als Nachweis für einen Refactor-Slice oft **Build + Unit-Tests**; E2E dann **lokal** oder in einer Pipeline mit installierten Browsern nachziehen und im PR/Chat vermerken.
+
 - **Smoke:** Login-Seite lädt, Root und geschützte Routen leiten zu `/login` um.
 - **Journey-Tests:** Pro Rolle (Viewer, User, Admin, Super-Admin) Login und Hauptseiten; fehlende Berechtigung führt zu Redirect.
 - **Mobile-Layout (`@mobile`):** Zwei Playwright-Projekte in [playwright.config.ts](../playwright.config.ts): **`mobile-chromium`** (Viewport iPhone 13) und **`tablet-chromium`** (Viewport iPad Pro 11). Datei [e2e/mobile-layout.spec.ts](../e2e/mobile-layout.spec.ts) loggt sich mit `E2E_USER_*` ein und prüft auf **allen** wichtigen Personal-Routen, dass **weder `html`/`body` noch das `main`** des Dashboard-Layouts horizontal breiter als der Viewport sind (`scrollWidth - clientWidth ≤ 1` je Element). Zusätzlich – wo die Seite passende Container setzt – `expectNoHorizontalOverflowInLocator` auf **`data-testid`**-Wurzeln, u. a. `hidden-products-scroll-root` (Ausgeblendete, Eigene & Ausgeblendete – Abschnitt Ausgeblendete, Backshop-Varianten), **`renamed-products-scroll-root`** (Umbenannt Obst/Backshop), **`offer-central-campaign-scroll-root`** / **`offer-local-advertising-scroll-root`** (Werbung Obst) sowie die Backshop-Pendants `backshop-offer-*`. Optional: **Picker-Vollseite** (nach „Produkte ausblenden“ → `/user/pick-hide-obst`) prüft Footer-Buttons (**Abbrechen** / Ausblenden-Aktion): zuerst per Scroll in den sichtbaren Bereich, dann **im Viewport** (bei 420px Höhe liegt der Footer unter der Liste). Abgedeckt u. a.: Dashboard, **PLU-Masterliste**, **Backshop-Liste**, **Eigene Produkte** (Obst + Backshop), **Eigene & Ausgeblendete**, **Ausgeblendete Produkte**, **Werbung**, **Umbenannt** (Obst + Backshop). **Super-Admin-Zweig** (falls Credentials gesetzt): u. a. Ausgeblendete, **PLU-Liste bearbeiten** Obst/Backshop (Block-Sort). Läuft bei `npm run test:e2e:full` mit; isoliert: `npm run test:e2e:mobile`. **Hinweis:** Konto muss Rolle **User (Personal)** sein (Login landet unter `/user/`). **Daten:** Zuverlässige Layout-Qualität setzt voraus, dass die E2E-Umgebung nicht nur leere Listen hat – bei **Ausgeblendeten** sollten möglichst einige Einträge mit **langen Artikelnamen** existieren, sonst bleiben Überbreiten-Fehler unsichtbar.
@@ -78,6 +82,8 @@ User-Journeys (Login, Navigation, Rollen-Redirects) werden mit **Playwright** in
 | `npm run test:e2e:mobile` | Nur **mobile-chromium** und **tablet-chromium** (`mobile-layout.spec.ts`) | Schneller Check Handy- + Tablet-Layout mit User-Credentials |
 
 **Vor dem Publish:** `npm run test:e2e:full` ausführen – alle Tests müssen grün sein.
+
+**Laufzeit:** Die vollständige Suite enthält u. a. mehrere lange **Tutorial-Walkthrough**-Tests und kann **deutlich über 15 Minuten** dauern. Bei vorzeitigem Abbruch oder Timeout im IDE-Terminal **`npm run test:e2e:full:serial`** im normalen Terminal ausführen (ein Worker, oft stabiler gegenüber Rate-Limits).
 
 ### Ausführung
 
@@ -155,7 +161,7 @@ Automatisiert nicht vollständig abgedeckt (u. a. PDF-Inhalt, Excel-Upload –
 
 ### Virtualisierung langer Listen (bewusst zurückgestellt)
 
-**Listen-Virtualisierung** (nur sichtbare Zeilen im DOM) ist **kein aktuelles Lieferziel**: sie kann Find-in-Page, Scroll-Ziele, Kiosk und Export-Pfade beeinflussen. Falls später nötig: **eigenes Projekt** mit erweiterten Playwright-Schritten (Suche, Scroll, relevante Rollen) und ohne Vermischung mit reinem Design-Refactor. Ausführliches Konzept (Risiken, Bibliothek, E2E-Plan): [VIRTUALISIERUNG_SPIKE.md](VIRTUALISIERUNG_SPIKE.md).
+**Listen-Virtualisierung** (nur sichtbare Zeilen im DOM) ist **kein aktuelles Lieferziel**: sie kann Find-in-Page, Scroll-Ziele, Kiosk und Export-Pfade beeinflussen. Falls später nötig: **eigenes Projekt** mit erweiterten Playwright-Schritten (Suche, Scroll, relevante Rollen) und ohne Vermischung mit reinem Design-Refactor. Ausführliches Konzept (Risiken, Bibliothek, E2E-Überblick): [VIRTUALISIERUNG_SPIKE.md](VIRTUALISIERUNG_SPIKE.md). **Operativer Projekt-/Agent-Plan (Stufe 5):** [REFACTOR_STUFE_5_AGENT_PLAN.md](REFACTOR_STUFE_5_AGENT_PLAN.md).
 
 ## Build
 

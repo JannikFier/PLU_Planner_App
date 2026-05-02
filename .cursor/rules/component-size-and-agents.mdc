@@ -60,6 +60,10 @@ Neue UI für die große PLU-Tabelle und die Kopf-/Toolbar-Zonen der Masterlisten
 
 `src/lib/plu-table-rows.ts` importiert **keine** React-Komponenten (nur Types/Helper), um Zyklen zu vermeiden.
 
+## Roadmap-Stufen 4 und 5
+
+Refactor-Reihenfolge, Doku-Sync zwischen Roadmap und Agent-Plänen, **Slice vs. strikt fertig**, Stufe‑5‑Gate **M0**: [.cursor/rules/refactor-roadmap-agents.mdc](refactor-roadmap-agents.mdc).
+
 ## Performance-Stufen
 
 - **Virtualisierung** langer Listen und großes Splitten von `PLUTable.tsx` / Masterlisten-Seiten sind **eigenständige Projekte** mit Tests (Find-in-Page, Mobile); Konzept: [docs/VIRTUALISIERUNG_SPIKE.md](../../docs/VIRTUALISIERUNG_SPIKE.md) – nicht „nebenbei“ beim nächsten kleinen Feature.

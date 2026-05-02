@@ -1,5 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import {
+  createSupabaseAuthStorage,
+  migrateSessionStorageAuthTo,
+  clearSupabaseAuthCookies,
+  listSupabaseAuthBaseKeys,
+} from '@/lib/supabase-auth-cookie-storage'
 
 // Supabase URL und Anon Key aus Environment Variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
@@ -10,6 +16,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
     'Supabase Konfiguration fehlt! Bitte VITE_SUPABASE_URL und VITE_SUPABASE_ANON_KEY in .env.local setzen.'
   )
 }
+
+/** Auth-Persistenz: lokal sessionStorage, Produktion Cookies (Domain=.<VITE_APP_DOMAIN>) fuer Subdomain-Wechsel. */
+const supabaseAuthStorage = createSupabaseAuthStorage(import.meta.env.VITE_APP_DOMAIN)
+migrateSessionStorageAuthTo(supabaseAuthStorage)
 
 const _nativeFetch = window.fetch.bind(window)
 
@@ -43,9 +53,9 @@ function supabaseClientFetch(input: RequestInfo | URL, init?: RequestInit): Prom
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   global: { fetch: supabaseClientFetch },
-  // Tab schließen = Session weg (Shared-PC); Reload im selben Tab bleibt eingeloggt.
+  // Lokal: sessionStorage. Produktion: Cookies mit Parent-Domain, damit www und Markt-Hosts dieselbe Session teilen.
   auth: {
-    storage: window.sessionStorage,
+    storage: supabaseAuthStorage,
     persistSession: true,
     autoRefreshToken: true,
   },
@@ -113,12 +123,16 @@ function listSupabaseAuthTokenKeys(storage: Storage): string[] {
  */
 export function clearSupabaseAuthStorage(): void {
   try {
+    for (const k of listSupabaseAuthBaseKeys(supabaseAuthStorage)) {
+      supabaseAuthStorage.removeItem(k)
+    }
     for (const k of listSupabaseAuthTokenKeys(sessionStorage)) {
       sessionStorage.removeItem(k)
     }
     for (const k of listSupabaseAuthTokenKeys(localStorage)) {
       localStorage.removeItem(k)
     }
+    clearSupabaseAuthCookies(import.meta.env.VITE_APP_DOMAIN)
   } catch {
     // ignorieren
   }
@@ -130,10 +144,10 @@ export function clearSupabaseAuthStorage(): void {
  */
 function getAccessTokenFromStorage(): string | null {
   try {
-    const keys = listSupabaseAuthTokenKeys(sessionStorage)
+    const keys = listSupabaseAuthBaseKeys(supabaseAuthStorage)
     const key = keys[0]
     if (!key) return null
-    const raw = JSON.parse(sessionStorage.getItem(key) || '{}')
+    const raw = JSON.parse(supabaseAuthStorage.getItem(key) || '{}')
     return raw?.access_token || null
   } catch {
     return null

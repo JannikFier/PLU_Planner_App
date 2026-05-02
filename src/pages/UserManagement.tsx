@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { supabase, invokeEdgeFunction, isTestModeActive } from '@/lib/supabase'
+import { useState } from 'react'
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { invokeEdgeFunction, isTestModeActive } from '@/lib/supabase'
 import { createUserSchema, createUserResponseSchema, validateEdgeFunctionResponse } from '@/lib/validation'
 import { useAuth } from '@/hooks/useAuth'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
@@ -49,8 +49,7 @@ import { UserPlus, KeyRound, Loader2, Copy, Check, Users, Trash2, Building2, Eye
 import { toast } from 'sonner'
 import type { Profile } from '@/types/database'
 import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer, roleBadgeLabel, generateOneTimePassword } from '@/lib/profile-helpers'
-import { useCurrentStore } from '@/hooks/useCurrentStore'
-import { useCompanyProfiles } from '@/hooks/useCompanyProfiles'
+import { useUserManagementProfileList } from '@/hooks/useUserManagementProfileList'
 import { useAllStores } from '@/hooks/useStores'
 import { useStoreAccessByUser, useAddUserToStore, useRemoveUserFromStore } from '@/hooks/useStoreAccess'
 import {
@@ -73,77 +72,20 @@ function invalidateProfileLists(queryClient: QueryClient) {
 }
 
 export function UserManagement() {
-  const { isSuperAdmin, isAdmin, user: currentUser } = useAuth()
-  const { currentStoreId, currentCompanyId, storeName, isLoading: storeContextLoading } = useCurrentStore()
-  const currentUserId = currentUser?.id ?? null
-  const queryClient = useQueryClient()
-
-  // Admin: RLS liefert nur Profile der eigenen Firma. Super-Admin: firmenspezifisch über Marktkontext.
-  const { data: adminUsers, isLoading: adminUsersLoading, isError: adminUsersError } = useQuery({
-    queryKey: ['all-profiles'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      return data as Profile[]
-    },
-    enabled: !isSuperAdmin,
-  })
-
   const {
-    data: companyUsers,
-    isLoading: companyUsersLoading,
-    isError: companyUsersError,
-  } = useCompanyProfiles(isSuperAdmin ? currentCompanyId : null)
-
-  const isLoading = isSuperAdmin
-    ? (storeContextLoading || (!!currentCompanyId && companyUsersLoading))
-    : adminUsersLoading
-
-  const isError = isSuperAdmin ? companyUsersError : adminUsersError
-
-  const needsCompanyHint = isSuperAdmin && !storeContextLoading && !currentCompanyId
-
-  const filteredUsers = useMemo(() => {
-    const withoutSa = (list: Profile[] | undefined) =>
-      list?.filter(u => u.role !== 'super_admin') ?? []
-
-    if (isSuperAdmin) {
-      if (!currentCompanyId) return []
-      return [...withoutSa(companyUsers)].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      )
-    }
-    return withoutSa(adminUsers)
-  }, [isSuperAdmin, currentCompanyId, companyUsers, adminUsers])
-
-  /** Deterministische ID der ersten Tabellenzeile fuer Tutorial-Anker (`user-management-row-first`). */
-  const firstUserRowId = useMemo(() => filteredUsers[0]?.id ?? null, [filteredUsers])
-
-  // Heimatmarkt des aktuellen Users laden (fuer User-Erstellung)
-  const { data: homeStoreId } = useQuery({
-    queryKey: ['home-store-id', currentUserId],
-    queryFn: async () => {
-      if (!currentUserId) throw new Error('Nicht eingeloggt.')
-      const { data, error } = await supabase
-        .from('user_store_access' as never)
-        .select('store_id')
-        .eq('user_id', currentUserId)
-        .eq('is_home_store', true)
-        .single()
-
-      if (error) throw error
-      return (data as { store_id: string } | null)?.store_id ?? null
-    },
-    enabled: !!currentUserId && !isSuperAdmin,
-  })
-
-  // Neuer User wird dem aktuell ausgewaehlten Markt zugewiesen (Super-Admin: nur bei gewähltem Markt im Kontext)
-  const effectiveStoreId = isSuperAdmin ? currentStoreId : (currentStoreId ?? homeStoreId)
-  const defaultStoreId = effectiveStoreId ?? undefined
+    isSuperAdmin,
+    currentUserId,
+    currentCompanyId,
+    storeName,
+    isLoading,
+    isError,
+    needsCompanyHint,
+    filteredUsers,
+    firstUserRowId,
+    defaultStoreId,
+  } = useUserManagementProfileList()
+  const { isAdmin } = useAuth()
+  const queryClient = useQueryClient()
 
   // Dialog States
   const [showCreateDialog, setShowCreateDialog] = useState(false)

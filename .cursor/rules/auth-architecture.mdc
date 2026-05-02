@@ -29,6 +29,6 @@ AuthProvider → StoreProvider (Store braucht Auth)
 
 ## Kiosk und mehrere Browser-Tabs
 
-- **Auth-Speicher:** Der Browser-Client persistiert Supabase-JWTs in **`sessionStorage`** (nicht `localStorage`). **Tab schließen** = Session lokal weg; **neuer Tab** = eigenes `sessionStorage`, oft erneuter Login. Parallele Tabs teilen die Session nicht automatisch.
+- **Auth-Speicher:** **Lokal (`VITE_APP_DOMAIN` = `localhost`):** Supabase-JWTs in **`sessionStorage`**. **Produktion (echte Basisdomain):** JWTs in **HTTP-Cookies** mit **`Domain=.<Basisdomain>`**, damit `www` und Markt-Subdomains dieselbe Session teilen (siehe `src/lib/supabase-auth-cookie-storage.ts`). **Tab schließen** bei localhost = Session weg; in Produktion Cookies mit Max-Age – **Abmelden** fuer geteilte PCs. **Neuer Tab** auf derselben Parent-Domain teilt die Cookie-Session; **anderer Origin** (z. B. anderes Subdomain-Deployment) = eigene Cookies.
 - **Kasse vs. Verwaltung auf demselben Host:** Kassen-Anmeldung betrifft nur den jeweiligen Tab-Kontext; gleicher Host wie die Verwaltung bleibt möglich, aber getrennte Hosts sind klarer.
 - **Empfohlen:** Kassen-QR auf **Markt-Subdomain-URL** (`buildKioskEntranceUrl` in `src/lib/kiosk-entrance-url.ts`) und Verwaltung auf **anderem Host** (z. B. `app.…`) – getrennte Origins, getrenntes Storage pro Host, Admin-Alltag unabhängig vom Kassen-Tab.

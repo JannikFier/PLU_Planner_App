@@ -33,11 +33,18 @@ import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
 import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
 import { parseExitWerbungExcel } from '@/lib/excel-parser'
 import {
+  buildObstCampaignUploadState,
+  centralCampaignWeekKey,
+  countUsableObstLines,
+  linesFromObstMatchRows,
+  reviewRowsFromObstMatchRows,
+  type ObstCampaignUploadState,
+} from '@/lib/central-campaign-upload-page-helpers'
+import {
   parseObstWerbungPluExcel,
   mergeObstWerbungParseResults,
   type ObstWerbungPluExcelParseResult,
 } from '@/lib/obst-werbung-plu-excel'
-import { buildObstWerbungMatchRows, type ObstWerbungMatchRow } from '@/lib/obst-werbung-match-rows'
 import { rankExitRowMatches } from '@/lib/exit-offer-matching'
 import type { MasterPluCandidate } from '@/lib/exit-offer-matching'
 import {
@@ -61,99 +68,6 @@ import { Upload, Loader2 } from 'lucide-react'
 
 export type CentralCampaignListType = 'obst' | 'backshop'
 
-/** Zentrale Obst-Werbung: nur Markierung (Namen-Gelb); kein Aktionspreis aus Excel */
-const MARK_ONLY_PROMO_PRICE = 0
-
-type ObstCampaignUploadState = {
-  fileName: string
-  skippedRows: number
-  matchRows: ObstWerbungMatchRow[]
-}
-
-function buildObstCampaignUploadState(
-  parsed: ObstWerbungPluExcelParseResult,
-  masterPluSet: Set<string>,
-  masterCandidates: MasterPluCandidate[],
-): ObstCampaignUploadState {
-  const matchRows = buildObstWerbungMatchRows(parsed.lines, masterPluSet, masterCandidates)
-  return {
-    fileName: parsed.fileName,
-    skippedRows: parsed.skippedRows,
-    matchRows,
-  }
-}
-
-/**
- * Mappt Obst-MatchRows auf die wiederverwendbare CampaignReviewRow-Struktur.
- * Behalten: Excel-PLU und Artikel-Hinweis fuer Anzeige + spaeteres Speichern.
- */
-function reviewRowsFromObstMatchRows(matchRows: ObstWerbungMatchRow[]): CampaignReviewRow[] {
-  return matchRows.map((mr, idx) => ({
-    id: `${mr.line.excelPlu}-${mr.line.rowIndex}-${idx}`,
-    rowIndex: mr.line.rowIndex,
-    sourcePlu: mr.line.excelPlu,
-    sourceArtikel: mr.line.artikelHint || null,
-    selectedPlu: mr.selectedPlu || null,
-    origin: mr.selectedPlu ? 'excel' : 'unassigned',
-  }))
-}
-
-/**
- * Baut die Save-Inputs aus MatchRows: Zeilen mit Master-PLU -> origin 'excel',
- * Zeilen ohne Zuordnung -> origin 'unassigned' (bleiben als Review-Archiv erhalten).
- */
-function linesFromObstMatchRows(
-  matchRows: ObstWerbungMatchRow[],
-): Array<{
-  plu: string | null
-  promo_price: number
-  source_plu: string | null
-  source_artikel: string | null
-  origin: 'excel' | 'unassigned'
-}> {
-  const seenPlu = new Set<string>()
-  const out: Array<{
-    plu: string | null
-    promo_price: number
-    source_plu: string | null
-    source_artikel: string | null
-    origin: 'excel' | 'unassigned'
-  }> = []
-  for (const r of matchRows) {
-    const source_plu = r.line.excelPlu || null
-    const source_artikel = r.line.artikelHint || null
-    if (r.selectedPlu) {
-      if (seenPlu.has(r.selectedPlu)) continue
-      seenPlu.add(r.selectedPlu)
-      out.push({
-        plu: r.selectedPlu,
-        promo_price: MARK_ONLY_PROMO_PRICE,
-        source_plu,
-        source_artikel,
-        origin: 'excel',
-      })
-    } else {
-      out.push({
-        plu: null,
-        promo_price: MARK_ONLY_PROMO_PRICE,
-        source_plu,
-        source_artikel,
-        origin: 'unassigned',
-      })
-    }
-  }
-  return out
-}
-
-function countUsableObstLines(matchRows: ObstWerbungMatchRow[]): number {
-  const seen = new Set<string>()
-  for (const r of matchRows) {
-    if (!r.selectedPlu) continue
-    seen.add(r.selectedPlu)
-  }
-  return seen.size
-}
-
 interface CentralCampaignUploadPageProps {
   listType: CentralCampaignListType
 }
@@ -161,10 +75,6 @@ interface CentralCampaignUploadPageProps {
 type ExitMatchRow = {
   parsed: ParsedExitWerbungRow
   selectedPlu: string
-}
-
-function weekKey(kw: number, year: number) {
-  return `${year}-${kw}`
 }
 
 /** Nummerierter Schritt-Titel innerhalb einer Karte (1 Dateien → 2 Kontrollieren → 3 Speichern) */
@@ -265,7 +175,7 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
 
   const weekSelectId = useId()
 
-  const selectedWeekKey = weekKey(targetWeek.kw, targetWeek.year)
+  const selectedWeekKey = centralCampaignWeekKey(targetWeek.kw, targetWeek.year)
 
   const [ordWeekUpload, setOrdWeekUpload] = useState<ObstCampaignUploadState | null>(null)
   const [ord3Upload, setOrd3Upload] = useState<ObstCampaignUploadState | null>(null)
@@ -650,7 +560,7 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
           <Select
             value={selectedWeekKey}
             onValueChange={(v) => {
-              const opt = weekOptions.find((o) => weekKey(o.kw, o.year) === v)
+              const opt = weekOptions.find((o) => centralCampaignWeekKey(o.kw, o.year) === v)
               if (opt) {
                 setWeekManuallyPicked(true)
                 setTargetWeek({ kw: opt.kw, year: opt.year })
@@ -662,7 +572,7 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
             </SelectTrigger>
             <SelectContent>
               {weekOptions.map((o) => (
-                <SelectItem key={weekKey(o.kw, o.year)} value={weekKey(o.kw, o.year)}>
+                <SelectItem key={centralCampaignWeekKey(o.kw, o.year)} value={centralCampaignWeekKey(o.kw, o.year)}>
                   {o.label}
                 </SelectItem>
               ))}

@@ -22,8 +22,20 @@ flowchart TB
 | **2** | PLUTable splitten, Master-/Backshop-Header & Toolbar, gemeinsame Hooks, Agenten-Leitplanken | erledigt |
 | **3a** | Master-/Backshop-Masterlisten: Display-/PDF-Hooks, `*PageStates.tsx`, Werbungs-UI-Hook Backshop | erledigt |
 | **3b** | Virtualisierung nur als **Konzept** (Risiken Find-in-Page, Kiosk, E2E) | Doku: [VIRTUALISIERUNG_SPIKE.md](VIRTUALISIERUNG_SPIKE.md) |
-| **4** | **App-weiter** dasselbe Strukturmuster auf übrige große `src/pages/` anwenden (Prioritäten + Slices siehe unten) | **Slice-Fahrplan** unten; Umsetzung inkrementell |
-| **5** | **Virtualisierung** der PLU-Hauptlisten umsetzen (Library, Row-Höhen, `data-row-index`, erweiterte E2E) | offen, eigenes Zeitbudget |
+| **4** | **App-weiter** dasselbe Strukturmuster auf übrige große `src/pages/` anwenden (Prioritäten + Slices siehe unten) | **Plan abgeschlossen:** **4.1–4.4** erledigt (inkl. Backshop Ausgeblendet: Utils + `useBackshopHiddenProductsPageModel` + UI-Slices); **4.5–4.10** mit Plan-Minimum erledigt (Hooks/Lib wie tabelliert). Weitere Verdünnung einzelner Pages **optional** – Details [REFACTOR_STUFE_4_AGENT_PLAN.md](REFACTOR_STUFE_4_AGENT_PLAN.md) |
+| **5** | **Virtualisierung** der PLU-Hauptlisten umsetzen | **Nur nach M0:** [STUFE_5_M0_CHECKLIST.md](STUFE_5_M0_CHECKLIST.md); dann [REFACTOR_STUFE_5_AGENT_PLAN.md](REFACTOR_STUFE_5_AGENT_PLAN.md); Konzept: [VIRTUALISIERUNG_SPIKE.md](VIRTUALISIERUNG_SPIKE.md) |
+
+### Status: wie lesen?
+
+- Die **Zeile zu Stufe 4** in der Tabelle ist ein **Kurzüberblick** (was grob erledigt ist und was noch inkrementell möglich ist).
+- **Stufe 4 (Plan-Ziele):** Stand ist mit [REFACTOR_STUFE_4_AGENT_PLAN.md](REFACTOR_STUFE_4_AGENT_PLAN.md) abgestimmt – die dortigen Arbeitspakete gelten als **umgesetzt** (Minimum bei 4.5–4.10); **Stufe 5** ist **keine** Pflicht-Fortsetzung von Stufe 4.
+- **Details**: welches Arbeitspaket (4.1–4.10) was bedeutet, aktuelle Auslagerungen und der Unterschied **Slice erledigt** vs. **Page weiter verdünnen** → immer [REFACTOR_STUFE_4_AGENT_PLAN.md](REFACTOR_STUFE_4_AGENT_PLAN.md).
+
+### Sync-Regel (keine Doku-Drift)
+
+Wer den **Umsetzungsstand** oder die **Tabelle 4.5–4.10** in `REFACTOR_STUFE_4_AGENT_PLAN.md` ändert, passt in **derselben** Änderung die **Stufe‑4‑Statuszeile** in der Tabelle oben an. Umgekehrt: Änderungen nur an der Roadmap-Tabelle müssen mit dem Agent-Plan übereinstimmen.
+
+Leitplanken für Agents: [.cursor/rules/refactor-roadmap-agents.mdc](../.cursor/rules/refactor-roadmap-agents.mdc).
 
 ## Stufe 3 – Planungs- und Umsetzungsstand
 
@@ -35,6 +47,10 @@ flowchart TB
 **Fazit:** Stufe 3 ist **planerisch abgeschlossen**, sobald die Dev-Hygiene unten erledigt ist. Es gibt **nichts Weiteres zu „planen“** für 3b außerhalb von Stufe 5.
 
 ## Stufe 4 – Slice-Fahrplan (nach und nach)
+
+**Hinweis:** Die folgenden Abschnitte beschreiben das **Vorgehensmuster** und die historische Reihenfolge; den **aktuellen Umsetzungsstand** liefert immer die Tabellenzeile **Stufe 4** oben und [REFACTOR_STUFE_4_AGENT_PLAN.md](REFACTOR_STUFE_4_AGENT_PLAN.md).
+
+**Konkrete Schritt-für-Schritt-Anleitung für den Agent-Modus:** [REFACTOR_STUFE_4_AGENT_PLAN.md](REFACTOR_STUFE_4_AGENT_PLAN.md) (Arbeitspakete 4.1–4.10, Prompt-Vorlage).
 
 ### Slice 1 – Dev-Hygiene (kurz, risikoarm)
 
@@ -93,6 +109,12 @@ Weitere Prioritäten siehe Tabelle unten („Prioritäten“); jeweils **ein kla
 
 ## Stufe 5 – Virtualisierung (= früheres 3b „bauen“)
 
+**Einordnung:** Stufe 5 ist **keine** Pflicht-Fortsetzung oder „Abschlussbedingung“ von Stufe 4. Sie startet nur bei **messbarem Bedarf** und nach erfülltem **M0** ([STUFE_5_M0_CHECKLIST.md](STUFE_5_M0_CHECKLIST.md)); bei **No-Go** bleibt Virtualisierung Konzept-only – Stufe 4 gilt davon unberührt als strukturell abgeschlossen.
+
+**Ausführlicher Umsetzungsplan:** [REFACTOR_STUFE_5_AGENT_PLAN.md](REFACTOR_STUFE_5_AGENT_PLAN.md) – Arbeitspakete **5.0–5.8**, **Meilensteine M0–M6**, Go/No-Go, Abhängigkeitsdiagramm, Prompt-Vorlage.
+
+**Erst nach M0:** Checkliste [STUFE_5_M0_CHECKLIST.md](STUFE_5_M0_CHECKLIST.md) (Messung, Go/No-Go). Ohne **Go** kein Paket 5.1ff.
+
 **Nur starten**, wenn ein **messbarer Bedarf** besteht (z. B. spürbar langsame Listen, Profiler). Nicht mit einem kleinen UI-Ticket mischen.
 
 Siehe [VIRTUALISIERUNG_SPIKE.md](VIRTUALISIERUNG_SPIKE.md) für Bibliothek, Risiken und E2E-Plan.
@@ -103,5 +125,6 @@ Siehe **Stufe 4 – Slice 1** oben (`MasterList` / `BackshopMasterList`: `import
 
 ## Verknüpfung zur Architektur
 
+- Refactor-Roadmap / Stufe 4–5 für Agents: [refactor-roadmap-agents.mdc](../.cursor/rules/refactor-roadmap-agents.mdc)
 - Leitplanken: [component-size-and-agents.mdc](../.cursor/rules/component-size-and-agents.mdc)
 - Architektur-Masterlisten: [ARCHITECTURE.md](ARCHITECTURE.md)

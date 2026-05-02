@@ -28,17 +28,17 @@ import {
   useBackshopSourceChoicesForStore,
   useSaveBackshopSourceChoice,
 } from '@/hooks/useBackshopSourceChoices'
-import { BACKSHOP_SOURCES } from '@/lib/backshop-sources'
 import { formatError } from '@/lib/error-messages'
 import { useAuth } from '@/hooks/useAuth'
 import type { BackshopSource } from '@/types/database'
 import { getGroupListStatus, matchesListFilter, type MarkenListFilter } from '@/lib/marken-auswahl-state'
 import { useBackshopSourceRulesForStore } from '@/hooks/useBackshopSourceRules'
-import { resolveEffectiveChosenSourcesForGroupFilter } from '@/lib/backshop-group-effective-chosen'
 import { MarkenAuswahlStatusBand } from '@/components/marken-auswahl/MarkenAuswahlStatusBand'
 import { MasterlistPreview } from '@/components/marken-auswahl/MasterlistPreview'
 import { GruppenSidebarList } from '@/components/marken-auswahl/GruppenSidebarList'
 import { MarkenKarteDesktop, MarkenKarteMobileRow, type KarteZustand } from '@/components/marken-auswahl/MarkenKarte'
+import { dashboardRolePrefixFromPathname } from '@/lib/dashboard-role-prefix'
+import { useBackshopMarkenAuswahlDerived } from '@/hooks/useBackshopMarkenAuswahlDerived'
 import { useMediaMinWidth } from '@/hooks/useMediaMinWidth'
 
 function FieldHelp({ id, text }: { id: string; text: string }) {
@@ -83,13 +83,7 @@ export function BackshopMarkenAuswahlPage() {
   const isSplit = useMediaMinWidth(1024)
   const detailRef = useRef<HTMLDivElement>(null)
 
-  const rolePrefix = location.pathname.startsWith('/super-admin')
-    ? '/super-admin'
-    : location.pathname.startsWith('/admin')
-      ? '/admin'
-      : location.pathname.startsWith('/viewer')
-        ? '/viewer'
-        : '/user'
+  const rolePrefix = dashboardRolePrefixFromPathname(location.pathname)
   const isSuperAdmin = profile?.role === 'super_admin'
 
   const { data: blocks = [] } = useBackshopBlocks()
@@ -107,13 +101,8 @@ export function BackshopMarkenAuswahlPage() {
   const { data: backshopBlockSourceRules = [] } = useBackshopSourceRulesForStore(currentStoreId)
   const saveChoice = useSaveBackshopSourceChoice()
 
-  const blockPreferredSourceByBlockId = useMemo(() => {
-    const m = new Map<string, BackshopSource>()
-    for (const r of backshopBlockSourceRules) {
-      m.set(r.block_id, r.preferred_source as BackshopSource)
-    }
-    return m
-  }, [backshopBlockSourceRules])
+  const { choiceByGroup, memberSourcesFor, choiceBaselineForGroup, withMeta } =
+    useBackshopMarkenAuswahlDerived(groups, choices, backshopBlockSourceRules)
 
   const [search, setSearch] = useState('')
   const [listFilter, setListFilter] = useState<MarkenListFilter>('all')
@@ -123,60 +112,6 @@ export function BackshopMarkenAuswahlPage() {
   const [doneSummary, setDoneSummary] = useState<null | { total: number; bewusst: number; offen: number }>(null)
   const longPressTimer = useRef<number | null>(null)
   const longPressFired = useRef(false)
-
-  const choiceByGroup = useMemo(() => {
-    const m = new Map<string, BackshopSource[]>()
-    for (const c of choices) m.set(c.group_id, (c.chosen_sources ?? []) as BackshopSource[])
-    return m
-  }, [choices])
-
-  const memberSourcesFor = useCallback(
-    (groupId: string) => {
-      const g = groups.find((x) => x.id === groupId)
-      if (!g) return [] as BackshopSource[]
-      return [...new Set(g.members.map((m) => m.source as BackshopSource))].sort((a, b) => {
-        const rank = (s: BackshopSource) =>
-          s === 'manual' ? 99 : BACKSHOP_SOURCES.indexOf(s as (typeof BACKSHOP_SOURCES)[number])
-        return rank(a) - rank(b)
-      })
-    },
-    [groups],
-  )
-
-  const choiceBaselineForGroup = useCallback(
-    (groupId: string) => {
-      const g = groups.find((x) => x.id === groupId)
-      if (!g) return [] as BackshopSource[]
-      const mem = memberSourcesFor(groupId)
-      const memberSet = new Set(mem)
-      const dbChosen = choiceByGroup.get(groupId) ?? []
-      return (
-        resolveEffectiveChosenSourcesForGroupFilter(
-          memberSet,
-          dbChosen,
-          g.block_id ?? undefined,
-          blockPreferredSourceByBlockId,
-        ) ?? dbChosen
-      )
-    },
-    [groups, memberSourcesFor, choiceByGroup, blockPreferredSourceByBlockId],
-  )
-
-  const withMeta = useMemo(() => {
-    return groups.map((g) => {
-      const mem = memberSourcesFor(g.id)
-      const memberSet = new Set(mem)
-      const dbChosen = choiceByGroup.get(g.id) ?? []
-      const inferred = resolveEffectiveChosenSourcesForGroupFilter(
-        memberSet,
-        dbChosen,
-        g.block_id ?? undefined,
-        blockPreferredSourceByBlockId,
-      )
-      const chosenForUi = inferred ?? dbChosen
-      return { g, mem, chosen: chosenForUi, st: getGroupListStatus(mem, chosenForUi) }
-    })
-  }, [groups, memberSourcesFor, choiceByGroup, blockPreferredSourceByBlockId])
 
   const q = search.trim().toLowerCase()
   const filteredRows = useMemo(() => {

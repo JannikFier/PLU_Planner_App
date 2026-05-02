@@ -1,7 +1,10 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useLayoutEffect } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
+import { useUserPreview } from '@/contexts/UserPreviewContext'
+import { getHomeDashboardPath } from '@/lib/effective-route-prefix'
+import { pickSafePostLoginPath, getPostLoginCanonicalRedirectUrl } from '@/lib/canonical-host-redirect'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,13 +20,9 @@ import { AppBrandLogo } from '@/components/layout/AppBrandLogo'
  * Passwort-Feld hat ein Auge-Icon zum Ein-/Ausblenden.
  */
 export function LoginPage() {
-  const location = useLocation()
-    const {
+  const {
     user,
     isLoading,
-    isSuperAdmin,
-    isAdmin,
-    isViewer,
     isKiosk,
     mustChangePassword,
     error,
@@ -53,25 +52,15 @@ export function LoginPage() {
   // Automatische Erkennung: Email (enthält @) oder Personalnummer (Hooks vor allen Returns)
   const isEmail = useMemo(() => identifier.includes('@'), [identifier])
 
-  // Wenn eingeloggt: weiterleiten (zur ursprünglich angefragten Route oder Dashboard) (zur ursprünglich angefragten Route oder Dashboard)
+  // Wenn eingeloggt: kanonischer Host (www / Markt-Subdomain) oder SPA-Navigate zum Dashboard
   if (user && !isLoading) {
     if (mustChangePassword) {
       return <Navigate to="/change-password" replace />
     }
-    const dashboardPath = isSuperAdmin
-      ? '/super-admin'
-      : isAdmin
-        ? '/admin'
-        : isViewer
-          ? '/viewer'
-          : isKiosk
-            ? '/kiosk'
-            : '/user'
     if (isKiosk) {
       return <Navigate to="/kiosk" replace />
     }
-    const from = (location.state as { from?: { pathname?: string } })?.from?.pathname || dashboardPath
-    return <Navigate to={from} replace />
+    return <LoginPostLoginRedirect />
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -279,4 +268,54 @@ export function LoginPage() {
       </div>
     </div>
   )
+}
+
+/** Nach erfolgreichem Login: ggf. voller Host-Wechsel (Cookies), sonst <Navigate>. */
+function LoginPostLoginRedirect() {
+  const location = useLocation()
+  const { profile } = useAuth()
+  const { preview } = useUserPreview()
+  const { subdomain, isLoading: storeLoading, isAdminDomain } = useCurrentStore()
+
+  if (!profile) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 px-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden />
+        <span className="sr-only">Wird geladen…</span>
+      </div>
+    )
+  }
+
+  const from = (location.state as { from?: { pathname?: string } })?.from?.pathname
+  const homePath = getHomeDashboardPath(profile.role, preview)
+
+  const canonicalUrl =
+    typeof window !== 'undefined'
+      ? getPostLoginCanonicalRedirectUrl({
+          appDomain: import.meta.env.VITE_APP_DOMAIN ?? '',
+          hostname: window.location.hostname,
+          profileRole: profile.role,
+          storeSubdomain: subdomain,
+          storeLoading,
+          isAdminDomain,
+          preview,
+          fromPathname: from,
+        })
+      : null
+
+  useLayoutEffect(() => {
+    if (canonicalUrl) window.location.assign(canonicalUrl)
+  }, [canonicalUrl])
+
+  if (canonicalUrl) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 px-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden />
+        <span className="sr-only">Weiterleitung…</span>
+      </div>
+    )
+  }
+
+  const path = pickSafePostLoginPath(profile.role, from, homePath)
+  return <Navigate to={path} replace />
 }
