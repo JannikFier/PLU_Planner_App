@@ -24,6 +24,13 @@ export function useVersions(options?: UseVersionsOptions) {
     queryKey: ['versions'],
     staleTime: 2 * 60_000,
     enabled,
+    // Bei 'Nicht angemeldet' (Cookie-Storage-Race direkt nach Login/Cache-Restore) automatisch retryen.
+    retry: (failureCount, error) => {
+      const msg = (error as { message?: string })?.message ?? ''
+      if (msg.startsWith('Nicht angemeldet')) return failureCount < 3
+      return false
+    },
+    retryDelay: 250,
     queryFn: async () => {
       const data = await queryRest<Version[]>('versions', {
         select: '*',
@@ -37,8 +44,14 @@ export function useVersions(options?: UseVersionsOptions) {
     if (!result.isError || result.isRefetching || !result.error) return
     const t = setTimeout(() => {
       if (isAbortError(result.error)) return
-      const msg = 'Versionen laden fehlgeschlagen: ' + ((result.error as { message?: string })?.message ?? 'Unbekannter Fehler')
-      toast.error(msg)
+      const errorMsg = (result.error as { message?: string })?.message ?? ''
+      // 'Nicht angemeldet' = transienter Cookie-Storage-Race direkt nach Login.
+      // React Query retryt bereits; kein User-Toast noetig.
+      if (errorMsg.startsWith('Nicht angemeldet')) {
+        console.warn('[useVersions] Auth-Race transient – kein Toast', errorMsg)
+        return
+      }
+      toast.error('Versionen laden fehlgeschlagen: ' + (errorMsg || 'Unbekannter Fehler'))
     }, TOAST_DELAY_MS)
     return () => clearTimeout(t)
   }, [result.isError, result.isRefetching, result.error])

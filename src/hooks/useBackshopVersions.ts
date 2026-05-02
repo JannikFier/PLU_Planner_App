@@ -13,6 +13,13 @@ export function useBackshopVersions() {
   return useQuery<BackshopVersion[]>({
     queryKey: ['backshop-versions'],
     staleTime: 2 * 60_000,
+    // Bei 'Nicht angemeldet' (Cookie-Storage-Race direkt nach Login/Cache-Restore) automatisch retryen.
+    retry: (failureCount, error) => {
+      const msg = (error as { message?: string })?.message ?? ''
+      if (msg.startsWith('Nicht angemeldet')) return failureCount < 3
+      return false
+    },
+    retryDelay: 250,
     queryFn: async () => {
       try {
         const data = await queryRest<BackshopVersion[]>('backshop_versions', {
@@ -21,7 +28,13 @@ export function useBackshopVersions() {
         })
         return data ?? []
       } catch (err) {
-        toast.error('Backshop-Versionen laden fehlgeschlagen: ' + ((err as Error)?.message ?? 'Unbekannter Fehler'))
+        const msg = (err as Error)?.message ?? 'Unbekannter Fehler'
+        if (msg.startsWith('Nicht angemeldet')) {
+          // Race direkt nach Login: kein Toast, React Query retryt automatisch.
+          console.warn('[useBackshopVersions] Auth-Race transient – kein Toast', msg)
+        } else {
+          toast.error('Backshop-Versionen laden fehlgeschlagen: ' + msg)
+        }
         throw err
       }
     },

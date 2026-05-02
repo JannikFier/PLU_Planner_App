@@ -156,18 +156,27 @@ export function getAccessTokenFromStorage(): string | null {
 
 /**
  * JWT robust beschaffen: erst aus Storage (sync, schnell), dann Fallback auf
- * supabase.auth.getSession() (in-memory). Behandelt die Race direkt nach Login,
- * wenn Cookie-Storage-Write noch nicht propagiert ist.
+ * supabase.auth.getSession() (in-memory). Mit Retry fuer Cookie-Storage-Race
+ * (Cache-Restore-Pfad in AuthContext kann Queries vor Supabase-JS-Session-Load
+ * starten – queryRest soll dann nicht "Nicht angemeldet" werfen).
  */
 async function getAccessToken(): Promise<string | null> {
-  const fromStorage = getAccessTokenFromStorage()
-  if (fromStorage) return fromStorage
-  try {
-    const { data: { session } } = await getSessionDeduped()
-    return session?.access_token ?? null
-  } catch {
-    return null
+  const TOTAL_TRIES = 6
+  const DELAY_MS = 200
+  for (let attempt = 0; attempt < TOTAL_TRIES; attempt++) {
+    const fromStorage = getAccessTokenFromStorage()
+    if (fromStorage) return fromStorage
+    try {
+      const { data: { session } } = await getSessionDeduped()
+      if (session?.access_token) return session.access_token
+    } catch {
+      /* weiter retry */
+    }
+    if (attempt < TOTAL_TRIES - 1) {
+      await new Promise(r => setTimeout(r, DELAY_MS))
+    }
   }
+  return null
 }
 
 /** Timeout fuer Session-Refresh (verhindert Hänger bei Netzwerkproblemen) */
