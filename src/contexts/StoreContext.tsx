@@ -240,6 +240,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const resolveByProfileFromAuth = useCallback(
     async (userId: string, authProfile: Profile | null) => {
+      // isLoading=true setzen, damit das Dashboard waehrend der Auflösung
+      // den Skeleton-Loader zeigt statt "Kein Markt zugewiesen".
+      setState(prev => prev.isLoading ? prev : { ...prev, isLoading: true, error: null })
       try {
         const preview = readUserPreviewState()
         if (preview?.active && preview.storeId) {
@@ -396,7 +399,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void Promise.resolve().then(() => resolveBySubdomain())
   }, [resolveBySubdomain])
 
-  // --- Schritt 2: Auth-basierter Fallback (kein Subdomain ODER Admin-Subdomain ohne Store) ---
+  // --- Schritt 2: Auth-basierter Fallback (immer wenn nach Auth kein Store gesetzt ist) ---
+  // Deckt:
+  //   - Subdomain ohne Auth nicht aufgeloest (anonyme RLS auf stores blockiert SELECT)
+  //   - Admin-Subdomain (kein automatischer Store)
+  //   - Kein Subdomain (localhost / www)
+  //   - Logout + Kiosk-Login (state-reset, currentStoreId leer trotz frueherer Subdomain-Auflösung)
   useEffect(() => {
     if (!user?.id || !session) {
       // Kein User ODER Session noch nicht bestaetigt (z.B. Cache-Restore)
@@ -414,15 +422,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       return
     }
-    // Subdomain hat den Markt gesetzt: Auth-Fallback nur ueberspringen, wenn der Client-State noch einen Markt hat.
-    // Sonst bleibt nach Logout (State-Reset) + Kiosk-Login currentStoreId leer → falsche/fehlende Listen-Sortierung.
-    if (resolvedBySubdomain.current && !state.isAdminDomain && state.currentStoreId) return
-    if (fallbackTriggered.current && state.currentStoreId) return
-    if (!resolvedBySubdomain.current || (state.isAdminDomain && !state.currentStoreId)) {
-      fallbackTriggered.current = true
-      void Promise.resolve().then(() => resolveByProfileFromAuth(user.id, profile))
-    }
-  }, [user?.id, profile, session, authLoading, state.isAdminDomain, state.currentStoreId, resolveByProfileFromAuth])
+    if (state.currentStoreId) return
+    if (fallbackTriggered.current) return
+    fallbackTriggered.current = true
+    void Promise.resolve().then(() => resolveByProfileFromAuth(user.id, profile))
+  }, [user?.id, profile, session, authLoading, state.currentStoreId, resolveByProfileFromAuth])
 
   const setActiveStore = useCallback(async (storeId: string, options?: SetActiveStoreOptions) => {
     const syncToProfile = options?.syncToProfile !== false
