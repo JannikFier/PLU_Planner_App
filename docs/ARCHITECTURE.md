@@ -25,6 +25,12 @@
 └─────────────────────────────────────────────┘
 ```
 
+## Struktur und Refactor-Leitplanken
+
+Neue Features halten die Projektregeln ein: **`src/pages/`** vorrangig zur **Orchestrierung** (Layout, Routing, Komposition); **Business-Logik** nach **`src/lib/`**, Daten-/Anzeige-Hooks nach **`src/hooks/`**. Damit entstehen keine neuen Monolithen in Seiten oder der PLU-Tabelle – siehe die Cursor-Regel [.cursor/rules/component-size-and-agents.mdc](../.cursor/rules/component-size-and-agents.mdc).
+
+Die **Refactor-Roadmap** (Stufe 4 aus Plan-Sicht abgeschlossen; **Stufe 5** Virtualisierung nur nach Messung und **M0**): [docs/REFACTOR_ROADMAP_STUFEN.md](REFACTOR_ROADMAP_STUFEN.md).
+
 ## Datenfluss
 
 ### Excel-Upload bis PDF-Export

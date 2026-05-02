@@ -30,4 +30,8 @@ alwaysApply: true
 
 ## Abschluss in der Antwort
 
-Nach Refactor-/Roadmap-Arbeit kurz angeben: **„Roadmap-Zeile Stufe 4 und REFACTOR_STUFE_4_AGENT_PLAN synchronisiert: ja/nein.“**
+**Nicht** pauschal „synchronisiert: nein“ sagen (wirkt wie Doku-Drift, gemeint wäre oft nur: heute keine Roadmap-Datei geändert).
+
+- **Wenn** in dieser Session `docs/REFACTOR_ROADMAP_STUFEN.md` oder `docs/REFACTOR_STUFE_4_AGENT_PLAN.md` (Umsetzungsstand, Tabelle 4.5–4.10) geändert wurde: kurz bestätigen, dass **Roadmap-Zeile Stufe 4** und **Agent-Plan** inhaltlich **gemeinsam** angepasst wurden (Sync-Regel oben).
+- **Wenn nicht:** **„Keine Änderung am Stufe‑4‑Doku-Stand.“** – kein „Sync nein“.
+- Bei größerem Refactor **ohne** Doku-Touch optional: **„Sync-Regel für künftige Standänderungen beachtet; beschriebener Stufe‑4‑Stand unverändert.“**

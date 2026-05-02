@@ -149,6 +149,8 @@ Erweitert Supabase Auth um App-spezifische Daten.
 
 **Trigger:** Bei neuem Auth-User wird automatisch ein Profil erstellt (`handle_new_user()`). Anonyme User werden ignoriert. E-Mail-Adressen, die dem Muster `kiosk_reg_<32hex>@example.com` (bzw. historisch `kiosk_reg_%@kiosk.pluplanner.invalid`) entsprechen, erhalten automatisch `role = 'kiosk'` und eine eindeutige `personalnummer` (Kassenkonten aus Edge Function `create-kiosk-register`).
 
+**RPC `get_my_profile()`** (Migration 083): Gibt die eigene `profiles`-Zeile als `jsonb` zurück (`SECURITY DEFINER`, nur `WHERE id = auth.uid()`). Die Web-App ruft das nach der Anmeldung auf, damit das Profil auch dann geladen wird, wenn der erste direkte `SELECT` unter RLS/Cookie-Timing kurz keine Zeile liefert. Ausführung: Migration in Supabase anwenden; ohne Migration fällt die App auf den bisherigen Tabellen-Select zurück.
+
 ### store_kiosk_entrances
 
 QR-/Link-Einstieg pro Markt (Token in der URL `/kasse/:token`).

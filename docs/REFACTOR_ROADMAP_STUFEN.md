@@ -27,6 +27,7 @@ flowchart TB
 
 ### Status: wie lesen?
 
+- **Standardannahme Stufe 4:** Der **Plan** (Arbeitspakete 4.1–4.10 mit Plan-Minimum) gilt als **abgeschlossen**; weitere Verdünnung einzelner Pages ist **optional**. Details und Tabellen immer im [REFACTOR_STUFE_4_AGENT_PLAN.md](REFACTOR_STUFE_4_AGENT_PLAN.md).
 - Die **Zeile zu Stufe 4** in der Tabelle ist ein **Kurzüberblick** (was grob erledigt ist und was noch inkrementell möglich ist).
 - **Stufe 4 (Plan-Ziele):** Stand ist mit [REFACTOR_STUFE_4_AGENT_PLAN.md](REFACTOR_STUFE_4_AGENT_PLAN.md) abgestimmt – die dortigen Arbeitspakete gelten als **umgesetzt** (Minimum bei 4.5–4.10); **Stufe 5** ist **keine** Pflicht-Fortsetzung von Stufe 4.
 - **Details**: welches Arbeitspaket (4.1–4.10) was bedeutet, aktuelle Auslagerungen und der Unterschied **Slice erledigt** vs. **Page weiter verdünnen** → immer [REFACTOR_STUFE_4_AGENT_PLAN.md](REFACTOR_STUFE_4_AGENT_PLAN.md).

@@ -9,6 +9,18 @@ import { loginEmailSchema, loginPersonalnummerSchema } from '@/lib/validation'
 import type { User, Session } from '@supabase/supabase-js'
 import type { Database, Profile } from '@/types/database'
 
+/** PostgREST: RPC get_my_profile noch nicht deployed oder Schema-Cache. */
+function isGetMyProfileRpcMissingError(error: { code?: string; message?: string }): boolean {
+  const code = String(error.code ?? '')
+  const msg = (error.message ?? '').toLowerCase()
+  return (
+    code === 'PGRST202'
+    || code === '42883'
+    || msg.includes('could not find the function')
+    || msg.includes('get_my_profile')
+  )
+}
+
 /** Auth-State – eine einzige Quelle für die gesamte App */
 export interface AuthState {
   user: User | null
@@ -74,8 +86,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const PROFILE_CACHE_KEY = 'plu_planner_profile'
   const SESSION_CACHE_KEY = 'plu_planner_session'
-  const FETCH_PROFILE_TIMEOUT = 8000
+  /** Gesamtbudget inkl. Retries (Cookie-Session muss fuer REST greifen). */
+  const FETCH_PROFILE_TIMEOUT = 20_000
   const PROFILE_ERROR_TOAST_DELAY_MS = 1500
+  /** Nach Login/Refresh: leere Profil-Antwort kurz wiederholen (Race Session vs. REST). */
+  const PROFILE_FETCH_EMPTY_RETRIES = 6
+  const PROFILE_FETCH_EMPTY_DELAY_MS = 200
   /** true wenn wir in diesem Init bereits aus Cache angezeigt haben – dann getSession-Update minimal halten */
   const displayedFromCacheRef = useRef(false)
   /** Timeout für verzögerten Profil-Fehler-Toast; wird gecleart sobald ein Profil gesetzt wird */
@@ -125,33 +141,92 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const fetchOnce = async (): Promise<Profile | null> => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle()
-
-      if (error) {
-        const err = error as { message?: string; cause?: unknown }
-        const isAbort = isAbortError(err) || isAbortError(err.cause) || (err.message?.includes?.('AbortError') ?? false)
-        if (!isAbort) {
-          scheduleProfileErrorToast('Profil laden fehlgeschlagen: ' + (error?.message ?? 'Unbekannter Fehler'))
+      const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
+      const cacheAndReturn = (profile: Profile): Profile => {
+        try {
+          sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ userId, profile }))
+        } catch {
+          // sessionStorage voll oder nicht verfügbar – ignorieren
         }
-        throw error
+        return profile
       }
-      if (!data) {
+
+      let rpcUnavailable = false
+
+      for (let attempt = 0; attempt < PROFILE_FETCH_EMPTY_RETRIES; attempt++) {
+        const { data: { session } } = await supabase.auth.getSession()
+        const sessionReady = Boolean(session?.access_token && session.user.id === userId)
+
+        if (!sessionReady) {
+          if (attempt < PROFILE_FETCH_EMPTY_RETRIES - 1) {
+            await sleep(PROFILE_FETCH_EMPTY_DELAY_MS)
+            continue
+          }
+          scheduleProfileErrorToast(
+            'Anmeldung unvollständig (Sitzung nicht bereit). Bitte Seite neu laden und erneut anmelden.',
+          )
+          return null
+        }
+
+        if (!rpcUnavailable) {
+          const { data: rpcPayload, error: rpcError } = await supabase.rpc('get_my_profile')
+
+          if (!rpcError && rpcPayload != null && typeof rpcPayload === 'object' && !Array.isArray(rpcPayload)) {
+            const profile = rpcPayload as Profile
+            if (profile.id === userId) {
+              return cacheAndReturn(profile)
+            }
+          }
+
+          if (!rpcError && rpcPayload == null) {
+            scheduleProfileErrorToast(
+              'Kein Profil gefunden. Bitte Administrator kontaktieren oder erneut anmelden.',
+            )
+            return null
+          }
+
+          if (rpcError && isGetMyProfileRpcMissingError(rpcError)) {
+            rpcUnavailable = true
+          } else if (rpcError) {
+            const err = rpcError as { message?: string; cause?: unknown }
+            const isAbort =
+              isAbortError(err) || isAbortError(err.cause) || (err.message?.includes?.('AbortError') ?? false)
+            if (!isAbort) {
+              scheduleProfileErrorToast('Profil laden fehlgeschlagen: ' + (rpcError?.message ?? 'Unbekannter Fehler'))
+            }
+            throw rpcError
+          }
+        }
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle()
+
+        if (error) {
+          const err = error as { message?: string; cause?: unknown }
+          const isAbort = isAbortError(err) || isAbortError(err.cause) || (err.message?.includes?.('AbortError') ?? false)
+          if (!isAbort) {
+            scheduleProfileErrorToast('Profil laden fehlgeschlagen: ' + (error?.message ?? 'Unbekannter Fehler'))
+          }
+          throw error
+        }
+
+        if (data) {
+          return cacheAndReturn(data as Profile)
+        }
+
+        if (attempt < PROFILE_FETCH_EMPTY_RETRIES - 1) {
+          await sleep(PROFILE_FETCH_EMPTY_DELAY_MS)
+          continue
+        }
         scheduleProfileErrorToast(
           'Kein Profil gefunden. Bitte Administrator kontaktieren oder erneut anmelden.',
         )
         return null
       }
-      const profile = data as Profile
-      try {
-        sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ userId, profile }))
-      } catch {
-        // sessionStorage voll oder nicht verfügbar – ignorieren
-      }
-      return profile
+      return null
     }
 
     try {
@@ -317,6 +392,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           if (event === 'SIGNED_IN' && session?.user) {
             const userId = session.user.id
+            if (session.access_token && session.refresh_token) {
+              const { error: setErr } = await supabase.auth.setSession({
+                access_token: session.access_token,
+                refresh_token: session.refresh_token,
+              })
+              if (setErr) console.error('[Auth] setSession bei SIGNED_IN:', setErr)
+            }
             let profile = await fetchProfile(userId)
             if (!mounted) return
             if (!profile) {
@@ -428,6 +510,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       if (error) throw { type: 'auth' as const, error }
       if (!data?.session?.user) throw { type: 'no_session' as const }
+      // Session explizit setzen (wichtig bei Cookie-Speicher / Subdomain-Wechsel), damit REST sofort das JWT nutzt.
+      const { error: setSessionError } = await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      })
+      if (setSessionError) {
+        console.error('[Auth] setSession nach Login:', setSessionError)
+      }
       let profile = await fetchProfile(data.session.user.id)
       if (!profile) {
         try {

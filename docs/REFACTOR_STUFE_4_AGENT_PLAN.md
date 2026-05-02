@@ -6,7 +6,7 @@ Dieses Dokument ist **copy-paste-tauglich**: Du kannst den Abschnitt [„Prompt-
 
 Übergeordnete Einordnung: [REFACTOR_ROADMAP_STUFEN.md](REFACTOR_ROADMAP_STUFEN.md).
 
-**Umsetzungsstand:** **4.1–4.3** und **4.4** (UI-Slices Backshop Ausgeblendet) sind umgesetzt. **4.5–4.10:** erste Struktur-Slices (Hooks/Lib) für die genannten großen Seiten – siehe Tabelle unten; weitere Verkleinerung der Pages bei Bedarf inkrementell.
+**Umsetzungsstand:** **4.1–4.4** sind umgesetzt (inkl. UI-Slices Backshop Ausgeblendet). **4.5–4.10:** erste Struktur-Slices (Hooks/Lib) für die genannten großen Seiten – siehe Tabelle unten; weitere Verkleinerung der Pages bei Bedarf inkrementell.
 
 ---
 

@@ -1509,6 +1509,11 @@ export interface Database {
         Args: { p_nummer: string }
         Returns: string | null
       }
+      /** Eigenes Profil (RLS-umgehend); null wenn keine Zeile zu auth.uid(). */
+      get_my_profile: {
+        Args: Record<string, never>
+        Returns: Record<string, unknown> | null
+      }
       rename_backshop_master_plu_item: {
         Args: { item_id: string; new_display_name: string; new_image_url?: string | null }
         Returns: undefined
