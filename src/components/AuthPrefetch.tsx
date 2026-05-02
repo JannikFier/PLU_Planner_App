@@ -22,13 +22,14 @@ import { supabase } from '@/lib/supabase'
 import type { Store } from '@/types/database'
 
 export function AuthPrefetch() {
-  const { user, isLoading: authLoading, mustChangePassword, profile } = useAuth()
+  const { user, session, isLoading: authLoading, mustChangePassword, profile } = useAuth()
+  const restReady = Boolean(session?.access_token)
   const { currentStoreId, currentCompanyId } = useCurrentStore()
   const queryClient = useQueryClient()
   const location = useLocation()
 
   useEffect(() => {
-    if (authLoading || !user || mustChangePassword) return
+    if (authLoading || !user || mustChangePassword || !restReady) return
 
     let cancelled = false
     void (async () => {
@@ -43,30 +44,30 @@ export function AuthPrefetch() {
       }
     })()
     return () => { cancelled = true }
-  }, [authLoading, user, mustChangePassword, queryClient, profile?.role])
+  }, [authLoading, user, mustChangePassword, queryClient, profile?.role, restReady])
 
   // Marktspezifische Daten prefetchen sobald currentStoreId verfuegbar
   useEffect(() => {
-    if (!currentStoreId || authLoading || !user || mustChangePassword) return
+    if (!currentStoreId || authLoading || !user || mustChangePassword || !restReady) return
     runStorePrefetch(queryClient, currentStoreId)
     runBackshopStorePrefetch(queryClient, currentStoreId)
-  }, [currentStoreId, authLoading, user, mustChangePassword, queryClient])
+  }, [currentStoreId, authLoading, user, mustChangePassword, queryClient, restReady])
 
   // Super-Admin: Benutzer der aktuellen Firma (gleiche Query wie Benutzerverwaltung)
   useEffect(() => {
-    if (!currentCompanyId || authLoading || !user || mustChangePassword) return
+    if (!currentCompanyId || authLoading || !user || mustChangePassword || !restReady) return
     if (profile?.role !== 'super_admin') return
     void queryClient.prefetchQuery({
       queryKey: ['company-profiles', currentCompanyId],
       queryFn: () => fetchProfilesForCompany(currentCompanyId),
       staleTime: 5 * 60 * 1000,
     })
-  }, [currentCompanyId, authLoading, user, mustChangePassword, queryClient, profile?.role])
+  }, [currentCompanyId, authLoading, user, mustChangePassword, queryClient, profile?.role, restReady])
 
   // Store-Detail aus URL prefetchen (Reload auf /super-admin/companies/.../stores/:storeId)
   const storeIdFromPath = location.pathname.match(/\/stores\/([a-f0-9-]+)/)?.[1]
   useEffect(() => {
-    if (!storeIdFromPath || authLoading || !user || mustChangePassword) return
+    if (!storeIdFromPath || authLoading || !user || mustChangePassword || !restReady) return
     void queryClient.prefetchQuery({
       queryKey: ['stores', 'detail', storeIdFromPath],
       queryFn: async () => {
@@ -81,7 +82,7 @@ export function AuthPrefetch() {
       },
     })
     void import('@/pages/SuperAdminStoreDetailPage')
-  }, [storeIdFromPath, authLoading, user, mustChangePassword, queryClient])
+  }, [storeIdFromPath, authLoading, user, mustChangePassword, queryClient, restReady])
 
   // Dashboard-Chunk der Rolle vorladen, damit Redirect/Navigation sofort den Chunk nutzen kann
   useEffect(() => {
