@@ -16,7 +16,7 @@ export function UserDashboard() {
   const navigate = useNavigate()
   const { isSuperAdmin } = useAuth()
   const { isUserPreviewActive } = useUserPreview()
-  const { currentStoreId } = useCurrentStore()
+  const { currentStoreId, isLoading: storeLoading } = useCurrentStore()
   usePrefetchForNavigation()
 
   const { obstGemuese: obstVisible, backshop: backshopVisible, isLoading: visibilityLoading } =
@@ -25,6 +25,16 @@ export function UserDashboard() {
   // Super-Admin gehoert auf /super-admin – ausser bei aktiver User-Vorschau (simulierte Rolle)
   if (isSuperAdmin && !isUserPreviewActive) {
     return <Navigate to="/super-admin" replace />
+  }
+
+  if (storeLoading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-8">
+          <div className="animate-pulse bg-muted h-32 rounded-lg" />
+        </div>
+      </DashboardLayout>
+    )
   }
 
   if (!currentStoreId) {

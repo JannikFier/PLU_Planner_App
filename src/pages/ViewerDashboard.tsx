@@ -13,7 +13,7 @@ import { ClipboardList } from 'lucide-react'
  */
 export function ViewerDashboard() {
   const navigate = useNavigate()
-  const { currentStoreId } = useCurrentStore()
+  const { currentStoreId, isLoading: storeLoading } = useCurrentStore()
   usePrefetchForNavigation()
 
   const { obstGemuese: obstVisible, backshop: backshopVisible, isLoading: visibilityLoading } =
@@ -53,6 +53,16 @@ export function ViewerDashboard() {
 
     return result
   }, [navigate, obstVisible, backshopVisible])
+
+  if (storeLoading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="animate-pulse bg-muted h-32 rounded-lg" />
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   if (!currentStoreId) {
     return (

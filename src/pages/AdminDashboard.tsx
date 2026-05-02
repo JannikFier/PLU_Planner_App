@@ -16,7 +16,7 @@ export function AdminDashboard() {
   const navigate = useNavigate()
   const { isSuperAdmin } = useAuth()
   const { isUserPreviewActive, preview } = useUserPreview()
-  const { currentStoreId } = useCurrentStore()
+  const { currentStoreId, isLoading: storeLoading } = useCurrentStore()
   usePrefetchForNavigation()
 
   const {
@@ -28,6 +28,16 @@ export function AdminDashboard() {
 
   if (isSuperAdmin && !(isUserPreviewActive && preview?.simulatedRole === 'admin')) {
     return <Navigate to="/super-admin" replace />
+  }
+
+  if (storeLoading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="animate-pulse bg-muted h-32 rounded-lg" />
+        </div>
+      </DashboardLayout>
+    )
   }
 
   if (!currentStoreId) {
