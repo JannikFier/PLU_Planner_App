@@ -3,7 +3,6 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { useAuth } from '@/hooks/useAuth'
 import { queryRest } from '@/lib/supabase'
 import { isAbortError } from '@/lib/error-utils'
 import type { Version } from '@/types/database'
@@ -20,14 +19,12 @@ export interface UseVersionsOptions {
  * Nutzt queryRest (direkter REST-Call) statt supabase.from() um Hanging zu vermeiden.
  */
 export function useVersions(options?: UseVersionsOptions) {
-  const { enabled: optionEnabled = true } = options ?? {}
-  const { session, isLoading: authLoading } = useAuth()
-  const restReady = !authLoading && Boolean(session?.access_token)
-  const enabled = optionEnabled && restReady
+  const { enabled = true } = options ?? {}
 
   const result = useQuery<Version[]>({
     queryKey: ['versions'],
     staleTime: 2 * 60_000,
+    // Kein Session-Gate: queryRest holt das JWT selbst (Storage + Memory-Fallback, 6x Retry).
     enabled,
     // Bei 'Nicht angemeldet' (Cookie-Storage-Race direkt nach Login/Cache-Restore) automatisch retryen.
     retry: (failureCount, error) => {

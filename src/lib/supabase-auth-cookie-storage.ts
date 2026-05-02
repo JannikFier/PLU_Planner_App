@@ -87,8 +87,9 @@ function createChunkedCookieStorage(appDomain: string) {
       }
       const single = getCookieRaw(key)
       if (single == null) return null
+      // Symmetrie zum Chunked-Pfad: setItem encoded 1x, writeCookie nochmal 1x → hier 2x decodeURIComponent.
       try {
-        return decodeURIComponent(single)
+        return decodeURIComponent(decodeURIComponent(single))
       } catch {
         return null
       }

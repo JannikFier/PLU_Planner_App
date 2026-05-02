@@ -50,6 +50,7 @@ import { ensureActiveVersion } from '@/lib/ensure-active-version'
 import { useStoreListCarryoverRows } from '@/hooks/useStoreListCarryover'
 import { carryoverObstRowToMasterItem } from '@/lib/carryover-master-snapshot'
 import { useObstPrevManualSupplementPluSet } from '@/hooks/usePrevManualSupplementPluSet'
+import { useAuth } from '@/hooks/useAuth'
 
 const ExportPDFDialog = lazy(() =>
   import('@/components/plu/ExportPDFDialog').then((m) => ({ default: m.ExportPDFDialog })),
@@ -75,6 +76,10 @@ export function MasterList({ mode }: MasterListProps) {
   const isSnapshot = Boolean(snapshotVersionId)
   const queryClient = useQueryClient()
   const { rolePrefix, readOnlyListMode, kioskLiveSkipVersions } = useMasterListRouteContext(mode, isSnapshot)
+
+  // Auth-Zustand fuer Sicherheitsnetz unten (verhindert "Keine KW"-Karte vor erstem Query-Tick)
+  const { session: authSession, isLoading: authLoading } = useAuth()
+  const authReady = !authLoading && Boolean(authSession?.access_token)
 
   // Daten laden
   const { data: activeVersion, isLoading: versionLoading } = useActiveVersion()
@@ -292,9 +297,12 @@ export function MasterList({ mode }: MasterListProps) {
     (isSnapshot && versionsLoading) ||
     itemsLoading
 
-  // Keine Version? Kurz-Hinweis statt endlos warten (nur Live-Liste)
+  // Keine Version? Kurz-Hinweis statt endlos warten (nur Live-Liste).
+  // Sicherheitsnetz: nur wenn Auth-Session bereit ist – sonst koennte die Karte vor dem ersten
+  // Query-Tick aufblitzen (Race direkt nach Reload, wenn session im AuthContext noch null ist).
   const hasNoVersion =
     !isSnapshot &&
+    authReady &&
     !versionLoading &&
     (kioskLiveSkipVersions
       ? !activeVersion

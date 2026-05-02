@@ -2,7 +2,6 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { useAuth } from '@/hooks/useAuth'
 import { queryRest } from '@/lib/supabase'
 import type { BackshopVersion } from '@/types/database'
 
@@ -11,13 +10,10 @@ import type { BackshopVersion } from '@/types/database'
  * Nutzt queryRest (direkter REST-Call) statt supabase.from() um Hanging zu vermeiden.
  */
 export function useBackshopVersions() {
-  const { session, isLoading: authLoading } = useAuth()
-  const restReady = !authLoading && Boolean(session?.access_token)
-
   return useQuery<BackshopVersion[]>({
     queryKey: ['backshop-versions'],
     staleTime: 2 * 60_000,
-    enabled: restReady,
+    // Kein Session-Gate: queryRest holt das JWT selbst (Storage + Memory-Fallback, 6x Retry).
     // Bei 'Nicht angemeldet' (Cookie-Storage-Race direkt nach Login/Cache-Restore) automatisch retryen.
     retry: (failureCount, error) => {
       const msg = (error as { message?: string })?.message ?? ''
