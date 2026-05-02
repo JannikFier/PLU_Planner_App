@@ -165,9 +165,54 @@ async function getAccessToken(): Promise<string | null> {
   const DELAY_MS = 200
   for (let attempt = 0; attempt < TOTAL_TRIES; attempt++) {
     const fromStorage = getAccessTokenFromStorage()
+    // #region agent log
+    // Nur wenn kein sofortiges JWT (sonst parallele queryRest-Aufrufe = Log-Spam) oder letzter Versuch.
+    const snap =
+      (attempt === 0 && !fromStorage) || attempt === TOTAL_TRIES - 1
+    if (snap) {
+      fetch('http://127.0.0.1:7267/ingest/590f247d-2c6b-46fa-9217-a3f682ace41c', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '97321b' },
+        body: JSON.stringify({
+          sessionId: '97321b',
+          runId: 'pre-fix',
+          hypothesisId: 'H2',
+          location: 'supabase.ts:getAccessToken',
+          message: 'attempt storage snapshot',
+          data: {
+            attempt,
+            hasFromStorage: Boolean(fromStorage),
+            origin: typeof window !== 'undefined' ? window.location.origin : '',
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+    }
+    // #endregion
     if (fromStorage) return fromStorage
     try {
       const { data: { session } } = await getSessionDeduped()
+      // #region agent log
+      if ((attempt === 0 && !fromStorage) || attempt === TOTAL_TRIES - 1) {
+        fetch('http://127.0.0.1:7267/ingest/590f247d-2c6b-46fa-9217-a3f682ace41c', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '97321b' },
+          body: JSON.stringify({
+            sessionId: '97321b',
+            runId: 'pre-fix',
+            hypothesisId: 'H4',
+            location: 'supabase.ts:getAccessToken',
+            message: 'after getSessionDeduped',
+            data: {
+              attempt,
+              getSessionHasJwt: Boolean(session?.access_token),
+              origin: typeof window !== 'undefined' ? window.location.origin : '',
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+      }
+      // #endregion
       if (session?.access_token) return session.access_token
     } catch {
       /* weiter retry */
@@ -176,6 +221,31 @@ async function getAccessToken(): Promise<string | null> {
       await new Promise(r => setTimeout(r, DELAY_MS))
     }
   }
+  // #region agent log
+  try {
+    const keyCount = listSupabaseAuthBaseKeys(supabaseAuthStorage).length
+    const storageKind = supabaseAuthStorage === window.sessionStorage ? 'sessionStorage' : 'cookieAdapter'
+    fetch('http://127.0.0.1:7267/ingest/590f247d-2c6b-46fa-9217-a3f682ace41c', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '97321b' },
+      body: JSON.stringify({
+        sessionId: '97321b',
+        runId: 'pre-fix',
+        hypothesisId: 'H3',
+        location: 'supabase.ts:getAccessToken',
+        message: 'exhausted retries no jwt',
+        data: {
+          keyCount,
+          storageKind,
+          origin: typeof window !== 'undefined' ? window.location.origin : '',
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+  } catch {
+    /* ignore */
+  }
+  // #endregion
   return null
 }
 
