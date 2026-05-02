@@ -305,30 +305,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           session = retry.data.session
         }
 
-        // #region agent log
-        try {
-          fetch('http://127.0.0.1:7267/ingest/590f247d-2c6b-46fa-9217-a3f682ace41c', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '97321b' },
-            body: JSON.stringify({
-              sessionId: '97321b',
-              runId: 'pre-fix',
-              hypothesisId: 'H4',
-              location: 'AuthContext.tsx:runGetSessionAndContinue',
-              message: 'getSession resolved',
-              data: {
-                hasSessionUser: Boolean(session?.user),
-                storageJwtHint: Boolean(getAccessTokenFromStorage()),
-                origin: typeof window !== 'undefined' ? window.location.origin : '',
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {})
-        } catch {
-          /* ignore */
-        }
-        // #endregion
-
         if (session?.user && mounted) {
           const userId = session.user.id
           try {
@@ -429,29 +405,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (cachedProfile && cachedSession && cachedProfile.userId === cachedSession.userId && mounted) {
           displayedFromCacheRef.current = true
-          // #region agent log
-          try {
-            const hasJwtInStorage = Boolean(getAccessTokenFromStorage())
-            fetch('http://127.0.0.1:7267/ingest/590f247d-2c6b-46fa-9217-a3f682ace41c', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '97321b' },
-              body: JSON.stringify({
-                sessionId: '97321b',
-                runId: 'pre-fix',
-                hypothesisId: 'H1',
-                location: 'AuthContext.tsx:initAuth-cache',
-                message: 'UI from profile+session cache before getSession',
-                data: {
-                  hasJwtInStorage,
-                  origin: typeof window !== 'undefined' ? window.location.origin : '',
-                },
-                timestamp: Date.now(),
-              }),
-            }).catch(() => {})
-          } catch {
-            /* ignore */
-          }
-          // #endregion
           clearProfileErrorToast()
           const minimalUser = { id: cachedProfile.userId, email: cachedSession.email ?? '' } as User
           setState((prev) => ({

@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { queryRest, getAccessTokenFromStorage } from '@/lib/supabase'
+import { queryRest } from '@/lib/supabase'
 import { isAbortError } from '@/lib/error-utils'
 import type { Version } from '@/types/database'
 
@@ -32,28 +32,6 @@ export function useVersions(options?: UseVersionsOptions) {
     },
     retryDelay: 250,
     queryFn: async () => {
-      // #region agent log
-      try {
-        fetch('http://127.0.0.1:7267/ingest/590f247d-2c6b-46fa-9217-a3f682ace41c', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '97321b' },
-          body: JSON.stringify({
-            sessionId: '97321b',
-            runId: 'pre-fix',
-            hypothesisId: 'H5',
-            location: 'useVersions.ts:queryFn',
-            message: 'versions fetch start',
-            data: {
-              hasStorageJwt: Boolean(getAccessTokenFromStorage()),
-              origin: typeof window !== 'undefined' ? window.location.origin : '',
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-      } catch {
-        /* ignore */
-      }
-      // #endregion
       const data = await queryRest<Version[]>('versions', {
         select: '*',
         order: 'jahr.desc,kw_nummer.desc',
