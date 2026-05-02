@@ -5,6 +5,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { logAdminAction } from '../_shared/audit.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -140,6 +141,23 @@ serve(async (req) => {
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
+
+      // Admin darf nur Marktzuweisungen von Benutzern derselben Firma aendern.
+      // Super-Admin agiert global - by design (siehe update-user-role).
+      const supabaseUser = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_ANON_KEY')!,
+        { global: { headers: { Authorization: `Bearer ${jwt}` } } }
+      )
+      const { data: sameCompany, error: rpcError } = await supabaseUser.rpc('is_same_company_user', {
+        target_user_id: user_id,
+      })
+      if (rpcError || !sameCompany) {
+        return new Response(
+          JSON.stringify({ error: 'Sie können nur Marktzuweisungen von Benutzern derselben Firma ändern.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
     // Bestehende Zuweisungen des Ziel-Users loeschen
@@ -192,6 +210,17 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    await logAdminAction(supabaseAdmin, {
+      actorUserId: caller.id,
+      actorRole: callerRole,
+      actionType: 'user.store_access_update',
+      targetUserId: user_id,
+      details: {
+        home_store_id,
+        additional_store_ids: additionalStoreIds,
+      },
+    })
 
     return new Response(
       JSON.stringify({ success: true }),

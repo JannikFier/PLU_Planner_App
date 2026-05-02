@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { logAdminAction } from '../_shared/audit.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -81,8 +82,43 @@ serve(async (req) => {
       }
     }
 
-    await supabaseAdmin.from('store_kiosk_registers').delete().eq('id', registerId)
-    await supabaseAdmin.auth.admin.deleteUser(reg.auth_user_id)
+    const { error: regDeleteError } = await supabaseAdmin
+      .from('store_kiosk_registers')
+      .delete()
+      .eq('id', registerId)
+
+    if (regDeleteError) {
+      return new Response(
+        JSON.stringify({ error: 'Kasse konnte nicht entfernt werden: ' + regDeleteError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(reg.auth_user_id)
+
+    if (authDeleteError) {
+      // Register-Row ist bereits weg, Auth-User aber noch da. Inkonsistenz sichtbar machen,
+      // damit der Admin im Supabase Dashboard manuell aufraeumen kann.
+      return new Response(
+        JSON.stringify({
+          error:
+            'Kasse wurde entfernt, das zugehörige Auth-Konto konnte aber nicht gelöscht werden: ' +
+            authDeleteError.message +
+            '. Bitte das Auth-Konto manuell aus dem Supabase Dashboard entfernen.',
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    // Audit: targetUserId NULL, weil Auth-User ist gerade weg (FK-Constraint).
+    await logAdminAction(supabaseAdmin, {
+      actorUserId: caller.id,
+      actorRole: callerProfile.role,
+      actionType: 'kiosk_register.delete',
+      targetUserId: null,
+      targetResourceId: registerId,
+      details: { store_id: reg.store_id, deleted_auth_user_id: reg.auth_user_id },
+    })
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

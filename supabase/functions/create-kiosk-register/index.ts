@@ -3,6 +3,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { logAdminAction } from '../_shared/audit.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -59,9 +60,9 @@ serve(async (req) => {
     const password = typeof body.password === 'string' ? body.password : ''
     /** Optionale Nummer fuer die neue Kasse (nur die naechsten drei freien Plaetze). */
     const rawSort = body.sort_order
-    if (!storeId || !password || password.length < 4) {
+    if (!storeId || !password || password.length < 6) {
       return new Response(
-        JSON.stringify({ error: 'store_id und Passwort (mindestens 4 Zeichen) sind erforderlich.' }),
+        JSON.stringify({ error: 'store_id und Passwort (mindestens 6 Zeichen) sind erforderlich.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
@@ -235,6 +236,15 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
+
+    await logAdminAction(supabaseAdmin, {
+      actorUserId: caller.id,
+      actorRole: callerProfile.role,
+      actionType: 'kiosk_register.create',
+      targetUserId: userId,
+      targetResourceId: regRow.id,
+      details: { store_id: storeId, sort_order: sortOrder, display_label: displayLabel },
+    })
 
     return new Response(
       JSON.stringify({

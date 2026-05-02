@@ -3,6 +3,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { logAdminAction } from '../_shared/audit.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -92,6 +93,25 @@ serve(async (req) => {
       )
     }
 
+    // Admin darf nur Passwörter von Benutzern derselben Firma zurücksetzen.
+    // Super-Admin agiert global - by design (siehe update-user-role).
+    if (callerProfile.role === 'admin') {
+      const supabaseUser = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_ANON_KEY')!,
+        { global: { headers: { Authorization: `Bearer ${jwt}` } } }
+      )
+      const { data: sameCompany, error: rpcError } = await supabaseUser.rpc('is_same_company_user', {
+        target_user_id: userId,
+      })
+      if (rpcError || !sameCompany) {
+        return new Response(
+          JSON.stringify({ error: 'Sie können nur Passwörter von Benutzern derselben Firma zurücksetzen.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
     // Passwort über Admin API setzen
     const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       password: newPassword,
@@ -109,6 +129,14 @@ serve(async (req) => {
       .from('profiles')
       .update({ must_change_password: true })
       .eq('id', userId)
+
+    await logAdminAction(supabaseAdmin, {
+      actorUserId: caller.id,
+      actorRole: callerProfile.role,
+      actionType: 'user.password_reset',
+      targetUserId: userId,
+      details: { target_role: targetProfile.role },
+    })
 
     return new Response(
       JSON.stringify({ success: true }),

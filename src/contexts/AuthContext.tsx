@@ -582,17 +582,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       if (error) throw { type: 'auth' as const, error }
       if (!data?.session?.user) throw { type: 'no_session' as const }
-      // Session explizit setzen (wichtig bei Cookie-Speicher / Subdomain-Wechsel), damit REST sofort das JWT nutzt.
-      const { error: setSessionError } = await supabase.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      })
-      if (setSessionError) {
-        console.error('[Auth] setSession nach Login:', setSessionError)
-      }
       const uid = data.session.user.id
-      // Profil blockierend laden; accessToken als Hard-Fallback wenn Cookie-Storage racy ist.
-      let profile = await fetchProfile(uid, { accessToken: data.session.access_token })
+      // setSession (Cookie-Write fuer Subdomain) + fetchProfile (RPC mit JWT) parallel.
+      // signInWithPassword hat currentSession bereits in-memory gesetzt – fetchProfile nutzt das.
+      // setSession ist nur fuer Cookie-Persistenz wichtig (Page-Reload, Subdomain-Wechsel).
+      const [setSessionResult, profileResult] = await Promise.all([
+        supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        }),
+        fetchProfile(uid, { accessToken: data.session.access_token }),
+      ])
+      if (setSessionResult.error) {
+        console.error('[Auth] setSession nach Login:', setSessionResult.error)
+      }
+      let profile = profileResult
       if (!profile) {
         try {
           const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)

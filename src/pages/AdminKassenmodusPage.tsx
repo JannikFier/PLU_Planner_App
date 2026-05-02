@@ -333,7 +333,7 @@ export function AdminKassenmodusPage({ embedded = false }: { embedded?: boolean 
           <CardHeader>
             <CardTitle>Kasse hinzufügen</CardTitle>
             <CardDescription>
-              Nummer wählen (nächste freie und zwei weitere), dann Passwort setzen (mindestens 4 Zeichen). Anzeigename:
+              Nummer wählen (nächste freie und zwei weitere), dann Passwort setzen (mindestens 6 Zeichen). Anzeigename:
               automatisch „Kasse …“.
             </CardDescription>
           </CardHeader>
@@ -506,7 +506,7 @@ function RegisterRowEditor({
       {pwOpen && (
         <div className="rounded-md border bg-muted/30 p-3 space-y-3">
           <p className="text-sm text-muted-foreground">
-            Neues Passwort für diese Kasse setzen (mindestens 4 Zeichen).
+            Neues Passwort für diese Kasse setzen (mindestens 6 Zeichen).
           </p>
           <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
             <div className="flex-1 space-y-1 min-w-0">
@@ -524,7 +524,7 @@ function RegisterRowEditor({
               <Button
                 type="button"
                 size="sm"
-                disabled={saving || pw.length < 4}
+                disabled={saving || pw.length < 6}
                 onClick={() => {
                   onSavePassword(pw)
                   cancelPasswordEdit()

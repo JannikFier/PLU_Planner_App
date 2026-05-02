@@ -19,6 +19,13 @@ export function useActiveBackshopVersion() {
   const result = useQuery<BackshopVersion | null>({
     queryKey: ['backshop-version', 'active'],
     staleTime: 60_000,
+    // Bei 'Nicht angemeldet' (Cookie-Storage-Race direkt nach Login) automatisch retryen.
+    retry: (failureCount, error) => {
+      const msg = (error as { message?: string })?.message ?? ''
+      if (msg.startsWith('Nicht angemeldet')) return failureCount < 3
+      return false
+    },
+    retryDelay: 250,
     queryFn: async ({ signal }) => {
       const active = await queryRest<BackshopVersion[]>('backshop_versions', {
         select: '*',
@@ -40,10 +47,14 @@ export function useActiveBackshopVersion() {
     if (!result.isError || result.isRefetching || !result.error) return
     const t = setTimeout(() => {
       if (isAbortError(result.error)) return
-      const msg =
-        'Keine Backshop-Version gefunden: ' +
-        ((result.error as { message?: string })?.message ?? 'Unbekannter Fehler')
-      toast.error(msg)
+      const errorMsg = (result.error as { message?: string })?.message ?? ''
+      // 'Nicht angemeldet' = transienter Cookie-Storage-Race direkt nach Login.
+      // React Query refetcht automatisch beim naechsten Mount/Stale; kein User-Toast noetig.
+      if (errorMsg.startsWith('Nicht angemeldet')) {
+        console.warn('[useActiveBackshopVersion] Auth-Race transient – kein Toast', errorMsg)
+        return
+      }
+      toast.error('Keine Backshop-Version gefunden: ' + (errorMsg || 'Unbekannter Fehler'))
     }, TOAST_DELAY_MS)
     return () => clearTimeout(t)
   }, [result.isError, result.isRefetching, result.error])

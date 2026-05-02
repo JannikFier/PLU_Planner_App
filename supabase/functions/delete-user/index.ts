@@ -4,6 +4,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { logAdminAction } from '../_shared/audit.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,7 +99,26 @@ serve(async (req) => {
       )
     }
 
-    // Super-Admin darf alle außer Super-Admin löschen; Admin nur User und Viewer
+    // Admin darf nur Benutzer derselben Firma löschen (RPC braucht User-JWT für auth.uid()).
+    // Super-Admin agiert global - by design (siehe update-user-role).
+    if (callerProfile.role === 'admin') {
+      const supabaseUser = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_ANON_KEY')!,
+        { global: { headers: { Authorization: `Bearer ${jwt}` } } }
+      )
+      const { data: sameCompany, error: rpcError } = await supabaseUser.rpc('is_same_company_user', {
+        target_user_id: userId,
+      })
+      if (rpcError || !sameCompany) {
+        return new Response(
+          JSON.stringify({ error: 'Sie können nur Benutzer derselben Firma löschen.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    // Super-Admin darf alle außer Super-Admin löschen; Admin nur User und Viewer derselben Firma
 
     // 1. Verknuepfte Daten explizit loeschen (user_store_access, profiles)
     //    CASCADE koennte nicht feuern wenn Auth nur soft-deleted.
@@ -114,6 +134,15 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    // Audit: targetUserId NULL, weil User-Row ist gerade weg (FK-Constraint).
+    await logAdminAction(supabaseAdmin, {
+      actorUserId: caller.id,
+      actorRole: callerProfile.role,
+      actionType: 'user.delete',
+      targetUserId: null,
+      details: { deleted_user_id: userId, previous_role: targetProfile.role },
+    })
 
     return new Response(
       JSON.stringify({ success: true }),

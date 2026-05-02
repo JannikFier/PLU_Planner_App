@@ -3,6 +3,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { logAdminAction } from '../_shared/audit.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -169,6 +170,14 @@ serve(async (req) => {
     } catch (auditErr) {
       console.error('[update-user-role] audit log failed:', auditErr)
     }
+
+    await logAdminAction(supabaseAdmin, {
+      actorUserId: caller.id,
+      actorRole: callerProfile.role,
+      actionType: 'user.role_update',
+      targetUserId: userId,
+      details: { old_role: oldRole, new_role: newRole },
+    })
 
     return new Response(
       JSON.stringify({ success: true }),

@@ -170,7 +170,7 @@ export function useAdminKassenmodusPage() {
   const createRegisterMutation = useMutation({
     mutationFn: async () => {
       if (!currentStoreId) throw new Error('Kein Markt')
-      if (newPassword.length < 4) throw new Error('Passwort mindestens 4 Zeichen.')
+      if (newPassword.length < 6) throw new Error('Passwort mindestens 6 Zeichen.')
       return invokeEdgeFunction<{ register: KioskRegister; entrance_token?: string }>('create-kiosk-register', {
         store_id: currentStoreId,
         password: newPassword,

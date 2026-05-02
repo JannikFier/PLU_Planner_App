@@ -4,6 +4,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { logAdminAction } from '../_shared/audit.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -112,7 +113,13 @@ serve(async (req) => {
 
     // Erlaubte Rollen: user, admin, viewer (super_admin bereits oben abgefangen)
     const allowedRoles = ['user', 'admin', 'viewer'] as const
-    const roleToSet = allowedRoles.includes(role) ? role : 'user'
+    if (!allowedRoles.includes(role)) {
+      return new Response(
+        JSON.stringify({ error: 'Ungültige Rolle. Erlaubt: user, admin, viewer.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    const roleToSet = role
 
     // home_store_id ist Pflicht
     if (!home_store_id || typeof home_store_id !== 'string') {
@@ -257,6 +264,18 @@ serve(async (req) => {
         .from('profiles')
         .update({ current_store_id: home_store_id })
         .eq('id', data.user.id)
+
+      await logAdminAction(supabaseAdmin, {
+        actorUserId: caller.id,
+        actorRole: callerProfile.role,
+        actionType: 'user.create',
+        targetUserId: data.user.id,
+        details: {
+          role: roleToSet,
+          home_store_id,
+          additional_store_ids: additionalStoreIds,
+        },
+      })
     }
 
     return new Response(
