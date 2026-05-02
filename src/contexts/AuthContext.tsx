@@ -86,16 +86,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const PROFILE_CACHE_KEY = 'plu_planner_profile'
   const SESSION_CACHE_KEY = 'plu_planner_session'
-  /** Gesamtbudget inkl. Retries (Cookie-Session muss fuer REST greifen). */
-  const FETCH_PROFILE_TIMEOUT = 20_000
+  /** Gesamtbudget inkl. Retries (Hard-Fallback per JWT in fetchProfile faengt Cookie-Storage-Hänger ab). */
+  const FETCH_PROFILE_TIMEOUT = 12_000
   const PROFILE_ERROR_TOAST_DELAY_MS = 1500
-  /** Nach Login/Refresh: leere Profil-Antwort kurz wiederholen (Race Session vs. REST). */
-  const PROFILE_FETCH_EMPTY_RETRIES = 6
+  /** RLS-Sichtbarkeits-Race kurz absichern (nicht mehr Storage-Race – das wird per accessToken-Fallback geloest). */
+  const PROFILE_FETCH_EMPTY_RETRIES = 3
   const PROFILE_FETCH_EMPTY_DELAY_MS = 200
   /** true wenn wir in diesem Init bereits aus Cache angezeigt haben – dann getSession-Update minimal halten */
   const displayedFromCacheRef = useRef(false)
-  /** Während Passwort-Login: SIGNED_IN nicht erneut setSession/fetchProfile ausfuehren (Doppelarbeit). */
-  const emailPasswordLoginInProgressRef = useRef(false)
   /** Timeout für verzögerten Profil-Fehler-Toast; wird gecleart sobald ein Profil gesetzt wird */
   const profileErrorToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -131,7 +129,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
-  const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
+  const fetchProfile = useCallback(async (
+    userId: string,
+    opts?: { accessToken?: string },
+  ): Promise<Profile | null> => {
     clearProfileErrorToast()
 
     const scheduleProfileErrorToast = (msg: string) => {
@@ -140,6 +141,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profileErrorToastTimeoutRef.current = null
         toast.error(msg)
       }, PROFILE_ERROR_TOAST_DELAY_MS)
+    }
+
+    /** Hard-Fallback: direkter REST-Call mit explizitem JWT (umgeht Cookie-Storage-Race). */
+    const callRpcDirect = async (jwt: string): Promise<Profile | null> => {
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rpc/get_my_profile`
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${jwt}`,
+            'Content-Type': 'application/json',
+          },
+          body: '{}',
+        })
+        if (!resp.ok) return null
+        const json = await resp.json() as Profile | null
+        if (json && typeof json === 'object' && !Array.isArray(json) && (json as Profile).id === userId) {
+          return json as Profile
+        }
+        return null
+      } catch {
+        return null
+      }
     }
 
     const fetchOnce = async (): Promise<Profile | null> => {
@@ -154,25 +179,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       let rpcUnavailable = false
+      let refreshedOnce = false
 
       for (let attempt = 0; attempt < PROFILE_FETCH_EMPTY_RETRIES; attempt++) {
-        const { data: { session } } = await supabase.auth.getSession()
-        const sessionReady = Boolean(session?.access_token && session.user.id === userId)
-
-        if (!sessionReady) {
-          if (attempt < PROFILE_FETCH_EMPTY_RETRIES - 1) {
-            await sleep(PROFILE_FETCH_EMPTY_DELAY_MS)
-            continue
-          }
-          scheduleProfileErrorToast(
-            'Anmeldung unvollständig (Sitzung nicht bereit). Bitte Seite neu laden und erneut anmelden.',
-          )
-          return null
-        }
-
         if (!rpcUnavailable) {
-          const { data: rpcPayload, error: rpcError } = await supabase.rpc('get_my_profile')
+          const { data: rpcPayload, error: rpcError, status: rpcStatus } =
+            await supabase.rpc('get_my_profile')
 
+          // Erfolg
           if (!rpcError && rpcPayload != null && typeof rpcPayload === 'object' && !Array.isArray(rpcPayload)) {
             const profile = rpcPayload as Profile
             if (profile.id === userId) {
@@ -180,13 +194,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
-          if (!rpcError && rpcPayload == null) {
-            scheduleProfileErrorToast(
-              'Kein Profil gefunden. Bitte Administrator kontaktieren oder erneut anmelden.',
-            )
+          // 401: einmal Refresh, dann ggf. Hard-Fallback mit explizitem JWT
+          if (rpcError && rpcStatus === 401) {
+            if (!refreshedOnce) {
+              refreshedOnce = true
+              try { await supabase.auth.refreshSession() } catch { /* Refresh fehlgeschlagen */ }
+              continue
+            }
+            if (opts?.accessToken) {
+              const direct = await callRpcDirect(opts.accessToken)
+              if (direct) return cacheAndReturn(direct)
+            }
+            scheduleProfileErrorToast('Profil laden fehlgeschlagen (Authentifizierung).')
             return null
           }
 
+          // RPC fehlt (noch nicht deployed): einmalig auf REST-Fallback umschalten
           if (rpcError && isGetMyProfileRpcMissingError(rpcError)) {
             rpcUnavailable = true
           } else if (rpcError) {
@@ -197,9 +220,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               scheduleProfileErrorToast('Profil laden fehlgeschlagen: ' + (rpcError?.message ?? 'Unbekannter Fehler'))
             }
             throw rpcError
+          } else if (rpcPayload == null) {
+            // Profil nicht sichtbar (RLS) oder fehlt: kurz retry, dann aufgeben
+            if (attempt < PROFILE_FETCH_EMPTY_RETRIES - 1) {
+              await sleep(PROFILE_FETCH_EMPTY_DELAY_MS)
+              continue
+            }
+            // Wenn JWT bekannt ist: noch einmal direkt versuchen (umgeht Client-State).
+            if (opts?.accessToken) {
+              const direct = await callRpcDirect(opts.accessToken)
+              if (direct) return cacheAndReturn(direct)
+            }
+            scheduleProfileErrorToast(
+              'Kein Profil gefunden. Bitte Administrator kontaktieren oder erneut anmelden.',
+            )
+            return null
           }
         }
 
+        // REST-Fallback: direktes Select aus profiles (RPC fehlt)
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
@@ -274,7 +313,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (cached && mounted && displayedFromCacheRef.current) {
             // Bereits aus Cache angezeigt – nur Session nachziehen, kein voller Re-Render mit gleichen Profildaten
             setState((prev) => ({ ...prev, session }))
-            void fetchProfile(userId) // Hintergrund: Profil-Cache für nächsten Reload aktualisieren
+            void fetchProfile(userId, { accessToken: session.access_token }) // Hintergrund: Profil-Cache aktualisieren
             return
           }
 
@@ -288,7 +327,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }))
             // Profil aus sessionStorage bereits angezeigt: Netz-Refresh darf Init nicht blockieren (sonst ~FETCH_PROFILE_TIMEOUT)
             if (!displayedFromCacheRef.current) {
-              void fetchProfile(userId).then((fresh) => {
+              void fetchProfile(userId, { accessToken: session.access_token }).then((fresh) => {
                 if (!mounted || !fresh) return
                 clearProfileErrorToast()
                 setState((prev) => ({
@@ -300,7 +339,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               })
             }
           } else if (!displayedFromCacheRef.current) {
-            let profile = await fetchProfile(userId)
+            let profile = await fetchProfile(userId, { accessToken: session.access_token })
             if (!profile) {
               try {
                 const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
@@ -393,10 +432,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!mounted) return
         try {
           if (event === 'SIGNED_IN' && session?.user) {
-            if (emailPasswordLoginInProgressRef.current) {
+            const userId = session.user.id
+
+            // Idempotenz: wenn loginWithEmail das Profil fuer diesen User gerade gesetzt
+            // hat (Cache-Hit), nur Session nachziehen statt Doppel-Fetch.
+            let cachedProfile: Profile | null = null
+            try {
+              const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
+              if (raw) {
+                const parsed = JSON.parse(raw) as { userId: string; profile: Profile }
+                if (parsed.userId === userId && parsed.profile) cachedProfile = parsed.profile
+              }
+            } catch { /* Cache ungueltig */ }
+
+            if (cachedProfile) {
+              clearProfileErrorToast()
+              setState((prev) => ({
+                ...prev,
+                ...authReducer(session.user, session, cachedProfile),
+                isLoading: false,
+                error: null,
+              }))
               return
             }
-            const userId = session.user.id
+
             if (session.access_token && session.refresh_token) {
               const { error: setErr } = await supabase.auth.setSession({
                 access_token: session.access_token,
@@ -404,19 +463,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               })
               if (setErr) console.error('[Auth] setSession bei SIGNED_IN:', setErr)
             }
-            let profile = await fetchProfile(userId)
+            const profile = await fetchProfile(userId, { accessToken: session.access_token })
             if (!mounted) return
-            if (!profile) {
-              try {
-                const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
-                if (raw) {
-                  const parsed = JSON.parse(raw) as { userId: string; profile: Profile }
-                  if (parsed.userId === userId && parsed.profile) profile = parsed.profile
-                }
-              } catch {
-                /* Cache ungültig */
-              }
-            }
             if (profile) clearProfileErrorToast()
             setState((prev) => ({
               ...prev,
@@ -437,7 +485,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Wenn der Cache bereits angezeigt wurde, nicht erneut fetchen – runGetSessionAndContinue erledigt das
             if (displayedFromCacheRef.current) return
             const userId = session.user.id
-            let profile = await fetchProfile(userId)
+            let profile = await fetchProfile(userId, { accessToken: session.access_token })
             if (!mounted) return
             if (!profile) {
               try {
@@ -506,9 +554,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
-    emailPasswordLoginInProgressRef.current = true
 
-    /** Nur signIn + setSession; Profil asynchron (Login-Button blockiert nicht auf fetchProfile). */
     const LOGIN_TIMEOUT = 25_000
     const loginTask = async () => {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -526,30 +572,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('[Auth] setSession nach Login:', setSessionError)
       }
       const uid = data.session.user.id
-      let profile: Profile | null = null
-      try {
-        const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
-        if (raw) {
-          const parsed = JSON.parse(raw) as { userId: string; profile: Profile }
-          if (parsed.userId === uid && parsed.profile) profile = parsed.profile
-        }
-      } catch {
-        /* Cache ungueltig */
-      }
-
-      void fetchProfile(uid).then((fresh) => {
-        if (!fresh) return
-        setState((prev) => {
-          if (prev.user?.id !== uid) return prev
-          clearProfileErrorToast()
-          return {
-            ...prev,
-            ...authReducer(prev.user!, prev.session!, fresh),
-            isLoading: false,
-            error: null,
+      // Profil blockierend laden; accessToken als Hard-Fallback wenn Cookie-Storage racy ist.
+      let profile = await fetchProfile(uid, { accessToken: data.session.access_token })
+      if (!profile) {
+        try {
+          const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
+          if (raw) {
+            const parsed = JSON.parse(raw) as { userId: string; profile: Profile }
+            if (parsed.userId === uid && parsed.profile) profile = parsed.profile
           }
-        })
-      })
+        } catch {
+          /* Cache ungueltig */
+        }
+      }
 
       return { session: data.session, user: data.session.user, profile }
     }
@@ -605,8 +640,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: userMessage,
       }))
       throw new Error(userMessage)
-    } finally {
-      emailPasswordLoginInProgressRef.current = false
     }
   }, [fetchProfile, clearProfileErrorToast])
 
