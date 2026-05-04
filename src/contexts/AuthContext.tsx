@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, us
 import { toast } from 'sonner'
 import { supabase, clearSupabaseAuthStorage, getSessionDeduped, getAccessTokenFromStorage } from '@/lib/supabase'
 import { queryClient } from '@/lib/query-client'
-import { isAbortError, shouldReportGlobalError } from '@/lib/error-utils'
+import { isAbortError, shouldReportGlobalError, LOGIN_ABORT_USER_MESSAGE } from '@/lib/error-utils'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
 import { clearDeferReplayWelcome } from '@/lib/tutorial-replay-session'
 import { loginEmailSchema, loginPersonalnummerSchema } from '@/lib/validation'
@@ -574,16 +574,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
     emailPasswordLoginInProgressRef.current = true
 
-    // Alte lokale Session nur bei Bedarf abräumen (Multi-Tab/Cookie-Konflikt).
-    // Leerer signOut + direkt signIn kann interne Auth-Requests abbrechen (AbortError).
-    const { data: { session: existingSession } } = await getSessionDeduped()
-    if (existingSession) {
-      await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      })
-    }
-
     const LOGIN_TIMEOUT = 25_000
     const loginTask = async () => {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -619,6 +609,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      // Alte lokale Session nur bei Bedarf abräumen (Multi-Tab/Cookie-Konflikt).
+      // Im try: Abbrüche landen im catch mit deutscher Meldung (nicht roher DOMException-Text in LoginPage).
+      const { data: { session: existingSession } } = await getSessionDeduped()
+      if (existingSession) {
+        await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        })
+      }
+
       const result = await Promise.race([
         loginTask(),
         new Promise<never>((_, reject) =>
@@ -671,7 +671,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error('[Auth] Supabase-Fehler:', err?.error)
         }
       } else if (isAbortError(e)) {
-        userMessage = 'Die Anmeldung wurde unterbrochen. Bitte versuche es erneut.'
+        userMessage = LOGIN_ABORT_USER_MESSAGE
       } else {
         userMessage = 'Ein Fehler ist aufgetreten. Bitte versuche es erneut.'
         console.error('[Auth] Login-Fehler:', e)
@@ -697,11 +697,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
 
-    // RPC: Args-Typ aus Database['public']['Functions']['lookup_email_by_personalnummer']['Args']
-    const { data: email, error: lookupError } = await supabase.rpc(
-      'lookup_email_by_personalnummer',
-      { p_nummer: personalnummer } as never
-    ) as { data: string | null; error: { message: string } | null }
+    let email: string | null = null
+    let lookupError: { message: string } | null = null
+    try {
+      const res = await supabase.rpc(
+        'lookup_email_by_personalnummer',
+        { p_nummer: personalnummer } as never
+      ) as { data: string | null; error: { message: string } | null }
+      email = res.data
+      lookupError = res.error
+    } catch (rpcErr: unknown) {
+      const userMessage = isAbortError(rpcErr)
+        ? LOGIN_ABORT_USER_MESSAGE
+        : 'Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.'
+      if (!isAbortError(rpcErr)) {
+        console.error('[Auth] lookup_email_by_personalnummer:', rpcErr)
+      }
+      setState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: userMessage,
+      }))
+      throw new Error(userMessage)
+    }
 
     if (lookupError || !email) {
       const userMessage = 'Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.'

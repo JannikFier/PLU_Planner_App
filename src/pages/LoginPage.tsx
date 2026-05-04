@@ -6,6 +6,7 @@ import { useUserPreview } from '@/contexts/UserPreviewContext'
 import { getHomeDashboardPath } from '@/lib/effective-route-prefix'
 import { pickSafePostLoginPath, getPostLoginCanonicalRedirectUrl } from '@/lib/canonical-host-redirect'
 import { getAccessTokenFromStorage } from '@/lib/supabase'
+import { isAbortError, LOGIN_ABORT_USER_MESSAGE } from '@/lib/error-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -76,8 +77,12 @@ export function LoginPage() {
         await loginWithPersonalnummer(identifier, password)
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : null
-      setLocalError(msg?.trim() ? msg : 'Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.')
+      if (isAbortError(err)) {
+        setLocalError(LOGIN_ABORT_USER_MESSAGE)
+      } else {
+        const msg = err instanceof Error ? err.message : null
+        setLocalError(msg?.trim() ? msg : 'Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.')
+      }
     } finally {
       setIsSubmitting(false)
     }
