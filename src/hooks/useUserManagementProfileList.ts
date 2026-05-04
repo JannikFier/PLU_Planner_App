@@ -55,8 +55,6 @@ export function useUserManagementProfileList() {
     return withoutSa(adminUsers)
   }, [isSuperAdmin, currentCompanyId, companyUsers, adminUsers])
 
-  const firstUserRowId = useMemo(() => filteredUsers[0]?.id ?? null, [filteredUsers])
-
   const { data: homeStoreId } = useQuery({
     queryKey: ['home-store-id', currentUserId],
     queryFn: async () => {
@@ -88,7 +86,6 @@ export function useUserManagementProfileList() {
     isError,
     needsCompanyHint,
     filteredUsers,
-    firstUserRowId,
     effectiveStoreId,
     defaultStoreId,
   }

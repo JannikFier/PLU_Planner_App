@@ -135,8 +135,9 @@ export function AppHeader() {
       const qs = location.search
       return qs ? `/user/backshop-werbung${qs}` : '/user/backshop-werbung'
     }
-    if (path === '/user/backshop-werbung') return '/user/backshop'
-    if (USER_BACKSHOP_SUB.includes(path)) return '/user/backshop'
+    if (path === '/user/backshop-werbung') return '/user/backshop/inhalt'
+    if (USER_BACKSHOP_SUB.includes(path)) return '/user/backshop/inhalt'
+    if (path === '/user/backshop/inhalt') return '/user/backshop'
     if (path === '/user/backshop') return '/user'
     if (path === '/user/backshop/konfiguration') return '/user/backshop'
     if (
@@ -159,8 +160,9 @@ export function AppHeader() {
       return qs ? `/viewer/backshop-werbung${qs}` : '/viewer/backshop-werbung'
     }
     if (path === '/viewer/backshop-list') return '/viewer/backshop'
-    if (path === '/viewer/backshop-kacheln') return '/viewer/backshop'
-    if (path === '/viewer/backshop-werbung') return '/viewer/backshop'
+    if (path === '/viewer/backshop/inhalt') return '/viewer/backshop'
+    if (path === '/viewer/backshop-kacheln') return '/viewer/backshop/inhalt'
+    if (path === '/viewer/backshop-werbung') return '/viewer/backshop/inhalt'
     return '/viewer'
   }
 
@@ -182,6 +184,7 @@ export function AppHeader() {
     }
 
     if (path === '/admin/obst') return '/admin'
+    if (path === '/admin/backshop/inhalt') return '/admin/backshop'
     if (path === '/admin/backshop') return '/admin'
     if (path === '/admin/obst/konfiguration') return '/admin/obst'
     if (path === '/admin/backshop/konfiguration') return '/admin/backshop'
@@ -193,7 +196,7 @@ export function AppHeader() {
       const qs = location.search
       return qs ? `/admin/backshop-werbung${qs}` : '/admin/backshop-werbung'
     }
-    if (path === '/admin/backshop-werbung') return '/admin/backshop'
+    if (path === '/admin/backshop-werbung') return '/admin/backshop/inhalt'
 
     if (
       path === '/admin/layout'
@@ -214,7 +217,7 @@ export function AppHeader() {
     }
 
     if (ADMIN_OBST_SUB.includes(path)) return '/admin/masterlist'
-    if (ADMIN_BACKSHOP_SUB.includes(path)) return '/admin/backshop'
+    if (ADMIN_BACKSHOP_SUB.includes(path)) return '/admin/backshop/inhalt'
 
     return '/admin'
   }

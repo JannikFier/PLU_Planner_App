@@ -1,10 +1,10 @@
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { ClipboardList, Croissant, LayoutGrid } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
+import { BereichsauswahlCard } from '@/components/layout/BereichsauswahlCard'
 import { useEffectiveListVisibility } from '@/hooks/useStoreListVisibility'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { getBackshopNavPrefix } from '@/lib/backshop-werbung-routes'
-import { BackshopBereichNav } from '@/components/backshop/BackshopBereichNav'
-import { BackshopWerbungKwListPage } from '@/pages/BackshopWerbungKwListPage'
 
 /** Dashboard nach Rolle, wenn Backshop für den Markt ausgeblendet ist. */
 function backshopHubFallbackPath(prefix: string): string {
@@ -15,10 +15,11 @@ function backshopHubFallbackPath(prefix: string): string {
 }
 
 /**
- * Backshop-Einstieg (User, Admin, Viewer): Navigation Werbung · Backshop-Liste · PLU-Liste · Konfiguration;
- * auf der Startseite des Bereichs: Kalenderwochen-Werbung wie bisher.
+ * Backshop-Einstieg (User, Admin, Viewer): drei Karten wie Super-Admin Markt → Listen → Backshop;
+ * Untermenü Werbung/Kachel-Liste über `/…/backshop/inhalt`.
  */
 export function BackshopHubPage() {
+  const navigate = useNavigate()
   const location = useLocation()
   const prefix = getBackshopNavPrefix(location.pathname)
   const { currentStoreId } = useCurrentStore()
@@ -46,17 +47,41 @@ export function BackshopHubPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6" data-tour="backshop-hub-page">
+      <div className="space-y-8" data-tour="backshop-hub-page">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800">Backshop</h2>
           <p className="text-muted-foreground mt-1">
-            Werbung nach Kalenderwoche, Kachel-Übersicht ohne Werbungs-Artikel oder klassische PLU-Tabelle.
+            PLU-Tabelle und Konfiguration direkt; unter „Backshop“ zusätzlich Werbung nach Kalenderwoche oder
+            Kachel-Übersicht mit PDF.
           </p>
         </div>
 
-        <BackshopBereichNav />
-
-        <BackshopWerbungKwListPage embedded />
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <BereichsauswahlCard
+            title="PLU-Liste"
+            description="Backshop-Liste, eigene Produkte, Ausgeblendete, Werbung, Umbenennungen – Aktionen in der Toolbar"
+            icon={ClipboardList}
+            onClick={() => navigate(`${prefix}/backshop-list`)}
+            variant="backshop"
+            dataTour="backshop-root-plu-card"
+          />
+          <BereichsauswahlCard
+            title="Konfiguration der Liste"
+            description="Layout, Bezeichnungsregeln, Gruppenregeln und Warengruppen-Sortierung"
+            icon={LayoutGrid}
+            onClick={() => navigate(`${prefix}/backshop/konfiguration`)}
+            variant="backshop"
+            dataTour="backshop-root-konfig-card"
+          />
+          <BereichsauswahlCard
+            title="Backshop"
+            description="Werbung nach Kalenderwoche oder Kachel-Übersicht (Warengruppen, PDF) – gleiche Daten wie die PLU-Tabelle"
+            icon={Croissant}
+            onClick={() => navigate(`${prefix}/backshop/inhalt`)}
+            variant="backshop"
+            dataTour="backshop-root-inhalt-card"
+          />
+        </div>
       </div>
     </DashboardLayout>
   )

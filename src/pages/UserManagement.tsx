@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { invokeEdgeFunction, isTestModeActive } from '@/lib/supabase'
 import { createUserSchema, createUserResponseSchema, validateEdgeFunctionResponse } from '@/lib/validation'
@@ -44,8 +44,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Link } from 'react-router-dom'
-import { UserPlus, KeyRound, Loader2, Copy, Check, Users, Trash2, Building2, Eye, ScanLine } from 'lucide-react'
+import { UserPlus, KeyRound, Loader2, Copy, Check, Users, Trash2, Building2, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Profile } from '@/types/database'
 import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer, roleBadgeLabel, generateOneTimePassword } from '@/lib/profile-helpers'
@@ -59,6 +58,8 @@ import {
 } from '@/hooks/useStoreListVisibility'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
+import { UserManagementKioskRegistersCard } from '@/components/admin/UserManagementKioskRegistersCard'
+import { useStoreKioskRegisters } from '@/hooks/useStoreKioskRegisters'
 
 /**
  * Benutzerverwaltung – für Admin und Super-Admin.
@@ -81,7 +82,6 @@ export function UserManagement() {
     isError,
     needsCompanyHint,
     filteredUsers,
-    firstUserRowId,
     defaultStoreId,
   } = useUserManagementProfileList()
   const { isAdmin } = useAuth()
@@ -124,6 +124,18 @@ export function UserManagement() {
     useStoreListAreaEnabled(defaultStoreId)
   const userObstVisible = userVisibility?.find(v => v.list_type === 'obst_gemuese')?.is_visible ?? true
   const userBackshopVisible = userVisibility?.find(v => v.list_type === 'backshop')?.is_visible ?? true
+
+  const staffUsers = useMemo(
+    () => (filteredUsers ?? []).filter((u) => u.role !== 'kiosk'),
+    [filteredUsers],
+  )
+  const firstStaffUserRowId = staffUsers[0]?.id ?? null
+
+  const kioskRegistersQuery = useStoreKioskRegisters(defaultStoreId)
+  const kioskRegisterCount = kioskRegistersQuery.data?.length ?? 0
+  const showKioskUserSection = Boolean(
+    defaultStoreId && !needsCompanyHint && (storeKioskEnabled || kioskRegisterCount > 0),
+  )
 
   // Formular States für neuen User
   const [newDisplayName, setNewDisplayName] = useState('')
@@ -529,7 +541,7 @@ export function UserManagement() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Alle Benutzer ({filteredUsers?.length ?? 0})
+              Alle Benutzer ({staffUsers.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -556,10 +568,10 @@ export function UserManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers?.map((user) => (
+                  {staffUsers.map((user) => (
                     <TableRow
                       key={user.id}
-                      data-tour={user.id === firstUserRowId ? 'user-management-row-first' : undefined}
+                      data-tour={user.id === firstStaffUserRowId ? 'user-management-row-first' : undefined}
                     >
                       <TableCell className="font-medium">
                         {user.display_name || '–'}
@@ -579,7 +591,7 @@ export function UserManagement() {
                           >
                             <SelectTrigger
                               className="w-[140px] h-8"
-                              data-tour={user.id === firstUserRowId ? 'user-management-row-edit' : undefined}
+                              data-tour={user.id === firstStaffUserRowId ? 'user-management-row-edit' : undefined}
                             >
                               <SelectValue />
                             </SelectTrigger>
@@ -620,7 +632,7 @@ export function UserManagement() {
                               variant="outline"
                               size="sm"
                               className="gap-1"
-                              data-tour={user.id === firstUserRowId ? 'user-management-row-reset-pw' : undefined}
+                              data-tour={user.id === firstStaffUserRowId ? 'user-management-row-reset-pw' : undefined}
                               disabled={resetPasswordMutation.isPending}
                               onClick={() => {
                                 setSelectedUser(user)
@@ -658,7 +670,7 @@ export function UserManagement() {
                     </TableRow>
                   ))}
 
-                  {filteredUsers?.length === 0 && (
+                  {staffUsers.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                         Noch keine Benutzer angelegt.
@@ -671,23 +683,8 @@ export function UserManagement() {
           </CardContent>
         </Card>
 
-        {storeKioskEnabled && (
-          <Card className="border-dashed">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ScanLine className="h-4 w-4 shrink-0" aria-hidden />
-                Kassen & QR
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">
-                QR-Code drucken, Kassen anlegen und Passwörter für den Kassenmodus verwalten.
-              </p>
-              <Button variant="secondary" asChild className="shrink-0 self-start sm:self-auto">
-                <Link to="/admin/kassenmodus">Zum Kassenmodus</Link>
-              </Button>
-            </CardContent>
-          </Card>
+        {showKioskUserSection && defaultStoreId && (
+          <UserManagementKioskRegistersCard storeId={defaultStoreId} />
         )}
 
         {/* Märkte-Zuordnung Dialog */}

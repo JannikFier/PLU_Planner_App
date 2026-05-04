@@ -11,6 +11,9 @@ import {
 } from '@/lib/kiosk-entrance-url'
 import { normalizeViteAppDomain } from '@/lib/subdomain'
 import { toast } from 'sonner'
+import { useStoreKioskRegisters, type KioskRegister } from '@/hooks/useStoreKioskRegisters'
+
+export type { KioskRegister }
 
 export type KioskEntrance = {
   id: string
@@ -19,16 +22,6 @@ export type KioskEntrance = {
   created_at: string
   revoked_at: string | null
   expires_at: string
-}
-
-export type KioskRegister = {
-  id: string
-  store_id: string
-  sort_order: number
-  display_label: string
-  auth_user_id: string
-  active: boolean
-  created_at: string
 }
 
 /** Lädt Kiosk-Routen-Chunks früh vor (Vorschau-Hover), damit der neue Tab schneller wird. */
@@ -67,20 +60,7 @@ export function useAdminKassenmodusPage() {
     enabled: !!currentStoreId,
   })
 
-  const registersQuery = useQuery({
-    queryKey: ['kiosk-registers', currentStoreId],
-    queryFn: async () => {
-      if (!currentStoreId) throw new Error('Kein Markt')
-      const { data, error } = await supabase
-        .from('store_kiosk_registers')
-        .select('*')
-        .eq('store_id', currentStoreId)
-        .order('sort_order', { ascending: true })
-      if (error) throw error
-      return (data ?? []) as KioskRegister[]
-    },
-    enabled: !!currentStoreId,
-  })
+  const registersQuery = useStoreKioskRegisters(currentStoreId ?? undefined)
 
   const maxRegisterSort = useMemo(() => {
     const list = registersQuery.data ?? []
@@ -182,6 +162,9 @@ export function useAdminKassenmodusPage() {
       setNewPassword('')
       void queryClient.invalidateQueries({ queryKey: ['kiosk-registers', currentStoreId] })
       void queryClient.invalidateQueries({ queryKey: ['kiosk-entrance', currentStoreId] })
+      if (currentStoreId) {
+        void queryClient.invalidateQueries({ queryKey: ['store-user-profiles', currentStoreId] })
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -193,6 +176,9 @@ export function useAdminKassenmodusPage() {
     onSuccess: () => {
       toast.success('Gespeichert.')
       void queryClient.invalidateQueries({ queryKey: ['kiosk-registers', currentStoreId] })
+      if (currentStoreId) {
+        void queryClient.invalidateQueries({ queryKey: ['store-user-profiles', currentStoreId] })
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -205,6 +191,9 @@ export function useAdminKassenmodusPage() {
       toast.success('Kasse gelöscht.')
       setDeleteTarget(null)
       void queryClient.invalidateQueries({ queryKey: ['kiosk-registers', currentStoreId] })
+      if (currentStoreId) {
+        void queryClient.invalidateQueries({ queryKey: ['store-user-profiles', currentStoreId] })
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   })

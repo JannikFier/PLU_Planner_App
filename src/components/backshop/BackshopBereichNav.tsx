@@ -17,7 +17,6 @@ export function BackshopBereichNav() {
   const prefix = getBackshopNavPrefix(location.pathname)
 
   const isWerbungActive =
-    location.pathname === `${prefix}/backshop` ||
     location.pathname === `${prefix}/backshop-werbung` ||
     location.pathname.startsWith(`${prefix}/backshop-werbung/`)
 
@@ -28,7 +27,7 @@ export function BackshopBereichNav() {
       data-tour={'backshop-bereich-nav'}
     >
       <NavLink
-        to={`${prefix}/backshop`}
+        to={`${prefix}/backshop-werbung`}
         className={() =>
           cn(navBtn, isWerbungActive ? 'bg-primary/10 text-primary border-primary/20' : 'text-muted-foreground hover:bg-muted')
         }

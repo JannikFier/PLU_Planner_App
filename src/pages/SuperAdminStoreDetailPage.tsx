@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
@@ -14,7 +14,7 @@ import {
 import { useStoreUserProfiles, useAddUserToStore, useRemoveUserFromStore } from '@/hooks/useStoreAccess'
 import { useCompanyProfiles } from '@/hooks/useCompanyProfiles'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -45,6 +45,9 @@ import { toast } from 'sonner'
 import type { Profile, UserListVisibility } from '@/types/database'
 import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer, roleBadgeLabel } from '@/lib/profile-helpers'
 import { useSuperAdminStoreDetailUserMutations } from '@/hooks/useSuperAdminStoreDetailUserMutations'
+import { useStoreKioskRegisters, type KioskRegister } from '@/hooks/useStoreKioskRegisters'
+import { useKioskRegisterMutations } from '@/hooks/useKioskRegisterMutations'
+import { KioskRegisterRowEditor } from '@/components/admin/KioskRegisterRowEditor'
 import { AdminKassenmodusPage } from '@/pages/AdminKassenmodusPage'
 
 type Section =
@@ -86,8 +89,17 @@ export function SuperAdminStoreDetailPage() {
   const addUserToStore = useAddUserToStore()
   const removeUserFromStore = useRemoveUserFromStore()
 
+  const staffStoreUsers = useMemo(
+    () => storeUsers?.filter((u) => u.role !== 'kiosk') ?? [],
+    [storeUsers],
+  )
+
   // Firmeninterne Profile laden (für "Benutzer hinzufügen" Dialog; gleicher Cache wie Benutzerverwaltung)
   const { data: companyProfiles } = useCompanyProfiles(companyId)
+
+  const kioskRegistersQuery = useStoreKioskRegisters(store?.id)
+  const { updateRegisterMutation, deleteMutation: deleteKioskRegisterMutation } = useKioskRegisterMutations(store?.id)
+  const [kioskDeleteTarget, setKioskDeleteTarget] = useState<KioskRegister | null>(null)
 
   // Settings-Dialoge
   const [showEditName, setShowEditName] = useState(false)
@@ -186,7 +198,7 @@ export function SuperAdminStoreDetailPage() {
   // Firmeninterne Benutzer die noch NICHT diesem Markt zugewiesen sind
   const assignedUserIds = new Set(storeUsers?.map(u => u.id) ?? [])
   const availableUsers = companyProfiles?.filter(
-    p => p.role !== 'super_admin' && !assignedUserIds.has(p.id),
+    p => p.role !== 'super_admin' && p.role !== 'kiosk' && !assignedUserIds.has(p.id),
   ) ?? []
 
   if (isLoading) {
@@ -416,7 +428,7 @@ export function SuperAdminStoreDetailPage() {
               <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
-                  Benutzer ({storeUsers?.length ?? 0})
+                  Benutzer ({staffStoreUsers.length})
                 </CardTitle>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowAddUser(true)}>
@@ -432,7 +444,7 @@ export function SuperAdminStoreDetailPage() {
               <CardContent>
                 {usersLoading ? (
                   <div className="space-y-3">{[1, 2].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
-                ) : !storeUsers?.length ? (
+                ) : staffStoreUsers.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">
                     Noch keine Benutzer zugewiesen.
                   </p>
@@ -447,7 +459,7 @@ export function SuperAdminStoreDetailPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {storeUsers.map(u => (
+                      {staffStoreUsers.map(u => (
                         <TableRow key={u.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setDetailUser(u)}>
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
@@ -471,6 +483,69 @@ export function SuperAdminStoreDetailPage() {
                 )}
               </CardContent>
             </Card>
+
+            <Card className="border-dashed">
+              <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2">
+                <div className="space-y-1">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ScanLine className="h-4 w-4 shrink-0" aria-hidden />
+                    Kassen &amp; QR
+                  </CardTitle>
+                  <CardDescription>
+                    QR-Code und neue Kassen im Kassenmodus. Hier dieselben Aktionen wie dort: deaktivieren, Passwort ändern, löschen.
+                  </CardDescription>
+                </div>
+                <Button type="button" variant="secondary" size="sm" className="shrink-0" onClick={() => setView('kassenmodus')}>
+                  Zum Kassenmodus
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {kioskRegistersQuery.isLoading ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                ) : (kioskRegistersQuery.data?.length ?? 0) === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Noch keine Kasse angelegt – im Kassenmodus anlegen.
+                  </p>
+                ) : (
+                  kioskRegistersQuery.data?.map((reg) => (
+                    <KioskRegisterRowEditor
+                      key={reg.id}
+                      register={reg}
+                      onSavePassword={(pw) => updateRegisterMutation.mutate({ register_id: reg.id, password: pw })}
+                      onToggleActive={(active) => updateRegisterMutation.mutate({ register_id: reg.id, active })}
+                      onDelete={() => setKioskDeleteTarget(reg)}
+                      saving={updateRegisterMutation.isPending}
+                    />
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            <AlertDialog open={kioskDeleteTarget !== null} onOpenChange={(o) => !o && setKioskDeleteTarget(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Kasse löschen?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {kioskDeleteTarget?.display_label} wird unwiderruflich entfernt.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                  <Button
+                    variant="destructive"
+                    disabled={deleteKioskRegisterMutation.isPending}
+                    onClick={() =>
+                      kioskDeleteTarget &&
+                      deleteKioskRegisterMutation.mutate(kioskDeleteTarget.id, {
+                        onSuccess: () => setKioskDeleteTarget(null),
+                      })
+                    }
+                  >
+                    Löschen
+                  </Button>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         )}
 
@@ -994,9 +1069,27 @@ function UserDetailDialog({
 
   if (!user) return null
 
+  const isKioskAccount = user.role === 'kiosk'
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        {isKioskAccount ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Kassen-Konto</DialogTitle>
+              <DialogDescription>
+                Kassen werden unter „Benutzer“ im Abschnitt „Kassen &amp; QR“ verwaltet – nicht wie Personalbenutzer.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button type="button" onClick={() => onOpenChange(false)}>
+                Schließen
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
         {/* Header mit Avatar-Kreis */}
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -1102,6 +1195,8 @@ function UserDetailDialog({
             </p>
           </div>
         </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   )

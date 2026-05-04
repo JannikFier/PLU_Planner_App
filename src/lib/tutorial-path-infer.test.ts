@@ -8,6 +8,9 @@ describe('inferTutorialModuleFromPath', () => {
   it('mappt User-Backshop-Hub', () => {
     expect(inferTutorialModuleFromPath('/user/backshop')).toBe('backshop')
   })
+  it('mappt User-Backshop-Inhalt-Hub', () => {
+    expect(inferTutorialModuleFromPath('/user/backshop/inhalt')).toBe('backshop')
+  })
   it('mappt User-Obst-Hub', () => {
     expect(inferTutorialModuleFromPath('/user/obst')).toBe('obst')
   })

@@ -38,6 +38,9 @@ const AdminObstKonfigurationPage = lazy(() =>
   import('@/pages/AdminObstKonfigurationPage').then((m) => ({ default: m.AdminObstKonfigurationPage })),
 )
 const BackshopHubPage = lazy(() => import('@/pages/BackshopHubPage').then((m) => ({ default: m.BackshopHubPage })))
+const BackshopInhaltHubPage = lazy(() =>
+  import('@/pages/BackshopInhaltHubPage').then((m) => ({ default: m.BackshopInhaltHubPage })),
+)
 const BackshopKachelCatalogPage = lazy(() =>
   import('@/pages/BackshopKachelCatalogPage').then((m) => ({ default: m.BackshopKachelCatalogPage })),
 )
@@ -402,6 +405,16 @@ function App() {
               }
             />
             <Route
+              path="/user/backshop/inhalt"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopInhaltHubPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/user/backshop"
               element={
                 <ProtectedRoute>
@@ -592,6 +605,16 @@ function App() {
               }
             />
             <Route
+              path="/viewer/backshop/inhalt"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopInhaltHubPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/viewer/backshop"
               element={
                 <ProtectedRoute>
@@ -672,6 +695,14 @@ function App() {
               element={
                 <ProtectedRoute requireAdmin>
                   <BackshopKonfigurationHubPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/backshop/inhalt"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <BackshopInhaltHubPage />
                 </ProtectedRoute>
               }
             />

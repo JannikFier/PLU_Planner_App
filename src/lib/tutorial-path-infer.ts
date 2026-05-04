@@ -27,7 +27,7 @@ export function inferTutorialModuleFromPath(pathname: string): TutorialContentMo
   if (/\/masterlist(\/|$)/.test(p)) return 'obst'
   if (/\/backshop-list(\/|$)/.test(p)) return 'backshop'
 
-  if (/\/admin\/backshop$|\/user\/backshop$|\/viewer\/backshop$/.test(p)) return 'backshop'
+  if (/\/(user|admin|viewer)\/backshop(\/inhalt)?$/.test(p)) return 'backshop'
   if (/\/admin\/obst$|\/user\/obst$|\/viewer\/obst$/.test(p)) return 'obst'
 
   return null

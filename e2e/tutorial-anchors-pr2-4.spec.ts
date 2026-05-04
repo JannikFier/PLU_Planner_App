@@ -29,17 +29,26 @@ test.describe('Tutorial PR 2.4 Anchors @extended', () => {
     await dismissTutorialWelcomeIfVisible(page)
   })
 
-  test('Backshop-Hub: Bereichsnavigation und Anker', async ({ page }) => {
+  test('Backshop-Hub: drei Einstiegskarten (ohne Bereichsnav)', async ({ page }) => {
     await page.goto('/admin/backshop')
     await page.waitForLoadState('networkidle')
     await expect(page.locator('[data-tour="backshop-hub-page"]')).toBeAttached({
       timeout: 15_000,
     })
-    await expect(page.locator('[data-tour="backshop-bereich-nav"]')).toBeAttached()
+    await expect(page.locator('[data-tour="backshop-root-plu-card"]')).toBeAttached()
+    await expect(page.locator('[data-tour="backshop-root-konfig-card"]')).toBeAttached()
+    await expect(page.locator('[data-tour="backshop-root-inhalt-card"]')).toBeAttached()
+    await expect(page.locator('[data-tour="backshop-bereich-nav"]')).toHaveCount(0)
+  })
+
+  test('Backshop Inhalt-Hub: Werbung und Kachel-Karten', async ({ page }) => {
+    await page.goto('/admin/backshop/inhalt')
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator('[data-tour="backshop-inhalt-hub-page"]')).toBeAttached({
+      timeout: 15_000,
+    })
     await expect(page.locator('[data-tour="backshop-hub-werbung-card"]')).toBeAttached()
     await expect(page.locator('[data-tour="backshop-hub-kachel-link"]')).toBeAttached()
-    await expect(page.locator('[data-tour="backshop-hub-list-card"]')).toBeAttached()
-    await expect(page.locator('[data-tour="backshop-hub-konfig-card"]')).toBeAttached()
   })
 
   test('Backshop-Masterlist: Toolbar/Find-Trigger/Quick-Buttons/Tabelle', async ({ page }) => {
