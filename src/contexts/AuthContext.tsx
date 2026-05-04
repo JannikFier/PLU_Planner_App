@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, us
 import { toast } from 'sonner'
 import { supabase, clearSupabaseAuthStorage, getSessionDeduped, getAccessTokenFromStorage } from '@/lib/supabase'
 import { queryClient } from '@/lib/query-client'
-import { isAbortError } from '@/lib/error-utils'
+import { isAbortError, shouldReportGlobalError } from '@/lib/error-utils'
 import { withRetryOnAbort } from '@/lib/supabase-retry'
 import { clearDeferReplayWelcome } from '@/lib/tutorial-replay-session'
 import { loginEmailSchema, loginPersonalnummerSchema } from '@/lib/validation'
@@ -574,10 +574,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
     emailPasswordLoginInProgressRef.current = true
 
-    // Alte lokale Session abräumen, damit ein Multi-Tab-Cookie-Konflikt
-    // nicht zum generischen Login-Fehler führt (scope: 'local' = nur lokal,
-    // serverseitige Sessions auf anderen Geräten bleiben unberührt).
-    await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+    // Alte lokale Session nur bei Bedarf abräumen (Multi-Tab/Cookie-Konflikt).
+    // Leerer signOut + direkt signIn kann interne Auth-Requests abbrechen (AbortError).
+    const { data: { session: existingSession } } = await getSessionDeduped()
+    if (existingSession) {
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      })
+    }
 
     const LOGIN_TIMEOUT = 25_000
     const loginTask = async () => {
@@ -637,8 +642,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }))
         return
       }
-      const err = e as { type?: string; error?: { message?: string } }
-      const supabaseMsg = err?.error?.message?.toLowerCase() ?? ''
+      const err = e as { type?: string; error?: { message?: string; status?: number } }
+      const authApi = err?.error
+      const supabaseMsg = (authApi?.message ?? '').toLowerCase()
+      const httpStatus = typeof authApi?.status === 'number' ? authApi.status : undefined
       let userMessage: string
       if (err?.type === 'auth' || err?.type === 'no_session') {
         if (
@@ -650,10 +657,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           userMessage = 'Bitte bestätige zuerst deine E-Mail-Adresse.'
         } else if (supabaseMsg.includes('too many') || supabaseMsg.includes('rate')) {
           userMessage = 'Zu viele Anmeldeversuche. Bitte warte einen Moment.'
+        } else if (
+          supabaseMsg.includes('failed to fetch') ||
+          supabaseMsg.includes('networkerror') ||
+          supabaseMsg.includes('load failed')
+        ) {
+          userMessage = 'Netzwerkfehler. Bitte Internetverbindung prüfen und erneut versuchen.'
+        } else if (httpStatus === 403 || httpStatus === 401) {
+          userMessage =
+            'Anmeldung wurde vom Server abgelehnt. Bitte Umgebung prüfen (Supabase-URL und Anon-Key) oder Administrator kontaktieren.'
         } else {
           userMessage = 'Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.'
           console.error('[Auth] Supabase-Fehler:', err?.error)
         }
+      } else if (isAbortError(e)) {
+        userMessage = 'Die Anmeldung wurde unterbrochen. Bitte versuche es erneut.'
       } else {
         userMessage = 'Ein Fehler ist aufgetreten. Bitte versuche es erneut.'
         console.error('[Auth] Login-Fehler:', e)
@@ -752,8 +770,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setTimeout(() => reject(new Error('Logout-Timeout')), LOGOUT_TIMEOUT_MS),
         ),
       ])
-    } catch {
-      // signOut fehlgeschlagen (Netzwerk, Timeout) – Auth-Daten lokal loeschen
+    } catch (e: unknown) {
+      const isTimeout = e instanceof Error && e.message === 'Logout-Timeout'
+      if (!isTimeout && shouldReportGlobalError(e)) {
+        console.warn('[Auth] Logout-SignOut:', e)
+      }
       clearSupabaseAuthStorage()
     }
     // Nach Logout zur Root-Domain (www) — ausser Kiosk (bleibt auf Markt-Subdomain) oder localhost.

@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import { initErrorReporting, captureError } from '@/lib/error-reporting'
+import { shouldReportGlobalError } from '@/lib/error-utils'
 import { isBareKasseEntrancePath } from '@/lib/kasse-bare-entry'
 import { KasseEntranceShell } from '@/components/KasseEntranceShell'
 import './index.css'
@@ -39,11 +40,18 @@ try {
 }
 
 window.addEventListener('unhandledrejection', (event) => {
+  if (!shouldReportGlobalError(event.reason)) {
+    event.preventDefault()
+    return
+  }
   captureError(event.reason, { type: 'unhandledrejection' })
 })
 
 window.onerror = (message, source, lineno, colno, error) => {
-  captureError(error ?? message, { source, lineno, colno })
+  const payload = error ?? message
+  if (!shouldReportGlobalError(payload)) return true
+  captureError(payload, { source, lineno, colno })
+  return false
 }
 
 const rootEl = document.getElementById('root')!

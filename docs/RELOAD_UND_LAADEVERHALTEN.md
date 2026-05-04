@@ -43,6 +43,8 @@ sequenceDiagram
 
    **Logout:** Beim Abmelden werden `PLU_PLANNER_QUERY_CACHE` (sessionStorage) und der **in-memory** TanStack-Query-Cache geleert (`queryClient.clear()` in [AuthContext.tsx](../src/contexts/AuthContext.tsx)), damit nach einem **Nutzerwechsel** (z. B. Admin → Super-Admin) keine mit der vorherigen Rolle/RLS gefilterten Daten stehen bleiben.
 
+   **Auth / Debugging (Login, Konsole):** Abgebrochene Auth-Requests (z. B. durch schnellen Tab-Wechsel oder interne Abbrüche) erzeugen oft `AbortError` – der globale `unhandledrejection`-Handler in [main.tsx](../src/main.tsx) meldet diese **nicht** mehr als Fehler (`shouldReportGlobalError` in [error-utils.ts](../src/lib/error-utils.ts)). **HTTP 403** auf `auth/v1` kommt vom Supabase-Auth-Server oder dem Netzwerk davor: Response-Body im Network-Tab prüfen, `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY` aus demselben Projekt, Projektstatus im Dashboard.
+
    **Marktwechsel:** [StoreChangeQuerySync.tsx](../src/components/StoreChangeQuerySync.tsx) entfernt bei Wechsel des aktuellen Markts (`currentStoreId`) alle marktspezifischen Queries per `removeQueries` (nicht nur `invalidateQueries`). So bleiben keine gecachten „Ausgeblendete“ / „Eigene Produkte“ / Werbung eines **anderen** Markts im Speicher sichtbar; die Listen laden für den neuen Markt neu.
 
 3. **Routen:** Die meisten Seiten sind per `lazy()` geladen. Beim ersten Aufruf einer Route wird der zugehörige JS-Chunk nachgeladen → zusätzliche kurze Verzögerung.

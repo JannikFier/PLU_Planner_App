@@ -13,25 +13,33 @@
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined
 
-let _initialized = false
+/** true sobald Sentry (oder spaeter anderer Dienst) aktiv initialisiert ist */
+let _sentryInitialized = false
+
+let _consoleModeHintLogged = false
 
 export function initErrorReporting(): void {
-  if (_initialized || !SENTRY_DSN) return
-  _initialized = true
-
-  // Wenn Sentry eingerichtet wird:
-  // import * as Sentry from '@sentry/react'
-  // Sentry.init({ dsn: SENTRY_DSN, environment: import.meta.env.MODE })
-  console.info('[Error Reporting] Bereit (kein externer Service konfiguriert)')
+  if (SENTRY_DSN) {
+    if (_sentryInitialized) return
+    _sentryInitialized = true
+    // Wenn Sentry eingerichtet wird:
+    // import * as Sentry from '@sentry/react'
+    // Sentry.init({ dsn: SENTRY_DSN, environment: import.meta.env.MODE })
+    console.info('[Error Reporting] Bereit (Sentry-DSN gesetzt; Capture folgt bei Integration)')
+    return
+  }
+  if (!_consoleModeHintLogged) {
+    _consoleModeHintLogged = true
+    console.info('[Error Reporting] Nur Konsole (kein VITE_SENTRY_DSN).')
+  }
 }
 
 export function captureError(error: unknown, context?: Record<string, unknown>): void {
-  if (!_initialized) {
-    console.error('[Error Reporting – nicht initialisiert]', error, context)
+  if (_sentryInitialized) {
+    // Wenn Sentry eingerichtet wird:
+    // Sentry.captureException(error, { extra: context })
+    console.error('[Error Reporting]', error, context)
     return
   }
-
-  // Wenn Sentry eingerichtet wird:
-  // Sentry.captureException(error, { extra: context })
-  console.error('[Error Reporting]', error, context)
+  console.error('[App]', error, context)
 }

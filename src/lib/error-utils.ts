@@ -9,3 +9,23 @@ export function isAbortError(err: unknown): boolean {
     (o?.cause != null && isAbortError(o.cause))
   )
 }
+
+function messageString(reason: unknown): string {
+  if (reason instanceof Error) return reason.message ?? ''
+  if (reason != null && typeof reason === 'object' && 'message' in reason) {
+    return String((reason as { message: unknown }).message ?? '')
+  }
+  return String(reason ?? '')
+}
+
+/**
+ * true = an globales Reporting (z. B. unhandledrejection) weitergeben.
+ * false = harmloser Abbruch (Abort) – nicht melden, Browser-Warnung unterdrücken.
+ */
+export function shouldReportGlobalError(reason: unknown): boolean {
+  if (isAbortError(reason)) return false
+  const m = messageString(reason).toLowerCase()
+  if (m.includes('signal is aborted')) return false
+  if (m.includes('aborterror')) return false
+  return true
+}
