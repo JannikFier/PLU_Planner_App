@@ -20,8 +20,8 @@ import {
   BackshopOfferSheetTestBadge,
   BackshopSourceInlineBadge,
   OfferKindBadge,
-  itemHasDisplayPreis,
 } from '@/components/plu/plu-table-inline-badges'
+import { itemHasDisplayPreis } from '@/lib/plu-table-inline-badges-helpers'
 
 /** Rendert eine Tabelle mit 4 Spalten für ROW_BY_ROW (Header über volle Breite). Bei backshop: Bild | PLU | Artikel pro Seite */
 export function PluTableRowByRow({

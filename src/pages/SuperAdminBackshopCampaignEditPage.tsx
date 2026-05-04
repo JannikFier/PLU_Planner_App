@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import {
   CampaignReviewTable,
   type CampaignReviewRow,
+  type CampaignPluComboboxChangeExtra,
 } from '@/components/plu/CampaignReviewTable'
 import {
   useBackshopOfferCampaignDetail,
@@ -98,6 +99,7 @@ export function SuperAdminBackshopCampaignEditPage() {
       rowIndex: null,
       sourcePlu: l.source_plu,
       sourceArtikel: l.source_artikel,
+      sourceArtNr: l.source_art_nr,
       selectedPlu: l.plu,
       origin: l.origin,
       createdManually: l.origin === 'manual',
@@ -126,15 +128,34 @@ export function SuperAdminBackshopCampaignEditPage() {
 
   const title = `Werbung ${formatKWLabel(kw, jahr)} (Backshop)`
 
-  const onChangePlu = (rowId: string, plu: string | null) => {
+  const onChangePlu = (
+    rowId: string,
+    plu: string | null,
+    extra?: CampaignPluComboboxChangeExtra,
+  ) => {
     setRows((prev) =>
       prev.map((r) => {
         if (r.id !== rowId) return r
-        const selectedPlu = plu
-        let origin: EditableRow['origin']
-        if (!selectedPlu) origin = 'unassigned'
-        else origin = r.createdManually ? 'manual' : 'excel'
-        return { ...r, selectedPlu, origin }
+        const trimmed = plu?.trim() ?? ''
+        if (trimmed) {
+          const display =
+            extra?.selectedCandidate && extra.selectedCandidate.plu === trimmed
+              ? { label: extra.selectedCandidate.label, source: extra.selectedCandidate.source }
+              : (() => {
+                  const m = candidates.find((c) => c.plu === trimmed)
+                  return m ? { label: m.label, source: m.source } : { label: trimmed }
+                })()
+          return {
+            ...r,
+            selectedPlu: trimmed,
+            selectedMasterDisplay: display,
+            origin: r.createdManually ? 'manual' : 'excel',
+          }
+        }
+        if (extra?.pendingNewProduct) {
+          return { ...r, selectedPlu: null, selectedMasterDisplay: null, origin: 'pending_custom' }
+        }
+        return { ...r, selectedPlu: null, selectedMasterDisplay: null, origin: 'unassigned' }
       }),
     )
   }
@@ -190,11 +211,20 @@ export function SuperAdminBackshopCampaignEditPage() {
           purchase_price: purchasePrices[r.id] ?? null,
           list_ek: orig?.list_ek ?? null,
           list_vk: orig?.list_vk ?? null,
+          source_art_nr: orig?.source_art_nr ?? null,
           source_plu: r.sourcePlu,
           source_artikel: r.sourceArtikel,
           origin: r.createdManually ? 'manual' : 'excel',
         })
       } else {
+        if (price <= 0 || !Number.isFinite(price)) {
+          toast.error(
+            r.origin === 'pending_custom'
+              ? 'Bitte für jede Zeile „Neues Produkt“ einen gültigen Aktions-VK eingeben.'
+              : 'Bitte für Zeilen ohne Master-PLU einen gültigen Preis eingeben (Archiv).',
+          )
+          return
+        }
         const orig = detail?.lines.find((l) => l.id === r.id)
         lines.push({
           plu: null,
@@ -202,9 +232,10 @@ export function SuperAdminBackshopCampaignEditPage() {
           purchase_price: purchasePrices[r.id] ?? null,
           list_ek: orig?.list_ek ?? null,
           list_vk: orig?.list_vk ?? null,
+          source_art_nr: orig?.source_art_nr ?? null,
           source_plu: r.sourcePlu,
           source_artikel: r.sourceArtikel,
-          origin: 'unassigned',
+          origin: r.origin === 'pending_custom' ? 'pending_custom' : 'unassigned',
         })
       }
     }
@@ -230,8 +261,8 @@ export function SuperAdminBackshopCampaignEditPage() {
           <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
           <p className="text-sm text-muted-foreground max-w-prose">
             Links steht, was aus der Exit-Excel ausgelesen wurde. Rechts kannst du die Master-PLU
-            ändern, „Keine Zuordnung" setzen oder eigene Zeilen hinzufügen. „Keine Zuordnung"-
-            Zeilen bleiben im Archiv, erscheinen aber nicht in der Marktliste.
+            wählen, „Keine Zuordnung“ (Archiv, nicht in der Markt-/Werbungsliste), „Neues Produkt“
+            (Markt legt später eine PLU über die KW-Werbung an) oder eigene Zeilen hinzufügen.
           </p>
         </div>
 
@@ -264,6 +295,8 @@ export function SuperAdminBackshopCampaignEditPage() {
               onChangePrice={onChangePrice}
               purchasePricesById={purchasePrices}
               onChangePurchasePrice={onChangePurchasePrice}
+              showSourceArtNrColumn
+              showNeuesProduktOption
               onAddRow={onAddRow}
               onRemoveRow={onRemoveRow}
               disabled={updateMutation.isPending || deleteMutation.isPending}

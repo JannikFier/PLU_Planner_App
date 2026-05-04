@@ -34,8 +34,10 @@ test.describe('Viewer-Journey @extended', () => {
     await expect(page.getByRole('heading', { name: /PLU-Liste|Masterliste/i })).toBeVisible({ timeout: 10_000 })
   })
 
-  test('Klick auf PLU-Liste Backshop öffnet Backshop-Liste', async ({ page }) => {
+  test('Klick auf PLU-Liste Backshop öffnet Backshop-Hub, dann PLU-Liste', async ({ page }) => {
     await page.getByText('PLU-Liste Backshop').click()
+    await expect(page).toHaveURL(/\/viewer\/backshop\/?$/)
+    await page.getByRole('navigation', { name: 'Backshop-Bereich' }).getByRole('link', { name: 'PLU-Liste' }).click()
     await expect(page).toHaveURL(/\/viewer\/backshop-list/)
   })
 

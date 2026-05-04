@@ -35,26 +35,56 @@ export type CampaignReviewRow = {
   sourcePlu: string | null
   /** Artikel-Hinweis aus Excel; null = nicht verfuegbar (manuell oder alte Kampagne) */
   sourceArtikel: string | null
+  /** Excel „Art. Nr.“ / GTIN (Strichcode); optional */
+  sourceArtNr?: string | null
   /** Aktuell ausgewaehlte Master-PLU; null = keine Zuordnung */
   selectedPlu: string | null
+  /** Anzeige bei mehreren Kandidaten mit gleicher PLU (nach manueller Auswahl) */
+  selectedMasterDisplay?: { label: string; source?: MasterPluCandidate['source'] } | null
   /** Herkunft der Zeile */
-  origin: 'excel' | 'manual' | 'unassigned'
+  origin: 'excel' | 'manual' | 'unassigned' | 'pending_custom'
 }
 
-/** Durchsuchbare Master-PLU-Auswahl mit Option "Keine Zuordnung". */
+/** Durchsuchbare Master-PLU-Auswahl mit „Keine Zuordnung“ und optional „Neues Produkt“ (Backshop). */
+export type CampaignPluComboboxChangeExtra = {
+  pendingNewProduct?: boolean
+  /** Gesetzter Listen-Eintrag (wichtig bei mehreren Master-Zeilen mit gleicher PLU). */
+  selectedCandidate?: MasterPluCandidate
+}
+
 export function CampaignPluCombobox({
   candidates,
   value,
   onChange,
   disabled,
+  showNeuesProduktOption = false,
+  pendingNewProductSelected = false,
+  /** Anzeige, wenn gewählter Kandidat nicht eindeutig über PLU ermittelbar ist */
+  displayOverride,
 }: {
   candidates: MasterPluCandidate[]
   value: string | null
-  onChange: (plu: string | null) => void
+  onChange: (plu: string | null, extra?: CampaignPluComboboxChangeExtra) => void
   disabled?: boolean
+  showNeuesProduktOption?: boolean
+  pendingNewProductSelected?: boolean
+  displayOverride?: { label: string; source?: MasterPluCandidate['source'] } | null
 }) {
   const [open, setOpen] = useState(false)
-  const selected = value ? candidates.find((c) => c.plu === value) : null
+  const selected =
+    value && displayOverride
+      ? { plu: value, label: displayOverride.label, source: displayOverride.source }
+      : value
+        ? candidates.find((c) => c.plu === value)
+        : null
+
+  const triggerLabel = (() => {
+    if (selected && value) return `${value} – ${selected.label ?? '?'}`
+    if (showNeuesProduktOption && pendingNewProductSelected) {
+      return 'Neues Produkt (Markt legt PLU an)…'
+    }
+    return 'PLU wählen…'
+  })()
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -72,9 +102,12 @@ export function CampaignPluCombobox({
               <MarkenQuellBadge source={selected.source} size="sm" className="shrink-0" />
             )}
             <span
-              className={cn('min-w-0 flex-1 truncate', !value && 'text-muted-foreground')}
+              className={cn(
+                'min-w-0 flex-1 truncate',
+                !value && !pendingNewProductSelected && 'text-muted-foreground',
+              )}
             >
-              {value ? `${value} – ${selected?.label ?? '?'}` : 'PLU wählen…'}
+              {triggerLabel}
             </span>
           </span>
           <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
@@ -89,18 +122,29 @@ export function CampaignPluCombobox({
               <CommandItem
                 value="__none__"
                 onSelect={() => {
-                  onChange(null)
+                  onChange(null, { pendingNewProduct: false })
                   setOpen(false)
                 }}
               >
                 — Keine Zuordnung —
               </CommandItem>
-              {candidates.map((c) => (
+              {showNeuesProduktOption && (
                 <CommandItem
-                  key={c.plu}
+                  value="__pending_new__"
+                  onSelect={() => {
+                    onChange(null, { pendingNewProduct: true })
+                    setOpen(false)
+                  }}
+                >
+                  — Neues Produkt (Markt legt PLU an) —
+                </CommandItem>
+              )}
+              {candidates.map((c, candIdx) => (
+                <CommandItem
+                  key={`cand-${candIdx}-${c.plu}-${c.source ?? 'none'}`}
                   value={`${c.plu} ${c.label}`}
                   onSelect={() => {
-                    onChange(c.plu)
+                    onChange(c.plu, { selectedCandidate: c })
                     setOpen(false)
                   }}
                 >
@@ -124,7 +168,11 @@ export function CampaignPluCombobox({
 export interface CampaignReviewTableProps {
   rows: CampaignReviewRow[]
   candidates: MasterPluCandidate[]
-  onChangePlu: (rowId: string, plu: string | null) => void
+  onChangePlu: (
+    rowId: string,
+    plu: string | null,
+    extra?: CampaignPluComboboxChangeExtra,
+  ) => void
   /** Zeile hinzufuegen (nur wenn editierbar) */
   onAddRow?: () => void
   /** Manuelle Zeile entfernen (nur manuell hinzugefuegte duerfen weg) */
@@ -135,6 +183,10 @@ export interface CampaignReviewTableProps {
   /** Optionale Erwerb-Spalte (Backshop) */
   purchasePricesById?: Record<string, number | null | undefined>
   onChangePurchasePrice?: (rowId: string, price: number | null) => void
+  /** Art.-Nr./GTIN aus Excel (read-only), z. B. Backshop-Strichcode */
+  showSourceArtNrColumn?: boolean
+  /** Backshop: zweite feste Combobox-Option „Neues Produkt“ */
+  showNeuesProduktOption?: boolean
   disabled?: boolean
   emptyMessage?: string
 }
@@ -153,24 +205,34 @@ export function CampaignReviewTable({
   onChangePrice,
   purchasePricesById,
   onChangePurchasePrice,
+  showSourceArtNrColumn = false,
+  showNeuesProduktOption = false,
   disabled,
   emptyMessage = 'Keine Zeilen vorhanden.',
 }: CampaignReviewTableProps) {
   const showPriceColumn = !!(pricesById && onChangePrice)
   const showPurchaseColumn = !!(purchasePricesById && onChangePurchasePrice)
-  const assignedCount = useMemo(
-    () => rows.filter((r) => r.selectedPlu && r.origin !== 'unassigned').length,
+
+  const assignedCount = useMemo(() => rows.filter((r) => !!r.selectedPlu).length, [rows])
+  const pendingNewCount = useMemo(
+    () => rows.filter((r) => !r.selectedPlu && r.origin === 'pending_custom').length,
     [rows],
   )
-  const unassignedCount = rows.length - assignedCount
+  const archiveUnassignedCount = useMemo(
+    () => rows.filter((r) => !r.selectedPlu && r.origin === 'unassigned').length,
+    [rows],
+  )
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
           <Badge variant="secondary">{assignedCount} zugeordnet</Badge>
-          {unassignedCount > 0 && (
-            <Badge variant="outline">{unassignedCount} ohne Zuordnung</Badge>
+          {showNeuesProduktOption && pendingNewCount > 0 && (
+            <Badge variant="outline">{pendingNewCount} neues Produkt (Markt)</Badge>
+          )}
+          {archiveUnassignedCount > 0 && (
+            <Badge variant="outline">{archiveUnassignedCount} Archiv (keine Zuordnung)</Badge>
           )}
         </div>
         {onAddRow && (
@@ -191,6 +253,9 @@ export function CampaignReviewTable({
                 <TableHead className="w-16">Zeile</TableHead>
                 <TableHead className="w-28">PLU (Excel)</TableHead>
                 <TableHead>Artikel (Excel)</TableHead>
+                {showSourceArtNrColumn && (
+                  <TableHead className="w-36 min-w-[9rem]">Art. Nr. (GTIN)</TableHead>
+                )}
                 <TableHead className="min-w-[260px]">Master-PLU (suchen &amp; wählen)</TableHead>
                 {showPriceColumn && <TableHead className="w-28">VK (Akt. UVP)</TableHead>}
                 {showPurchaseColumn && <TableHead className="w-28">Erwerb</TableHead>}
@@ -221,11 +286,23 @@ export function CampaignReviewTable({
                             </span>
                           )}
                     </TableCell>
+                    {showSourceArtNrColumn && (
+                      <TableCell className="font-mono text-xs tabular-nums max-w-[10rem] break-all">
+                        {r.sourceArtNr?.trim()
+                          ? r.sourceArtNr.trim()
+                          : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <CampaignPluCombobox
                         candidates={candidates}
                         value={r.selectedPlu}
-                        onChange={(plu) => onChangePlu(r.id, plu)}
+                        displayOverride={r.selectedMasterDisplay ?? null}
+                        showNeuesProduktOption={showNeuesProduktOption}
+                        pendingNewProductSelected={!r.selectedPlu && r.origin === 'pending_custom'}
+                        onChange={(plu, extra) => onChangePlu(r.id, plu, extra)}
                         disabled={disabled}
                       />
                     </TableCell>

@@ -26,6 +26,7 @@ import {
   CampaignReviewTable,
   CampaignPluCombobox,
   type CampaignReviewRow,
+  type CampaignPluComboboxChangeExtra,
 } from '@/components/plu/CampaignReviewTable'
 import { useActiveVersion } from '@/hooks/useActiveVersion'
 import { usePLUData } from '@/hooks/usePLUData'
@@ -75,6 +76,10 @@ interface CentralCampaignUploadPageProps {
 type ExitMatchRow = {
   parsed: ParsedExitWerbungRow
   selectedPlu: string
+  /** Anzeige bei mehreren Master-Kandidaten mit gleicher PLU */
+  selectedMasterDisplay?: { label: string; source?: MasterPluCandidate['source'] } | null
+  /** Wenn keine Master-PLU: Archiv vs. Neues Produkt (Markt) */
+  rowOrigin?: 'unassigned' | 'pending_custom'
 }
 
 /** Nummerierter Schritt-Titel innerhalb einer Karte (1 Dateien → 2 Kontrollieren → 3 Speichern) */
@@ -309,28 +314,77 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
     }
   }
 
-  const updateBackshopPlu = (rowIndex: number, plu: string | null) => {
+  const updateBackshopPlu = (
+    rowIndex: number,
+    plu: string | null,
+    extra?: CampaignPluComboboxChangeExtra,
+  ) => {
     setBackshopMatchRows((prev) =>
-      prev.map((r, i) => (i === rowIndex ? { ...r, selectedPlu: plu ?? '' } : r)),
+      prev.map((r, i) => {
+        if (i !== rowIndex) return r
+        const trimmed = plu?.trim() ?? ''
+        const display =
+          trimmed && extra?.selectedCandidate && extra.selectedCandidate.plu === trimmed
+            ? { label: extra.selectedCandidate.label, source: extra.selectedCandidate.source }
+            : trimmed
+              ? (() => {
+                  const m = masterCandidates.find((c) => c.plu === trimmed)
+                  return m ? { label: m.label, source: m.source } : { label: trimmed }
+                })()
+              : null
+        return {
+          ...r,
+          selectedPlu: trimmed,
+          selectedMasterDisplay: display,
+          rowOrigin:
+            trimmed
+              ? undefined
+              : extra?.pendingNewProduct
+                ? 'pending_custom'
+                : 'unassigned',
+        }
+      }),
     )
   }
 
-  const updateOrdWeekMatchPlu = (rowIndex: number, plu: string | null) => {
+  const updateOrdWeekMatchPlu = (rowIndex: number, plu: string | null, extra?: CampaignPluComboboxChangeExtra) => {
     setOrdWeekUpload((prev) => {
       if (!prev) return prev
-      const matchRows = prev.matchRows.map((r, i) =>
-        i === rowIndex ? { ...r, selectedPlu: plu ?? '' } : r,
-      )
+      const matchRows = prev.matchRows.map((r, i) => {
+        if (i !== rowIndex) return r
+        const trimmed = plu?.trim() ?? ''
+        const display =
+          trimmed && extra?.selectedCandidate && extra.selectedCandidate.plu === trimmed
+            ? { label: extra.selectedCandidate.label, source: extra.selectedCandidate.source }
+            : trimmed
+              ? (() => {
+                  const m = masterCandidates.find((c) => c.plu === trimmed)
+                  return m ? { label: m.label, source: m.source } : { label: trimmed }
+                })()
+              : null
+        return { ...r, selectedPlu: trimmed, selectedMasterDisplay: display }
+      })
       return { ...prev, matchRows }
     })
   }
 
-  const updateOrd3MatchPlu = (rowIndex: number, plu: string | null) => {
+  const updateOrd3MatchPlu = (rowIndex: number, plu: string | null, extra?: CampaignPluComboboxChangeExtra) => {
     setOrd3Upload((prev) => {
       if (!prev) return prev
-      const matchRows = prev.matchRows.map((r, i) =>
-        i === rowIndex ? { ...r, selectedPlu: plu ?? '' } : r,
-      )
+      const matchRows = prev.matchRows.map((r, i) => {
+        if (i !== rowIndex) return r
+        const trimmed = plu?.trim() ?? ''
+        const display =
+          trimmed && extra?.selectedCandidate && extra.selectedCandidate.plu === trimmed
+            ? { label: extra.selectedCandidate.label, source: extra.selectedCandidate.source }
+            : trimmed
+              ? (() => {
+                  const m = masterCandidates.find((c) => c.plu === trimmed)
+                  return m ? { label: m.label, source: m.source } : { label: trimmed }
+                })()
+              : null
+        return { ...r, selectedPlu: trimmed, selectedMasterDisplay: display }
+      })
       return { ...prev, matchRows }
     })
   }
@@ -348,7 +402,7 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
     source_art_nr: string | null
     source_plu: string | null
     source_artikel: string | null
-    origin: 'excel' | 'unassigned'
+    origin: 'excel' | 'unassigned' | 'pending_custom'
   }> => {
     const seen = new Set<string>()
     const out: Array<{
@@ -360,7 +414,7 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
       source_art_nr: string | null
       source_plu: string | null
       source_artikel: string | null
-      origin: 'excel' | 'unassigned'
+      origin: 'excel' | 'unassigned' | 'pending_custom'
     }> = []
     for (const r of rows) {
       const source_artikel = r.parsed.artikel || null
@@ -397,7 +451,7 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
           source_art_nr,
           source_plu: null,
           source_artikel,
-          origin: 'unassigned',
+          origin: r.rowOrigin === 'pending_custom' ? 'pending_custom' : 'unassigned',
         })
       }
     }
@@ -405,7 +459,12 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
   }
 
   const hasBackshopAssignments = (rows: ExitMatchRow[]) =>
-    rows.some((r) => !!r.selectedPlu && r.parsed.aktUvp != null && !Number.isNaN(Number(r.parsed.aktUvp)))
+    rows.some((r) => {
+      const priceOk = r.parsed.aktUvp != null && !Number.isNaN(Number(r.parsed.aktUvp))
+      const hasPlu = !!r.selectedPlu?.trim()
+      const pending = r.rowOrigin === 'pending_custom' && !hasPlu
+      return priceOk && (hasPlu || pending)
+    })
 
   const handleSaveOrdWeek = () => {
     if (!ordWeekUpload) {
@@ -684,9 +743,9 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
                     <CampaignReviewTable
                       rows={ordWeekReviewRows}
                       candidates={allPluOptions}
-                      onChangePlu={(rowId, plu) => {
+                      onChangePlu={(rowId, plu, extra) => {
                         const idx = ordWeekRowIdToIndex.get(rowId)
-                        if (idx != null) updateOrdWeekMatchPlu(idx, plu)
+                        if (idx != null) updateOrdWeekMatchPlu(idx, plu, extra)
                       }}
                       disabled={disableObstUploads}
                     />
@@ -795,9 +854,9 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
                     <CampaignReviewTable
                       rows={ord3ReviewRows}
                       candidates={allPluOptions}
-                      onChangePlu={(rowId, plu) => {
+                      onChangePlu={(rowId, plu, extra) => {
                         const idx = ord3RowIdToIndex.get(rowId)
-                        if (idx != null) updateOrd3MatchPlu(idx, plu)
+                        if (idx != null) updateOrd3MatchPlu(idx, plu, extra)
                       }}
                       disabled={disableObstUploads}
                     />
@@ -889,6 +948,7 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-24">Zeile</TableHead>
+                        <TableHead className="w-32 font-mono text-xs">Art. Nr.</TableHead>
                         <TableHead>Artikel</TableHead>
                         <TableHead className="w-24">Akt. UVP</TableHead>
                         <TableHead className="min-w-[240px]">PLU (suchen &amp; wählen)</TableHead>
@@ -898,13 +958,21 @@ export function CentralCampaignUploadPage({ listType }: CentralCampaignUploadPag
                       {backshopMatchRows.map((mr, idx) => (
                         <TableRow key={`${mr.parsed.rowIndex}-${idx}`}>
                           <TableCell>{mr.parsed.rowIndex}</TableCell>
+                          <TableCell className="font-mono text-xs tabular-nums break-all max-w-[8rem]">
+                            {mr.parsed.artNr}
+                          </TableCell>
                           <TableCell className="max-w-xs break-words">{mr.parsed.artikel}</TableCell>
                           <TableCell>{mr.parsed.aktUvp?.toFixed(2)}</TableCell>
                           <TableCell>
                             <CampaignPluCombobox
                               candidates={allPluOptions}
-                              value={mr.selectedPlu || null}
-                              onChange={(plu) => updateBackshopPlu(idx, plu)}
+                              value={mr.selectedPlu?.trim() ? mr.selectedPlu : null}
+                              displayOverride={mr.selectedMasterDisplay ?? null}
+                              showNeuesProduktOption
+                              pendingNewProductSelected={
+                                !mr.selectedPlu?.trim() && mr.rowOrigin === 'pending_custom'
+                              }
+                              onChange={(plu, extra) => updateBackshopPlu(idx, plu, extra)}
                               disabled={disableBackshopUpload}
                             />
                           </TableCell>

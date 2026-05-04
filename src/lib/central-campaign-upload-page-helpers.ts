@@ -39,6 +39,7 @@ export function reviewRowsFromObstMatchRows(matchRows: ObstWerbungMatchRow[]): C
     sourcePlu: mr.line.excelPlu,
     sourceArtikel: mr.line.artikelHint || null,
     selectedPlu: mr.selectedPlu || null,
+    selectedMasterDisplay: mr.selectedMasterDisplay ?? undefined,
     origin: mr.selectedPlu ? 'excel' : 'unassigned',
   }))
 }

@@ -1,7 +1,7 @@
 // Backshop: Dialog zum Anlegen eines eigenen Produkts (PLU, Name, Bild Pflicht).
 // Warengruppe layoutabhängig: bei BY_BLOCK Pflicht inkl. „Neue Warengruppe erstellen“, bei ALPHABETICAL entfällt sie.
 
-import { useState, useCallback, useRef, useMemo } from 'react'
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAddBackshopCustomProduct } from '@/hooks/useBackshopCustomProducts'
+import { useLinkBackshopWerbungPendingLine } from '@/hooks/useCentralOfferCampaigns'
 import { useBackshopLayoutSettings } from '@/hooks/useBackshopLayoutSettings'
 import { useCreateBackshopBlock } from '@/hooks/useBackshopBlocks'
 import { useAuth } from '@/hooks/useAuth'
@@ -37,6 +38,10 @@ interface BackshopCustomProductDialogProps {
   onOpenChange: (open: boolean) => void
   existingPLUs: Set<string>
   blocks: BackshopBlock[]
+  /** Aus Werbung: Artikelname vorbefüllen */
+  initialName?: string | null
+  /** Aus Werbung: Pending-Zeile nach Speichern mit neuem Custom-Produkt verknüpfen */
+  werbungCampaignLineId?: string | null
 }
 
 export function BackshopCustomProductDialog({
@@ -44,9 +49,12 @@ export function BackshopCustomProductDialog({
   onOpenChange,
   existingPLUs,
   blocks,
+  initialName = null,
+  werbungCampaignLineId = null,
 }: BackshopCustomProductDialogProps) {
   const { user, isAdmin } = useAuth()
   const addProduct = useAddBackshopCustomProduct()
+  const linkWerbungLine = useLinkBackshopWerbungPendingLine()
   const { data: layoutSettings } = useBackshopLayoutSettings()
   const createBlock = useCreateBackshopBlock()
   const { data: blockRules = [] } = useBackshopBlockRules()
@@ -72,6 +80,16 @@ export function BackshopCustomProductDialog({
   const [errorPopup, setErrorPopup] = useState<string | null>(null)
   /** Test = auf PDF „Nur Angebote“ unter „Neue Produkte“; Standard beim Anlegen. */
   const [offerSheetTest, setOfferSheetTest] = useState(true)
+
+  /** Werbung: Namen vorbefüllen, wenn Dialog geöffnet wird (async, um set-state-in-effect-Lint zu vermeiden). */
+  useEffect(() => {
+    if (!open) return
+    const n = initialName?.trim()
+    if (!n) return
+    queueMicrotask(() => {
+      setName(n)
+    })
+  }, [open, initialName])
 
   /** Nur für Admins: „Neue Warengruppe“-Eingabe; ohne Effect (kein setState in useEffect). */
   const showNewBlockSection = isAdmin && showNewBlockInput
@@ -181,18 +199,24 @@ export function BackshopCustomProductDialog({
     }
 
     try {
-      await addProduct.mutateAsync({
+      const created = await addProduct.mutateAsync({
         plu: plu.trim(),
         name: name.trim(),
         image_url: imageUrl,
         block_id: sortMode === 'BY_BLOCK' ? blockId || null : null,
         is_offer_sheet_test: offerSheetTest,
       })
+      if (werbungCampaignLineId?.trim()) {
+        await linkWerbungLine.mutateAsync({
+          campaignLineId: werbungCampaignLineId.trim(),
+          customProductId: created.id,
+        })
+      }
       handleClose()
     } catch {
-      // Fehlermeldung: toast im Hook useAddBackshopCustomProduct (onError)
+      // Fehlermeldung: toast im Hook useAddBackshopCustomProduct / useLinkBackshopWerbungPendingLine (onError)
     }
-  }, [plu, name, imageFile, imagePreview, blockId, sortMode, existingPLUs, user, addProduct, handleClose, offerSheetTest])
+  }, [plu, name, imageFile, imagePreview, blockId, sortMode, existingPLUs, user, addProduct, handleClose, offerSheetTest, werbungCampaignLineId, linkWerbungLine])
 
   const pluError = (() => {
     if (plu.length === 0) return undefined
@@ -468,9 +492,9 @@ export function BackshopCustomProductDialog({
           <Button
             type="submit"
             data-tour="backshop-custom-add-dialog-submit"
-            disabled={addProduct.isPending || !canSubmit}
+            disabled={addProduct.isPending || linkWerbungLine.isPending || !canSubmit}
           >
-            {addProduct.isPending ? 'Wird hinzugefügt…' : 'Hinzufügen'}
+            {addProduct.isPending || linkWerbungLine.isPending ? 'Wird hinzugefügt…' : 'Hinzufügen'}
           </Button>
         </DialogFooter>
         </form>

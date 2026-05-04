@@ -574,6 +574,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
     emailPasswordLoginInProgressRef.current = true
 
+    // Alte lokale Session abräumen, damit ein Multi-Tab-Cookie-Konflikt
+    // nicht zum generischen Login-Fehler führt (scope: 'local' = nur lokal,
+    // serverseitige Sessions auf anderen Geräten bleiben unberührt).
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+
     const LOGIN_TIMEOUT = 25_000
     const loginTask = async () => {
       const { data, error } = await supabase.auth.signInWithPassword({

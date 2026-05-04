@@ -1,15 +1,25 @@
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { DashboardCard } from '@/components/layout/DashboardCard'
 import { useEffectiveListVisibility } from '@/hooks/useStoreListVisibility'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
+import { getBackshopNavPrefix } from '@/lib/backshop-werbung-routes'
 import { LayoutGrid, BookText, GripVertical, ListFilter } from 'lucide-react'
 
+function konfigHubFallbackPath(prefix: string): string {
+  if (prefix === '/admin') return '/admin'
+  if (prefix === '/viewer') return '/viewer'
+  if (prefix === '/super-admin') return '/super-admin'
+  return '/user'
+}
+
 /**
- * Admin: Konfiguration Backshop – Layout, Regeln, Gruppenregeln, Block-Sortierung.
+ * Backshop-Konfigurations-Hub (User, Admin, Viewer): Layout, Regeln, Sortierung, Gruppenregeln.
  */
-export function AdminBackshopKonfigurationPage() {
+export function BackshopKonfigurationHubPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const prefix = getBackshopNavPrefix(location.pathname)
   const { currentStoreId } = useCurrentStore()
   const { backshop: backshopVisible, isLoading } = useEffectiveListVisibility()
 
@@ -30,7 +40,7 @@ export function AdminBackshopKonfigurationPage() {
   }
 
   if (!backshopVisible) {
-    return <Navigate to="/admin" replace />
+    return <Navigate to={konfigHubFallbackPath(prefix)} replace />
   }
 
   return (
@@ -48,7 +58,7 @@ export function AdminBackshopKonfigurationPage() {
             title="Layout Backshop"
             description="Darstellung und Optionen für diesen Markt"
             icon={LayoutGrid}
-            onClick={() => navigate('/admin/backshop-layout')}
+            onClick={() => navigate(`${prefix}/backshop-layout`)}
             color="text-amber-800"
             bg="bg-amber-50"
             dataTour="backshop-konfig-hub-layout-card"
@@ -57,7 +67,7 @@ export function AdminBackshopKonfigurationPage() {
             title="Bezeichnungsregeln (Backshop)"
             description="Keyword-Regeln für Namen in diesem Markt"
             icon={BookText}
-            onClick={() => navigate('/admin/backshop-rules')}
+            onClick={() => navigate(`${prefix}/backshop-rules`)}
             color="text-amber-800"
             bg="bg-amber-50"
             dataTour="backshop-konfig-hub-rules-card"
@@ -66,7 +76,7 @@ export function AdminBackshopKonfigurationPage() {
             title="Warengruppen sortieren (Backshop)"
             description="Drag & Drop für diesen Markt"
             icon={GripVertical}
-            onClick={() => navigate('/admin/backshop-block-sort')}
+            onClick={() => navigate(`${prefix}/backshop-block-sort`)}
             color="text-amber-800"
             bg="bg-amber-50"
             dataTour="backshop-konfig-hub-block-sort-card"
@@ -75,7 +85,7 @@ export function AdminBackshopKonfigurationPage() {
             title="Gruppenregeln (Backshop)"
             description="Bevorzugte Marke pro Warengruppe, Basis für die Listenansicht"
             icon={ListFilter}
-            onClick={() => navigate('/admin/backshop-gruppenregeln')}
+            onClick={() => navigate(`${prefix}/backshop-gruppenregeln`)}
             color="text-amber-800"
             bg="bg-amber-50"
             dataTour="backshop-konfig-hub-gruppenregeln-card"

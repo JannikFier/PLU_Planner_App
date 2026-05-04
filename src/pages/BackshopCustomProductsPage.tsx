@@ -1,7 +1,7 @@
 // Backshop: Eigene Produkte (Bild Pflicht), Ausblenden, Bearbeiten, Löschen
 
 import { useMemo, useState, useCallback } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,47 @@ export function BackshopCustomProductsPage() {
   const canHideUnhide = canManageMarketHiddenItems(effectiveRole, pathname)
 
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const werbungFromLineId = searchParams.get('fromWerbungLine')?.trim() || null
+  const werbungPrefillNameRaw = searchParams.get('prefillName')
+  const werbungPrefillName = werbungPrefillNameRaw
+    ? (() => {
+        try {
+          return decodeURIComponent(werbungPrefillNameRaw)
+        } catch {
+          return werbungPrefillNameRaw
+        }
+      })()
+    : null
+
+  /** Werbung-Link: Dialog offen, sobald die URL den Pending-Zeilen-Parameter trägt (ohne Effect). */
+  const addDialogOpen = showAddDialog || Boolean(werbungFromLineId)
+
+  const clearWerbungQueryParams = useCallback(() => {
+    if (
+      !searchParams.get('fromWerbungLine') &&
+      !searchParams.get('prefillName') &&
+      !searchParams.get('kw') &&
+      !searchParams.get('jahr')
+    ) {
+      return
+    }
+    const next = new URLSearchParams(searchParams)
+    next.delete('fromWerbungLine')
+    next.delete('prefillName')
+    next.delete('kw')
+    next.delete('jahr')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  const handleAddDialogOpenChange = useCallback(
+    (open: boolean) => {
+      setShowAddDialog(open)
+      if (!open) clearWerbungQueryParams()
+    },
+    [clearWerbungQueryParams],
+  )
+
   const [editingProduct, setEditingProduct] = useState<BackshopCustomProduct | null>(null)
   const [productToDelete, setProductToDelete] = useState<BackshopCustomProduct | null>(null)
 
@@ -117,7 +158,7 @@ export function BackshopCustomProductsPage() {
             variant="outline"
             size="sm"
             data-tour="backshop-custom-add-button"
-            onClick={() => setShowAddDialog(true)}
+            onClick={() => handleAddDialogOpenChange(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
             Eigenes Produkt hinzufügen
@@ -164,10 +205,12 @@ export function BackshopCustomProductsPage() {
         </Card>
 
         <BackshopCustomProductDialog
-          open={showAddDialog}
-          onOpenChange={setShowAddDialog}
+          open={addDialogOpen}
+          onOpenChange={handleAddDialogOpenChange}
           existingPLUs={existingPLUs}
           blocks={blocks}
+          initialName={werbungPrefillName}
+          werbungCampaignLineId={werbungFromLineId}
         />
 
         {editingProduct && (

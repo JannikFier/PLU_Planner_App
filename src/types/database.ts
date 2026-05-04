@@ -1103,7 +1103,7 @@ export interface Database {
           source_art_nr: string | null
           source_plu: string | null
           source_artikel: string | null
-          origin: 'excel' | 'manual' | 'unassigned'
+          origin: 'excel' | 'manual' | 'unassigned' | 'pending_custom'
         }
         Insert: {
           id?: string
@@ -1117,7 +1117,7 @@ export interface Database {
           source_art_nr?: string | null
           source_plu?: string | null
           source_artikel?: string | null
-          origin?: 'excel' | 'manual' | 'unassigned'
+          origin?: 'excel' | 'manual' | 'unassigned' | 'pending_custom'
         }
         Update: {
           plu?: string | null
@@ -1129,7 +1129,32 @@ export interface Database {
           source_art_nr?: string | null
           source_plu?: string | null
           source_artikel?: string | null
-          origin?: 'excel' | 'manual' | 'unassigned'
+          origin?: 'excel' | 'manual' | 'unassigned' | 'pending_custom'
+        }
+      }
+      backshop_offer_campaign_line_store_plu: {
+        Row: {
+          id: string
+          campaign_line_id: string
+          store_id: string
+          plu: string
+          custom_product_id: string
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          campaign_line_id: string
+          store_id: string
+          plu: string
+          custom_product_id: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          plu?: string
+          custom_product_id?: string
+          created_by?: string | null
         }
       }
       backshop_offer_store_disabled: {
@@ -1618,6 +1643,10 @@ export interface Database {
         Args: { p_token: string }
         Returns: undefined
       }
+      link_backshop_werbung_pending_line: {
+        Args: { p_campaign_line_id: string; p_custom_product_id: string }
+        Returns: undefined
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -1664,6 +1693,8 @@ export type BackshopRenamedItem = Database['public']['Tables']['backshop_renamed
 export type BackshopOfferItem = Database['public']['Tables']['backshop_offer_items']['Row']
 export type BackshopOfferCampaign = Database['public']['Tables']['backshop_offer_campaigns']['Row']
 export type BackshopOfferCampaignLine = Database['public']['Tables']['backshop_offer_campaign_lines']['Row']
+export type BackshopOfferCampaignLineStorePlu =
+  Database['public']['Tables']['backshop_offer_campaign_line_store_plu']['Row']
 export type BackshopOfferStoreDisabled = Database['public']['Tables']['backshop_offer_store_disabled']['Row']
 export type BackshopOfferStoreLocalPrice = Database['public']['Tables']['backshop_offer_store_local_prices']['Row']
 export type BackshopWerbungWeekdayQuantity = Database['public']['Tables']['backshop_werbung_weekday_quantities']['Row']

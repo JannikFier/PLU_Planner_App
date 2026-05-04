@@ -23,8 +23,10 @@ export function useBackshopOfferPreviewUi(options: {
   /** Bei jedem Betreten der Live-Liste: Werbung wieder auf automatische aktuelle KW. */
   useEffect(() => {
     if (isSnapshot) return
-    setOfferPreviewSelection({ mode: 'auto' })
-    writeBackshopOfferPreviewSelection({ mode: 'auto' })
+    queueMicrotask(() => {
+      setOfferPreviewSelection({ mode: 'auto' })
+      writeBackshopOfferPreviewSelection({ mode: 'auto' })
+    })
   }, [isSnapshot])
 
   const lockedSnapshotPreview = useMemo((): BackshopOfferPreviewSelection | null => {
@@ -47,8 +49,10 @@ export function useBackshopOfferPreviewUi(options: {
     )
     if (!ok) {
       const next = { mode: 'auto' as const }
-      setOfferPreviewSelection(next)
-      writeBackshopOfferPreviewSelection(next)
+      queueMicrotask(() => {
+        setOfferPreviewSelection(next)
+        writeBackshopOfferPreviewSelection(next)
+      })
     }
   }, [lockedSnapshotPreview, offerPreviewSelection, offerSlots, offerSlotsFetched])
 

@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import {
   CampaignReviewTable,
   type CampaignReviewRow,
+  type CampaignPluComboboxChangeExtra,
 } from '@/components/plu/CampaignReviewTable'
 import {
   useObstOfferCampaignDetail,
@@ -124,15 +125,23 @@ export function SuperAdminObstCampaignEditPage() {
 
   const title = `${kindInfo.label} ${formatKWLabel(kw, jahr)}`
 
-  const onChangePlu = (rowId: string, plu: string | null) => {
+  const onChangePlu = (rowId: string, plu: string | null, extra?: CampaignPluComboboxChangeExtra) => {
     setRows((prev) =>
       prev.map((r) => {
         if (r.id !== rowId) return r
-        const selectedPlu = plu
-        let origin: EditableRow['origin']
-        if (!selectedPlu) origin = 'unassigned'
-        else origin = r.createdManually ? 'manual' : 'excel'
-        return { ...r, selectedPlu, origin }
+        const trimmed = plu?.trim() ?? ''
+        if (!trimmed) {
+          return { ...r, selectedPlu: null, selectedMasterDisplay: null, origin: 'unassigned' }
+        }
+        const display =
+          extra?.selectedCandidate && extra.selectedCandidate.plu === trimmed
+            ? { label: extra.selectedCandidate.label, source: extra.selectedCandidate.source }
+            : (() => {
+                const m = candidates.find((c) => c.plu === trimmed)
+                return m ? { label: m.label, source: m.source } : { label: trimmed }
+              })()
+        const origin = r.createdManually ? 'manual' : 'excel'
+        return { ...r, selectedPlu: trimmed, selectedMasterDisplay: display, origin }
       }),
     )
   }

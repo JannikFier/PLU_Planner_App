@@ -84,6 +84,19 @@ test.describe('Mobile Layout @mobile @extended', () => {
     await expectNoHorizontalOverflow(page)
   })
 
+  test('Backshop-Kachel-Katalog: keine horizontale Scrollbreite', async ({ page }) => {
+    await page.goto('/user/backshop-kacheln')
+    await expect(page).toHaveURL(/\/user\/backshop-kacheln/)
+    await page.waitForLoadState('networkidle')
+    await dismissTutorialWelcomeIfVisible(page)
+    await expect(page.getByRole('heading', { name: 'Backshop-Liste' })).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalOverflow(page)
+    const gridRoot = page.locator('[data-testid="backshop-kachel-grid-root"]')
+    if ((await gridRoot.count()) > 0) {
+      await expectNoHorizontalOverflowInLocator(gridRoot.first(), 'backshop-kachel-grid-root')
+    }
+  })
+
   test('Eigene Produkte: keine horizontale Scrollbreite', async ({ page }) => {
     await page.goto('/user/custom-products')
     await expect(page).toHaveURL(/\/user\/custom-products/)

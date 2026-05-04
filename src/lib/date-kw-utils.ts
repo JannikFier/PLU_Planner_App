@@ -379,6 +379,19 @@ export function formatIsoWeekMondayToSaturdayDe(kw: number, isoYear: number): st
 }
 
 /**
+ * ISO-KW als Klartext für PDF/Screenshots: Montag … bis Sonntag … (deutsch, mit Wochentag).
+ * Beispiel: „Montag, 5. Mai 2026 bis Sonntag, 11. Mai 2026“
+ */
+export function formatIsoWeekMondayToSundayWeekdaysDe(kw: number, isoYear: number): string {
+  const kwClamped = Math.min(53, Math.max(1, Math.round(kw)))
+  const monday = startOfISOWeek(setISOWeek(setISOWeekYear(new Date(), isoYear), kwClamped))
+  const sunday = addDays(monday, 6)
+  const from = format(monday, 'EEEE, d. MMMM yyyy', { locale: de })
+  const to = format(sunday, 'EEEE, d. MMMM yyyy', { locale: de })
+  return `${from} bis ${to}`
+}
+
+/**
  * Datenbank-`kw_label` optional um Mo–Sa-Datumsspanne ergänzen (mittlerer Punkt als Trenner).
  */
 export function formatKwLabelWithOptionalMonSatRange(

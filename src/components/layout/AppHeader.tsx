@@ -105,9 +105,24 @@ export function AppHeader() {
   // Obst/Gemüse-Unter-Seiten (eigene Produkte, ausgeblendet, Werbung, umbenannt) → Zurück zur Masterliste
   const USER_OBST_SUB = ['/user/custom-products', '/user/hidden-products', '/user/offer-products', '/user/renamed-products', '/user/hidden-items', '/user/obst-warengruppen']
   const ADMIN_OBST_SUB = ['/admin/custom-products', '/admin/hidden-products', '/admin/offer-products', '/admin/renamed-products', '/admin/hidden-items', '/admin/obst-warengruppen']
-  // Backshop-Unter-Seiten → Zurück zur Backshop-Liste
-  const USER_BACKSHOP_SUB = ['/user/backshop-custom-products', '/user/backshop-hidden-products', '/user/backshop-offer-products', '/user/backshop-renamed-products', '/user/marken-auswahl', '/user/backshop-werbung']
-  const ADMIN_BACKSHOP_SUB = ['/admin/backshop-custom-products', '/admin/backshop-hidden-products', '/admin/backshop-offer-products', '/admin/backshop-renamed-products', '/admin/marken-auswahl', '/admin/backshop-werbung']
+  // Backshop-Unter-Seiten → Zurück zur Backshop-Liste (Hub eine Ebene höher über die Liste)
+  const USER_BACKSHOP_SUB = [
+    '/user/backshop-custom-products',
+    '/user/backshop-hidden-products',
+    '/user/backshop-offer-products',
+    '/user/backshop-renamed-products',
+    '/user/marken-auswahl',
+    '/user/backshop-marken-tinder',
+    '/user/backshop-kacheln',
+  ]
+  const ADMIN_BACKSHOP_SUB = [
+    '/admin/backshop-custom-products',
+    '/admin/backshop-hidden-products',
+    '/admin/backshop-offer-products',
+    '/admin/backshop-renamed-products',
+    '/admin/marken-auswahl',
+    '/admin/backshop-kacheln',
+  ]
 
   /** Zurück-Ziel für User-Bereich (/user) – Obst-Unter-Seiten → Masterliste, Backshop-Unter-Seiten → Backshop-Liste, Masterliste/Liste → Dashboard */
   function getUserAreaBackTarget(path: string): string | null {
@@ -116,17 +131,36 @@ export function AppHeader() {
     if (path === '/user') return null
     if (USER_OBST_SUB.includes(path)) return '/user/masterlist'
     if (path === '/user/masterlist') return '/user'
-    if (path.startsWith('/user/backshop-werbung/')) return '/user/backshop-werbung'
-    if (USER_BACKSHOP_SUB.includes(path)) return '/user/backshop-list'
-    if (path === '/user/backshop-list') return '/user'
+    if (path.startsWith('/user/backshop-werbung/')) {
+      const qs = location.search
+      return qs ? `/user/backshop-werbung${qs}` : '/user/backshop-werbung'
+    }
+    if (path === '/user/backshop-werbung') return '/user/backshop'
+    if (USER_BACKSHOP_SUB.includes(path)) return '/user/backshop'
+    if (path === '/user/backshop') return '/user'
+    if (path === '/user/backshop/konfiguration') return '/user/backshop'
+    if (
+      path === '/user/backshop-layout'
+      || path === '/user/backshop-rules'
+      || path === '/user/backshop-block-sort'
+      || path === '/user/backshop-gruppenregeln'
+    ) {
+      return '/user/backshop/konfiguration'
+    }
+    if (path === '/user/backshop-list') return '/user/backshop'
     return '/user'
   }
 
   /** Zurück-Ziel für Viewer-Bereich (/viewer) */
   function getViewerAreaBackTarget(path: string): string | null {
     if (path === '/viewer') return null
-    if (path.startsWith('/viewer/backshop-werbung/')) return '/viewer/backshop-werbung'
-    if (path === '/viewer/backshop-werbung') return '/viewer/backshop-list'
+    if (path.startsWith('/viewer/backshop-werbung/')) {
+      const qs = location.search
+      return qs ? `/viewer/backshop-werbung${qs}` : '/viewer/backshop-werbung'
+    }
+    if (path === '/viewer/backshop-list') return '/viewer/backshop'
+    if (path === '/viewer/backshop-kacheln') return '/viewer/backshop'
+    if (path === '/viewer/backshop-werbung') return '/viewer/backshop'
     return '/viewer'
   }
 
@@ -155,7 +189,10 @@ export function AppHeader() {
 
     if (path === '/admin/masterlist') return '/admin/obst'
     if (path === '/admin/backshop-list') return '/admin/backshop'
-    if (path.startsWith('/admin/backshop-werbung/')) return '/admin/backshop-werbung'
+    if (path.startsWith('/admin/backshop-werbung/')) {
+      const qs = location.search
+      return qs ? `/admin/backshop-werbung${qs}` : '/admin/backshop-werbung'
+    }
     if (path === '/admin/backshop-werbung') return '/admin/backshop'
 
     if (
@@ -177,7 +214,7 @@ export function AppHeader() {
     }
 
     if (ADMIN_OBST_SUB.includes(path)) return '/admin/masterlist'
-    if (ADMIN_BACKSHOP_SUB.includes(path)) return '/admin/backshop-list'
+    if (ADMIN_BACKSHOP_SUB.includes(path)) return '/admin/backshop'
 
     return '/admin'
   }
@@ -205,6 +242,7 @@ export function AppHeader() {
 
     const saBackshopMarktUnter = [
       '/super-admin/backshop-list',
+      '/super-admin/backshop-kacheln',
       '/super-admin/backshop-custom-products',
       '/super-admin/backshop-hidden-products',
       '/super-admin/backshop-offer-products',
@@ -219,7 +257,8 @@ export function AppHeader() {
       '/super-admin/backshop-werbung',
     ]
     if (path.startsWith('/super-admin/backshop-werbung/')) {
-      return '/super-admin/backshop-werbung'
+      const qs = location.search
+      return qs ? `/super-admin/backshop-werbung${qs}` : '/super-admin/backshop-werbung'
     }
     if (saBackshopMarktUnter.includes(path)) {
       const saStateBackTo = (location.state as { backTo?: string } | null)?.backTo
@@ -227,6 +266,10 @@ export function AppHeader() {
       const saBackTo = saStateBackTo || saQueryBackTo
       if (saBackTo && isSafeSuperAdminBackToTarget(saBackTo)) {
         return saBackTo
+      }
+      // „Werbung bestellen“ ist marktbezogen; ohne backTo nicht zur globalen Backshop-Kachel (Upload) springen
+      if (path === '/super-admin/backshop-werbung') {
+        return '/super-admin'
       }
       if (path === '/super-admin/backshop-list') {
         return '/super-admin/backshop'
@@ -295,6 +338,7 @@ export function AppHeader() {
 
       if (!viewParam || viewParam === 'overview') return companyPath
       if (viewParam === 'listen') return storePath
+      if (viewParam === 'listen-backshop-inhalt') return `${storePath}?view=listen-backshop`
       if (viewParam === 'listen-obst' || viewParam === 'listen-backshop') return `${storePath}?view=listen`
       if (viewParam === 'benutzer' || viewParam === 'einstellungen') return storePath
       return storePath

@@ -256,7 +256,7 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
     const weightItems = items.filter((i) => i.item_type === 'WEIGHT')
 
     return (
-      <div className="space-y-8">
+      <div className="space-y-8" data-tour="masterlist-rows">
         {findInPageExternalTrigger && showFindInPage && showSearchBar && (
           <FindInPageFixedPortal>{findInPageBarEl}</FindInPageFixedPortal>
         )}
@@ -339,7 +339,7 @@ export const PLUTable = forwardRef<PLUTableHandle, PLUTableProps>(function PLUTa
   }
 
   return (
-    <div>
+    <div data-tour="masterlist-rows">
       {findInPageExternalTrigger && showFindInPage && showSearchBar && (
         <FindInPageFixedPortal>{findInPageBarEl}</FindInPageFixedPortal>
       )}

@@ -1,10 +1,19 @@
 import type { DriveStep } from 'driver.js'
+import { toast } from 'sonner'
 import type { TutorialTask } from '@/lib/tutorial-interactive-engine'
 import {
   TUTORIAL_CONTENT_VERSIONS,
   type TutorialModuleKey,
   type TutorialStatePayload,
 } from '@/lib/tutorial-types'
+
+/** Im DEV-Mode sichtbare Warnung wenn ein Tutorial-Anker fehlt — hilft Bug-Hunting. In Prod nur console.warn. */
+function notifyAnchorMissing(selector: string, kind: 'driver' | 'coach') {
+  if (import.meta.env.DEV) {
+    const label = kind === 'driver' ? 'Driver-Step' : 'Coach-Task'
+    toast.warning(`Tutorial: ${label} übersprungen, Anker fehlt: ${selector}`, { duration: 8000 })
+  }
+}
 
 export function dashboardHomeForRole(role: string): string {
   if (role === 'admin') return '/admin'
@@ -52,6 +61,7 @@ export async function filterExistingStepsAsync(
       result.push(s)
     } else {
       console.warn(`[tutorial] anchor missing for selector ${sel}`)
+      notifyAnchorMissing(sel, 'driver')
       try {
         window.dispatchEvent(
           new CustomEvent('tutorial:anchor-missing', { detail: { selector: sel } }),
@@ -88,6 +98,7 @@ export async function filterTutorialTasksWithAnchorsAsync(
       result.push(t)
     } else {
       console.warn(`[tutorial] anchor missing for coach selector ${sel}`)
+      notifyAnchorMissing(sel, 'coach')
       try {
         window.dispatchEvent(
           new CustomEvent('tutorial:anchor-missing', { detail: { selector: sel } }),

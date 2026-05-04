@@ -32,7 +32,10 @@ const VISIBLE_PATH_PATTERNS: RegExp[] = [
   /\/offer-products(\/|$)/,
   /\/renamed-products(\/|$)/,
   // Backshop
+  /\/backshop\/?$/,
   /\/backshop-list(\/|$)/,
+  /\/backshop-kacheln(\/|$)/,
+  /\/backshop-werbung(\/|$)/,
   /\/backshop-custom-products(\/|$)/,
   /\/backshop-hidden-products(\/|$)/,
   /\/backshop-offer-products(\/|$)/,

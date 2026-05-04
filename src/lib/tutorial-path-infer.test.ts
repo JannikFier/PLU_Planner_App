@@ -5,6 +5,9 @@ describe('inferTutorialModuleFromPath', () => {
   it('mappt Admin-Backshop-Hub', () => {
     expect(inferTutorialModuleFromPath('/admin/backshop')).toBe('backshop')
   })
+  it('mappt User-Backshop-Hub', () => {
+    expect(inferTutorialModuleFromPath('/user/backshop')).toBe('backshop')
+  })
   it('mappt User-Obst-Hub', () => {
     expect(inferTutorialModuleFromPath('/user/obst')).toBe('obst')
   })

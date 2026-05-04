@@ -368,10 +368,10 @@ Manuelle Werbung: Laufzeit in Wochen (1–4), Start = aktuelle KW beim Anlegen. 
 **Herkunftsarchiv je Werbungszeile (Migration 058):** `obst_offer_campaign_lines` und `backshop_offer_campaign_lines` haben jeweils:
 - `source_plu TEXT NULL` – PLU wie in der Excel aufgetaucht (oder `NULL` wenn Zeile manuell ergänzt wurde bzw. bei alten Kampagnen vor der Migration).
 - `source_artikel TEXT NULL` – Artikel-Hinweis aus der Excel (oder `NULL`).
-- `origin TEXT NOT NULL DEFAULT 'excel'` mit CHECK auf `('excel','manual','unassigned')`. Semantik: `excel` = aus Upload zugeordnet, `manual` = nachträglich in der Edit-Seite hinzugefügt, `unassigned` = Zeile aus Excel ohne Master-PLU (bleibt im Archiv, zählt **nicht** für die Marktliste).
-- `plu` ist jetzt **nullable**: exakt `plu IS NULL ↔ origin = 'unassigned'` (zusätzlicher CHECK).
+- `origin TEXT NOT NULL DEFAULT 'excel'` mit CHECK auf `('excel','manual','unassigned')` (**Obst**). **Backshop** (Migration **088**): zusätzlich `pending_custom` – zentrale Zeile ohne `plu`, sichtbar in der KW-Werbung; der Markt verknüpft später ein **eigenes Backshop-Produkt** über `backshop_offer_campaign_line_store_plu` (siehe unten). Backshop-Check: `plu IS NULL` genau bei `unassigned` oder `pending_custom`.
+- `plu` ist **nullable**: **Obst** – `plu IS NULL` genau bei `origin = 'unassigned'`. **Backshop** – `plu IS NULL` bei `unassigned` oder `pending_custom` (Migration 088).
 - UNIQUE-Schlüssel: `(campaign_id, sort_index)` statt `(campaign_id, plu)` – damit keine Konflikte bei null-PLU oder doppelten Source-PLUs entstehen.
-Lesen für die Marktlisten filtert Zeilen mit `plu IS NULL` bzw. `origin = 'unassigned'` raus; nur die Edit-Seite (Super-Admin) sieht sie.
+Lesen für die Marktlisten filtert **Obst** wie bisher; **Backshop** schließt `unassigned` aus der Angebots-/Listenlogik aus, zeigt `pending_custom` in der **KW-Werbung** und – bei marktbezogener Auflösung – in der Angebots-Markierung (siehe `backshop_offer_campaign_line_store_plu`).
 
 **Backshop – Erwerbspreis (Migration 071):** `backshop_offer_campaign_lines.purchase_price NUMERIC NULL` – Erwerb/EK aus der Exit-Excel, wenn eine passende Spalte per Header erkannt wurde (z. B. „Erwerb“, „Einkauf“, „EK“); sonst `NULL`. **`promo_price`** bleibt der aus der Spalte **„Akt. UVP“** ausgelesene zentrale Aktions-VK (wie bisher).
 
@@ -380,6 +380,8 @@ Lesen für die Marktlisten filtert Zeilen mit `plu IS NULL` bzw. `origin = 'unas
 **Backshop – Auslieferung (Migration 074):** `backshop_offer_campaigns.auslieferung_ab DATE NULL` – aus der Exit-Spalte **„Auslieferung ab“** (z. B. `DD.MM.YY`); ein Kalenderdatum pro Kampagne. Anzeige auf **Werbung bestellen** (KW-Übersicht und KW-Detail) mit relativem Hinweis (z. B. „Noch n Tage“).
 
 **Backshop – Bestellmengen zur KW-Werbung (Migration 072):** `backshop_werbung_weekday_quantities` – pro Markt (`store_id`), KW (`kw_nummer`, `jahr`) und `plu` die Felder `qty_mo` … `qty_sa` (nullable), `updated_at`, `updated_by`. **UNIQUE** `(store_id, kw_nummer, jahr, plu)`. **RLS:** Lesen für Rollen mit Marktzugriff; Schreiben für User/Admin/Super-Admin; Viewer nur Lesen.
+
+**Backshop – Werbung „Neues Produkt“ (Migration 088):** `backshop_offer_campaign_line_store_plu` – verknüpft eine zentrale Zeile `origin = pending_custom` (ohne zentrale `plu`) mit der **PLU eines eigenen Backshop-Produkts** am jeweiligen Markt (`store_id`). Spalten u. a. `campaign_line_id`, `plu`, `custom_product_id` (FK → `backshop_custom_products` **ON DELETE CASCADE**: Löschen des eigenen Produkts hebt die Verknüpfung auf). **UNIQUE** `(campaign_line_id, store_id)`, **UNIQUE** `(store_id, custom_product_id)`. **RLS:** Lesen für Marktzugriff; Schreiben am aktuellen Markt (nicht Viewer); Super-Admin. Zusätzlich RPC `link_backshop_werbung_pending_line(campaign_line_id, custom_product_id)` (SECURITY DEFINER) für die Verknüpfung nach dem Anlegen des Produkts.
 
 **RLS:** Lesen für alle Auth-User; Einfügen/Löschen/Update nur für User, Admin, Super-Admin (nicht Viewer). Kampagnen: nur Super-Admin schreiben (siehe Migration 050).
 
@@ -431,7 +433,7 @@ Getrennte Tabellen für die zweite PLU-Liste „Backshop“. Keine Änderung an 
 
 **Hinweis:** Die App im Repo nutzt die Tabelle **`blocks`**. Wenn die Browser-Konsole **`/rest/v1/product_groups`** zeigt, muss entweder Migration 056 auf Supabase laufen **oder** der Client-Code auf `blocks` vereinheitlicht werden.
 
-**RLS (Fortsetzung):** Schreiben für versions/items/layout/bezeichnungsregeln weiterhin nur Super-Admin wo zutreffend; `backshop_custom_products` wie `custom_products`; `backshop_hidden_items` wie `hidden_items` (Schreiben nur aktueller Markt, Migration 049).
+**RLS (Fortsetzung):** Schreiben für versions/items/layout/bezeichnungsregeln weiterhin nur Super-Admin wo zutreffend. **Markt-Backshop-Konfiguration** (`backshop_layout_settings`, `backshop_bezeichnungsregeln`, `store_backshop_block_order`, `store_backshop_name_block_override`, `backshop_source_rules_per_store`): Schreiben für Super-Admin oder für **User/Admin** im **aktuellen Markt** (`store_id = get_current_store_id()`, `is_not_viewer()`), Migration **088** (zuvor Migration 052/059 nur `is_admin()` für diese marktbezogenen Tabellen). `backshop_custom_products` wie `custom_products`; `backshop_hidden_items` wie `hidden_items` (Schreiben nur aktueller Markt, Migration 049).
 
 ## Supabase Storage (Backshop-Bilder)
 
@@ -485,3 +487,4 @@ Die Datenbank wird über nummerierte SQL-Scripts aufgebaut:
 50. **080_kiosk_list_registers_store_company.sql** – RPC `kiosk_list_registers` liefert zusätzlich `store_name` und `company_name` (Join auf `stores` / `companies`).
 51. **081_kiosk_list_registers_store_id.sql** – RPC liefert zusätzlich `store_id` (Client-Prefetch nach Kiosk-Login).
 52. **082_kiosk_client_auth_rpc.sql** – Index auf `store_kiosk_entrances(token)`; RPCs `kiosk_resolve_register_auth`, `kiosk_finalize_entrance_session` (Anmeldung ohne Edge Function).
+53. **088_backshop_store_config_user_write.sql** – RLS: User (Rolle `user`) darf marktbezogene Backshop-Konfiguration wie Admin im aktuellen Markt schreiben (`is_not_viewer()` + `get_current_store_id()`), inkl. `backshop_source_rules_per_store`.

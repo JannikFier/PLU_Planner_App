@@ -20,8 +20,8 @@ import {
   BackshopOfferSheetTestBadge,
   BackshopSourceInlineBadge,
   OfferKindBadge,
-  itemHasDisplayPreis,
 } from '@/components/plu/plu-table-inline-badges'
+import { itemHasDisplayPreis } from '@/lib/plu-table-inline-badges-helpers'
 
 /** Rendert eine einzelne Spalte der Tabelle (für COLUMN_FIRST). Bei listType backshop: Bild | PLU | Name */
 export function PluTableColumn({

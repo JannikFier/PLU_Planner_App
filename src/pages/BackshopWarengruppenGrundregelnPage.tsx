@@ -1,14 +1,13 @@
-// Admin/Super-Admin: Grundregeln pro Warengruppe (bevorzugte Marke pro Block, Bulk-Markenwahl)
+// User: Grundregeln (bevorzugte Marke pro Block, Bulk-Markenwahl)
 
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { BackshopWarengruppenGrundregelnCard } from '@/components/backshop/BackshopWarengruppenGrundregelnCard'
-import { useAuth } from '@/hooks/useAuth'
+import { getBackshopNavPrefix } from '@/lib/backshop-werbung-routes'
 
 export function BackshopWarengruppenGrundregelnPage() {
-  const { profile } = useAuth()
-  const isSuperAdmin = profile?.role === 'super_admin'
-  const rolePrefix = isSuperAdmin ? '/super-admin' : '/admin'
+  const location = useLocation()
+  const rolePrefix = getBackshopNavPrefix(location.pathname)
   return (
     <DashboardLayout>
       <div className="space-y-6 w-full max-w-5xl mx-auto" data-tour="backshop-konfig-gruppenregeln-page">

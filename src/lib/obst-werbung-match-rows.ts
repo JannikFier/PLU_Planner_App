@@ -8,6 +8,8 @@ export interface ObstWerbungMatchRow {
   line: ParsedObstWerbungLine
   /** Gewählte Master-PLU (leer = nicht zuordnen / nicht speichern) */
   selectedPlu: string
+  /** Anzeige bei mehreren Master-Kandidaten mit gleicher PLU */
+  selectedMasterDisplay?: { label: string; source?: MasterPluCandidate['source'] } | null
 }
 
 /**

@@ -1,7 +1,8 @@
 // KW-Detail: zentrale Werbungsartikel (Kacheln + Tabelle), Bestellzahlen, Strichcode
 
 import { useCallback, useEffect, useRef, useState, startTransition } from 'react'
-import { Barcode, ImageIcon } from 'lucide-react'
+import { Barcode, ImageIcon, Plus } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { BackshopPluBarcodeDialog } from '@/components/backshop-werbung/BackshopPluBarcodeDialog'
@@ -179,6 +180,10 @@ export interface BackshopWerbungKwDetailContentProps {
   lines: BackshopWerbungResolvedLine[]
   weekdayMap: Map<string, BackshopWerbungWeekdayQuantity>
   readOnlyWeekdays: boolean
+  /** z. B. `/user/backshop-custom-products` – für Plus-Link */
+  customProductsListPath: string
+  /** false für Viewer: kein Link zum Anlegen */
+  showAddCustomProductLink: boolean
 }
 
 export function BackshopWerbungKwDetailContent({
@@ -187,16 +192,21 @@ export function BackshopWerbungKwDetailContent({
   lines,
   weekdayMap,
   readOnlyWeekdays,
+  customProductsListPath,
+  showAddCustomProductLink,
 }: BackshopWerbungKwDetailContentProps) {
   const [barcodeFor, setBarcodeFor] = useState<{
-    plu: string
+    plu: string | null
     name: string
     source_art_nr: string | null
   } | null>(null)
 
-  const openBarcode = (plu: string, name: string, source_art_nr: string | null) => {
+  const openBarcode = (plu: string | null, name: string, source_art_nr: string | null) => {
     setBarcodeFor({ plu, name, source_art_nr })
   }
+
+  const customProductHref = (lineId: string, displayName: string) =>
+    `${customProductsListPath}?fromWerbungLine=${encodeURIComponent(lineId)}&kw=${kw}&jahr=${jahr}&prefillName=${encodeURIComponent(displayName)}`
 
   if (lines.length === 0) {
     return (
@@ -230,6 +240,13 @@ export function BackshopWerbungKwDetailContent({
                 className="px-2 py-2 text-left font-medium align-middle min-w-[8rem] max-w-[min(28vw,14rem)] border-b border-border/80"
               >
                 Artikel
+              </th>
+              <th
+                rowSpan={2}
+                className="px-1 py-2 text-center font-medium align-middle w-11 border-b border-border/80"
+                title="Eigenes Produkt anlegen"
+              >
+                +
               </th>
               <th
                 colSpan={2}
@@ -316,10 +333,27 @@ export function BackshopWerbungKwDetailContent({
                   <BackshopThumbnail src={line.image_url} size="2xl" />
                 </td>
                 <td className="px-2 py-2 align-middle font-medium text-base text-foreground tabular-nums whitespace-nowrap">
-                  {getDisplayPlu(line.plu)}
+                  {line.plu?.trim() ? getDisplayPlu(line.plu) : '—'}
                 </td>
                 <td className="px-2 py-2 align-middle min-w-0 max-w-[min(28vw,14rem)] break-words text-base text-foreground">
                   {line.display_name}
+                </td>
+                <td className="px-1 py-2 align-middle text-center w-11">
+                  {line.isPendingWithoutResolution && showAddCustomProductLink ? (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="icon"
+                      className="h-10 w-10 shrink-0"
+                      title="Eigenes Produkt anlegen (Werbung)"
+                    >
+                      <Link to={customProductHref(line.lineId, line.display_name)} aria-label="Eigenes Produkt anlegen">
+                        <Plus className="h-5 w-5" />
+                      </Link>
+                    </Button>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">—</span>
+                  )}
                 </td>
                 <td className={tdPrice('liste', 'first')}>{formatOptionalEur(line.list_ek)}</td>
                 <td className={tdPrice('liste', 'second')}>{formatOptionalEur(line.list_vk)}</td>
@@ -329,9 +363,9 @@ export function BackshopWerbungKwDetailContent({
                   <ArticleWeekdayEditor
                     kw={kw}
                     jahr={jahr}
-                    plu={line.plu}
-                    stored={weekdayMap.get(line.plu)}
-                    readOnly={readOnlyWeekdays}
+                    plu={line.plu ?? ''}
+                    stored={line.plu ? weekdayMap.get(line.plu) : undefined}
+                    readOnly={readOnlyWeekdays || !line.plu}
                     layout="tableGrid"
                   />
                 </td>
@@ -342,9 +376,7 @@ export function BackshopWerbungKwDetailContent({
                     size="icon"
                     className="h-10 w-10 shrink-0"
                     aria-label="Strichcode anzeigen"
-                    onClick={() =>
-                      openBarcode(line.plu, line.display_name, line.source_art_nr)
-                    }
+                    onClick={() => openBarcode(line.plu, line.display_name ?? '', line.source_art_nr)}
                   >
                     <Barcode className="h-5 w-5" />
                   </Button>
@@ -376,9 +408,16 @@ export function BackshopWerbungKwDetailContent({
                 </div>
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <p className="font-semibold text-base text-foreground leading-snug break-words">{line.display_name}</p>
-                  <p className="text-base font-medium text-foreground tabular-nums">
-                    PLU {getDisplayPlu(line.plu)}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-base font-medium text-foreground tabular-nums">
+                      PLU {line.plu?.trim() ? getDisplayPlu(line.plu) : '—'}
+                    </p>
+                    {line.isPendingWithoutResolution && showAddCustomProductLink ? (
+                      <Button asChild variant="outline" size="sm" className="shrink-0 h-8">
+                        <Link to={customProductHref(line.lineId, line.display_name)}>Eigenes Produkt</Link>
+                      </Button>
+                    ) : null}
+                  </div>
                   <div className="space-y-3 text-sm">
                     <div>
                       <div className="mb-1.5">
@@ -422,17 +461,15 @@ export function BackshopWerbungKwDetailContent({
               <ArticleWeekdayEditor
                 kw={kw}
                 jahr={jahr}
-                plu={line.plu}
-                stored={weekdayMap.get(line.plu)}
-                readOnly={readOnlyWeekdays}
+                plu={line.plu ?? ''}
+                stored={line.plu ? weekdayMap.get(line.plu) : undefined}
+                readOnly={readOnlyWeekdays || !line.plu}
               />
               <Button
                 type="button"
                 variant="secondary"
                 className="w-full"
-                onClick={() =>
-                  openBarcode(line.plu, line.display_name, line.source_art_nr)
-                }
+                onClick={() => openBarcode(line.plu, line.display_name ?? '', line.source_art_nr)}
               >
                 <Barcode className="h-4 w-4 mr-2" />
                 Strichcode anzeigen

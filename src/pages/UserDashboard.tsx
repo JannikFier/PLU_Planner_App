@@ -90,9 +90,9 @@ export function UserDashboard() {
           {backshopVisible && (
             <BereichsauswahlCard
               title="Backshop"
-              description="Backshop-Liste mit Bild, PLU und Name"
+              description="PLU-Liste, Konfiguration und Werbung für diesen Markt"
               icon={Croissant}
-              onClick={() => navigate('/user/backshop-list')}
+              onClick={() => navigate('/user/backshop')}
               variant="backshop"
               dataTour="dashboard-card-backshop"
             />

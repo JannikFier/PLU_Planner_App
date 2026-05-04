@@ -141,13 +141,13 @@ export function buildObstMasterlistSteps(): DriveStep[] {
       },
     },
     {
-      element: '[data-tour="masterlist-toolbar-actions"]',
+      element: '[data-tour="masterlist-rows"]',
       popover: {
         title: 'Markierungen in der Liste',
         description:
           'Fier: Rot markierte Zeilen = geänderte PLU. Gelb = neuer Artikel (z. B. nach Upload oder eigenen Produkten). So erkennst du schnell, was sich getan hat.',
-        side: 'bottom',
-        align: 'end',
+        side: 'top',
+        align: 'start',
       },
     },
   ]

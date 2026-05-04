@@ -29,7 +29,9 @@ export function useTutorialPersistence(userId: string | undefined, storeId: stri
       return rowStateToPayload((data as { state: unknown }).state)
     },
     enabled: Boolean(userId && storeId),
-    staleTime: 30_000,
+    // staleTime 0: Tutorial-State soll zwischen Tabs/Stores frisch sein.
+    // Re-Fetch nach jedem Save erzwingt der invalidateQueries-Call in saveMutation.onSuccess.
+    staleTime: 0,
   })
 
   const saveMutation = useMutation({

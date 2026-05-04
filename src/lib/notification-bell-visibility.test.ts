@@ -29,6 +29,8 @@ describe('shouldShowNotificationBell', () => {
   })
 
   it('zeigt auf Backshop-Liste und Unterseiten', () => {
+    expect(shouldShowNotificationBell('user', '/user/backshop')).toBe(true)
+    expect(shouldShowNotificationBell('user', '/user/backshop-kacheln')).toBe(true)
     expect(shouldShowNotificationBell('user', '/backshop-list')).toBe(true)
     expect(shouldShowNotificationBell('user', '/backshop-custom-products')).toBe(true)
     expect(shouldShowNotificationBell('user', '/backshop-hidden-products')).toBe(true)

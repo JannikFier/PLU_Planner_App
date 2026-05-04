@@ -77,8 +77,10 @@ const PROP_RX = /\bdataTour=["']([^"']+)["']/g
 // Dynamische Anker via JSX-Expression: data-tour={cond ? 'foo' : undefined}
 // oder data-tour={isX ? 'foo' : 'bar'} – wir erfassen alle gequoteten Tokens
 // innerhalb des Expression-Blocks, damit auch konditionale Anker als
-// "definiert" gelten.
+// "definiert" gelten. Tokens müssen lowercase-mit-Bindestrich sein
+// (echte Anker), sonst sind es Identifier-Vergleichswerte (z.B. 'BY_BLOCK').
 const ATTR_EXPR_RX = /data-tour=\{([^}]+)\}/g
+const ANCHOR_VALUE_RX = /^[a-z][a-z0-9-]*$/
 for (const f of allFiles) {
   if (curriculumSet.has(path.resolve(f))) continue
   const txt = fs.readFileSync(f, 'utf8')
@@ -90,7 +92,10 @@ for (const f of allFiles) {
     const expr = em[1]
     const tokenRx = /['"]([a-zA-Z0-9_:-]+)['"]/g
     let tm
-    while ((tm = tokenRx.exec(expr)) != null) defined.add(tm[1])
+    while ((tm = tokenRx.exec(expr)) != null) {
+      // Nur echte Anker übernehmen, keine Vergleichs-Identifier wie 'BY_BLOCK'.
+      if (ANCHOR_VALUE_RX.test(tm[1])) defined.add(tm[1])
+    }
   }
 }
 
@@ -107,4 +112,36 @@ if (missing.length > 0) {
 console.log(`\u2713 ${referenced.size} Tutorial-Selektoren validiert.`)
 if (unused.length > 0) {
   console.log(`(${unused.length} data-tour-Attribute ohne Referenz im Tutorial – vermutlich reine E2E-Hooks.)`)
+}
+
+// =========================================================================
+// Phase 0 (Tutorial-Rewrite): Konsistenz zwischen DOM-Ankern und tutorial-anchors.ts
+// Stellt sicher, dass jeder im DOM definierte Anker auch als TS-Konstante existiert.
+// Zweck: Refactor-Sicherheit (Find-Usages) und Tippfehler-Schutz im neuen Curriculum.
+// =========================================================================
+
+const anchorsFile = path.join(srcDir, 'lib', 'tutorial-anchors.ts')
+if (fs.existsSync(anchorsFile)) {
+  const anchorsTxt = fs.readFileSync(anchorsFile, 'utf8')
+  const ANCHOR_CONST_RX = /^\s*[A-Z][A-Z0-9_]*:\s*['"]([a-z][a-z0-9-]*)['"],?\s*$/gm
+  const anchorsConsts = new Set()
+  let am
+  while ((am = ANCHOR_CONST_RX.exec(anchorsTxt)) != null) anchorsConsts.add(am[1])
+
+  const inDomNotInConsts = [...defined].filter((d) => !anchorsConsts.has(d)).sort()
+  const inConstsNotInDom = [...anchorsConsts].filter((c) => !defined.has(c)).sort()
+
+  if (inDomNotInConsts.length > 0) {
+    console.error('\n❌ data-tour-Anker im DOM ohne Konstante in tutorial-anchors.ts:')
+    for (const a of inDomNotInConsts) console.error(`  - "${a}"`)
+    console.error(`\n${inDomNotInConsts.length} Anker fehlen in tutorial-anchors.ts. Bitte als Konstante ergaenzen.\n`)
+    process.exit(1)
+  }
+
+  if (inConstsNotInDom.length > 0) {
+    console.warn(`\n⚠  ${inConstsNotInDom.length} Konstanten in tutorial-anchors.ts ohne DOM-Anker (eventuell entfernen):`)
+    for (const a of inConstsNotInDom) console.warn(`  - "${a}"`)
+  }
+
+  console.log(`✓ tutorial-anchors.ts konsistent mit ${anchorsConsts.size} DOM-Ankern.`)
 }

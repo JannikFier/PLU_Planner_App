@@ -62,7 +62,7 @@ Die App setzt die Kette aus `tutorial-registry` (driver.js) plus optional `runTa
 | `masterlist-toolbar-actions`, `masterlist-search`, `masterlist-toolbar-eigene-produkte`, `masterlist-toolbar-ausgeblendete` | [`MasterList`](../src/pages/MasterList.tsx) |
 | `backshop-master-toolbar`, `backshop-toolbar-suche`, `backshop-toolbar-eigene-produkte`, `backshop-toolbar-ausgeblendete`, `backshop-toolbar-werbung` | [`BackshopMasterList`](../src/pages/BackshopMasterList.tsx) |
 | `admin-obst-hub-konfig`, `admin-backshop-hub-konfig` | Admin-Hubs |
-| `admin-*-konfig-*-card` | [`AdminObstKonfigurationPage`](../src/pages/AdminObstKonfigurationPage.tsx), [`AdminBackshopKonfigurationPage`](../src/pages/AdminBackshopKonfigurationPage.tsx) |
+| `admin-*-konfig-*-card` | [`AdminObstKonfigurationPage`](../src/pages/AdminObstKonfigurationPage.tsx), [`BackshopKonfigurationHubPage`](../src/pages/BackshopKonfigurationHubPage.tsx) |
 | `user-management-heading`, `user-management-new-user`, `user-management-create-dialog` | [`UserManagement`](../src/pages/UserManagement.tsx) |
 | `unified-notification-bell` | [`UnifiedNotificationBell`](../src/components/plu/UnifiedNotificationBell.tsx) |
 | `testmode-exit-button` | [`TestModeBanner`](../src/components/layout/TestModeBanner.tsx) |

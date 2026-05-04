@@ -70,6 +70,7 @@ Der PLU Planner unterscheidet fünf Rollen mit klar abgegrenzten Rechten (inkl. 
 - Volle PLU-Funktionen: eigene Produkte, ausblenden, **Master-Produkte umbenennen**, PDF, Benachrichtigungen
 - **Keine** Benutzerverwaltung (kein Zugriff auf andere Personen)
 - Sieht nur die Bereiche (Obst/Gemüse, Backshop), die per `user_list_visibility` freigeschaltet sind
+- **Backshop:** Einstiegshub **`/user/backshop`** mit PLU-Liste, **Konfiguration der Liste** (Layout, Bezeichnungsregeln, Warengruppen-Sortierung, Gruppenregeln) und **Werbung** (KW-Übersicht) – dieselben Funktionen wie beim Admin-Hub im aktuellen Markt, ohne Admin-Dashboard
 - Loggt sich mit **7-stelliger Personalnummer** oder E-Mail ein
 
 **Viewer** – `role: 'viewer'`
@@ -85,8 +86,7 @@ Der PLU Planner unterscheidet fünf Rollen mit klar abgegrenzten Rechten (inkl. 
 ### Backshop Multi-Source (Marken-Tinder)
 
 - **Super-Admin:** drei Uploads (Edeka/Harry/Aryzta), Produktgruppen-Review und alle Markt-Entscheidungen. PDF nie durch Konflikte blockiert.
-- **Admin:** Grundregeln pro Warengruppe (`backshop_source_rules_per_store`) und Einzel-Entscheidung pro Produktgruppe. PDF-Export **nicht** wegen fehlender Marken-Auswahl gesperrt.
-- **User:** Einzel-Entscheidung pro Produktgruppe (`backshop_source_choice_per_store`). Kein PDF-Lock wegen Marken.
+- **Admin und User:** Grundregeln pro Warengruppe (`backshop_source_rules_per_store`) und Einzel-Entscheidung pro Produktgruppe (`backshop_source_choice_per_store`) im **aktuellen Markt**. PDF-Export **nicht** wegen fehlender Marken-Auswahl gesperrt.
 - **Viewer:** PDF wie gewohnt.
 
 ## Login-Flows

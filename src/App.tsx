@@ -37,9 +37,12 @@ const AdminObstHubPage = lazy(() => import('@/pages/AdminObstHubPage').then((m) 
 const AdminObstKonfigurationPage = lazy(() =>
   import('@/pages/AdminObstKonfigurationPage').then((m) => ({ default: m.AdminObstKonfigurationPage })),
 )
-const AdminBackshopHubPage = lazy(() => import('@/pages/AdminBackshopHubPage').then((m) => ({ default: m.AdminBackshopHubPage })))
-const AdminBackshopKonfigurationPage = lazy(() =>
-  import('@/pages/AdminBackshopKonfigurationPage').then((m) => ({ default: m.AdminBackshopKonfigurationPage })),
+const BackshopHubPage = lazy(() => import('@/pages/BackshopHubPage').then((m) => ({ default: m.BackshopHubPage })))
+const BackshopKachelCatalogPage = lazy(() =>
+  import('@/pages/BackshopKachelCatalogPage').then((m) => ({ default: m.BackshopKachelCatalogPage })),
+)
+const BackshopKonfigurationHubPage = lazy(() =>
+  import('@/pages/BackshopKonfigurationHubPage').then((m) => ({ default: m.BackshopKonfigurationHubPage })),
 )
 const SuperAdminDashboard = lazy(() => import('@/pages/SuperAdminDashboard').then((m) => ({ default: m.SuperAdminDashboard })))
 const SuperAdminCompaniesPage = lazy(() => import('@/pages/SuperAdminCompaniesPage').then((m) => ({ default: m.SuperAdminCompaniesPage })))
@@ -389,11 +392,41 @@ function App() {
               }
             />
             <Route
+              path="/user/backshop/konfiguration"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopKonfigurationHubPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/backshop"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopHubPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/user/backshop-list"
               element={
                 <ProtectedRoute>
                   <ListAreaGuard listType="backshop">
                     <BackshopMasterList />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/backshop-kacheln"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopKachelCatalogPage />
                   </ListAreaGuard>
                 </ProtectedRoute>
               }
@@ -498,6 +531,46 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/user/backshop-layout"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopLayoutSettingsPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/backshop-rules"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopRulesPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/backshop-block-sort"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopBlockSortPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/backshop-gruppenregeln"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopWarengruppenGrundregelnPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
 
             {/* === Viewer-Bereich (nur viewer) === */}
             <Route
@@ -519,11 +592,31 @@ function App() {
               }
             />
             <Route
+              path="/viewer/backshop"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopHubPage />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/viewer/backshop-list"
               element={
                 <ProtectedRoute>
                   <ListAreaGuard listType="backshop">
                     <BackshopMasterList />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/viewer/backshop-kacheln"
+              element={
+                <ProtectedRoute>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopKachelCatalogPage />
                   </ListAreaGuard>
                 </ProtectedRoute>
               }
@@ -578,7 +671,7 @@ function App() {
               path="/admin/backshop/konfiguration"
               element={
                 <ProtectedRoute requireAdmin>
-                  <AdminBackshopKonfigurationPage />
+                  <BackshopKonfigurationHubPage />
                 </ProtectedRoute>
               }
             />
@@ -586,7 +679,7 @@ function App() {
               path="/admin/backshop"
               element={
                 <ProtectedRoute requireAdmin>
-                  <AdminBackshopHubPage />
+                  <BackshopHubPage />
                 </ProtectedRoute>
               }
             />
@@ -676,6 +769,16 @@ function App() {
                 <ProtectedRoute requireAdmin>
                   <ListAreaGuard listType="backshop">
                     <BackshopMasterList />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/backshop-kacheln"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopKachelCatalogPage />
                   </ListAreaGuard>
                 </ProtectedRoute>
               }
@@ -1084,6 +1187,16 @@ function App() {
                 <ProtectedRoute requireSuperAdmin>
                   <ListAreaGuard listType="backshop">
                     <BackshopMasterList />
+                  </ListAreaGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin/backshop-kacheln"
+              element={
+                <ProtectedRoute requireSuperAdmin>
+                  <ListAreaGuard listType="backshop">
+                    <BackshopKachelCatalogPage />
                   </ListAreaGuard>
                 </ProtectedRoute>
               }

@@ -16,6 +16,7 @@ import {
   clampCampaignWeekToOptions,
   formatBackshopActiveListToolbarRange,
   formatIsoWeekMondayToSaturdayDe,
+  formatIsoWeekMondayToSundayWeekdaysDe,
   formatKwLabelWithOptionalMonSatRange,
   formatBackshopWerbungContextPlainLabel,
   getBackshopToolbarWerbungLayout,
@@ -84,6 +85,11 @@ describe('date-kw-utils', () => {
       expect(formatKwLabelWithOptionalMonSatRange('KW07/2026', 7, 2026, false)).toBe('KW07/2026')
       expect(formatKwLabelWithOptionalMonSatRange('KW07/2026', 7, 2026, true)).toBe(
         'KW07/2026 · 09.02.2026–14.02.2026',
+      )
+    })
+    it('formatiert Mo–So mit Wochentagen für ISO-KW 7/2026', () => {
+      expect(formatIsoWeekMondayToSundayWeekdaysDe(7, 2026)).toBe(
+        'Montag, 9. Februar 2026 bis Sonntag, 15. Februar 2026',
       )
     })
   })

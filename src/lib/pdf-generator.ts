@@ -33,7 +33,7 @@ import {
 } from '@/lib/newspaper-column-pages'
 import type { MegaphonePdfRaster } from '@/lib/pdf-megaphone-raster'
 import { loadMegaphoneIconRaster } from '@/lib/pdf-megaphone-raster'
-import { blobToOrientationCorrectedPngDataUrl } from '@/lib/image-exif-orientation'
+import { loadRemoteImageForPdf } from '@/lib/pdf-remote-image'
 
 /** 1 pt → mm (PDF) */
 const PT_TO_MM = 25.4 / 72
@@ -871,18 +871,6 @@ export interface GenerateBackshopPDFInput {
   exportMode?: PdfExportContentMode
 }
 
-/** Lädt ein Bild von URL und gibt Data-URL plus Pixelmaße zurück; bei Fehler null. */
-async function loadImageWithDimensions(url: string): Promise<{ dataUrl: string; width: number; height: number } | null> {
-  try {
-    const res = await fetch(url, { mode: 'cors', credentials: 'omit' })
-    if (!res.ok) return null
-    const blob = await res.blob()
-    return await blobToOrientationCorrectedPngDataUrl(blob)
-  } catch {
-    return null
-  }
-}
-
 /**
  * Erzeugt ein PDF für die Backshop-Liste: Reihenfolge Bild → PLU → Name,
  * Kopf „PLU-Liste Backshop“, Footer wie Obst/Gemüse.
@@ -943,7 +931,7 @@ export async function generateBackshopPDF(input: GenerateBackshopPDFInput): Prom
   const urlsToLoad = items.flatMap((i) => (i.image_url ? [{ id: i.id, url: i.image_url }] : []))
   await Promise.all(
     urlsToLoad.map(async ({ id, url }) => {
-      const loaded = await loadImageWithDimensions(url)
+      const loaded = await loadRemoteImageForPdf(url)
       if (loaded) imageDataUrls.set(id, loaded)
     }),
   )

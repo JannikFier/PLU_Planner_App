@@ -165,6 +165,9 @@ export function useDeleteBackshopCustomProduct() {
     onSuccess: () => {
       if (!isTestModeActive()) {
         queryClient.invalidateQueries({ queryKey: ['backshop-custom-products', currentStoreId] })
+        queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaign-line-store-plu'] })
+        queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaign'] })
+        queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaign-detail'] })
       }
       toast.success('Eigenes Produkt (Backshop) gelöscht')
     },

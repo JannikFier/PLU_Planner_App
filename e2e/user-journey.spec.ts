@@ -44,13 +44,15 @@ test.describe('User-Journey @extended', () => {
     await expect(page.getByRole('heading', { name: 'PLU Obst und Gemüse' })).toBeVisible({ timeout: 15_000 })
   })
 
-  test('Backshop-Karte führt zur Backshop-Liste', async ({ page }) => {
+  test('Backshop-Karte führt zum Backshop-Hub', async ({ page }) => {
     await page.getByRole('heading', { name: 'Backshop', level: 3 }).click()
-    await expect(page).toHaveURL(/\/user\/backshop-list/)
+    await expect(page).toHaveURL(/\/user\/backshop\/?$/)
   })
 
   test('Backshop-Liste: Seite lädt mit Inhalt', async ({ page }) => {
     await page.getByRole('heading', { name: 'Backshop', level: 3 }).click()
+    await expect(page).toHaveURL(/\/user\/backshop\/?$/)
+    await page.getByRole('navigation', { name: 'Backshop-Bereich' }).getByRole('link', { name: 'PLU-Liste' }).click()
     await expect(page).toHaveURL(/\/user\/backshop-list/)
     await page.waitForLoadState('networkidle')
     // Backshop-Liste zeigt Überschrift oder leeren Zustand

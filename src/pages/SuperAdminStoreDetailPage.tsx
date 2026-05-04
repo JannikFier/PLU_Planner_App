@@ -36,7 +36,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import {
-  ClipboardList, LayoutGrid, Megaphone, Users, Settings, Trash2, Loader2,
+  ClipboardList, LayoutGrid, LayoutTemplate, Megaphone, Users, Settings, Trash2, Loader2,
   Apple, Croissant, Eye, Globe, Home, UserPlus, KeyRound, Copy, Check, UserMinus,
   ScanLine,
 } from 'lucide-react'
@@ -47,7 +47,15 @@ import { formatProfileDisplayEmail, formatProfileDisplayPersonalnummer, roleBadg
 import { useSuperAdminStoreDetailUserMutations } from '@/hooks/useSuperAdminStoreDetailUserMutations'
 import { AdminKassenmodusPage } from '@/pages/AdminKassenmodusPage'
 
-type Section = 'overview' | 'listen' | 'listen-obst' | 'listen-backshop' | 'benutzer' | 'einstellungen' | 'kassenmodus'
+type Section =
+  | 'overview'
+  | 'listen'
+  | 'listen-obst'
+  | 'listen-backshop'
+  | 'listen-backshop-inhalt'
+  | 'benutzer'
+  | 'einstellungen'
+  | 'kassenmodus'
 
 export function SuperAdminStoreDetailPage() {
   const { companyId, storeId } = useParams<{ companyId: string; storeId: string }>()
@@ -113,6 +121,7 @@ export function SuperAdminStoreDetailPage() {
   const storeBasePath = `/super-admin/companies/${companyId}/stores/${storeId}`
   const marktListenBackObst = `${storeBasePath}?view=listen-obst`
   const marktListenBackBackshop = `${storeBasePath}?view=listen-backshop`
+  const marktListenBackBackshopInhalt = `${storeBasePath}?view=listen-backshop-inhalt`
 
   const { createUserMutation, resetPasswordMutation, deleteUserMutation, updateRoleMutation } =
     useSuperAdminStoreDetailUserMutations({
@@ -329,8 +338,8 @@ export function SuperAdminStoreDetailPage() {
             <div>
               <h3 className="text-2xl font-bold tracking-tight text-slate-800">Backshop</h3>
               <p className="text-muted-foreground">
-                Backshop-Liste öffnen, Werbung nach Kalenderwoche bestellen oder Darstellung und Regeln für diesen Markt
-                anpassen.
+                PLU-Tabelle und Konfiguration direkt; unter „Backshop“ zusätzlich Werbung nach Kalenderwoche oder
+                Kachel-Übersicht mit PDF.
               </p>
             </div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -349,11 +358,44 @@ export function SuperAdminStoreDetailPage() {
                 variant="backshop"
               />
               <BereichsauswahlCard
+                title="Backshop"
+                description="Werbung nach Kalenderwoche oder Kachel-Übersicht (Warengruppen, PDF) – gleiche Daten wie die PLU-Tabelle"
+                icon={Croissant}
+                onClick={() => setView('listen-backshop-inhalt')}
+                variant="backshop"
+              />
+            </div>
+          </div>
+        )}
+
+        {view === 'listen-backshop-inhalt' && (
+          <div className="space-y-8">
+            <div>
+              <h3 className="text-2xl font-bold tracking-tight text-slate-800">Backshop</h3>
+              <p className="text-muted-foreground">
+                Wähle Werbung (KW-Übersicht) oder die kompakte Backshop-Liste mit Kacheln und PDF-Export.
+              </p>
+            </div>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <BereichsauswahlCard
                 title="Werbung"
                 description="Kalenderwoche wählen: zentrale Werbung bestellen, Strichcodes, Mengen Mo–Sa"
                 icon={Megaphone}
                 onClick={() =>
-                  navigate(`/super-admin/backshop-werbung?backTo=${encodeURIComponent(marktListenBackBackshop)}`)
+                  navigate(
+                    `/super-admin/backshop-werbung?backTo=${encodeURIComponent(marktListenBackBackshopInhalt)}`,
+                  )
+                }
+                variant="backshop"
+              />
+              <BereichsauswahlCard
+                title="Backshop-Liste"
+                description="Kacheln nach Warengruppe ohne Werbungs-Artikel, PDF mit Stand – gleiche Sortierung wie die PLU-Tabelle"
+                icon={LayoutTemplate}
+                onClick={() =>
+                  navigate(
+                    `/super-admin/backshop-kacheln?backTo=${encodeURIComponent(marktListenBackBackshopInhalt)}`,
+                  )
                 }
                 variant="backshop"
               />

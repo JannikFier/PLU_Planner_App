@@ -3,12 +3,6 @@ import { GitCompareArrows, Megaphone, Tag } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { BackshopSourceBadge } from '@/components/backshop/BackshopSourceBadge'
 import type { DisplayItem } from '@/types/plu'
-import { getDisplayPreisForItem } from '@/lib/plu-helpers'
-
-export function itemHasDisplayPreis(item: DisplayItem | undefined): boolean {
-  if (!item) return false
-  return getDisplayPreisForItem(item) != null
-}
 
 /** Inline-Badge mit Marke (nur Backshop, nicht im PDF). */
 export function BackshopSourceInlineBadge({

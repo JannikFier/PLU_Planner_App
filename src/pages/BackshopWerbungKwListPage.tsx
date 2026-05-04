@@ -19,11 +19,14 @@ function KwCampaignRow({
   c,
   prefix,
   navigate,
+  preserveSearch,
   highlight,
 }: {
   c: BackshopOfferCampaignAdminSummary
   prefix: string
   navigate: ReturnType<typeof useNavigate>
+  /** Query (?backTo=…) vom Werbungs-Überblick auf die KW-Detailseite mitnehmen */
+  preserveSearch: string
   highlight?: 'current'
 }) {
   const auslieferungLine = formatAuslieferungCountdownOneLine(c.auslieferung_ab)
@@ -32,7 +35,9 @@ function KwCampaignRow({
       <button
         type="button"
         className="w-full text-left rounded-lg border bg-card p-4 shadow-sm hover:bg-muted/40 transition-colors flex items-center justify-between gap-3"
-        onClick={() => navigate(`${prefix}/backshop-werbung/${c.kw_nummer}/${c.jahr}`)}
+        onClick={() =>
+          navigate(`${prefix}/backshop-werbung/${c.kw_nummer}/${c.jahr}${preserveSearch}`)
+        }
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -57,7 +62,7 @@ function KwCampaignRow({
   )
 }
 
-export function BackshopWerbungKwListPage() {
+export function BackshopWerbungKwListPage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate()
   const location = useLocation()
   const prefix = getBackshopWerbungRolePrefix(location.pathname)
@@ -73,9 +78,11 @@ export function BackshopWerbungKwListPage() {
   const hasAny =
     buckets.current != null || buckets.future.length > 0 || buckets.past.length > 0
 
-  return (
-    <DashboardLayout>
-      <div className="space-y-6 max-w-7xl">
+  const preserveSearch = location.search
+
+  const body = (
+    <div className={cn('space-y-6', !embedded && 'max-w-7xl')}>
+        {!embedded && (
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800">Werbung bestellen</h2>
           <p className="text-muted-foreground text-sm mt-1">
@@ -83,6 +90,7 @@ export function BackshopWerbungKwListPage() {
             Markt.
           </p>
         </div>
+        )}
 
         {isLoading ? (
           <div className="space-y-3">
@@ -108,6 +116,7 @@ export function BackshopWerbungKwListPage() {
                     c={buckets.current}
                     prefix={prefix}
                     navigate={navigate}
+                    preserveSearch={preserveSearch}
                     highlight="current"
                   />
                 </ul>
@@ -129,8 +138,14 @@ export function BackshopWerbungKwListPage() {
                   Kommende Kalenderwochen
                 </h3>
                 <ul className="space-y-3">
-                  {buckets.future.map((c) => (
-                    <KwCampaignRow key={c.id} c={c} prefix={prefix} navigate={navigate} />
+                    {buckets.future.map((c) => (
+                    <KwCampaignRow
+                      key={c.id}
+                      c={c}
+                      prefix={prefix}
+                      navigate={navigate}
+                      preserveSearch={preserveSearch}
+                    />
                   ))}
                 </ul>
               </section>
@@ -163,7 +178,13 @@ export function BackshopWerbungKwListPage() {
                 {pastOpen && (
                   <ul className="space-y-3 border-t px-4 py-3">
                     {buckets.past.map((c) => (
-                      <KwCampaignRow key={c.id} c={c} prefix={prefix} navigate={navigate} />
+                      <KwCampaignRow
+                        key={c.id}
+                        c={c}
+                        prefix={prefix}
+                        navigate={navigate}
+                        preserveSearch={preserveSearch}
+                      />
                     ))}
                   </ul>
                 )}
@@ -172,8 +193,11 @@ export function BackshopWerbungKwListPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   )
+
+  if (embedded) return body
+
+  return <DashboardLayout>{body}</DashboardLayout>
 }
 
 export default BackshopWerbungKwListPage

@@ -14,7 +14,8 @@ import { formatKWLabel } from '@/lib/plu-helpers'
 export interface BackshopPluBarcodeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  plu: string
+  /** Optional, z. B. bei „Neues Produkt“ noch ohne PLU */
+  plu?: string | null
   productName: string
   /** Aus Exit-Excel „Art. Nr.“ (GTIN/EAN), Feld `source_art_nr` */
   sourceArtNr?: string | null
@@ -64,7 +65,9 @@ export function BackshopPluBarcodeDialog({
         <div className="flex flex-col items-stretch gap-5 py-2">
           <div className="text-center space-y-1">
             <p className="font-medium text-foreground">{productName}</p>
-            <p className="text-sm text-muted-foreground tabular-nums">PLU {plu}</p>
+            <p className="text-sm text-muted-foreground tabular-nums">
+              {plu?.trim() ? `PLU ${plu}` : 'PLU noch offen – wird über „Eigenes Produkt“ ergänzt'}
+            </p>
             {kwHint && (
               <p className="text-xs text-muted-foreground">Werbung {kwHint}</p>
             )}

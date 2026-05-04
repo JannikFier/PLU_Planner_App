@@ -28,9 +28,17 @@ import {
   type CampaignWithLines,
   type ObstCentralCampaignKind,
 } from '@/lib/offer-display'
+import {
+  buildSourceArtNrMapFromLines,
+  mergeSourceArtNrFromPreviousCampaign,
+} from '@/lib/backshop-offer-campaign-merge'
+import {
+  mergeBackshopDisplayLinesForOfferMap,
+  type BackshopCampaignLineStoreResolution,
+} from '@/lib/backshop-offer-campaign-store-merge'
 
 export type SaveCampaignLineInput = {
-  /** null = "keine Zuordnung" (origin muss dann 'unassigned' sein) */
+  /** null = "keine Zuordnung" (origin unassigned) oder pending_custom (Neues Produkt) */
   plu: string | null
   promo_price: number
   /** Backshop: Erwerbspreis aus Excel oder manuell; optional (Aktions-EK) */
@@ -42,13 +50,14 @@ export type SaveCampaignLineInput = {
   source_art_nr?: string | null
   source_plu?: string | null
   source_artikel?: string | null
-  origin?: 'excel' | 'manual' | 'unassigned'
+  origin?: 'excel' | 'manual' | 'unassigned' | 'pending_custom'
 }
 
-/** Backshop: genau eine Kampagne pro KW/Jahr – Zeilen für Anzeige (ohne unassigned). */
-async function fetchBackshopCampaignWithLinesForKwYear(
+/** Backshop: genau eine Kampagne pro KW/Jahr – Zeilen für Anzeige (ohne unassigned; pending_custom per Markt aufgelöst). */
+export async function fetchBackshopCampaignWithLinesForKwYear(
   kw: number,
   jahr: number,
+  storeId: string | null | undefined,
 ): Promise<CampaignWithLines | null> {
   const campaigns = await queryRest<BackshopOfferCampaign[]>('backshop_offer_campaigns', {
     select: 'id,kw_nummer,jahr',
@@ -58,16 +67,52 @@ async function fetchBackshopCampaignWithLinesForKwYear(
   const c = campaigns?.[0]
   if (!c) return null
   const lines = await queryRest<BackshopOfferCampaignLine[]>('backshop_offer_campaign_lines', {
-    select: 'plu,promo_price,origin',
+    select: 'id,plu,promo_price,origin',
     campaign_id: `eq.${c.id}`,
     order: 'sort_index.asc',
   })
+  const raw = lines ?? []
+  if (!storeId) {
+    return {
+      kw_nummer: c.kw_nummer,
+      jahr: c.jahr,
+      lines: raw
+        .filter((l) => l.plu != null && l.origin !== 'unassigned')
+        .map((l) => ({ plu: l.plu as string, promo_price: Number(l.promo_price) })),
+    }
+  }
+
+  const pendingIds = raw
+    .filter((l) => l.origin === 'pending_custom' && (l.plu == null || String(l.plu).trim() === ''))
+    .map((l) => l.id)
+
+  let resolutions: BackshopCampaignLineStoreResolution[] = []
+  if (pendingIds.length > 0) {
+    const inList = pendingIds.join(',')
+    const rows = await queryRest<
+      Array<{ campaign_line_id: string; plu: string }>
+    >('backshop_offer_campaign_line_store_plu', {
+      select: 'campaign_line_id,plu',
+      store_id: `eq.${storeId}`,
+      campaign_line_id: `in.(${inList})`,
+    })
+    resolutions = rows ?? []
+  }
+
+  const merged = mergeBackshopDisplayLinesForOfferMap(
+    raw.map((l) => ({
+      id: l.id,
+      plu: l.plu,
+      promo_price: Number(l.promo_price),
+      origin: String(l.origin),
+    })),
+    resolutions,
+  )
+
   return {
     kw_nummer: c.kw_nummer,
     jahr: c.jahr,
-    lines: (lines ?? [])
-      .filter((l) => l.plu != null && l.origin !== 'unassigned')
-      .map((l) => ({ plu: l.plu as string, promo_price: Number(l.promo_price) })),
+    lines: merged,
   }
 }
 
@@ -75,14 +120,16 @@ async function fetchBackshopCampaignWithLinesForKwYear(
  * Lädt Kampagne für aktuelle ISO-KW; falls keine, für die nächste KW (Vorbereitung: Upload oft für „kommende Woche“).
  * Backshop: genau eine Kampagne pro KW.
  */
-async function fetchBackshopCampaignWithLinesAuto(): Promise<CampaignWithLines | null> {
+async function fetchBackshopCampaignWithLinesAuto(
+  storeId: string | null | undefined,
+): Promise<CampaignWithLines | null> {
   const now = new Date()
   const anchorDate = getBackshopWerbungAnchorDate(now)
   const cur = getKWAndYearFromDate(anchorDate)
   const next = getKWAndYearFromDate(addWeeks(anchorDate, 1))
 
   for (const slot of [cur, next]) {
-    const c = await fetchBackshopCampaignWithLinesForKwYear(slot.kw, slot.year)
+    const c = await fetchBackshopCampaignWithLinesForKwYear(slot.kw, slot.year, storeId)
     if (c) return c
   }
   return null
@@ -239,12 +286,13 @@ export function useToggleObstOfferDisabled() {
 /** Backshop: zentrale Kampagne + Zeilen (aktuelle KW, sonst nächste KW) */
 export function useBackshopOfferCampaignWithLines() {
   const { kw, year } = getBackshopWerbungKwYearFromDate(new Date())
+  const { currentStoreId } = useCurrentStore()
 
   return useQuery({
-    queryKey: ['backshop-offer-campaign', kw, year],
+    queryKey: ['backshop-offer-campaign', kw, year, currentStoreId ?? ''],
     staleTime: 60_000,
     queryFn: async (): Promise<CampaignWithLines | null> => {
-      return fetchBackshopCampaignWithLinesAuto()
+      return fetchBackshopCampaignWithLinesAuto(currentStoreId ?? undefined)
     },
   })
 }
@@ -342,16 +390,24 @@ export type BackshopOfferPreviewSelection =
  */
 export function useBackshopOfferCampaignWithPreview(selection: BackshopOfferPreviewSelection) {
   const anchor = getBackshopWerbungKwYearFromDate(new Date())
+  const { currentStoreId } = useCurrentStore()
+  const storeKey = currentStoreId ?? ''
 
   return useQuery({
     queryKey:
       selection.mode === 'auto'
-        ? (['backshop-offer-campaign', 'preview', 'auto', anchor.kw, anchor.year] as const)
-        : (['backshop-offer-campaign', 'preview', 'explicit', selection.kw, selection.jahr] as const),
+        ? (['backshop-offer-campaign', 'preview', 'auto', anchor.kw, anchor.year, storeKey] as const)
+        : (['backshop-offer-campaign', 'preview', 'explicit', selection.kw, selection.jahr, storeKey] as const),
     staleTime: 60_000,
     queryFn: async (): Promise<CampaignWithLines | null> => {
-      if (selection.mode === 'auto') return fetchBackshopCampaignWithLinesAuto()
-      return fetchBackshopCampaignWithLinesForKwYear(selection.kw, selection.jahr)
+      if (selection.mode === 'auto') {
+        return fetchBackshopCampaignWithLinesAuto(currentStoreId ?? undefined)
+      }
+      return fetchBackshopCampaignWithLinesForKwYear(
+        selection.kw,
+        selection.jahr,
+        currentStoreId ?? undefined,
+      )
     },
   })
 }
@@ -557,6 +613,29 @@ export function useSaveBackshopOfferCampaign() {
       lines: SaveCampaignLineInput[]
     }) => {
       if (!user) throw new Error('Nicht eingeloggt')
+
+      const previousCampaigns = await queryRest<BackshopOfferCampaign[]>('backshop_offer_campaigns', {
+        select: 'id',
+        kw_nummer: `eq.${payload.kwNummer}`,
+        jahr: `eq.${payload.jahr}`,
+      })
+      const previousCampaignId = previousCampaigns?.[0]?.id
+      let previousByPlu = new Map<string, string>()
+      if (previousCampaignId) {
+        const oldLines = await queryRest<
+          { plu: string | null; source_art_nr: string | null }[]
+        >('backshop_offer_campaign_lines', {
+          select: 'plu,source_art_nr',
+          campaign_id: `eq.${previousCampaignId}`,
+        })
+        previousByPlu = buildSourceArtNrMapFromLines(oldLines ?? [])
+      }
+
+      const linesWithMergedArtNr = mergeSourceArtNrFromPreviousCampaign(
+        payload.lines,
+        previousByPlu,
+      )
+
       const { error: delErr } = await supabase
         .from('backshop_offer_campaigns')
         .delete()
@@ -578,21 +657,32 @@ export function useSaveBackshopOfferCampaign() {
       if (insErr) throw insErr
       const campaignId = (camp as { id: string }).id
 
-      if (payload.lines.length === 0) return
+      if (linesWithMergedArtNr.length === 0) return
 
-      const lineRows = payload.lines.map((l, i) => ({
-        campaign_id: campaignId,
-        plu: l.plu,
-        promo_price: l.promo_price,
-        purchase_price: l.purchase_price ?? null,
-        list_ek: l.list_ek ?? null,
-        list_vk: l.list_vk ?? null,
-        sort_index: i,
-        source_art_nr: l.source_art_nr ?? null,
-        source_plu: l.source_plu ?? null,
-        source_artikel: l.source_artikel ?? null,
-        origin: l.origin ?? (l.plu ? 'excel' : 'unassigned'),
-      }))
+      const lineRows = linesWithMergedArtNr.map((l, i) => {
+        const origin: 'excel' | 'manual' | 'unassigned' | 'pending_custom' =
+          l.origin === 'pending_custom' ||
+          l.origin === 'unassigned' ||
+          l.origin === 'manual' ||
+          l.origin === 'excel'
+            ? l.origin
+            : l.plu
+              ? 'excel'
+              : 'unassigned'
+        return {
+          campaign_id: campaignId,
+          plu: l.plu,
+          promo_price: l.promo_price,
+          purchase_price: l.purchase_price ?? null,
+          list_ek: l.list_ek ?? null,
+          list_vk: l.list_vk ?? null,
+          sort_index: i,
+          source_art_nr: l.source_art_nr ?? null,
+          source_plu: l.source_plu ?? null,
+          source_artikel: l.source_artikel ?? null,
+          origin,
+        }
+      })
       const { error: lineErr } = await supabase.from('backshop_offer_campaign_lines').insert(lineRows as never[])
       if (lineErr) throw lineErr
     },
@@ -741,7 +831,7 @@ export type CampaignDetailLine = {
   list_ek?: number | null
   /** Nur Backshop: Listen-VK */
   list_vk?: number | null
-  origin: 'excel' | 'manual' | 'unassigned'
+  origin: 'excel' | 'manual' | 'unassigned' | 'pending_custom'
   source_plu: string | null
   source_artikel: string | null
   source_art_nr: string | null
@@ -993,19 +1083,30 @@ export function useUpdateBackshopOfferCampaignLines() {
 
       if (payload.lines.length === 0) return
 
-      const lineRows = payload.lines.map((l, i) => ({
-        campaign_id: campaignId!,
-        plu: l.plu,
-        promo_price: l.promo_price,
-        purchase_price: l.purchase_price ?? null,
-        list_ek: l.list_ek ?? null,
-        list_vk: l.list_vk ?? null,
-        sort_index: i,
-        source_art_nr: l.source_art_nr ?? null,
-        source_plu: l.source_plu ?? null,
-        source_artikel: l.source_artikel ?? null,
-        origin: l.origin ?? (l.plu ? 'excel' : 'unassigned'),
-      }))
+      const lineRows = payload.lines.map((l, i) => {
+        const origin: 'excel' | 'manual' | 'unassigned' | 'pending_custom' =
+          l.origin === 'pending_custom' ||
+          l.origin === 'unassigned' ||
+          l.origin === 'manual' ||
+          l.origin === 'excel'
+            ? l.origin
+            : l.plu
+              ? 'excel'
+              : 'unassigned'
+        return {
+          campaign_id: campaignId!,
+          plu: l.plu,
+          promo_price: l.promo_price,
+          purchase_price: l.purchase_price ?? null,
+          list_ek: l.list_ek ?? null,
+          list_vk: l.list_vk ?? null,
+          sort_index: i,
+          source_art_nr: l.source_art_nr ?? null,
+          source_plu: l.source_plu ?? null,
+          source_artikel: l.source_artikel ?? null,
+          origin,
+        }
+      })
       const { error: lineErr } = await supabase.from('backshop_offer_campaign_lines').insert(lineRows as never[])
       if (lineErr) throw lineErr
     },
@@ -1014,9 +1115,41 @@ export function useUpdateBackshopOfferCampaignLines() {
       queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaign-slots'] })
       queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaigns-admin'] })
       queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaign-detail'] })
+      queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaign-line-store-plu'] })
       toast.success('Werbung aktualisiert')
     },
     onError: (err) => {
+      toast.error(`Fehler: ${formatError(err)}`)
+    },
+  })
+}
+
+/** Markt: zentrale Werbezeile pending_custom mit neu angelegtem eigenen Backshop-Produkt verknüpfen. */
+export function useLinkBackshopWerbungPendingLine() {
+  const queryClient = useQueryClient()
+  const { currentStoreId } = useCurrentStore()
+
+  return useMutation({
+    mutationFn: async (payload: { campaignLineId: string; customProductId: string }) => {
+      if (!currentStoreId) throw new Error('Kein Markt ausgewählt.')
+      if (isTestModeActive()) return
+      const { error } = await supabase.rpc('link_backshop_werbung_pending_line', {
+        p_campaign_line_id: payload.campaignLineId,
+        p_custom_product_id: payload.customProductId,
+      } as never)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      if (!isTestModeActive()) {
+        queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaign-line-store-plu'] })
+        queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaign'] })
+        queryClient.invalidateQueries({ queryKey: ['backshop-offer-campaign-detail'] })
+        queryClient.invalidateQueries({ queryKey: ['backshop-custom-products', currentStoreId] })
+      }
+      toast.success('Werbung mit eigenem Produkt verknüpft')
+    },
+    onError: (err) => {
+      console.error('[useLinkBackshopWerbungPendingLine]', err)
       toast.error(`Fehler: ${formatError(err)}`)
     },
   })

@@ -125,12 +125,16 @@ function computeProfileCoachPosition(
     }
   }
 
-  const extraLeft = 72
-  let left = trigger.left - GAP - panelW - extraLeft
-  left = clamp(left, EDGE, vw - panelW - EDGE)
-  let top = trigger.bottom + 22
-  top = clamp(top, EDGE, vh - panelH - EDGE)
+  // Profil-Trigger ist klein (Avatar ~36px) und sitzt im Header oben rechts.
+  // Panel mittig UNTER dem Avatar zentrieren; Pfeil zeigt zuverlässig nach oben auf den Avatar.
+  // Das Panel beginnt unter dem Header, verdeckt also keine Header-Icons.
+  // Wenn Avatar nahe der rechten Bildschirmkante: clamp() rückt das Panel automatisch
+  // soweit nach links wie nötig, der Pfeil bleibt korrekt am Avatar dank arrowX.
   const cx = trigger.left + trigger.width / 2
+  let left = cx - panelW / 2
+  left = clamp(left, EDGE, vw - panelW - EDGE)
+  let top = trigger.bottom + 12
+  top = clamp(top, EDGE, vh - panelH - EDGE)
   const arrowX = clamp(cx - left, 24, panelW - 24)
   return { top, left, side: 'bottom', arrowX, arrowY: 0 }
 }

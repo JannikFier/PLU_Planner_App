@@ -99,6 +99,7 @@ export function AuthPrefetch() {
     if (location.pathname.includes('/masterlist')) void import('@/pages/MasterList')
     if (location.pathname.includes('/kiosk')) void import('@/pages/KioskLayout')
     if (location.pathname.includes('/backshop-list')) void import('@/pages/BackshopMasterList')
+    if (location.pathname.includes('/backshop-kacheln')) void import('@/pages/BackshopKachelCatalogPage')
     if (location.pathname.includes('pick-hide-obst')) void import('@/pages/PickHideObstPage')
     if (location.pathname.includes('pick-hide-backshop')) void import('@/pages/PickHideBackshopPage')
     if (location.pathname.includes('pick-rename-obst')) void import('@/pages/PickRenameObstPage')

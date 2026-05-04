@@ -43,9 +43,9 @@ export function ViewerDashboard() {
     if (backshopVisible) {
       result.push({
         title: 'PLU-Liste Backshop',
-        description: 'Backshop-Liste mit Bild, PLU und Name ansehen',
+        description: 'Backshop: Werbung, Kachel-Übersicht und PLU-Tabelle',
         icon: ClipboardList,
-        onClick: () => navigate('/viewer/backshop-list'),
+        onClick: () => navigate('/viewer/backshop'),
         color: 'text-slate-600',
         bg: 'bg-slate-100',
       })

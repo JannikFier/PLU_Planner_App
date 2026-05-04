@@ -29,17 +29,17 @@ test.describe('Tutorial PR 2.4 Anchors @extended', () => {
     await dismissTutorialWelcomeIfVisible(page)
   })
 
-  test('Backshop-Hub: 2 Karten erreichbar', async ({ page }) => {
+  test('Backshop-Hub: Bereichsnavigation und Anker', async ({ page }) => {
     await page.goto('/admin/backshop')
     await page.waitForLoadState('networkidle')
     await expect(page.locator('[data-tour="backshop-hub-page"]')).toBeAttached({
       timeout: 15_000,
     })
+    await expect(page.locator('[data-tour="backshop-bereich-nav"]')).toBeAttached()
+    await expect(page.locator('[data-tour="backshop-hub-werbung-card"]')).toBeAttached()
+    await expect(page.locator('[data-tour="backshop-hub-kachel-link"]')).toBeAttached()
     await expect(page.locator('[data-tour="backshop-hub-list-card"]')).toBeAttached()
-    const konfig = page.locator('[data-tour="backshop-hub-konfig-card"]')
-    if ((await konfig.count()) > 0) {
-      await expect(konfig).toBeAttached()
-    }
+    await expect(page.locator('[data-tour="backshop-hub-konfig-card"]')).toBeAttached()
   })
 
   test('Backshop-Masterlist: Toolbar/Find-Trigger/Quick-Buttons/Tabelle', async ({ page }) => {
