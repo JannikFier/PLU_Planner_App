@@ -79,7 +79,7 @@ export function buildAdminPostBackshopTasks(getPathname: () => string): Tutorial
       headline: 'Konfiguration',
       body: 'Öffne die Kachel „Konfiguration der Liste“ für Layout, Regeln und Gruppenregeln.',
       fierKey: 'pdown',
-      nearSelector: '[data-tour="backshop-hub-konfig-card"]',
+      nearSelector: '[data-tour="backshop-root-konfig-card"]',
       pollIntervalMs: 250,
       validate: () => getPathname().startsWith('/admin/backshop/konfiguration'),
     },

@@ -105,26 +105,25 @@ export function AppHeader() {
   // Obst/Gemüse-Unter-Seiten (eigene Produkte, ausgeblendet, Werbung, umbenannt) → Zurück zur Masterliste
   const USER_OBST_SUB = ['/user/custom-products', '/user/hidden-products', '/user/offer-products', '/user/renamed-products', '/user/hidden-items', '/user/obst-warengruppen']
   const ADMIN_OBST_SUB = ['/admin/custom-products', '/admin/hidden-products', '/admin/offer-products', '/admin/renamed-products', '/admin/hidden-items', '/admin/obst-warengruppen']
-  // Backshop-Unter-Seiten → Zurück zur Backshop-Liste (Hub eine Ebene höher über die Liste)
-  const USER_BACKSHOP_SUB = [
+  // Backshop: Unterseiten der PLU-Tabelle (Toolbar) → Zurück zur PLU-Tabelle; Kachel-Katalog → Inhalt-Hub
+  const USER_BACKSHOP_PLU_TOOLBAR_SUB = [
     '/user/backshop-custom-products',
     '/user/backshop-hidden-products',
     '/user/backshop-offer-products',
     '/user/backshop-renamed-products',
     '/user/marken-auswahl',
     '/user/backshop-marken-tinder',
-    '/user/backshop-kacheln',
   ]
-  const ADMIN_BACKSHOP_SUB = [
+  const ADMIN_BACKSHOP_PLU_TOOLBAR_SUB = [
     '/admin/backshop-custom-products',
     '/admin/backshop-hidden-products',
     '/admin/backshop-offer-products',
     '/admin/backshop-renamed-products',
     '/admin/marken-auswahl',
-    '/admin/backshop-kacheln',
+    '/admin/backshop-marken-tinder',
   ]
 
-  /** Zurück-Ziel für User-Bereich (/user) – Obst-Unter-Seiten → Masterliste, Backshop-Unter-Seiten → Backshop-Liste, Masterliste/Liste → Dashboard */
+  /** Zurück-Ziel für User-Bereich (/user) – Obst-Unter-Seiten → Masterliste; Backshop-Toolbar → PLU-Tabelle; Kacheln → Inhalt-Hub */
   function getUserAreaBackTarget(path: string): string | null {
     const pickerBack = resolvePickerBackTarget(path, location.state)
     if (pickerBack) return pickerBack
@@ -136,7 +135,8 @@ export function AppHeader() {
       return qs ? `/user/backshop-werbung${qs}` : '/user/backshop-werbung'
     }
     if (path === '/user/backshop-werbung') return '/user/backshop/inhalt'
-    if (USER_BACKSHOP_SUB.includes(path)) return '/user/backshop/inhalt'
+    if (USER_BACKSHOP_PLU_TOOLBAR_SUB.includes(path)) return '/user/backshop-list'
+    if (path === '/user/backshop-kacheln') return '/user/backshop/inhalt'
     if (path === '/user/backshop/inhalt') return '/user/backshop'
     if (path === '/user/backshop') return '/user'
     if (path === '/user/backshop/konfiguration') return '/user/backshop'
@@ -217,7 +217,8 @@ export function AppHeader() {
     }
 
     if (ADMIN_OBST_SUB.includes(path)) return '/admin/masterlist'
-    if (ADMIN_BACKSHOP_SUB.includes(path)) return '/admin/backshop/inhalt'
+    if (ADMIN_BACKSHOP_PLU_TOOLBAR_SUB.includes(path)) return '/admin/backshop-list'
+    if (path === '/admin/backshop-kacheln') return '/admin/backshop/inhalt'
 
     return '/admin'
   }

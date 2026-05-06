@@ -1,8 +1,7 @@
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, LayoutTemplate, Megaphone } from 'lucide-react'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { LayoutTemplate, Megaphone } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { BereichsauswahlCard } from '@/components/layout/BereichsauswahlCard'
-import { Button } from '@/components/ui/button'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useEffectiveListVisibility } from '@/hooks/useStoreListVisibility'
 import { getBackshopNavPrefix } from '@/lib/backshop-werbung-routes'
@@ -46,20 +45,9 @@ export function BackshopInhaltHubPage() {
     return <Navigate to={backshopInhaltFallbackPath(prefix)} replace />
   }
 
-  const hubBack = `${prefix}/backshop`
-
   return (
     <DashboardLayout>
       <div className="space-y-8" data-tour="backshop-inhalt-hub-page">
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="ghost" size="sm" className="gap-1.5 -ml-2" asChild>
-            <Link to={hubBack}>
-              <ArrowLeft className="h-4 w-4" aria-hidden />
-              Zurück zur Übersicht
-            </Link>
-          </Button>
-        </div>
-
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800">Backshop</h2>
           <p className="text-muted-foreground mt-1">

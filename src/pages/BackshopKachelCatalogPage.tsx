@@ -8,7 +8,6 @@ import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useBackshopMasterListDisplayBundle } from '@/hooks/useBackshopMasterListDisplayBundle'
 import { buildBackshopKachelWarengruppeBlocks } from '@/lib/backshop-kachel-groups'
 import { BackshopKachelGrid } from '@/components/backshop/BackshopKachelGrid'
-import { BackshopBereichNav } from '@/components/backshop/BackshopBereichNav'
 import {
   BackshopMasterListItemsErrorCard,
   BackshopMasterListLoadingSkeletonCard,
@@ -94,8 +93,6 @@ export function BackshopKachelCatalogPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <BackshopBereichNav />
-
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-800">Backshop-Liste</h2>
