@@ -15,6 +15,17 @@ function visibleNonCustomMasterKeys(items: DisplayItem[]): Set<string> {
   return s
 }
 
+/** PLUs eigener Backshop-Produkte, die in der gebauten Anzeigeliste vorkommen. */
+function visibleCustomPluSetFromDisplayItems(items: DisplayItem[]): Set<string> {
+  const s = new Set<string>()
+  for (const it of items) {
+    if (!it.is_custom) continue
+    if (it.plu === '—' || !it.plu.trim()) continue
+    s.add(it.plu)
+  }
+  return s
+}
+
 /** Wie in `buildBackshopDisplayList`: Master + Carryover-Duplikate entfernen. */
 export function mergeBackshopMasterAndCarryover(
   masterItems: BackshopMasterPLUItem[],
@@ -32,9 +43,14 @@ export function mergeBackshopMasterAndCarryover(
 export function getBackshopRuleFilteredMasterRows(
   listInput: BackshopDisplayListInput,
   manualHiddenPluSet: Set<string>,
-): { visiblePluSourceKeys: Set<string>; ruleFilteredRows: BackshopMasterPLUItem[] } {
+): {
+  visiblePluSourceKeys: Set<string>
+  visibleCustomPluSet: Set<string>
+  ruleFilteredRows: BackshopMasterPLUItem[]
+} {
   const result = buildBackshopDisplayList(listInput)
   const visible = visibleNonCustomMasterKeys(result.items)
+  const visibleCustomPluSet = visibleCustomPluSetFromDisplayItems(result.items)
   const all = mergeBackshopMasterAndCarryover(
     listInput.masterItems,
     listInput.carryoverMasterItems,
@@ -45,5 +61,5 @@ export function getBackshopRuleFilteredMasterRows(
     const src = (m.source ?? 'edeka') as BackshopSource
     if (!visible.has(`${m.plu}|${src}`)) ruleFiltered.push(m)
   }
-  return { visiblePluSourceKeys: visible, ruleFilteredRows: ruleFiltered }
+  return { visiblePluSourceKeys: visible, visibleCustomPluSet, ruleFilteredRows: ruleFiltered }
 }

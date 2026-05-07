@@ -37,7 +37,8 @@ import {
   useStoreBackshopBlockOrder,
   useStoreBackshopNameBlockOverrides,
 } from '@/hooks/useStoreBackshopBlockLayout'
-import { buildBackshopDisplayList, type BackshopDisplayListInput, toBackshopCustomProductInput } from '@/lib/layout-engine'
+import { buildBackshopDisplayList, type BackshopDisplayListInput } from '@/lib/layout-engine'
+import { buildBackshopDisplayListInputFromSnapshot } from '@/lib/backshop-display-list-input-build'
 import { buildOfferDisplayMap } from '@/lib/offer-display'
 import { getKWAndYearFromDate } from '@/lib/date-kw-utils'
 import { orderByPluDisplayOrder } from '@/lib/list-order'
@@ -235,19 +236,19 @@ export function useBackshopHiddenProductsPageModel({
   const sortMode = (layoutSettings?.sort_mode ?? 'ALPHABETICAL') as 'ALPHABETICAL' | 'BY_BLOCK'
 
   const displayListInput: BackshopDisplayListInput | null = useMemo(() => {
-    if (!versionId) return null
-    const listVersion = activeVersion!
+    if (!versionId || !activeVersion) return null
     const carryoverMaster = backshopCarryoverRows
       .filter((r) => r.market_include)
-      .map((r) => carryoverBackshopRowToMasterItem(r, listVersion.id))
-    return {
+      .map((r) => carryoverBackshopRowToMasterItem(r, activeVersion.id))
+    return buildBackshopDisplayListInputFromSnapshot({
+      versionId,
       masterItems,
       carryoverMasterItems: carryoverMaster,
-      hiddenPLUs: effectiveHiddenPLUs,
+      effectiveHiddenPLUs,
       offerDisplayByPlu,
       sortMode,
       blocks: blocks as Block[],
-      customProducts: customProducts.map(toBackshopCustomProductInput),
+      customProducts,
       bezeichnungsregeln: regeln,
       renamedItems,
       markYellowKwCount: markYellow,
@@ -264,7 +265,7 @@ export function useBackshopHiddenProductsPageModel({
       backshopPrevManualPluSet: backshopPrevManualPluSetForLayout,
       lineForceShowKeys,
       lineForceHideKeys,
-    }
+    })
   }, [
     versionId,
     activeVersion,

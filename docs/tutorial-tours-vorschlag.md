@@ -102,10 +102,12 @@ Symbole: 🆕 = komplett neu, ⚙️ = stark überarbeitet, 🔄 = leicht angepa
 
 **Glocke-Block (Abschluss, bevor User Liste verlässt — gibt Überblick was er mit der Liste alles anstellen kann):**
 10. **Glocken-Symbol** oben im Header (interaktiv) — „Hier siehst du, was sich an der Liste geändert hat"
-11. **Tab „Neu":** Produkte die diese KW neu sind (Verbindung zur gelben PLU-Markierung)
-12. **Tab „Geändert":** Produkte mit neuer PLU (Verbindung zur roten PLU-Markierung)
-13. **Tab „Entfernt" + Carryover (interaktiv):** rausgefallene Produkte für 1 Woche verlängern, damit du Restbestand verkaufen kannst
-14. „Alle als gelesen markieren"
+11. **Tab „Neu":** Produkte die diese KW neu sind (gelblich-oranger Streifen vorn, passt zur gelben PLU). „Ausblenden"-Knopf pro Eintrag → Toast „Produkt ausgeblendet"/„Produkt wieder eingeblendet"
+12. **Tab „Geändert":** Produkte mit neuer PLU (rötlich-oranger Streifen vorn, passt zur roten PLU). Sub-Text **„Ehemals PLU {nummer}"** unter dem Namen
+13. **Tab „Raus" + Carryover (interaktiv):** rausgefallene Produkte mit Pill „Rausgefallen". **Zwei Buttons pro Eintrag:**
+    - **„Eine KW in Liste"** (sekundär) — Produkt einmalig übernehmen für Restbestand. Nach Klick erscheint Audit-Trail-Sub-Text „Markt: wieder in Liste · zuletzt {User}, {Datum}"
+    - **„Nicht übernehmen"** (primär blau) — bestätigt das Rauswerfen
+14. Pro Sektion „Gelesen"-Knopf, Footer-Knopf „Alles als gelesen markieren"
 15. Abschluss: „Eigene Touren für jede dieser Aktionen — siehe Tutorial-Knopf"
 
 ### B2 · Eigene Obst-Produkte 🆕 (~5-7 Steps, interaktiv)
@@ -131,23 +133,23 @@ Symbole: 🆕 = komplett neu, ⚙️ = stark überarbeitet, 🔄 = leicht angepa
 7. Produkt umbenennen (interaktiv) — neuen Namen eingeben
 8. Speichern, Effekt in Liste sehen — ggf. zurücksetzen
 
-### B4 · Obst-Werbung anlegen + ändern ⚙️ (~6-8 Steps, interaktiv)
+### B4 · Obst-Werbung anlegen + ändern ⚙️ (~9-11 Steps, interaktiv)
 **Rolle:** User, Admin
 
 1. „Werbung"-Button (interaktiv)
-2. **Eigene vs. Zentrale Werbung** — Unterschied: zentrale kommt vom Super-Admin, eigene macht der Markt selbst
-3. **„Megafon aus" — mit Beispiel:**
-   - Bei **zentraler Werbung** (vom Hauptsitz für alle Märkte) gibt es ein **Megafon-Symbol** an jedem Eintrag
-   - Beispiel: Zentrale Kampagne „Bananen 1,99 €" → erscheint in deinem Markt mit Werbungs-Markierung (dunkleres/helleres Gelb)
-   - Du willst Bananen **in deinem Markt nicht als Werbung** zeigen → **Megafon ausschalten**
-   - **Ergebnis:** Werbungs-Markierung weg, Bananen sind aber **noch in der Liste** mit normalem Preis
-   - Wenn du Bananen **komplett aus deiner Liste** weghaben willst → zusätzlich **ausblenden** (siehe B3)
-4. Eigene Werbung: Produkt hinzufügen (interaktiv)
-5. Kalenderwoche festlegen
-6. **Lokalpreis:** Eigener Preis nur für diesen Markt (überschreibt zentralen Preis falls vorhanden)
-7. Speichern
-8. Werbung wieder ändern: Eintrag öffnen, anpassen
-9. Hinweis: dunkleres Gelb in der Liste = Wochen-Werbung, helleres Gelb = 3-Tages-Werbung
+2. **Zwei Sektionen:** „Zentrale Werbung (KW XX/YYYY)" (vom Hauptsitz) und „Eigene Werbung" (vom Markt selbst)
+3. **Stift pro Zeile = „Eigener Aktionspreis":** Dialog mit Untertitel „Nur für diesen Markt. Der zentrale Vorgabepreis bleibt zur Orientierung sichtbar." Read-only Zentral-Referenz + Number-Input „Eigener Verkaufspreis (€)". Toast: **„Eigener Aktionspreis gespeichert"**
+4. **Megafon pro Zeile** (interaktiv) — Dialog **„Zentrale Werbung":** „Diese Aktion kommt von der Zentrale. Du kannst sie für deinen Markt abschalten oder die Zeile komplett aus deiner Liste entfernen." **Drei Optionen:**
+   - **„Nur normale Zeile (ohne Werbung)"** (blau) → Megafon aus, Zeile bleibt in Liste durchgestrichen ausgegraut. Toast: „Werbung aus, Produkt bleibt in der Liste"
+   - **„Aus Liste und PDF entfernen"** (rot, destruktiv) — Zeile komplett raus
+   - **„Abbrechen"**
+5. **Bananen-Beispiel:** Zentrale Kampagne „Bananen 1,99 €" → Megafon-Klick → „Nur normale Zeile" → Bananen ohne Werbungs-Hinweis aber noch in Liste. Wenn ganz weg: zusätzlich ausblenden (siehe B3)
+6. **Eigene Werbung anlegen:** „Produkte zur Werbung hinzufügen"-Knopf (interaktiv) — großer Dialog mit Suche + 2-spaltige Tabelle
+7. Klick auf Megafon eines Produkts → Detail-Dialog: Artikel-Card + **„Aktionspreis (€), optional"** (Placeholder „Leer = nur Werbung ohne…") + **„Laufzeit:"** Dropdown 1/2/3/4 Wochen
+8. **Submit-Buttons:** „Zur Aktion hinzufügen (ab dieser KW)" (blau) ODER „Abrechnungsperiode (4 Wochen)" (sekundär)
+9. Speichern → Eintrag in „Eigene Werbung"
+10. **Markierungen erinnern:** dunkleres Gelb auf Namen = Wochen-Werbung, helleres Gelb = 3-Tages-Werbung
+11. Werbung wieder ändern: Stift-Icon → Aktionspreis-Dialog erneut öffnen
 
 ### B5 · Obst PDF-Export 🆕 (~3-4 Steps)
 **Rolle:** User, Admin (Viewer hat eigenen Lese-PDF in F-Light)
@@ -210,8 +212,11 @@ Symbole: 🆕 = komplett neu, ⚙️ = stark überarbeitet, 🔄 = leicht angepa
 
 **Liste-Block:**
 1. Vom Dashboard auf „Backshop" (interaktiv)
-2. **Für Admin:** Hub-Page — Wahl zwischen Liste / Marken-Auswahl / Konfiguration
-3. „Liste" öffnen (interaktiv)
+2. **Für Admin:** Hub-Page mit DREI Karten (anders als Obst!):
+   - **PLU-Liste** → Backshop-Masterliste
+   - **Konfiguration der Liste** → Layout/Bezeichnungsregeln/Warengruppen/Gruppenregeln (4 Sub-Karten)
+   - **Backshop** (Sub-Hub) → Werbung + Backshop-Liste (Kachel-PDF)
+3. „PLU-Liste" öffnen (interaktiv)
 4. Listen-Aufbau (Bild, PLU, Name)
 5. **Markierungen erklären** (ähnlich wie Obst — kürzer wenn B1 schon gemacht):
    - **PLU rot** = PLU geändert
@@ -229,22 +234,37 @@ Symbole: 🆕 = komplett neu, ⚙️ = stark überarbeitet, 🔄 = leicht angepa
 13. Carryover-Verlängerung (interaktiv)
 14. Abschluss: „Detail-Touren für die einzelnen Aktionen findest du im Tutorial-Knopf"
 
-### D2 · Eigene Backshop-Produkte: testen vs. fest 🆕 (~6-7 Steps, interaktiv)
+### D2 · Eigene Backshop-Produkte: Test vs. Fest 🆕 (~7-8 Steps, interaktiv)
 **Rolle:** User, Admin
+**Wichtig:** **Bild ist PFLICHT** — ohne Bild bleibt „Hinzufügen" disabled (live verifiziert)!
 
-1. „Eigene Produkte"-Button (interaktiv)
-2. **Test vs. Fest — der Unterschied:**
-   - **Test:** Produkt erscheint nur auf dem **wöchentlichen Angebotszettel** (den du eh ausdruckst). Vorteil: weniger Papier, weil kein neuer Druck der großen Liste nötig
-   - **Fest:** Produkt erscheint auch in der **großen Haupt-PDF** (die einmal pro Woche groß gedruckt wird)
-3. **Empfehlung:** Erst „Test" → wenn sich's bewährt, auf „Fest" umstellen
-4. Neues Produkt testweise anlegen (interaktiv)
-5. Speichern, in Liste sehen
-6. Konvertieren von „Test" zu „Fest" (falls möglich)
-7. „Wenn der Name doch nicht stimmt → Umbenannt-Bereich"
+1. „+ Eigene Produkte"-Button (interaktiv)
+2. „+ Eigenes Produkt hinzufügen" → Dialog
+3. **Test vs. Fest — der Unterschied (Dropdown „Angebots-PDF"):**
+   - **„Test (unter 'Neue Produkte' auf Angebots-PDF)"** (Default) — erscheint nur auf wöchentlichem Angebots-Zettel. Hinweis im Dialog: „'Test': zusätzlich auf dem PDF 'Nur Angebote'. Beim Export der vollen Liste kannst du alle Test-Artikel auf einmal übernehmen."
+   - **„Sofort fest in der Hauptliste"** — direkt in PLU-/Backshop-Liste
+4. **Empfehlung:** erst „Test" → wenn bewährt, auf „Fest" umstellen
+5. **Pflichtfelder ausfüllen:** PLU (4–5 Ziffern) + Artikelname + **Bild** (über „Bild wählen" oder „Foto aufnehmen" — Webcam, gut für Tablets im Markt) + Warengruppe (Dropdown oder „Neue Warengruppe erstellen"-Link für Inline-Anlage)
+6. **Ohne Bild:** „Hinzufügen" bleibt disabled — bestätigt durch Live-Test
+7. Speichern → in Liste sehen
+8. Bearbeiten via Stift → Test/Fest-Dropdown ändern, neue Position prüfen
 
-### D3 · Backshop ausblenden + umbenennen 🆕 (~6-8 Steps, interaktiv)
+### D3 · Backshop ausblenden + umbenennen 🆕 (~8-10 Steps, interaktiv)
 **Rolle:** User, Admin
-**Inhalt:** analog B3, plus Hinweis auf Gruppenregeln-Verbindung (siehe E2 — Gruppenregeln können auch ausblenden)
+**Hinweis:** Backshop-Hidden-Page ist anders als Obst — sie hat **zwei Tabs**!
+
+**Ausblenden-Block:**
+1. „Ausgeblendete"-Button (interaktiv) → `/admin/backshop-hidden-products`
+2. **Header:** Auge-Schrägstrich-Icon + Help-Icon + Lupe + „Produkte ausblenden"-Knopf
+3. **Tab „Manuell ausgeblendet"** + Counter: Quellen-Filter-Pills (Alle/E Edeka/H Harry/A Aryzta/O Eigene), Card-Grid pro Warengruppe → Detail-Tabelle mit blauem Einblenden-Knopf
+4. **Tab „Durch Regel gefiltert"** + Counter: zeigt Produkte die durch Gruppenregeln (E2) oder Markenauswahl (D4) ausgeblendet sind. Pro Zeile: Knopf **„Marken wählen"** (führt zur Marken-Auswahl mit Pre-Selection) + Einblenden-Knopf
+5. „Produkte ausblenden"-Klick → `/admin/pick-hide-backshop` — wie Obst aber **mit Bildern und Quellen-Pills (E/H/A)** pro Zeile. **Wichtig:** Counter zählt PLU, nicht Marken-Varianten — eine PLU bei Edeka+Harry markiert beide automatisch
+
+**Umbenennen-Block (Backshop hat Bild-Override!):**
+6. „Umbenennen"-Button → Renamed-Liste mit 3-Spalten (Bild | PLU | ORIGINAL | AKTUELL | Aktion)
+7. Stift-Dialog **„Produkt umbenennen":** Feld „Neuer Name" + **Bild-Sektion** mit Thumbnail + Buttons „Bild ersetzen" / „Bild entfernen" — NEU gegenüber Obst!
+8. Speichern → Toast „Produktname geändert"
+9. Zurücksetzen-Bestätigung Backshop: „Der Anzeigename wird wieder auf '{Original-Name}' gesetzt. **Das Bild bleibt unverändert.**" (Backshop-Extra-Hinweis)
 
 ### D4 · Backshop Markenauswahl 🆕 (~5-6 Steps, interaktiv)
 **Rolle:** User, Admin
@@ -256,23 +276,40 @@ Symbole: 🆕 = komplett neu, ⚙️ = stark überarbeitet, 🔄 = leicht angepa
 5. Effekt in der Liste sehen (Marken-Badge E/H/A)
 6. **Verbindung zu Gruppenregeln (E2):** „Wenn du sagst 'alles Brot von Harry', kannst du via Gruppenregeln einzelne Edeka-Brote trotzdem behalten"
 
-### D5 · Backshop Werbung & Bestellungen ⚙️ (~8-10 Steps, interaktiv)
+### D5 · Backshop Werbung & Bestellungen ⚙️ (~10-12 Steps, interaktiv)
 **Rolle:** User, Admin
+**Wichtig:** Backshop-Werbung ist anders als Obst — hier bestellst du tatsächlich Mengen pro Tag mit EK/VK!
 
-1. Werbungs-Page (KW-Liste) öffnen (interaktiv)
-2. Was bedeutet Werbung im Backshop? — User-Zitat: „Produkte über die Werbung bestellen"
-3. Eine KW öffnen (interaktiv)
-4. Produkt für KW hinzufügen (interaktiv)
-5. **Wochenmenge eintragen** — wie viele Stück bestellen?
-6. **EK = Einkaufspreis, VK = Verkaufspreis** (Standard) — ggf. lokal anpassen
-7. **Auslieferung-ab-Datum:** ab wann das Produkt verfügbar ist
-8. Was, wenn Produkt-Daten falsch aussehen? → Wechsel zu Umbenannt
-9. Speichern, in Liste sehen
-10. Hinweis: spezielle Visuals (z.B. „angemalt") — kurzes Hinweis-Element
+1. **Vom Hub:** „Backshop" → Sub-Hub mit zwei Karten („Werbung" + „Backshop-Liste"). Klick „Werbung" (interaktiv)
+2. **KW-Liste-Übersicht** (`/admin/backshop-werbung`) — drei Sektionen:
+   - **Aktuelle Woche** (1 Card mit Pill „Aktuelle Woche")
+   - **Kommende Kalenderwochen** (3 Cards mit „Auslieferung ab DD.MM.YYYY")
+   - **Frühere Werbe-Kalenderwochen (letzte 3)** — klappbares Akkordeon
+3. KW-Card anklicken (interaktiv) → KW-Detail-Page
+4. **Bestelltabelle** — pro Werbe-Produkt eine Zeile mit Spalten: **Bild | PLU | Artikel | + (manuell hinzu) | LISTE EK / LISTE VK | AKTION EK / AKTION VK | Mo–Sa | Code**
+5. **Mo–Sa = SECHS separate Number-Inputs** (Mo, Di, Mi, Do, Fr, Sa) — du trägst pro Tag ein wieviele Stück du bestellst
+6. **Beispiel:** Bei „Wurzelbrot dunkel" (PLU 88550) Mo-Feld auf 20 setzen — wird **automatisch gespeichert** (kein Save-Klick nötig)
+7. **EK = Einkaufspreis** (was du zahlst), **VK = Verkaufspreis** (was Kunde zahlt). Standard kommt aus Excel-Upload, kannst lokal anpassen
+8. **„Code"-Spalte = Strichcode-Symbol** → Dialog mit großem Barcode (CODE128/EAN-Style) und GTIN-Nummer (z. B. „Aus Artikelnummer / GTIN 7388329"). Hilft beim Etiketten-Druck
+9. Wenn Produkt-Daten falsch aussehen → Wechsel zu „Umbenannt" (Tour D3)
+10. **„PDF exportieren"-Knopf** rechts oben → druckbare Bestelltabelle (Knopf wird zu „PDF wird erstellt…", Toast nach ~3s „PDF wurde erstellt.")
+11. Auslieferungs-Countdown auf KW-Cards: „Noch X Tag(e) · Auslieferung ab DD.MM.YYYY"
+12. Abschluss: „Tour fertig — die Bestelltabelle ist deine wichtigste Backshop-Werbe-Sicht"
 
-### D6 · Backshop PDF-Export 🆕 (~3-4 Steps)
+### D6 · Backshop PDF-Export (Werbung) 🆕 (~3-4 Steps)
 **Rolle:** User, Admin
-**Inhalt:** analog B5, plus Hinweis auf Bilder im PDF (Backshop hat Bild-Spalte)
+**Inhalt:** PDF aus der Werbungs-Bestelltabelle (siehe D5). Sortierung default „Nach Warengruppe", Sub für „Nur Angebote": „Angebotszeilen und ggf. neue Produkte (Test), A–Z, eigener Titel."
+
+### D7 · Backshop-Liste (Kachel-PDF) 🆕 (~5-6 Steps) ⭐ NEU — war übersehen
+**Rolle:** User, Admin (Viewer hat Lese-Sicht)
+**Konzept:** Druckbare Kachel-Übersicht aller Backshop-Produkte mit Bildern + Strichcodes — Service für tägliche Markt-Nutzung an der Auslage. **Werbe-Artikel sind hier NICHT enthalten**, das ist eine separate Bestelltabelle (D5).
+
+1. **Vom Hub:** „Backshop" → Sub-Hub → Karte „Backshop-Liste" (interaktiv) → `/admin/backshop-kacheln`
+2. **Tab-Navigation oben** beschreiben: **Werbung | Backshop-Liste (aktiv) | PLU-Liste | Konfiguration** — vier Tabs zur Schnellnavigation
+3. **Kachel-Grid pro Warengruppe:** Sektion-Header in Großbuchstaben (z. B. „BROT"), 6 Kacheln pro Reihe (Desktop). Pro Kachel: **Bild oben + PLU mittig + ARTIKEL-Name + STRICHCODE als gerenderter Barcode unten**
+4. „Stand: {Datum} {Zeit} · {Markt} · Liste KW{aktuell}/{Jahr}" — Hinweis dass es **ohne Werbungs-Artikel** ist (das ist gewollt — Werbe-Produkte sind in D5)
+5. **„PDF erzeugen"-Knopf rechts oben** (interaktiv) — direkter Klick (kein Optionen-Dialog!). Knopf wird zu **„PDF wird erstellt…"** mit Refresh-Spinner, nach ~3s Toast **„PDF wurde erstellt."** + Auto-Download
+6. Abschluss: „Diese Kachel-Liste hilft dir schnell die richtige PLU zu finden, ohne Original-Excel durchzusuchen. Strichcode-Sicht ist auch nützlich beim Etiketten-Druck."
 
 ---
 
@@ -352,16 +389,16 @@ Symbole: 🆕 = komplett neu, ⚙️ = stark überarbeitet, 🔄 = leicht angepa
 
 ## Zusammenfassung
 
-**13 Touren** (v3 hatte 13 → v4 hatte 15 mit Glocke separat → jetzt v5 wieder 13, Glocke in B1/D1 integriert):
+**14 Touren** (v6 nach Browser-Agent-Walkthrough — D7 Kachel-PDF ergänzt):
 - 1 Onboarding (alle)
-- 5 Obst (B1 Liste+Glocke, B2 Eigene, B3 Ausblenden+Umbenennen, B4 Werbung, B5 PDF)
+- 5 Obst (B1 Liste+Glocke, B2 Eigene, B3 Ausblenden+Umbenennen, B4 Werbung+Megafon, B5 PDF)
 - 2 Obst-Konfig (Admin)
-- 6 Backshop (D1 Liste+Glocke, D2-D6 wie vorher)
+- 7 Backshop (D1 Liste+Glocke, D2 Eigene Test/Fest, D3 Ausblenden+Umbenennen, D4 Markenauswahl, D5 Werbung+Bestellungen Mo-Sa, D6 PDF Werbung, **D7 Kachel-PDF** ⭐ NEU)
 - 2 Backshop-Konfig (Admin)
 - 2 Verwaltung (Admin)
 - 1 Abschluss
 
-Geschätzt **~115-135 Steps** (heute: 172).
+Geschätzt **~125-145 Steps** (heute: 172).
 
 **Tour-Reihenfolge ist NICHT starr.** A1 zuerst, G1 zuletzt. Dazwischen wählt der User selbst.
 
@@ -503,840 +540,720 @@ Wenn das geklärt ist:
 
 ---
 
-# 📜 DETAILLIERTE TOUR-SKRIPTE (Schritt 1.5)
-
-Hier alle 13 Touren in B2-Niveau ausgearbeitet. Pro Step: **Anker** (data-tour Wert) · **Modus** (interactive/spotlight/wait-for-action) · **Fier-Text**.
-
-Modus-Bedeutung:
-- **interactive:** Tour wartet bis User die geforderte Aktion ausführt
-- **spotlight:** Erklärung mit „Weiter"-Knopf — User muss aktiv klicken um zu bestätigen dass er's gelesen hat
-- **wait-for-action:** Tour wartet auf eine erkennbare App-Veränderung (z.B. Dialog geht auf, Pfad wechselt)
 
 ---
 
-## Tour A1 · Erste Schritte
+# 📜 DETAILLIERTE TOUR-SKRIPTE (v6 nach Browser-Agent-Walkthrough 2026-05-04)
 
-**Rolle:** alle (User, Admin, Viewer)
-**Voraussetzung:** keine — startet automatisch nach erstem Login
-**Ziel:** App-Header & Profil-Menü kennen, Test-Modus aktiv haben für die folgenden Touren
-**Steps:** 8
+Pro Step: **Anker** · **Modus** · **Fier-Text** mit echten App-Texten. Modus: `spotlight` (Lesen + Weiter), `interactive` (Klick erforderlich), `wait-for-action` (App-Veränderung erwarten).
 
-### Step 1 — Begrüßung
-- **Anker:** dashboard-welcome
-- **Modus:** spotlight
-- **Fier:** „Hi! Ich bin Fier, dein Reiseführer durch diese App. Ich zeig dir Schritt für Schritt was du wo findest. Du kannst jederzeit pausieren — klick mit mir oben rechts auf 'Weiter' wenn du soweit bist."
-
-### Step 2 — Dashboard-Karten-Übersicht
-- **Anker:** dashboard-card-obst (oder erste sichtbare Karte)
-- **Modus:** spotlight
-- **Fier:** „Das hier ist dein Dashboard. Jede Karte führt dich zu einem Bereich der App — z.B. die Obst-Liste, Backshop, Benutzer (für Admins), Kassenmodus (für Admins). Welche Karten du siehst, hängt von deinen Rechten ab."
-
-### Step 3 — Header oben rechts: Glocke
-- **Anker:** unified-notification-bell
-- **Modus:** spotlight
-- **Fier:** „Oben rechts hast du die Glocke — da kommen Hinweise rein, was sich an deinen Listen geändert hat. Mehr dazu in der Liste-Tour."
-
-### Step 4 — Header oben rechts: Tutorial-Knopf
-- **Anker:** header-tutorial-icon
-- **Modus:** spotlight
-- **Fier:** „Hier findest du **mich** wieder — der Tutorial-Knopf. Wenn du eine Tour wiederholen willst oder eine neue starten, klick einfach drauf."
-
-### Step 5 — Profil-Menü öffnen
-- **Anker:** profile-menu
-- **Modus:** interactive (User muss klicken; Validierung: Dropdown ist offen, data-state="open")
-- **Fier:** „Klick mal auf dein Profilbild oben rechts (das Kreis-Symbol mit deinen Initialen). Da findest du Logout, Passwort ändern und 'Einführung wiederholen' — also mich."
-
-### Step 6 — Test-Modus erklären
-- **Anker:** header-testmode-menu-item
-- **Modus:** spotlight (Dropdown ist offen, Test-Modus-Eintrag ist hervorgehoben)
-- **Fier:** „Wichtig: 'Testmodus starten' macht alle deine Aktionen **vorübergehend**. Beim Beenden wird alles verworfen. Genau das brauchen wir für die Touren — du kannst gefahrlos Produkte anlegen, ausblenden, was auch immer."
-
-### Step 7 — Test-Modus aktivieren
-- **Anker:** header-testmode-menu-item
-- **Modus:** interactive (User klickt auf 'Testmodus starten'; Validierung: TestMode aktiv, gelber Banner sichtbar)
-- **Fier:** „Klick jetzt drauf 👆 Du siehst gleich einen gelben Rahmen — das ist dein Sicherheitsnetz."
-
-### Step 8 — Tour-Auswahl
-- **Anker:** header-tutorial-icon
-- **Modus:** wait-for-action (Übergabe an Welcome-Modal Tour-Auswahl)
-- **Fier:** „Top — du bist startklar! Was möchtest du als nächstes lernen? Hier sind die Touren die du anschauen kannst." (zeigt Tour-Auswahl gefiltert nach Rolle und Listen-Sichtbarkeit)
+Toast-Texte sind **echt aus dem Live-Test** zitiert (siehe `docs/tutorial-app-walkthrough.md`).
 
 ---
 
-## Tour B1 · Obst-Liste verstehen + Glocke
+## A1 · Erste Schritte
+**Rolle:** alle | **Voraussetzung:** keine | **Steps:** 9
 
-**Rolle:** alle (User, Admin, Viewer)
-**Voraussetzung:** A1 abgeschlossen, Test-Modus aktiv
-**Ziel:** Liste-Aufbau, Markierungen verstehen, Glocke kennen
-**Steps:** 13 (bei Viewer kürzer: ~9 Steps, lasse interaktive Detail-Hinweise weg)
+1. **Begrüßung** · `dashboard-welcome` · spotlight
+   *Fier:* „Hi! Ich bin Fier, dein Reiseführer durch Fier Hub. Ich zeig dir Schritt für Schritt was du wo findest. Klick mit mir auf 'Weiter' wenn du soweit bist."
 
-### Step 1 — Vom Dashboard
-- **Anker:** dashboard-card-obst
-- **Modus:** interactive (Klick; Validierung: Pfad enthält /masterlist oder /obst-hub)
-- **Fier:** „Klick auf die Obst-Karte. Das ist deine PLU-Liste."
+2. **Dashboard-Karten** · `dashboard-card-obst` · spotlight
+   *Fier:* „Das hier ist dein Dashboard mit vier Karten: Obst & Gemüse, Backshop, Benutzer, Kassenmodus. Welche du siehst hängt von deinen Rechten ab."
 
-### Step 2 — Hub-Page (nur Admin)
-- **Anker:** admin-obst-hub-page
-- **Modus:** spotlight (nur wenn Admin)
-- **Fier:** „Als Admin landest du hier auf einer Übersicht: 'PLU-Liste' (was deine Mitarbeiter sehen) und 'Konfiguration' (wo du Layout/Regeln einstellst). Wir gehen heute auf die Liste — Konfiguration ist eine eigene Tour."
+3. **Header-Glocke** · `unified-notification-bell` · spotlight
+   *Fier:* „Oben rechts die Glocke zeigt was sich an deinen Listen geändert hat — neue Produkte, geänderte PLUs, rausgefallene Artikel. Mehr in der Liste-Tour."
 
-### Step 3 — Liste öffnen (nur Admin, sonst skip)
-- **Anker:** admin-obst-hub-liste
-- **Modus:** interactive (Klick; Validierung: Pfad /masterlist)
-- **Fier:** „Klick auf 'PLU-Liste'."
+4. **Tutorial-Knopf** · `header-tutorial-icon` · spotlight
+   *Fier:* „Hier findest du mich wieder — der Tutorial-Knopf. Wenn du eine Tour wiederholen oder eine neue starten willst, klick einfach drauf."
 
-### Step 4 — Listen-Aufbau
-- **Anker:** masterlist-rows
-- **Modus:** spotlight
-- **Fier:** „Hier ist deine PLU-Liste. Je nach Markt-Einstellung siehst du Stück und Gewicht getrennt oder alles in einer Liste. Jede Zeile = ein Produkt mit PLU, Name und ggf. Markierungen."
+5. **Profil-Menü öffnen** · `profile-menu` · interactive (Validierung: data-state="open")
+   *Fier:* „Klick mal auf dein Profilbild oben rechts. Da findest du Logout, Admin-Bereich und vor allem 'Testmodus starten'."
 
-### Step 5 — Markierung Rot
-- **Anker:** masterlist-rows
-- **Modus:** spotlight
-- **Fier:** „**Rote PLU** = die PLU-Nummer hat sich geändert. Gleiches Produkt, neue Nummer. Wenn du Etiketten gedruckt hast, musst du die wahrscheinlich erneuern."
+6. **Testmodus erklären** · `header-testmode-menu-item` · spotlight
+   *Fier:* „Wichtig: 'Testmodus starten' macht alle deine Aktionen vorübergehend. Beim Beenden wird alles verworfen. Genau das brauchen wir für die Touren — du kannst gefahrlos klicken."
 
-### Step 6 — Markierung Gelb (PLU)
-- **Anker:** masterlist-rows
-- **Modus:** spotlight
-- **Fier:** „**Gelbe PLU** = neues Produkt diese Woche. Wenn du was verkaufen willst was du noch nicht kennst, hier suchst du."
+7. **Testmodus aktivieren** · `header-testmode-menu-item` · interactive (Validierung: gelber Rahmen sichtbar)
+   *Fier:* „Klick jetzt drauf 👆 Du siehst gleich einen gelben Rahmen — das ist dein Sicherheitsnetz. Toast bestätigt: 'Testmodus aktiviert – Änderungen werden nicht gespeichert.'"
 
-### Step 7 — Markierung Werbung (helleres/dunkleres Gelb auf Namen)
-- **Anker:** masterlist-rows
-- **Modus:** spotlight
-- **Fier:** „**Helleres Gelb auf dem Namen** = 3-Tages-Werbung. **Dunkleres Gelb** = Wochen-Werbung oder Exit-Aktion. Hilft dir beim Anschreiben der Schilder."
+8. **Testmodus-Floating-Knopf** · `testmode-exit-button` · spotlight
+   *Fier:* „Unten rechts gibt's jetzt den 'Testmodus beenden'-Knopf. Den brauchen wir später wenn wir fertig sind."
 
-### Step 8 — Suche (interaktiv mit Bananen)
-- **Anker:** masterlist-search
-- **Modus:** interactive (Klick auf Lupe + 'Banane' tippen; Validierung: Liste gefiltert auf "Banane"-Treffer)
-- **Fier:** „Such mal nach Bananen. Klick auf die Lupe oben, tipp 'Banane' und Enter. Du siehst nur noch Bananen-Produkte. Genauso findest du jedes andere Produkt."
-
-### Step 9 — Suche schließen
-- **Anker:** masterlist-search (oder X-Knopf in Suchleiste)
-- **Modus:** interactive (Suche schließen; Validierung: Liste wieder vollständig)
-- **Fier:** „Schließ die Suche wieder mit X."
-
-### Step 10 — Toolbar-Übersicht
-- **Anker:** masterlist-toolbar-actions
-- **Modus:** spotlight
-- **Fier:** „Oben rechts hast du die Toolbar: **Eigene Produkte** (selbst angelegt), **Ausgeblendet** (nicht in Liste), **Werbung**, **Umbenannt**, **PDF**. Für jeden Knopf gibt's eine eigene Tour."
-
-### Step 11 — Glocke öffnen (Übergang zum Glocke-Block)
-- **Anker:** unified-notification-bell
-- **Modus:** interactive (Klick; Validierung: Notification-Panel offen)
-- **Fier:** „Bevor wir die Liste verlassen, zeig ich dir die Glocke. Klick mal drauf."
-
-### Step 12 — Glocke: Tabs
-- **Anker:** unified-notification-bell (Panel)
-- **Modus:** spotlight
-- **Fier:** „Hier siehst du Tabs: **Neu** (was diese Woche dazugekommen ist — passt zu den gelben PLUs in der Liste), **Geändert** (passt zu den roten), **Entfernt** (was rausgefallen ist)."
-
-### Step 13 — Glocke: Carryover (Verlängerung)
-- **Anker:** unified-notification-bell (Tab "Entfernt")
-- **Modus:** spotlight (interactive falls User wirklich was verlängert)
-- **Fier:** „Wenn ein Produkt rausfällt aber du noch Restbestand hast: Klick auf **'1 Woche verlängern'**. Dann bleibt die PLU eine Woche länger gültig — du kannst den Restbestand verkaufen."
-
-### Step 14 — Abschluss
-- **Anker:** masterlist-toolbar-actions
-- **Modus:** spotlight
-- **Fier:** „Tour fertig 🎉. Du kennst jetzt deine Liste. Für Eigene Produkte / Ausblenden / Werbung / PDF gibt's eigene Touren — du findest sie unter dem Tutorial-Knopf oben."
+9. **Tour-Auswahl** · `header-tutorial-icon` · wait-for-action
+   *Fier:* „Top — du bist startklar! Was möchtest du als nächstes lernen? Hier sind die Touren die zu dir passen."
 
 ---
 
-## Tour B2 · Eigene Obst-Produkte anlegen
+## B1 · Obst-Liste verstehen + Glocke
+**Rolle:** alle | **Voraussetzung:** A1 + Testmodus | **Steps:** 15 (Viewer: ~10)
 
-**Rolle:** User, Admin
-**Voraussetzung:** A1 + Test-Modus aktiv; Obst-Liste mind. einmal gesehen (B1 empfohlen aber nicht zwingend)
-**Ziel:** Eigenes Produkt anlegen, in Liste sehen
-**Steps:** 9 (siehe Beispiel-Tour weiter oben — diese ist die Master-Referenz)
+**Liste-Block:**
 
-→ Volle Step-Beschreibung siehe oben unter "Beispiel-Detailausarbeitung (B2)"
+1. **Vom Dashboard** · `dashboard-card-obst` · interactive (Validierung: Pfad /masterlist oder /admin/obst)
+   *Fier:* „Klick auf die Obst-Karte."
 
----
+2. **Hub (nur Admin)** · `admin-obst-hub-page` · spotlight
+   *Fier:* „Als Admin landest du auf einer Übersicht: 'PLU-Liste' (was deine Mitarbeiter sehen) und 'Konfiguration' (Layout/Regeln). Heute zeigen wir die Liste."
 
-## Tour B3 · Obst-Produkte ausblenden + umbenennen
+3. **Liste öffnen** (nur Admin) · `admin-obst-hub-liste` · interactive
+   *Fier:* „Klick auf 'PLU-Liste'."
 
-**Rolle:** User, Admin
-**Voraussetzung:** A1 + Test-Modus aktiv
-**Ziel:** Produkt ausblenden + wieder einblenden, Produkt umbenennen, Effekt in Liste sehen
-**Steps:** 9
+4. **Listen-Aufbau** · `masterlist-rows` · spotlight
+   *Fier:* „Hier ist deine PLU-Liste — Desktop zwei Spalten, Mobile eine. Buchstaben-Trenner '— A —' für die Sortierung. Je nach Layout siehst du Stück und Gewicht getrennt oder gemischt."
 
-### Step 1 — Begrüßung
-- **Anker:** masterlist-toolbar-ausgeblendete
-- **Modus:** spotlight
-- **Fier:** „Diese Tour zeigt dir zwei Sachen: wie du Produkte aus deiner Liste ausblendest (z.B. weil du sie nicht verkaufst) und wie du Produkte umbenennst (z.B. weil der zentrale Name unklar ist)."
+5. **Markierung Rot** · `masterlist-rows` · spotlight
+   *Fier:* „Rote PLU = die Nummer hat sich geändert (gleiches Produkt, neue PLU). Wenn du Etiketten gedruckt hast, musst du die wahrscheinlich erneuern."
 
-### Step 2 — Ausgeblendet-Page öffnen
-- **Anker:** masterlist-toolbar-ausgeblendete
-- **Modus:** interactive (Klick; Validierung: Pfad /hidden-products)
-- **Fier:** „Klick auf 'Ausgeblendete' in der Toolbar."
+6. **Markierung Gelb (PLU)** · `masterlist-rows` · spotlight
+   *Fier:* „Gelbe PLU = neues Produkt diese Woche. Wenn du was verkaufen willst was du noch nicht kennst, hier suchst du."
 
-### Step 3 — Ausgeblendet-Übersicht
-- **Anker:** obst-hidden-list
-- **Modus:** spotlight
-- **Fier:** „Hier landen Produkte die du aus der Liste rausnimmst. Sie sind **nicht gelöscht** — du kannst sie jederzeit wieder einblenden."
+7. **Markierung Werbung (Name)** · `masterlist-rows` · spotlight
+   *Fier:* „Helleres Gelb auf dem Namen = 3-Tages-Werbung. Dunkleres Gelb = Wochen-Werbung oder Exit-Aktion. Hilft beim Anschreiben der Schilder."
 
-### Step 4 — Produkt manuell ausblenden
-- **Anker:** obst-hidden-add-button
-- **Modus:** interactive (Klick + Produkt wählen + speichern; Validierung: Liste hat einen Eintrag mehr)
-- **Fier:** „Klick '+ Produkt ausblenden', wähl ein Beispiel-Produkt aus, speichern. Schon ist es nicht mehr in der Hauptliste."
+8. **Suche mit Bananen** · `masterlist-search` · interactive (Validierung: Suche aktiv mit Treffern)
+   *Fier:* „Such mal nach Bananen. Klick auf die Lupe oben, tipp 'Banane' und Enter. Du siehst nur noch Bananen-Produkte."
 
-### Step 5 — Wieder einblenden
-- **Anker:** obst-hidden-list
-- **Modus:** interactive (Eintrag löschen; Validierung: Liste hat einen Eintrag weniger)
-- **Fier:** „Klick auf den Mülleimer neben deinem ausgeblendeten Produkt — schon ist es wieder in der Hauptliste."
+9. **Suche schließen** · `masterlist-search` · interactive
+   *Fier:* „Schließ die Suche wieder mit X — alle Produkte sind wieder da."
 
-### Step 6 — Wechsel zu Umbenannt
-- **Anker:** masterlist-toolbar-umbenennen
-- **Modus:** interactive (Klick; Validierung: Pfad /renamed-products)
-- **Fier:** „Jetzt zum Umbenennen. Geh zurück zur Liste-Toolbar und klick 'Umbenannt'."
+10. **Kontextzeile** · `masterlist-context-line` · spotlight
+    *Fier:* „Oben siehst du Sortierung ('Alphabetisch'), Anzeige-Modus ('Nach Typ getrennt'), Liste-KW + Aktiv-Pill. Diese Statusanzeigen sind nicht klickbar — sie zeigen, was in der Konfiguration eingestellt ist."
 
-### Step 7 — Umbenennen-Übersicht
-- **Anker:** obst-renamed-list
-- **Modus:** spotlight
-- **Fier:** „Hier siehst du alle Produkte die du selbst umbenannt hast. Der zentrale Name bleibt im System — du siehst aber **deinen Namen** in der Liste."
+11. **Toolbar-Buttons** · `masterlist-toolbar-actions` · spotlight
+    *Fier:* „Oben rechts hast du die Toolbar: Eigene Produkte, Ausgeblendete, Werbung, Umbenennen, PDF. Für jeden Knopf gibt's eine eigene Tour."
 
-### Step 8 — Produkt umbenennen
-- **Anker:** obst-renamed-add-button
-- **Modus:** interactive (Klick + Produkt wählen + neuer Name + speichern; Validierung: neuer Eintrag)
-- **Fier:** „Probier's: '+ Umbenennen', wähl ein Produkt, gib einen neuen Namen ein (z.B. 'Bio-Apfel klein'), speichern. Du siehst den neuen Namen sowohl hier als auch in der Hauptliste."
+**Glocke-Block (Abschluss):**
 
-### Step 9 — Abschluss
-- **Anker:** obst-renamed-list
-- **Modus:** spotlight
-- **Fier:** „Geschafft! Im Test-Modus wird das beim Beenden alles verworfen. Echte Aktionen bleiben erhalten."
+12. **Glocke öffnen** · `unified-notification-bell` · interactive (Validierung: Modal offen)
+    *Fier:* „Bevor wir die Liste verlassen, zeig ich dir die Glocke. Klick mal drauf."
+
+13. **Tabs Neu/Geändert** · `unified-notification-bell` · spotlight
+    *Fier:* „Tab 'Neu': Produkte mit gelber PLU. Tab 'Geändert': Produkte mit neuer PLU — Sub-Text zeigt 'Ehemals PLU {nummer}'."
+
+14. **Tab „Raus" (Carryover)** · `unified-notification-bell` · spotlight
+    *Fier:* „Tab 'Raus' zeigt rausgefallene Produkte. Pro Eintrag zwei Knöpfe: 'Eine KW in Liste' (sekundär) übernimmt das Produkt einmalig für Restbestand. 'Nicht übernehmen' (blau, primär) bestätigt das Rauswerfen."
+
+15. **Abschluss** · `masterlist-toolbar-actions` · spotlight
+    *Fier:* „Tour fertig 🎉. Eigene Touren für jede Toolbar-Aktion findest du im Tutorial-Knopf oben."
 
 ---
 
-## Tour B4 · Obst-Werbung anlegen + ändern
+## B2 · Eigene Obst-Produkte
+**Rolle:** User, Admin | **Voraussetzung:** A1 + Testmodus | **Steps:** 9
 
-**Rolle:** User, Admin
-**Voraussetzung:** A1 + Test-Modus aktiv
-**Ziel:** Werbung anlegen, Lokalpreis verstehen, Megafon kennen
-**Steps:** 10
+1. **Toolbar-Button** · `masterlist-toolbar-eigene-produkte` · interactive
+   *Fier:* „In dieser Tour zeige ich dir, wie du eigene Produkte anlegst — Sachen die nicht aus der zentralen PLU-Liste kommen. Klick auf 'Eigene Produkte' oben."
 
-### Step 1 — Werbung-Page öffnen
-- **Anker:** masterlist-toolbar-werbung
-- **Modus:** interactive (Klick; Validierung: Pfad /offer-products)
-- **Fier:** „Klick 'Werbung' in der Toolbar."
+2. **Eigene-Produkte-Page** · `obst-custom-list` · spotlight
+   *Fier:* „Hier landen alle Produkte die du selbst angelegt hast. Tabelle mit PLU, Name, Typ, Preis und Aktions-Icons rechts: Stift, Auge-Schrägstrich, Mülltonne."
 
-### Step 2 — Übersicht: Eigene + Zentrale
-- **Anker:** obst-offer-section-eigen
-- **Modus:** spotlight
-- **Fier:** „Werbung gibt's in zwei Sorten: **Eigene Werbung** machst du selbst für deinen Markt. **Zentrale Werbung** kommt vom Hauptsitz für alle Märkte. Beide werden in der Liste mit gelbem Namen markiert."
+3. **Anlegen-Knopf** · `obst-custom-add-button` · interactive (Validierung: Dialog offen)
+   *Fier:* „Klick '+ Eigenes Produkt hinzufügen'."
 
-### Step 3 — Megafon-aus mit Bananen-Beispiel
-- **Anker:** obst-offer-section-zentral
-- **Modus:** spotlight
-- **Fier:** „Beispiel: Hauptsitz macht Aktion 'Bananen 1,99 €'. In deinem Markt willst du das nicht bewerben. Klick neben dem Eintrag aufs **Megafon** → ausgeschaltet → keine Werbungs-Markierung mehr in deiner Liste. Bananen sind aber noch da. Wenn du sie ganz raus haben willst → zusätzlich ausblenden (siehe B3)."
+4. **PLU oder Preis** · `obst-custom-add-dialog` · spotlight
+   *Fier:* „Wichtig: Du hast zwei Möglichkeiten — entweder eine PLU (4–5 Ziffern, z.B. 7123) ODER einen Preis (z.B. 1,50 €). Nicht beides! Bei PLU wiegt der Kunde an der Kasse, bei Festpreis nimmt er das Produkt einfach mit."
 
-### Step 4 — Eigene Werbung anlegen: Knopf
-- **Anker:** obst-offer-add-button
-- **Modus:** interactive (Klick; Validierung: Dialog offen)
-- **Fier:** „Jetzt legen wir eigene Werbung an. Klick '+ Produkt zur Werbung'."
+5. **Felder ausfüllen** · `obst-custom-add-dialog` · interactive (Validierung: Felder gefüllt)
+   *Fier:* „Probier's: PLU 98765, Name 'Mein Test-Apfel', Typ 'Stück'. Validierung: Wenn die PLU schon existiert, wird das Feld rot mit 'PLU 98765 existiert bereits' und Hinzufügen disabled."
 
-### Step 5 — Produkt suchen + auswählen
-- **Anker:** obst-offer-add-dialog
-- **Modus:** interactive (Produkt finden + bestätigen)
-- **Fier:** „Such ein Produkt (z.B. 'Apfel'), wähl eines aus."
+6. **Speichern** · `obst-custom-add-dialog-submit` · interactive (Validierung: Toast)
+   *Fier:* „Klick 'Hinzufügen'. Toast erscheint: 'Eigenes Produkt hinzugefügt'."
 
-### Step 6 — Kalenderwoche festlegen
-- **Anker:** obst-offer-add-dialog
-- **Modus:** interactive (KW wählen)
-- **Fier:** „Welche KW soll's beworben werden? Wähl die aktuelle oder eine kommende."
+7. **In Liste sehen** · `obst-custom-list` · spotlight
+   *Fier:* „Dein neuer Eintrag erscheint in der Tabelle mit Pill 'Von mir erstellt'. Auch in der Hauptliste ist er jetzt mit gelber PLU markiert (zeitlich begrenzt)."
 
-### Step 7 — Lokalpreis erklären + setzen
-- **Anker:** obst-offer-local-price-dialog (oder im Add-Dialog)
-- **Modus:** spotlight + interactive
-- **Fier:** „**Lokalpreis** ist dein eigener Preis nur für deinen Markt. Wenn du nichts einträgst, gilt der zentrale/Standard-Preis. Wenn du z.B. 1,49 € einträgst, sieht der Kunde diesen Preis — andere Märkte sehen den Standard."
+8. **Bearbeiten** · `obst-custom-edit-dialog` · spotlight
+   *Fier:* „Stift-Icon öffnet Edit-Dialog: PLU bleibt read-only ('PLU kann nicht geändert werden'), Name/Typ/Preis sind editierbar."
 
-### Step 8 — Speichern
-- **Anker:** obst-offer-add-dialog (Submit-Knopf)
-- **Modus:** interactive (Validierung: Dialog zu, Eintrag in Liste)
-- **Fier:** „Speichern. Dein Produkt steht jetzt in der Werbung."
-
-### Step 9 — Werbung ändern
-- **Anker:** obst-offer-section-eigen (auf den eben angelegten Eintrag)
-- **Modus:** interactive (Klick auf Eintrag → öffnet Bearbeiten)
-- **Fier:** „Wenn was nicht stimmt: Eintrag anklicken, anpassen, neu speichern. Genauso funktioniert's für KW oder Preis ändern."
-
-### Step 10 — Abschluss
-- **Anker:** obst-offer-toolbar
-- **Modus:** spotlight
-- **Fier:** „Tour fertig! In der Hauptliste siehst du jetzt das Produkt mit dunklerem Gelb auf dem Namen — Wochen-Werbung."
+9. **Abschluss** · `obst-custom-list` · spotlight
+   *Fier:* „Im Testmodus wird das beim Beenden wieder verworfen — echte Produkte bleiben natürlich erhalten. Wenn du den Namen ändern willst, gibt's eine eigene Umbenennen-Tour."
 
 ---
 
-## Tour B5 · Obst PDF-Export
+## B3 · Obst-Produkte ausblenden + umbenennen
+**Rolle:** User, Admin | **Voraussetzung:** A1 + Testmodus | **Steps:** 11
 
-**Rolle:** User, Admin (Viewer kann nur lesen, eigene Mini-Tour)
-**Voraussetzung:** A1 + Test-Modus optional (PDF-Generierung ist read-only)
-**Steps:** 4
+**Ausblenden:**
 
-### Step 1 — PDF-Knopf
-- **Anker:** masterlist-toolbar-pdf
-- **Modus:** interactive (Klick; Validierung: Dialog offen)
-- **Fier:** „PDF erstellen — klick auf 'PDF' in der Toolbar."
+1. **Ausgeblendete-Page öffnen** · `masterlist-toolbar-ausgeblendete` · interactive
+   *Fier:* „Klick 'Ausgeblendete' in der Toolbar."
 
-### Step 2 — Optionen
-- **Anker:** masterlist-toolbar-pdf (Dialog)
-- **Modus:** spotlight
-- **Fier:** „Du kannst die KW wählen und je nach Layout-Einstellung ein paar Optionen anpassen. Für den Standard-Druck reichen die Voreinstellungen."
+2. **Empty-State erklären** · `obst-hidden-list` · spotlight
+   *Fier:* „Hier landen Produkte die du aus deiner Liste rausnimmst. Sie sind nicht gelöscht — du kannst sie jederzeit wieder einblenden."
 
-### Step 3 — Vorschau
-- **Anker:** masterlist-toolbar-pdf (Preview)
-- **Modus:** spotlight
-- **Fier:** „Hier siehst du die Vorschau. **S/W-Druck:** rote Zeilen werden mit fettem Rahmen, gelbe mit gestricheltem Rahmen markiert — auch ohne Farbe erkennst du Änderungen."
+3. **Picker öffnen** · `obst-hidden-add-button` · interactive (Validierung: Pfad /pick-hide-obst)
+   *Fier:* „Klick 'Produkte ausblenden' oben rechts."
 
-### Step 4 — Download
-- **Anker:** masterlist-toolbar-pdf (Download-Knopf)
-- **Modus:** interactive (Download)
-- **Fier:** „Download. Fertig — drucken und an die Wand!"
+4. **Picker-Auswahl** · `obst-hidden-add-dialog` · interactive (Validierung: mind. 1 Checkbox)
+   *Fier:* „Auf der nächsten Seite siehst du eine Liste aller verfügbaren Produkte mit Buchstaben-Trennern und Sektion '=== STÜCK ==='. Klick die Checkbox bei einem Beispiel-Produkt an."
 
----
+5. **Submit Picker** · `obst-hidden-add-dialog-submit` · interactive (Validierung: Toast)
+   *Fier:* „Sticky-Footer unten zeigt 'X Produkte ausblenden' — Klick. Toast: 'X Produkte ausgeblendet' + Redirect zur Hidden-Liste."
 
-## Tour C1 · Obst-Konfiguration: Hub & Layout (nur Admin)
+6. **Wieder einblenden** · `obst-hidden-list` · interactive (Validierung: Eintrag weg)
+   *Fier:* „Pro Zeile: blauer 'Einblenden'-Knopf. Klick — Toast 'Produkt wieder eingeblendet', Zeile verschwindet."
 
-**Rolle:** Admin
-**Voraussetzung:** A1 + Test-Modus aktiv
-**Steps:** 7
+**Umbenennen:**
 
-### Step 1 — Konfig öffnen vom Hub
-- **Anker:** admin-obst-hub-konfig
-- **Modus:** interactive (Klick; Validierung: Pfad /admin/obst/konfiguration)
-- **Fier:** „Vom Obst-Hub aus klick auf 'Konfiguration'."
+7. **Umbenennen öffnen** · `masterlist-toolbar-umbenennen` · interactive
+   *Fier:* „Zurück zur Liste, dann 'Umbenennen' in der Toolbar."
 
-### Step 2 — Konfig-Hub-Übersicht
-- **Anker:** obst-konfig-hub-page
-- **Modus:** spotlight
-- **Fier:** „Hier hast du drei Bereiche: **Layout** (wie sieht die Liste aus), **Bezeichnungsregeln** (wie wird sortiert), **Warengruppen** (wie wird gruppiert). Heute Layout."
+8. **Renamed-Tabelle erklären** · `obst-renamed-list` · spotlight
+   *Fier:* „3-Spalten-Tabelle: PLU, Original, Aktuell, Zurücksetzen-Knopf. Hier siehst du alle Umbenennungen für deinen Markt — die zentrale Master-Liste bleibt unverändert."
 
-### Step 3 — Layout öffnen
-- **Anker:** obst-konfig-hub-layout-card
-- **Modus:** interactive (Klick; Validierung: Pfad /admin/layout)
-- **Fier:** „Klick auf die Layout-Karte."
+9. **Pick-Rename öffnen** · `obst-renamed-add-button` · interactive
+   *Fier:* „Klick 'Produkte umbenennen' für die Auswahl-Page."
 
-### Step 4 — Display-Modus erklären
-- **Anker:** obst-konfig-layout-display-mode-card
-- **Modus:** spotlight
-- **Fier:** „**Stück / Gewicht getrennt**: zwei Listen untereinander. **Alle zusammen**: eine Liste, alphabetisch."
+10. **Umbenennen-Dialog** · `obst-renamed-rename-dialog-submit` · interactive (Validierung: Toast „Produktname geändert")
+    *Fier:* „Klick auf einen Eintrag — Dialog mit PLU + 'Original: {Name}' + Feld 'Neuer Name'. Tipp einen neuen Namen ein, speichern. Toast: 'Produktname geändert'."
 
-### Step 5 — Markierungslänge
-- **Anker:** obst-konfig-layout-mark-duration-card
-- **Modus:** spotlight + interactive (Wert anpassen)
-- **Fier:** „Wie lange bleiben **rote** und **gelbe** Markierungen sichtbar? Standard: 4 Wochen. Du kannst's anpassen."
-
-### Step 6 — Vorschau
-- **Anker:** obst-konfig-layout-preview
-- **Modus:** spotlight
-- **Fier:** „Live-Vorschau zeigt dir wie die Liste aussehen wird. Wenn was nicht passt: hier siehst du's sofort."
-
-### Step 7 — Speichern + Effekt sehen
-- **Anker:** obst-konfig-layout-save-status
-- **Modus:** spotlight
-- **Fier:** „Änderungen speichern automatisch. Wenn du jetzt in die Liste gehst, siehst du das neue Layout."
+11. **Zurücksetzen** · `obst-renamed-reset-confirm` · spotlight
+    *Fier:* „Falls du zurück willst: 'Zurücksetzen'-Knopf in der Renamed-Liste. Bestätigung: 'Der Anzeigename wird wieder auf {Original} gesetzt.' Eintrag verschwindet."
 
 ---
 
-## Tour C2 · Obst-Konfiguration: Bezeichnungsregeln + Warengruppen
+## B4 · Obst-Werbung anlegen + ändern
+**Rolle:** User, Admin | **Voraussetzung:** A1 + Testmodus | **Steps:** 11
 
-**Rolle:** Admin
-**Voraussetzung:** A1 + Test-Modus aktiv
-**Steps:** 11
+1. **Werbung öffnen** · `masterlist-toolbar-werbung` · interactive
+   *Fier:* „Klick 'Werbung' in der Toolbar."
 
-### Step 1 — Bezeichnungsregeln öffnen
-- **Anker:** obst-konfig-hub-rules-card
-- **Modus:** interactive (Klick; Validierung: Pfad /admin/rules)
-- **Fier:** „Klick auf 'Bezeichnungsregeln' im Konfig-Hub."
+2. **Zwei Sektionen erklären** · `obst-offer-section-zentral` · spotlight
+   *Fier:* „Werbung gibt's in zwei Sorten: 'Zentrale Werbung' kommt vom Hauptsitz für alle Märkte. 'Eigene Werbung' machst du selbst. Beide werden in der Liste mit gelbem Namen markiert."
 
-### Step 2 — Was sind Bezeichnungsregeln?
-- **Anker:** obst-konfig-rules-keywords-card
-- **Modus:** spotlight
-- **Fier:** „Bezeichnungsregeln sind **Text-Regeln**. Beispiel: 'Alles mit 'Bio' im Namen → nach vorne'. Hilfreich beim alphabetischen Sortieren — alle Bio-Produkte stehen zusammen."
+3. **Aktionspreis-Stift erklären** · `obst-offer-section-zentral` · spotlight
+   *Fier:* „Bei zentraler Werbung: Stift-Icon öffnet 'Eigener Aktionspreis'-Dialog. Untertitel: 'Nur für diesen Markt. Der zentrale Vorgabepreis bleibt zur Orientierung sichtbar.' Du gibst einen eigenen VK ein, Toast: 'Eigener Aktionspreis gespeichert.'"
 
-### Step 3 — Beispielregel anlegen
-- **Anker:** obst-konfig-rules-add-button
-- **Modus:** interactive (Klick + Schlagwort + Position; Validierung: Regel in Liste)
-- **Fier:** „Probier's: '+ Regel', Schlagwort 'Bio', Position 'B' (für vorne in der B-Ecke). Speichern."
+4. **Megafon erklären (Bananen-Beispiel)** · `obst-offer-section-zentral` · spotlight
+   *Fier:* „Beispiel: Hauptsitz macht Aktion 'Bananen 1,99 €'. In deinem Markt willst du das nicht bewerben. Klick aufs Megafon-Icon."
 
-### Step 4 — Anwenden auf Liste
-- **Anker:** obst-konfig-rules-schlagwort-apply-all
-- **Modus:** interactive
-- **Fier:** „Klick 'Anwenden auf alle Produkte'. Jetzt landen alle Produkte mit 'Bio' bei B."
+5. **Megafon-Dialog 3 Optionen** · `obst-offer-section-zentral` · spotlight
+   *Fier:* „Dialog 'Zentrale Werbung': Drei Optionen — 'Nur normale Zeile (ohne Werbung)' (blau, Werbung weg, Produkt bleibt durchgestrichen ausgegraut, Toast 'Werbung aus, Produkt bleibt in der Liste'). 'Aus Liste und PDF entfernen' (rot, komplett raus). 'Abbrechen'."
 
-### Step 5 — Effekt in Liste sehen (kurzer Sprung)
-- **Anker:** masterlist-rows
-- **Modus:** spotlight
-- **Fier:** „Geh kurz in die Liste — du siehst Bio-Produkte unter B sortiert."
+6. **Eigene Werbung anlegen** · `obst-offer-add-button` · interactive (Validierung: Dialog offen)
+   *Fier:* „Jetzt legen wir eigene Werbung an. Klick '+ Produkte zur Werbung hinzufügen'."
 
-### Step 6 — Wechsel zu Warengruppen
-- **Anker:** admin-obst-hub-konfig
-- **Modus:** interactive
-- **Fier:** „Zurück zum Konfig-Hub, dann auf 'Warengruppen'."
+7. **Produkt suchen + Megafon** · `obst-offer-add-dialog` · interactive
+   *Fier:* „Großer Dialog mit Suche + 2-spaltige Tabelle. Such ein Produkt (z.B. 'Apfel'), klick auf das Megafon der Zeile."
 
-### Step 7 — Was sind Warengruppen?
-- **Anker:** obst-konfig-warengruppen-info-card
-- **Modus:** spotlight
-- **Fier:** „Warengruppen sind **strukturelle Gruppierungen**: Obst, Gemüse, Salate. Anders als Bezeichnungsregeln — die nur Sortierhilfe sind. Warengruppen wirken erst bei Sortierung 'Nach Warengruppen' im Layout."
+8. **Detail-Dialog Aktionspreis + Laufzeit** · `obst-offer-add-dialog` · interactive
+   *Fier:* „Detail-Dialog: 'Aktionspreis (€), optional' (leer = nur Werbung ohne Preis-Override) + 'Laufzeit:' Dropdown 1/2/3/4 Wochen."
 
-### Step 8 — Warengruppe anlegen
-- **Anker:** obst-konfig-warengruppen-create-dialog
-- **Modus:** interactive (Klick + Name + speichern)
-- **Fier:** „Leg eine Beispiel-Warengruppe an, z.B. 'Tropische Früchte'."
+9. **Speichern** · `obst-offer-add-dialog-submit` · interactive (Validierung: Eintrag in Liste)
+   *Fier:* „Zwei Submit-Buttons: 'Zur Aktion hinzufügen (ab dieser KW)' (blau) ODER 'Abrechnungsperiode (4 Wochen)'. Nach Klick: Eintrag erscheint in 'Eigene Werbung'."
 
-### Step 9 — Produkt zuweisen
-- **Anker:** obst-konfig-warengruppen-pick-card
-- **Modus:** interactive (Klick auf Warengruppe + Produkt zuweisen)
-- **Fier:** „Klick auf 'Tropische Früchte', dann auf eine Banane in der rechten Spalte → 'Zuweisen'. Banane gehört jetzt zur Tropischen Früchte."
+10. **Markierungs-Effekt** · `obst-offer-section-eigen` · spotlight
+    *Fier:* „In der Hauptliste siehst du das Produkt jetzt mit dunklerem Gelb auf dem Namen — Wochen-Werbung. Helleres Gelb wäre 3-Tages-Werbung gewesen."
 
-### Step 10 — Reihenfolge anpassen
-- **Anker:** obst-konfig-warengruppen-group-list
-- **Modus:** spotlight
-- **Fier:** „Du kannst die Warengruppen per Drag-and-Drop umsortieren — die Reihenfolge in deiner Liste passt sich an."
-
-### Step 11 — Verbindung Regeln ↔ Warengruppen
-- **Anker:** obst-konfig-warengruppen-page
-- **Modus:** spotlight
-- **Fier:** „Bezeichnungsregeln und Warengruppen kombinieren sich: in einer Warengruppe wird per Bezeichnungsregel sortiert. Beispiel: Warengruppe 'Obst', darin nach Bio-Regel die Bios vorn."
+11. **Abschluss** · `obst-offer-toolbar` · spotlight
+    *Fier:* „Tour fertig! Wenn du bestehende Werbung ändern willst: Stift-Icon in der Liste."
 
 ---
 
-## Tour D1 · Backshop-Liste verstehen + Glocke
+## B5 · Obst PDF-Export
+**Rolle:** User, Admin (Viewer hat eigene Lese-Variante) | **Voraussetzung:** A1 | **Steps:** 5
 
-**Rolle:** alle (User, Admin, Viewer)
-**Voraussetzung:** A1 + Test-Modus aktiv
-**Sequenz:** wenn B1 schon gemacht → Markierungs-/Glocken-Steps kürzer
-**Steps:** 13 (oder 9 wenn B1 schon gemacht)
+1. **PDF-Knopf** · `masterlist-toolbar-pdf` · interactive (Validierung: Dialog offen)
+   *Fier:* „Klick 'PDF' in der Toolbar."
 
-### Step 1 — Vom Dashboard
-- **Anker:** dashboard-card-backshop
-- **Modus:** interactive (Klick; Validierung: Pfad /backshop-list oder /backshop-hub)
-- **Fier:** „Klick auf die Backshop-Karte."
+2. **KW-Auswahl + Inhalt** · `masterlist-toolbar-pdf` · spotlight
+   *Fier:* „Dialog 'PDF exportieren': Dropdown 'Kalenderwoche für PDF' (Default aktive KW). Inhalt: Radio-Karten 'Volle Liste' oder 'Nur Angebote'."
 
-### Step 2 — Hub (nur Admin)
-- **Anker:** backshop-hub-page
-- **Modus:** spotlight (nur wenn Admin)
-- **Fier:** „Backshop-Hub: **Liste**, **Werbung**, **Marken-Auswahl**, **Konfiguration**. Wir gehen heute auf die Liste."
+3. **Sub-Optionen volle Liste** · `masterlist-toolbar-pdf` · spotlight
+   *Fier:* „Bei 'Volle Liste': Sub-Toggle 'Mit Angeboten' (default) oder 'Ohne Angebots-Hinweise'. So entscheidest du ob die Werbungs-Markierungen mit ins PDF kommen."
 
-### Step 3 — Liste öffnen
-- **Anker:** backshop-hub-list-card
-- **Modus:** interactive
-- **Fier:** „Klick auf 'PLU-Liste Backshop'."
+4. **Vorschau-Card** · `masterlist-toolbar-pdf` · spotlight
+   *Fier:* „Vorschau zeigt Counter ('KW19/2026 — 181 Artikel') + Pills für Statistik ('5 Neue', '3 PLU geändert', '1 Eigene'). S/W-tauglich: gestrichelter Rahmen = neu, fetter Rahmen = PLU geändert."
 
-### Step 4 — Listen-Aufbau
-- **Anker:** backshop-master-table
-- **Modus:** spotlight
-- **Fier:** „Backshop-Liste: Bild, PLU, Name. Anders als Obst — keine Stück/Gewicht-Trennung."
+5. **Download** · `masterlist-toolbar-pdf` · interactive
+   *Fier:* „Drei Buttons unten: 'Abbrechen' / 'Drucken' / 'PDF herunterladen' (blau). Toast nach Erstellung: 'PDF wurde erstellt.'"
 
-### Step 5 — Markierungen (kürzer wenn B1 gemacht)
-- **Anker:** backshop-master-table
-- **Modus:** spotlight
-- **Fier:** (wenn B1: „Gleich wie Obst — Rot/Gelb für PLU-Änderungen, Hell/Dunkel-Gelb für Werbungs-Arten") (wenn nicht: ausführlich erklären wie B1 Steps 5-7)
-
-### Step 6 — Marken-Badge erklären
-- **Anker:** backshop-master-source-badge
-- **Modus:** spotlight
-- **Fier:** „Backshop hat drei Quellen: **E** (Edeka), **H** (Harry), **A** (Aryzta). Manche Produkte gibt's von mehreren Marken — über die Marken-Auswahl entscheidest du, von wem du sie haben willst."
-
-### Step 7 — Angebote-Konzept
-- **Anker:** backshop-master-marken-hint
-- **Modus:** spotlight
-- **Fier:** „Angebote werden **automatisch hochgeladen**, meistens am Mittwoch der Vorwoche. Wenn KW 14 anliegt, sind die KW 14-Angebote ab Mittwoch der KW 13 verfügbar."
-
-### Step 8 — Suche (wenn B1 gemacht: kürzer)
-- **Anker:** backshop-master-find-trigger
-- **Modus:** interactive (suchen 'Brot' z.B.)
-- **Fier:** „Suche: such mal 'Brot' oder 'Brötchen'."
-
-### Step 9 — Toolbar
-- **Anker:** backshop-master-toolbar
-- **Modus:** spotlight
-- **Fier:** „Toolbar: **Eigene**, **Ausgeblendet**, **Werbung**, **Umbenannt**, **PDF**. Marken-Auswahl ist eine eigene Tour."
-
-### Step 10 — Glocke öffnen
-- **Anker:** unified-notification-bell
-- **Modus:** interactive (Klick)
-- **Fier:** „Glocke öffnen — analog Obst (wenn B1 gemacht: kürzer)."
-
-### Step 11 — Tabs Neu/Geändert/Entfernt (Backshop-Quellen)
-- **Anker:** backshop-notification-tab-new
-- **Modus:** spotlight
-- **Fier:** „Hier siehst du Änderungen je Quelle. Edeka-Brot neu? Harry-Brötchen entfernt? Alles sortiert nach E/H/A."
-
-### Step 12 — Carryover
-- **Anker:** backshop-notification-tab-removed
-- **Modus:** spotlight
-- **Fier:** „Genauso wie bei Obst: rausgefallene Produkte 1 Woche verlängern für Restbestand."
-
-### Step 13 — Abschluss
-- **Anker:** backshop-master-toolbar
-- **Modus:** spotlight
-- **Fier:** „Backshop-Liste-Tour fertig. Detail-Touren für jeden Toolbar-Knopf gibt's separat."
 
 ---
 
-## Tour D2 · Eigene Backshop-Produkte: Test vs. Fest
+## C1 · Obst-Konfiguration: Layout
+**Rolle:** Admin | **Voraussetzung:** A1 + Testmodus | **Steps:** 9
 
-**Rolle:** User, Admin
-**Voraussetzung:** A1 + Test-Modus aktiv
-**Steps:** 8
+1. **Konfig öffnen** · `admin-obst-hub-konfig` · interactive
+   *Fier:* „Vom Obst-Hub aus klick auf 'Konfiguration'."
 
-### Step 1 — Eigene-Produkte öffnen
-- **Anker:** backshop-master-quick-custom (oder backshop-custom-page-Toolbar)
-- **Modus:** interactive
-- **Fier:** „Klick 'Eigene Produkte' in der Toolbar."
+2. **Konfig-Hub** · `obst-konfig-hub-page` · spotlight
+   *Fier:* „Drei Karten: Layout, Bezeichnungsregeln, Warengruppen. Heute Layout."
 
-### Step 2 — Test vs. Fest erklären
-- **Anker:** backshop-custom-list
-- **Modus:** spotlight
-- **Fier:** „Wichtig — zwei Sorten: **Test-Produkte** erscheinen nur auf dem **wöchentlichen Angebotszettel** (den du eh druckst). **Feste Produkte** erscheinen zusätzlich in der **großen Haupt-Liste** (die du seltener neu druckst). Empfehlung: erst Test, wenn's gut läuft → Fest."
+3. **Layout-Page** · `obst-konfig-hub-layout-card` · interactive
+   *Fier:* „Klick auf die Layout-Karte."
 
-### Step 3 — Anlegen-Knopf
-- **Anker:** backshop-custom-add-button
-- **Modus:** interactive
-- **Fier:** „'+ Neues Produkt' klicken."
+4. **Anzeige-Modus** · `obst-konfig-layout-display-mode-card` · spotlight
+   *Fier:* „'Alle zusammen': Stück und Gewicht in einer Liste gemischt. 'Stück + Gewicht getrennt': zwei separate Bereiche. Wähle was zu deinem Markt passt."
 
-### Step 4 — Felder ausfüllen
-- **Anker:** backshop-custom-add-dialog
-- **Modus:** interactive (Beispiel füllen oder selbst, Test-Mode wählen)
-- **Fier:** „PLU, Name, Bild (optional), und wichtig: **Test oder Fest** wählen. Heute machen wir 'Test'."
+5. **Sortierung** · `obst-konfig-layout-sort-mode-card` · spotlight
+   *Fier:* „'Alphabetisch (A–Z)': Buchstaben-Header. 'Nach Warengruppen': Gruppen-Header und aktiviert die Warengruppen-Workbench."
 
-### Step 5 — Speichern
-- **Anker:** backshop-custom-add-dialog-submit
-- **Modus:** interactive
-- **Fier:** „Speichern."
+6. **Markierungsdauer** · `obst-konfig-layout-mark-duration-card` · interactive
+   *Fier:* „Wie lange bleiben rote und gelbe Markierungen sichtbar? Standard: Rot 1 KW, Gelb 1 KW. Bis 4 KW möglich."
 
-### Step 6 — In Liste sehen
-- **Anker:** backshop-custom-list
-- **Modus:** spotlight
-- **Fier:** „Dein Produkt ist da, mit Test-Badge."
+7. **Schriftgrößen + Vorschau** · `obst-konfig-layout-fonts-card` · spotlight
+   *Fier:* „Drei Felder bei Zeilenweise: Listen-Header (28), Spaltenköpfe (16), Produktzeilen (18). Live-Vorschau rechts zeigt das Ergebnis sofort."
 
-### Step 7 — Bearbeiten + auf Fest umstellen
-- **Anker:** backshop-custom-edit-dialog
-- **Modus:** interactive (Eintrag öffnen + Test→Fest)
-- **Fier:** „Klick auf den Eintrag, ändere 'Test' auf 'Fest', speichern. Jetzt erscheint's auch in der großen Liste."
+8. **Features-Toggles** · `obst-konfig-layout-features-card` · spotlight
+   *Fier:* „Drei Toggles: 'Eigene Produkte' (User dürfen anlegen), 'Produkte ausblenden', 'Warengruppen' (aktiviert die Workbench)."
 
-### Step 8 — Abschluss
-- **Anker:** backshop-custom-list
-- **Modus:** spotlight
-- **Fier:** „Geschafft. Im Test-Modus wird das alles wieder verworfen."
+9. **Auto-Save** · `obst-konfig-layout-save-status` · spotlight
+   *Fier:* „Alles speichert automatisch — kein Speichern-Knopf. Status oben rechts: Loader während speichern, Checkmark wenn fertig. Tour fertig!"
 
 ---
 
-## Tour D3 · Backshop ausblenden + umbenennen
+## C2 · Obst-Konfiguration: Bezeichnungsregeln + Warengruppen
+**Rolle:** Admin | **Voraussetzung:** A1 + Testmodus | **Steps:** 12
 
-**Rolle:** User, Admin
-**Voraussetzung:** A1 + Test-Modus aktiv
-**Steps:** 9 (analog B3)
+**Bezeichnungsregeln:**
 
-Inhalt analog zu B3, Anker mit `backshop-` Prefix:
-- backshop-hidden-page, backshop-hidden-add-button, backshop-hidden-list
-- backshop-renamed-page, backshop-renamed-add-button, backshop-renamed-list
-- Modi: interactive für Anlegen/Löschen, spotlight für Erklärung
-- **Zusätzlich:** Erwähnung dass Backshop **Regel-basiertes Ausblenden** hat (siehe Tour E2 Gruppenregeln)
+1. **Regeln-Page** · `obst-konfig-hub-rules-card` · interactive
+   *Fier:* „Vom Konfig-Hub: 'Bezeichnungsregeln'."
 
-### Step 1 — Ausgeblendet öffnen → Step 9 analog B3
-(Ich kürze hier, weil identische Logik. Voll ausgearbeitet wenn du Bestätigung gibst.)
+2. **Konzept** · `obst-konfig-rules-keywords-card` · spotlight
+   *Fier:* „Bezeichnungsregeln sind Text-Regeln zum alphabetischen Sortieren. Beispiel: 'Bio' immer vorne, oder 'GG' immer hinten. Hat NICHTS mit Warengruppen zu tun!"
 
----
+3. **Schlagwort anlegen** · `obst-konfig-rules-add-button` · interactive
+   *Fier:* „Klick '+ Regel'. Dialog 'Schlagwort-Manager' öffnet sich."
 
-## Tour D4 · Backshop Markenauswahl
+4. **Eingabe + Position** · `obst-konfig-rules-schlagwort-input` · interactive
+   *Fier:* „Tipp 'Bio' ein. Position: 'Vorne anzeigen' (default). Live-Vorschau zeigt: 'X Produkte enthalten Bio · Y davon werden geändert' mit Vorher → Nachher Liste."
 
-**Rolle:** User, Admin
-**Voraussetzung:** A1 + Test-Modus aktiv
-**Steps:** 6
+5. **Hinzufügen + Anwenden** · `obst-konfig-rules-schlagwort-submit` · interactive
+   *Fier:* „Klick '+ Hinzufügen'. Toast: 'Regel hinzugefügt'. Dann unten 'Alle Regeln anwenden' (blau). Toast: 'Namensdarstellung ist für diesen Markt in der Liste aktiv (keine zentrale Master-Speicherung).' — markt-lokal, Master bleibt unverändert."
 
-### Step 1 — Markenauswahl-Page
-- **Anker:** backshop-marken-auswahl-page
-- **Modus:** interactive (Vom Hub oder Toolbar)
-- **Fier:** „Klick auf 'Marken-Auswahl' im Backshop-Hub."
+**Warengruppen:**
 
-### Step 2 — Was ist das?
-- **Anker:** backshop-marken-auswahl-list
-- **Modus:** spotlight
-- **Fier:** „Im Backshop gibt's drei Quellen: Edeka, Harry, Aryzta. Manche Produkte (z.B. Vollkornbrot) gibt's von mehreren. Hier wählst du **deine bevorzugte Marke** pro Produkt."
+6. **Wechsel zu Warengruppen** · `admin-obst-hub-konfig` · interactive
+   *Fier:* „Zurück zum Konfig-Hub, dann auf 'Warengruppen'."
 
-### Step 3 — Bedienung: Kachel-Klick
-- **Anker:** backshop-marken-auswahl-list
-- **Modus:** spotlight
-- **Fier:** „Pro Produkt-Gruppe siehst du Kacheln der verfügbaren Marken (E, H, A). Klick auf die gewünschte Marke."
+7. **Konzept** · `obst-konfig-warengruppen-info-card` · spotlight
+   *Fier:* „Warengruppen sind STRUKTURELLE Gruppierungen — 'Obst', 'Gemüse', 'Kräuter'. Anders als Bezeichnungsregeln. Wirken nur bei Sortierung 'Nach Warengruppen' im Layout."
 
-### Step 4 — Marke wählen
-- **Anker:** backshop-marken-auswahl-list
-- **Modus:** interactive
-- **Fier:** „Wähl bei einem Beispiel-Produkt eine Marke aus."
+8. **Hinweis-Banner** · `obst-konfig-warengruppen-layout-hint` · spotlight
+   *Fier:* „Falls Sortierung noch auf 'Alphabetisch' steht: Hinweis-Banner oben mit Direkt-Link zu Layout."
 
-### Step 5 — Status-Übersicht
-- **Anker:** backshop-marken-auswahl-status
-- **Modus:** spotlight
-- **Fier:** „Oben siehst du wie viele Produkte du noch nicht zugewiesen hast. Solang noch was offen ist, erscheinen Default-Marken in der Liste."
+9. **Warengruppe anlegen** · `obst-konfig-warengruppen-create-dialog` · interactive
+   *Fier:* „'+ Neu' oder Plus-Knopf in der linken Sidebar. Dialog mit Namens-Feld. Beispiel: 'Tropische Früchte'. Toast: 'Warengruppe erstellt'."
 
-### Step 6 — Verbindung Gruppenregeln + Abschluss
-- **Anker:** backshop-marken-auswahl-page
-- **Modus:** spotlight
-- **Fier:** „**Tipp:** Mit Gruppenregeln (Tour E2) kannst du Ausnahmen machen: z.B. 'Alles Brot von Harry, aber das Edeka-Brot trotzdem behalten.'"
+10. **Produkt zuweisen** · `obst-konfig-warengruppen-products-assign-button` · interactive
+    *Fier:* „Mittel-Spalte: Such 'Mango'. Checkbox bei einem Treffer. Rechte Spalte: Knopf 'Auswahl → Tropische Früchte zuweisen' (blau im Sticky-Footer)."
+
+11. **Reihenfolge** · `obst-konfig-warengruppen-group-list` · spotlight
+    *Fier:* „Per Drag-and-Drop am 6-Punkt-Griff verschiebst du Warengruppen. Die Reihenfolge persistiert sofort."
+
+12. **Verbindung erklären** · `obst-konfig-warengruppen-page` · spotlight
+    *Fier:* „Bezeichnungsregeln + Warengruppen kombinieren sich: in einer Warengruppe wird per Bezeichnungsregel sortiert. Tour fertig!"
 
 ---
 
-## Tour D5 · Backshop Werbung & Bestellungen
+## D1 · Backshop-Liste verstehen + Glocke
+**Rolle:** alle | **Voraussetzung:** A1 + Testmodus | **Steps:** 14 (sequenz-abhängig kürzer wenn B1 schon gemacht)
 
-**Rolle:** User, Admin
-**Voraussetzung:** A1 + Test-Modus aktiv
-**Steps:** 10
+1. **Vom Dashboard** · `dashboard-card-backshop` · interactive
+   *Fier:* „Klick auf die Backshop-Karte."
 
-### Step 1 — Werbung-Page (KW-Liste)
-- **Anker:** backshop-master-toolbar (Werbung-Knopf, oder backshop-werbung-routes)
-- **Modus:** interactive
-- **Fier:** „Klick 'Werbung' in der Backshop-Toolbar — du landest auf der KW-Übersicht."
+2. **Hub mit DREI Karten** · `backshop-hub-page` · spotlight
+   *Fier:* „Backshop-Hub hat drei Karten (anders als Obst!): 'PLU-Liste', 'Konfiguration der Liste' (4 Sub-Karten), und 'Backshop' (Sub-Hub mit Werbung + Backshop-Liste)."
 
-### Step 2 — Werbung-Konzept
-- **Anker:** backshop-werbung-routes (Liste der KWs)
-- **Modus:** spotlight
-- **Fier:** „**Werbung im Backshop = Bestellung**. Du trägst pro KW ein, welche Produkte du in welcher Menge bestellen willst, mit EK/VK und Auslieferungsdatum."
+3. **PLU-Liste öffnen** · `backshop-hub-list-card` · interactive
+   *Fier:* „Klick auf 'PLU-Liste Backshop'."
 
-### Step 3 — KW öffnen
-- **Anker:** backshop-werbung-routes (eine KW anklicken)
-- **Modus:** interactive
-- **Fier:** „Klick auf eine KW (z.B. die kommende)."
+4. **Listen-Aufbau** · `backshop-master-table` · spotlight
+   *Fier:* „Spalten: Bild (Thumbnail) | PLU | Name. Anders als Obst — keine Stück/Gewicht-Trennung."
 
-### Step 4 — Produkt hinzufügen
-- **Anker:** backshop-offer-add-button
-- **Modus:** interactive
-- **Fier:** „'+ Produkt' klicken."
+5. **Markierungen** · `backshop-master-table` · spotlight
+   *Fier:* (wenn B1 gemacht: „Wie bei Obst — Rot/Gelb auf PLU, Hell/Dunkel-Gelb auf Namen für Werbung.") (wenn nicht: ausführlich erklären wie B1 Steps 5-7)
 
-### Step 5 — Menge eintragen
-- **Anker:** backshop-offer-add-dialog
-- **Modus:** interactive
-- **Fier:** „Wie viele Stück bestellst du? Trag z.B. 50 ein."
+6. **Marken-Badge E/H/A** · `backshop-master-source-badge` · spotlight
+   *Fier:* „Backshop hat drei Quellen: E (Edeka, blau), H (Harry, orange), A (Aryzta, rot/violett). Manche Produkte gibt's von mehreren Marken — über die Marken-Auswahl entscheidest du, von wem du sie haben willst."
 
-### Step 6 — EK + VK
-- **Anker:** backshop-offer-add-dialog
-- **Modus:** spotlight + interactive
-- **Fier:** „**EK** = dein Einkaufspreis (was du zahlst). **VK** = Verkaufspreis (was der Kunde zahlt). Standard kommt aus dem System — kannst du anpassen."
+7. **Zeitraum-Zeile + Werbe-KW-Wahl** · `backshop-master-toolbar` · spotlight
+   *Fier:* „Zeitraum 'KW 17 – KW 19 · 2026' — die zweite KW ist ein Dropdown! Wenn Werbung für spätere Wochen existiert, kannst du die anzeigen lassen (nur vorwärts). Plus 'Archiv'-Pill für ältere KWen."
 
-### Step 7 — Auslieferungsdatum
-- **Anker:** backshop-offer-add-dialog
-- **Modus:** interactive
-- **Fier:** „Ab wann ist das Produkt verfügbar? Wähl ein Datum."
+8. **Suche** · `backshop-master-find-trigger` · interactive
+   *Fier:* „Such mal 'Brot' oder 'Brötchen'."
 
-### Step 8 — Speichern
-- **Anker:** backshop-offer-add-dialog (submit)
-- **Modus:** interactive
-- **Fier:** „Speichern."
+9. **Toolbar 6 Aktionen** · `backshop-master-toolbar` · spotlight
+   *Fier:* „Toolbar Zeile 2 hat sechs Aktionen: Eigene Produkte, Ausgeblendete, Werbung, Marken-Auswahl, Umbenennen, PDF. Für jeden Knopf gibt's eine eigene Tour."
 
-### Step 9 — Übersicht der KW-Bestellungen
-- **Anker:** backshop-offer-page
-- **Modus:** spotlight
-- **Fier:** „Du siehst alle Bestellungen für diese KW. Wenn was falsch aussieht: Eintrag öffnen, anpassen. Falls der Name komisch ist: → Tour D3 Umbenennen."
+**Glocke-Block:**
 
-### Step 10 — Abschluss
-- **Anker:** backshop-offer-section-eigen
-- **Modus:** spotlight
-- **Fier:** „Tour fertig. Im Test-Modus alles ohne Folgen — übrigens, in echt sieht der Hauptsitz deine Bestellungen auch."
+10. **Glocke öffnen** · `unified-notification-bell` · interactive
+    *Fier:* „Glocke öffnen — analog Obst (wenn B1 gemacht: kürzer)."
+
+11. **Tabs für Backshop-Quellen** · `backshop-notification-tab-new` · spotlight
+    *Fier:* „Hier siehst du Änderungen je Quelle. Edeka-Brot neu? Harry-Brötchen entfernt? Alles mit E/H/A-Badge sortiert."
+
+12. **Tab „Raus" Carryover** · `backshop-notification-tab-removed` · spotlight
+    *Fier:* „Genauso wie bei Obst: 'Eine KW in Liste' (sekundär, einmaliges Übernehmen) oder 'Nicht übernehmen' (blau, primär)."
+
+13. **„Alle als gelesen"** · `backshop-notification-mark-all-read` · spotlight
+    *Fier:* „Footer-Knopf 'Alles als gelesen markieren' (für beide Bereiche, falls sichtbar)."
+
+14. **Abschluss** · `backshop-master-toolbar` · spotlight
+    *Fier:* „Backshop-Liste-Tour fertig. Detail-Touren für jeden Toolbar-Knopf gibt's separat."
 
 ---
 
-## Tour D6 · Backshop PDF-Export
+## D2 · Eigene Backshop-Produkte: Test vs. Fest
+**Rolle:** User, Admin | **Voraussetzung:** A1 + Testmodus | **Steps:** 8
 
-**Rolle:** User, Admin
-**Steps:** 4 (analog B5)
+1. **Eigene-Produkte öffnen** · `backshop-master-quick-custom` · interactive
+   *Fier:* „Klick 'Eigene Produkte' in der Backshop-Toolbar."
 
-Inhalt analog B5 mit Backshop-Spezifika:
-- Bilder im PDF erwähnen (Backshop hat Bild-Spalte)
-- Anker: backshop-master-pdf-export
+2. **Empty-State** · `backshop-custom-page` · spotlight
+   *Fier:* „'Noch keine eigenen Backshop-Produkte. Füge eines hinzu (mit Bild).' — wichtig: Bild ist Pflicht!"
 
----
+3. **Anlegen-Dialog** · `backshop-custom-add-button` · interactive
+   *Fier:* „Klick '+ Eigenes Produkt hinzufügen'."
 
-## Tour E1 · Backshop-Konfig: Hub, Layout, Bezeichnungsregeln (nur Admin)
+4. **Test vs. Fest erklären** · `backshop-custom-add-dialog` · spotlight
+   *Fier:* „Wichtig — Dropdown 'Angebots-PDF' mit zwei Optionen: 'Test (unter Neue Produkte auf Angebots-PDF)' (Default, sparen Papier weil Angebots-Zettel eh wöchentlich gedruckt wird). ODER 'Sofort fest in der Hauptliste' (auch im großen PDF). Empfehlung: erst Test, wenn bewährt → Fest."
 
-**Rolle:** Admin
-**Voraussetzung:** A1 + Test-Modus aktiv
-**Sequenz:** wenn C1 schon gemacht → kürzer
-**Steps:** 8
+5. **Bild-Pflicht** · `backshop-custom-add-dialog` · spotlight
+   *Fier:* „Wichtig: BILD IST PFLICHT! Zwei Buttons: 'Bild wählen' (Datei-Picker) oder 'Foto aufnehmen' (Webcam — gut für Tablets im Markt). Ohne Bild bleibt 'Hinzufügen' disabled."
 
-Inhalt parallel zu C1, mit Backshop-Spezifika:
-- Anzeige-Modi: nur „Alle zusammen" oder „Nach Warengruppen" (keine Stück/Gewicht-Trennung)
-- Anker: backshop-konfig-hub-page, backshop-konfig-layout-page, backshop-konfig-rules-page
+6. **Felder + Warengruppe** · `backshop-custom-add-dialog` · interactive
+   *Fier:* „Pflichtfelder: PLU (4-5 Ziffern) + Name. Warengruppe per Dropdown. Cooler Trick: Link 'Neue Warengruppe erstellen' verwandelt das Dropdown in Inline-Anlage — kein separater Dialog!"
 
----
+7. **Speichern** · `backshop-custom-add-dialog-submit` · interactive (Validierung: Eintrag in Liste)
+   *Fier:* „Klick 'Hinzufügen'. Eintrag erscheint in der Tabelle."
 
-## Tour E2 · Backshop-Konfig: Warengruppen + Sortierung + Gruppenregeln (nur Admin)
-
-**Rolle:** Admin
-**Voraussetzung:** A1 + Test-Modus aktiv
-**Steps:** 12
-
-### Step 1-5 — Warengruppen analog C2 Steps 7-10
-(mit backshop-konfig-warengruppen-page Ankern)
-
-### Step 6 — Wechsel zu Sortierung
-- **Anker:** backshop-konfig-block-sort-page
-- **Modus:** interactive
-- **Fier:** „Klick auf 'Sortierung'."
-
-### Step 7 — Reihenfolge per Drag
-- **Anker:** backshop-konfig-block-sort-section
-- **Modus:** interactive
-- **Fier:** „Drag-and-Drop die Warengruppen in deine gewünschte Reihenfolge."
-
-### Step 8 — Wechsel zu Gruppenregeln
-- **Anker:** backshop-konfig-gruppenregeln-page
-- **Modus:** interactive
-- **Fier:** „Jetzt zu Gruppenregeln."
-
-### Step 9 — Was sind Gruppenregeln?
-- **Anker:** backshop-konfig-gruppenregeln-card
-- **Modus:** spotlight
-- **Fier:** „**Gruppenregeln** blenden Produkte einer ganzen Marke pro Warengruppe aus. Beispiel: 'Alle Edeka-Brote in Warengruppe Brot ausblenden' — alle auf einmal."
-
-### Step 10 — Beispiel-Regel anlegen
-- **Anker:** backshop-konfig-gruppenregeln-source-select
-- **Modus:** interactive
-- **Fier:** „Wähl eine Warengruppe + eine Quelle (z.B. Brot + Edeka), klick 'Anwenden'."
-
-### Step 11 — Effekt sehen
-- **Anker:** backshop-master-table
-- **Modus:** spotlight (Sprung in die Liste)
-- **Fier:** „Schau in die Hauptliste — die Edeka-Brote sind weg. Im 'Ausgeblendet'-Bereich siehst du sie unter 'Durch Regeln gefiltert'."
-
-### Step 12 — Verbindung Markenauswahl ↔ Gruppenregeln
-- **Anker:** backshop-konfig-gruppenregeln-marken-link
-- **Modus:** spotlight
-- **Fier:** „**Tipp:** Markenauswahl (D4) gibt deine **Default-Marke** vor. Gruppenregeln machen **Bulk-Ausnahmen**. Z.B. Default Harry, aber Gruppenregel 'Edeka-Brötchen wieder anzeigen'."
+8. **Edit Test → Fest** · `backshop-custom-edit-dialog` · spotlight
+   *Fier:* „Wenn sich's bewährt: Stift-Icon → Edit-Dialog → Dropdown 'Sofort fest in der Hauptliste' wählen. Jetzt erscheint's auch in der großen PLU-Liste."
 
 ---
 
-## Tour F1 · Benutzer verwalten (nur Admin)
+## D3 · Backshop ausblenden + umbenennen
+**Rolle:** User, Admin | **Voraussetzung:** A1 + Testmodus | **Steps:** 11
 
-**Rolle:** Admin
-**Voraussetzung:** A1 + Test-Modus aktiv
-**Steps:** 7
+**Ausblenden (mit zwei Tabs!):**
 
-### Step 1 — UserManagement öffnen
-- **Anker:** dashboard-card-users (oder Profil-Menü → Users)
-- **Modus:** interactive
-- **Fier:** „Klick auf die Benutzer-Karte."
+1. **Hidden-Page öffnen** · `backshop-master-quick-hidden` · interactive
+   *Fier:* „Klick 'Ausgeblendete' in der Toolbar."
 
-### Step 2 — Übersicht
-- **Anker:** user-management-list
-- **Modus:** spotlight
-- **Fier:** „Hier siehst du alle Benutzer deiner Firma. Du kannst neue anlegen, Rolle ändern, Passwort zurücksetzen, löschen."
+2. **Header beschreiben** · `backshop-hidden-page` · spotlight
+   *Fier:* „Backshop-Hidden ist anders als Obst! Header mit Auge-Schrägstrich-Icon + Help-Icon + Lupe + 'Produkte ausblenden'-Knopf."
 
-### Step 3 — Neuen User anlegen
-- **Anker:** user-management-new-user
-- **Modus:** interactive
-- **Fier:** „'+ Neuer Benutzer'."
+3. **Tab „Manuell"** · `backshop-hidden-mode-manual` · spotlight
+   *Fier:* „Tab 'Manuell ausgeblendet' + Counter. Quellen-Filter-Pills oben: 'Alle X / E Edeka X / H Harry X / A Aryzta X / O Eigene X'."
 
-### Step 4 — Felder + Rolle
-- **Anker:** user-management-create-dialog
-- **Modus:** interactive
-- **Fier:** „Name, Personalnummer ODER E-Mail (eines reicht), Rolle. Speichern → Einmalpasswort wird angezeigt, das gibst du dem Mitarbeiter."
+4. **Card-Grid pro Warengruppe** · `backshop-hidden-list` · spotlight
+   *Fier:* „Sektion 'Warengruppen': Card-Grid mit Counter-Pill, Bild, Layer-Icon. Klick auf Card → Detail-Tabelle (PLU, Artikel, Marke, Warengruppe, Ausgeblendet von, Einblenden-Knopf)."
 
-### Step 5 — Markt zuweisen
-- **Anker:** user-management-row-edit (oder Markt-Knopf)
-- **Modus:** interactive
-- **Fier:** „Klick beim neuen User auf 'Märkte' → wähl welche Märkte er sieht."
+5. **Tab „Durch Regel gefiltert"** · `backshop-hidden-mode-rule` · spotlight
+   *Fier:* „Tab 'Durch Regel gefiltert' + Counter — Produkte die durch Gruppenregeln (E2) oder Markenauswahl (D4) ausgeblendet sind. Pro Zeile zusätzlich: Knopf 'Marken wählen' führt zur Marken-Auswahl mit Pre-Selection."
 
-### Step 6 — Bereiche-Sichtbarkeit
-- **Anker:** user-management-row-edit (Bereiche-Knopf)
-- **Modus:** spotlight
-- **Fier:** „**Bereiche-Sichtbarkeit:** soll dieser User Obst sehen? Backshop? Beides? Hier einstellen pro User."
+6. **Picker mit Bildern + E/H/A** · `backshop-hidden-add-button` · interactive
+   *Fier:* „Klick 'Produkte ausblenden' oben rechts → Picker mit Bildern und Quellen-Pills (E/H/A) pro Zeile. Sektion-Header '=== BROT ==='. Wichtig: Counter zählt PLU, nicht Marken-Varianten — eine PLU bei E+H markiert beide automatisch!"
 
-### Step 7 — Passwort zurücksetzen
-- **Anker:** user-management-row-reset-pw
-- **Modus:** spotlight
-- **Fier:** „Bei 'Passwort vergessen': klick auf den Schlüssel-Knopf — neues Einmalpasswort, das gibst du dem User."
+7. **Submit** · `backshop-hidden-add-dialog-submit` · interactive (Validierung: Toast)
+   *Fier:* „Sticky-Footer: 'X Produkte ausblenden'. Toast: 'X Produkte ausgeblendet'."
 
----
+**Umbenennen (mit Bild-Override!):**
 
-## Tour F2 · Kassenmodus & QR-Code (nur Admin)
+8. **Umbenennen öffnen** · `backshop-master-toolbar` · interactive
+   *Fier:* „Zurück zur Liste, 'Umbenennen' in der Toolbar."
 
-**Rolle:** Admin
-**Voraussetzung:** A1 + Test-Modus aktiv (Achtung: Kassenmodus-Anlage ist real, nicht testbar)
-**Steps:** 7
+9. **Renamed-Tabelle** · `backshop-renamed-list` · spotlight
+   *Fier:* „4-Spalten-Tabelle: Bild | PLU | Original | Aktuell + Zurücksetzen-Knopf. Backshop hat zusätzlich Bild-Spalte!"
 
-### Step 1 — Kassenmodus öffnen
-- **Anker:** dashboard-card-kiosk (oder Admin-Hub)
-- **Modus:** interactive
-- **Fier:** „Klick auf 'Kassenmodus' im Admin-Bereich."
+10. **Stift mit Bild-Sektion** · `backshop-renamed-add-dialog` · interactive
+    *Fier:* „Stift-Dialog: Feld 'Neuer Name' + BILD-SEKTION mit Thumbnail + 'Bild ersetzen' (öffnet Datei-Picker) / 'Bild entfernen' (Mülltonne). NEU gegenüber Obst!"
 
-### Step 2 — Was ist das?
-- **Anker:** kassenmodus-qr (Page)
-- **Modus:** spotlight
-- **Fier:** „Kassenmodus = ein Tablet/Bildschirm an der Kasse, an dem das Personal die PLU-Liste lesen kann. Anmeldung über QR-Code + Kassen-Passwort."
+11. **Zurücksetzen-Bestätigung** · `backshop-renamed-list` · spotlight
+    *Fier:* „Zurücksetzen-Bestätigung Backshop: 'Der Anzeigename wird wieder auf {Original} gesetzt. Das Bild bleibt unverändert.' — Backshop-Extra-Hinweis!"
 
-### Step 3 — Erste Kasse anlegen
-- **Anker:** kassenmodus-add-register
-- **Modus:** interactive
-- **Fier:** „'+ Kasse hinzufügen'. Wähl Nummer (z.B. Kasse 1), Passwort (mindestens **6 Zeichen**)."
-
-### Step 4 — QR-Code zeigt sich
-- **Anker:** kassenmodus-qr
-- **Modus:** spotlight
-- **Fier:** „Hier ist dein QR-Code. Den scannt das Personal, gibt das Passwort ein → ist drin."
-
-### Step 5 — QR-Code drucken
-- **Anker:** kassenmodus-qr (Drucken-Knopf)
-- **Modus:** interactive
-- **Fier:** „Klick 'Drucken' oder 'PDF speichern'. Druck den aus, kleb ihn an die Kasse."
-
-### Step 6 — Vorschau testen
-- **Anker:** kassenmodus-qr (Vorschau-Knopf)
-- **Modus:** interactive
-- **Fier:** „Vorschau: öffnet die Kassen-Anmeldung in neuem Tab. Geben dort dein Kassen-Passwort ein → du siehst die Kassen-Ansicht."
-
-### Step 7 — Sicherheits-Hinweis
-- **Anker:** kassenmodus-qr
-- **Modus:** spotlight
-- **Fier:** „**Wichtig:** Der QR läuft nach **6 Monaten ab**. Bei Leak (jemand fotografiert) klick 'Neuen Link erzeugen' — alter wird ungültig, alles weg."
 
 ---
 
-## Tour G1 · Abschluss
+## D4 · Backshop Markenauswahl
+**Rolle:** User, Admin | **Voraussetzung:** A1 + Testmodus | **Steps:** 9
 
-**Rolle:** alle
-**Voraussetzung:** mind. eine andere Tour abgeschlossen
-**Steps:** 3
+1. **Marken-Auswahl öffnen** · `backshop-master-toolbar` · interactive (Validierung: Pfad /marken-auswahl)
+   *Fier:* „Klick 'Marken-Auswahl' in der Backshop-Toolbar."
 
-### Step 1 — Lob
-- **Anker:** dashboard-welcome
-- **Modus:** spotlight
-- **Fier:** „Top — du hast die Basics gelernt! Du kennst jetzt deine Liste, weißt was die Markierungen bedeuten und wie du eigene Sachen anlegst."
+2. **Konzept** · `backshop-marken-auswahl-page` · spotlight
+   *Fier:* „Im Backshop gibt's drei Quellen (E/H/A) die teilweise dasselbe Produkt anbieten — z.B. Vollkornbrot von Edeka UND Harry. Hier wählst du, von welcher Marke du es haben willst."
 
-### Step 2 — Wiederholen
-- **Anker:** header-tutorial-icon
-- **Modus:** spotlight
-- **Fier:** „Wenn du was vergisst oder eine andere Tour machen willst — der Tutorial-Knopf oben ist dein Anlaufpunkt. Da kannst du jede Tour einzeln wiederholen."
+3. **Sidebar mit Status-Filtern** · `backshop-marken-auswahl-sidebar` · spotlight
+   *Fier:* „Linke Sidebar: Suche oben + Status-Filter-Pills 'Alle / Offen / Teilweise / Alle bestätigt'. Pro Master-Eintrag: Counter wie '0/1' oder '1/2' + Status-Pill. Aktiver Master blau."
 
-### Step 3 — Hilfe
-- **Anker:** profile-menu
-- **Modus:** spotlight
-- **Fier:** „Im Profil-Menü findest du auch 'Einführung wiederholen' — falls du den Knopf oben mal nicht findest. Bis bald! 👋"
+4. **Status-Banner** · `backshop-marken-auswahl-status` · spotlight
+   *Fier:* „Oben im Detail-View ein Banner mit vier möglichen Zuständen: hellblau 'Keine Auswahl – alle Marken bleiben sichtbar' (Initial). Gelb 'Exklusiv-Modus: nur diese Marke bleibt'. Hellblau 'X von Y gewählt'. Grün 'Alle Marken bestätigt – auditierbar gespeichert'."
 
----
+5. **Bedienung erklären** · `backshop-marken-auswahl-list` · spotlight
+   *Fier:* „WICHTIG: Kachel-System, kein Tinder-Swipe! Einfachklick = Mehrfachauswahl + Auto-Sprung zum nächsten Master. Doppelklick oder Shift+Enter = Exklusiv-Modus (nur diese Marke)."
 
-## Mini-Tour T-Multi-Markt (conditional, nur wenn User mehrere Märkte hat)
+6. **Marke wählen** · `backshop-marken-auswahl-list` · interactive
+   *Fier:* „Klick auf eine Marken-Kachel. Aktive Card bekommt blauen Rand + Häkchen oben rechts. Wenn du eine Marke wählst, springt der Counter im Status-Filter automatisch (z.B. 'Offen 19 → 18')."
 
-**Rolle:** alle (User, Admin, Viewer) **wenn** `useStores().data.length > 1`
-**Steps:** 3
+7. **Auswirkung-Tabelle** · `backshop-marken-auswahl-preview` · spotlight
+   *Fier:* „Unten 'AUSWIRKUNG AUF DIE MASTERLISTE': Tabelle pro Marken-Variante mit Sichtbarkeits-Pill — 'sichtbar' (grün), 'sichtbar (ohne Wahl)' (gelblich, Initial), 'ausgeblendet' (grau, durch andere Wahl gefiltert)."
 
-### Step 1 — Markt-Switcher
-- **Anker:** header-store-switcher
-- **Modus:** spotlight
-- **Fier:** „Du hast mehrere Märkte. Oben im Header siehst du den **Markt-Switcher** — der zeigt dir wo du gerade bist."
+8. **Weiter-Button** · `backshop-marken-auswahl-page` · interactive
+   *Fier:* „Footer: 'Zurück' / 'Weiter' (blau). 'Weiter' springt zum nächsten offenen oder teilweisen Master in der Sidebar."
 
-### Step 2 — Wechseln
-- **Anker:** header-store-switcher
-- **Modus:** interactive (Klick + anderer Markt wählen)
-- **Fier:** „Klick drauf, wähl einen anderen Markt aus."
-
-### Step 3 — Liste zeigt anderen Markt
-- **Anker:** masterlist-context-line
-- **Modus:** spotlight
-- **Fier:** „Die ganze App schaltet jetzt um — du siehst die Liste, Werbung, Benutzer **dieses Markts**. Beim Zurückwechseln sieht der erste Markt wieder genauso aus wie vorher."
+9. **Verbindung Gruppenregeln** · `backshop-marken-auswahl-page` · spotlight
+   *Fier:* „Tipp: Mit Gruppenregeln (Tour E2) machst du Bulk-Wahlen auf Warengruppen-Ebene. Markenauswahl hier ist die Feinabstimmung pro Master-Produkt."
 
 ---
 
-# 🏁 Schritt 1 abgeschlossen
+## D5 · Backshop Werbung & Bestellungen
+**Rolle:** User, Admin | **Voraussetzung:** A1 + Testmodus | **Steps:** 12
+
+1. **Vom Hub: Sub-Hub** · `backshop-hub-werbung-card` · interactive
+   *Fier:* „Vom Backshop-Hub aus: Sub-Hub 'Backshop' (Karte). Im Sub-Hub: zwei Karten 'Werbung' und 'Backshop-Liste'. Klick 'Werbung'."
+
+2. **KW-Liste-Übersicht** · `backshop-werbung-routes` · spotlight
+   *Fier:* „Untertitel: 'Kalenderwoche wählen – Artikel, Preise und Strichcode aus der zentralen Werbung für diesen Markt.' Drei Sektionen: Aktuelle Woche, Kommende KWen (3 Cards), Frühere (Akkordeon)."
+
+3. **KW-Card öffnen** · `backshop-werbung-routes` · interactive (Validierung: KW-Detail offen)
+   *Fier:* „Card-Click → KW-Detail. Auslieferungs-Countdown: 'Noch X Tag(e) · Auslieferung ab DD.MM.YYYY'."
+
+4. **Bestelltabelle erklären** · `backshop-offer-page` · spotlight
+   *Fier:* „Pro Werbe-Produkt eine Zeile mit: Bild | PLU | Artikel | + (manuell hinzufügen) | LISTE EK / LISTE VK | AKTION EK / AKTION VK | Mo–Sa | Code."
+
+5. **Mo-Sa SECHS Inputs** · `backshop-offer-page` · interactive
+   *Fier:* „'Mo–Sa' ist SECHS separate Number-Inputs (Mo, Di, Mi, Do, Fr, Sa) — du trägst pro Tag ein wieviele Stück du bestellst. Beispiel: bei Wurzelbrot dunkel Mo-Feld auf 20 setzen."
+
+6. **Auto-Save** · `backshop-offer-page` · spotlight
+   *Fier:* „Eingabe wird automatisch gespeichert — kein Speichern-Klick nötig. Sobald du das Feld verlässt, ist es persistiert."
+
+7. **EK + VK** · `backshop-offer-page` · spotlight
+   *Fier:* „EK = dein Einkaufspreis (was du zahlst). VK = Verkaufspreis (was Kunde zahlt). Standard kommt aus Excel-Upload, du kannst lokal anpassen."
+
+8. **Strichcode-Symbol** · `backshop-offer-page` · interactive
+   *Fier:* „'Code'-Spalte = Strichcode-Symbol. Klick öffnet Dialog mit großem Barcode (CODE128/EAN-Style) und Nummer — z.B. 'Wurzelbrot dunkel / PLU 88550 / Werbung KW19/2026 / GTIN 7388329'. Hilft beim Etiketten-Druck."
+
+9. **PDF-Export** · `backshop-offer-page` · interactive
+   *Fier:* „Rechts oben: 'PDF exportieren'-Knopf für die druckbare Bestelltabelle."
+
+10. **Falsche Daten** · `backshop-offer-page` · spotlight
+    *Fier:* „Wenn ein Produkt-Name komisch aussieht: → Tour D3 'Umbenennen', dort kannst du markt-spezifisch korrigieren."
+
+11. **Verbindung zum Sub-Hub** · `backshop-hub-werbung-card` · spotlight
+    *Fier:* „Sub-Hub hat noch 'Backshop-Liste' — eine Kachel-Übersicht ohne Werbe-Artikel für die tägliche Markt-Nutzung. Tour D7."
+
+12. **Abschluss** · `backshop-offer-toolbar` · spotlight
+    *Fier:* „Tour fertig. Bestelltabelle ist deine wichtigste Backshop-Werbe-Sicht."
+
+---
+
+## D6 · Backshop PDF-Export (Werbung)
+**Rolle:** User, Admin | **Voraussetzung:** A1 | **Steps:** 4
+
+1. **PDF-Knopf** · `backshop-master-pdf-export` · interactive (Validierung: Dialog offen)
+   *Fier:* „Klick 'PDF' in der Backshop-Toolbar."
+
+2. **Optionen Backshop-spezifisch** · `backshop-master-pdf-export` · spotlight
+   *Fier:* „'Volle Liste' oder 'Nur Angebote'. Bei 'Nur Angebote': 'Angebotszeilen und ggf. neue Produkte (Test), A–Z, eigener Titel.' Sortierung default 'Nach Warengruppe'. Spalten 'Bild | PLU | Name'."
+
+3. **Vorschau** · `backshop-master-pdf-export` · spotlight
+   *Fier:* „Vorschau zeigt Counter und Layout. Bilder kommen mit ins PDF (Backshop hat Bild-Spalte)."
+
+4. **Download** · `backshop-master-pdf-export` · interactive
+   *Fier:* „'PDF herunterladen' (blau). Toast nach Erstellung: 'PDF wurde erstellt.'"
+
+---
+
+## D7 · Backshop-Liste (Kachel-PDF) ⭐ war übersehen
+**Rolle:** User, Admin (Viewer hat Lese-Sicht) | **Voraussetzung:** A1 | **Steps:** 6
+
+1. **Vom Sub-Hub** · `backshop-hub-list-card` · interactive (Validierung: Pfad /backshop-kacheln)
+   *Fier:* „Vom Backshop-Hub: Sub-Hub 'Backshop' → 'Backshop-Liste'-Karte (Quadrat-Raster). Das öffnet die Kachel-Übersicht."
+
+2. **Tab-Navigation oben** · `backshop-master-page` · spotlight
+   *Fier:* „Vier Tabs zur Schnellnavigation: Werbung | Backshop-Liste (aktiv) | PLU-Liste | Konfiguration."
+
+3. **Kachel-Grid** · `backshop-master-table` · spotlight
+   *Fier:* „Sektion-Header in Großbuchstaben pro Warengruppe (z.B. 'BROT'). Pro Kachel: Bild oben + PLU mittig + Artikel-Name + STRICHCODE als gerenderter Barcode unten. Desktop 6 pro Reihe."
+
+4. **Untertitel verstehen** · `backshop-master-page` · spotlight
+   *Fier:* „'Stand: {Datum} {Zeit} · {Markt} · Liste KW{aktuell}/{Jahr}'. Wichtig: 'Übersicht ohne Werbungs-Artikel' — Werbe-Produkte sind in der Werbungs-Tour (D5), das hier ist die Standard-Sortimentssicht."
+
+5. **PDF erzeugen** · `backshop-master-pdf-export` · interactive (Validierung: Toast)
+   *Fier:* „Rechts oben: 'PDF erzeugen'-Knopf — direkter Klick (kein Optionen-Dialog wie bei PLU-Liste-PDF). Knopf wird zu 'PDF wird erstellt…' mit Refresh-Spinner. Nach ~3 Sekunden Toast: 'PDF wurde erstellt.' + Auto-Download."
+
+6. **Wofür nutzen** · `backshop-master-page` · spotlight
+   *Fier:* „Diese Kachel-Liste hilft dir schnell die richtige PLU zu finden, ohne Original-Excel durchzusuchen. Strichcode-Sicht ist auch nützlich beim Etiketten-Druck. Tour fertig!"
+
+---
+
+## E1 · Backshop-Konfig: Layout + Bezeichnungsregeln
+**Rolle:** Admin | **Voraussetzung:** A1 + Testmodus | **Steps:** 9 (sequenz-abhängig kürzer wenn C1/C2 schon gemacht)
+
+1. **Konfig öffnen** · `backshop-hub-konfig-card` · interactive
+   *Fier:* „Vom Backshop-Hub: 'Konfiguration der Liste'."
+
+2. **4 Sub-Karten** · `backshop-konfig-hub-page` · spotlight
+   *Fier:* „Backshop-Konfig hat VIER Karten (Obst hatte drei): Layout, Bezeichnungsregeln, Warengruppen sortieren, Gruppenregeln. Heute Layout + Regeln."
+
+3. **Layout** · `backshop-konfig-hub-layout-card` · interactive
+   *Fier:* „Klick auf Layout-Karte."
+
+4. **Anzeige (Backshop-spezifisch)** · `backshop-konfig-layout-display-mode-card` · spotlight
+   *Fier:* „Anzeige nur 'Alle zusammen (alphabetisch)' oder 'Nach Warengruppen (alphabetisch)' — keine Stück/Gewicht-Trennung wie bei Obst."
+
+5. **PDF-Seitenumbruch** · `backshop-konfig-layout-pdf-page-break` · spotlight
+   *Fier:* „NEU bei Backshop: Toggle 'Vorschau: eine Seite pro Warengruppe'. PDF bricht platzsparend um — neue Seite nur wenn nächste Warengruppe komplett nicht mehr passt."
+
+6. **Default-Schriftgrößen anders** · `backshop-konfig-layout-fonts-card` · spotlight
+   *Fier:* „Backshop hat größere Default-Schriften: 32/24/18 (Obst war 28/16/18). Du kannst's anpassen."
+
+7. **Markierungsdauer** · `backshop-konfig-layout-mark-duration-card` · spotlight
+   *Fier:* „Backshop-Default: Rot 2 KW, Gelb 2 KW (Obst war 1/1). Anpassbar."
+
+**Bezeichnungsregeln:**
+
+8. **Wechsel zu Regeln** · `backshop-konfig-hub-rules-card` · interactive
+   *Fier:* „Zurück zum Konfig-Hub, dann auf 'Bezeichnungsregeln'."
+
+9. **Regel-Konzept (sequenz-abhängig)** · `backshop-konfig-rules-keywords-card` · spotlight
+   *Fier:* (wenn C2 gemacht: „Wie bei Obst — Schlagwort + Position. Placeholder hier: 'Bio' oder 'Vollkorn'.") (wenn nicht: ausführlich erklären analog C2)
+
+---
+
+## E2 · Backshop-Konfig: Warengruppen + Sortierung + Gruppenregeln
+**Rolle:** Admin | **Voraussetzung:** A1 + Testmodus | **Steps:** 13
+
+**Workbench:**
+
+1. **Warengruppen öffnen** · `backshop-konfig-hub-block-sort-card` · interactive
+   *Fier:* „Konfig-Hub → 'Warengruppen sortieren'."
+
+2. **3-Spalten-Workbench** · `backshop-konfig-block-sort-section` · spotlight
+   *Fier:* „Drei Spalten: Links Warengruppen mit Counter (z.B. 'Brot 53'), Mitte Artikel-Karten mit Bildern, Rechts Status-Card mit 'OHNE ZUORDNUNG / MARKT-OVERRIDES / ARTIKEL GESAMT / ZULETZT GEÄNDERT'."
+
+3. **Neue Warengruppe** · `backshop-konfig-warengruppen-create-dialog` · interactive
+   *Fier:* „Linke Spalte: '+ Neu'-Knopf. Dialog 'Neue Warengruppe (Backshop)' mit Name-Feld. Toast: 'Warengruppe erstellt'."
+
+4. **Mehrfachauswahl + Zuweisen** · `backshop-konfig-warengruppen-products-assign-button` · interactive
+   *Fier:* „Mittlere Spalte: 'Mehrfachauswahl'-Knopf aktiviert Checkboxen + 'Alle auswählen'-Knopf. Wähl 2-3 Artikel, dann Sticky-Footer 'Auswahl → {Gruppe} zuweisen' (blau)."
+
+5. **Drag-and-Drop** · `backshop-konfig-warengruppen-products-list` · spotlight
+   *Fier:* „Pro Karte: 6-Punkt-Drag-Handle unten rechts. Drag eines Artikels auf andere Gruppe in der Sidebar = Markt-Override."
+
+6. **Warengruppe löschen** · `backshop-konfig-warengruppen-delete-confirm` · spotlight
+   *Fier:* „Aktive Gruppe → Mülltonnen-Icon → Bestätigung 'Test-Gruppe wirklich löschen? Produkte verlieren nur die Zuordnung.' Toast: 'Warengruppe gelöscht'."
+
+**Gruppenregeln:**
+
+7. **Gruppenregeln öffnen** · `backshop-konfig-hub-gruppenregeln-card` · interactive
+   *Fier:* „Zurück zum Konfig-Hub, dann auf 'Gruppenregeln'."
+
+8. **Konzept** · `backshop-konfig-gruppenregeln-card` · spotlight
+   *Fier:* „Pro Warengruppe eine bevorzugte Marke wählen. Untertitel: 'Nicht bevorzugte Master-Marken werden in der Listenansicht ausgeblendet; Angebote der aktuellen Kalenderwoche und eigene Produkte bleiben sichtbar. Fein anpassen kannst du unter Marken-Auswahl.'"
+
+9. **Tabelle erklären** · `backshop-konfig-gruppenregeln-table` · spotlight
+   *Fier:* „Pro Warengruppe eine Zeile mit Dropdown 'Bevorzugte Marke'. Wenn gesetzt: zusätzlicher Knopf 'Erneut anwenden'."
+
+10. **Marke wählen** · `backshop-konfig-gruppenregeln-source-select` · interactive
+    *Fier:* „Beispiel: Warengruppe 'Brot' → Dropdown 'Harry'. Toast: 'Regel auf 10 Gruppe(n) angewendet.' (10 = Brot-Untergruppen in der Sortiments-Hierarchie). Wechsel der Marke löst direkt die Anwendung aus."
+
+11. **Effekt prüfen** · `backshop-master-table` · spotlight
+    *Fier:* „Wechsel kurz zur Backshop-Liste — du siehst dass nicht-Harry-Brote jetzt unter 'Durch Regel gefiltert' (Tour D3) gelistet sind."
+
+12. **Erneut anwenden** · `backshop-konfig-gruppenregeln-reapply-button` · spotlight
+    *Fier:* „Falls neue Produkte hochgeladen werden: 'Erneut anwenden' aktualisiert die Filterung."
+
+13. **Verbindung Markenauswahl** · `backshop-konfig-gruppenregeln-marken-link` · spotlight
+    *Fier:* „Tipp: Markenauswahl (D4) ist Feinabstimmung pro Master-Produkt. Gruppenregeln machen Bulk-Defaults pro Warengruppe. Beispiel: Default Harry, aber Edeka-Brötchen pro Master ausnehmen."
+
+
+---
+
+## F1 · Benutzer verwalten
+**Rolle:** Admin | **Voraussetzung:** A1 + Testmodus | **Steps:** 9
+
+1. **UserManagement öffnen** · `dashboard-card-users` · interactive
+   *Fier:* „Vom Dashboard auf 'Benutzer'-Karte."
+
+2. **Tabelle erklären** · `user-management-list` · spotlight
+   *Fier:* „Tabelle 'Alle Benutzer (X)' mit Spalten: Name, Personalnr., E-Mail, Rolle, Märkte, Aktionen. Pro Zeile vier Knöpfe: Märkte, Bereiche (Auge), Passwort (Schlüssel), Löschen (rot)."
+
+3. **Neuer Benutzer** · `user-management-new-user` · interactive
+   *Fier:* „Klick '+ Neuer Benutzer' (blau, oben rechts)."
+
+4. **Felder + Rolle** · `user-management-create-dialog` · interactive
+   *Fier:* „Untertitel: 'Der Benutzer erhält ein Einmalpasswort und muss beim ersten Login ein eigenes Passwort vergeben.' Felder: Name (Pflicht), Personalnummer 7-stellig ODER E-Mail (mind. eines), Rolle Dropdown 'User (Personal)' (default) / Admin / Viewer (nur Liste + PDF). Hinweis: 'Der Benutzer wird dem Markt {Test} zugewiesen.'"
+
+5. **Erstellen + Einmalpasswort** · `user-management-create-submit` · interactive (Validierung: Einmalpasswort-Dialog)
+   *Fier:* „Klick 'Benutzer erstellen' (disabled bis Pflichtfelder gefüllt). Spinner 'Wird erstellt…'. Nach ~2s: Einmalpasswort-Dialog mit großem Mono-Passwort + Kopier-Icon. Hinweis: 'Dieses Passwort wird nur einmal angezeigt. Bitte notieren oder kopieren.'"
+
+6. **Märkte zuweisen** · `user-management-row-edit` · interactive
+   *Fier:* „Bei einer User-Zeile: 'Märkte'-Knopf. Dialog mit Untertitel 'Märkte zuweisen oder entfernen. Änderungen werden sofort gespeichert.' (Auto-Save, kein Save-Knopf!) Markt-Cards mit Checkbox + Name + Slug."
+
+7. **Bereiche-Sichtbarkeit** · `user-management-row-edit` · interactive
+   *Fier:* „'Bereiche'-Knopf (Auge): zwei Toggles 'Obst und Gemüse' + 'Backshop'. Auch hier Auto-Save. Untertitel: 'Welche Listen soll dieser Benutzer sehen?'"
+
+8. **Passwort zurücksetzen** · `user-management-row-reset-pw` · interactive
+   *Fier:* „Schlüssel-Icon: Bestätigungs-Dialog 'Passwort zurücksetzen?' Buttons: Abbrechen / 'Passwort zurücksetzen' (blau). Neues Einmalpasswort wird angezeigt."
+
+9. **Löschen + Card „Kassen & QR"** · `user-management-page` · spotlight
+   *Fier:* „Mülltonne (rot, disabled für eigenen Account): Bestätigungs-Dialog 'Benutzer wirklich löschen?' Buttons: 'Nein, nicht löschen' / 'Ja, löschen' (rot). Toast: 'Benutzer wurde gelöscht.' Unten Card 'Kassen & QR' für Kassen-Konten — die sind separat. Tour fertig!"
+
+---
+
+## F2 · Kassenmodus & QR-Code
+**Rolle:** Admin | **Voraussetzung:** A1 (Achtung: Kassen-Anlage ist auch im Testmodus echt!) | **Steps:** 8
+
+1. **Kassenmodus öffnen** · `dashboard-card-kiosk` · interactive
+   *Fier:* „Vom Dashboard: 'Kassenmodus'-Karte."
+
+2. **Konzept** · `kassenmodus-qr` · spotlight
+   *Fier:* „Kassenmodus = Tablet/Bildschirm an der Kasse. Das Personal scannt QR + gibt Passwort ein → kommt in Kiosk-Layout (nur Listen, kein PDF, kein Marktwechsler). Sicherheit: Token läuft nach 6 Monaten ab."
+
+3. **Card 'Einstiegs-Link & QR'** · `kassenmodus-qr` · spotlight
+   *Fier:* „Card oben: URL mit Token + 'Gültig bis {Datum}'. Großer QR-Code rechts (~200×200 px). Fünf Aktion-Buttons: Link kopieren, Drucken, PDF speichern, Neuen Link erzeugen, Vorschau (neuer Tab)."
+
+4. **Info-Banner** · `kassenmodus-qr` · spotlight
+   *Fier:* „Wichtige Warnung: 'Gleicher Browser, mehrere Tabs / Wenn du hier eingeloggt bist und im neuen Tab die Kasse anmeldest, gilt die Kiosk-Session für alle offenen Tabs dieser Website.' Für Vorschau ohne deine Admin-Session zu verlieren: privates Fenster oder zweites Browser-Profil."
+
+5. **Erste Kasse anlegen** · `kassenmodus-add-register` · spotlight
+   *Fier:* „Card 'Kasse hinzufügen' unten links. Dropdown 'Kassen-Nummer' (Default 'Kasse 2 (nächste)') + Passwort-Feld (mind. 6 Zeichen) + '+ Kasse anlegen'-Knopf."
+
+6. **Kassen-Liste** · `kassenmodus-registers-list` · spotlight
+   *Fier:* „Card 'Kassen' rechts: pro existierende Kasse Zeile mit Anzeigename + 'Deaktivieren' (sekundär) + 'Passwort ändern' (Schlüssel) + Mülltonne (Löschen)."
+
+7. **Link kopieren testen** · `kassenmodus-qr` · interactive
+   *Fier:* „Klick 'Link kopieren'. Toast: 'Link kopiert.' URL ist jetzt in der Zwischenablage."
+
+8. **Sicherheits-Hinweis** · `kassenmodus-qr` · spotlight
+   *Fier:* „Wichtig: 'Neuen Link erzeugen' rotiert den Token — ALLE aktiven Kassen-Sessions werden danach ungültig! Nur nutzen wenn QR geleakt ist. Token läuft sowieso nach 6 Monaten ab. Tour fertig!"
+
+---
+
+## G1 · Abschluss
+**Rolle:** alle | **Voraussetzung:** mind. 1 andere Tour | **Steps:** 4
+
+1. **Lob** · `dashboard-welcome` · spotlight
+   *Fier:* „Top — du hast die Basics gelernt! Du kennst jetzt deine Listen, weißt was die Markierungen bedeuten und wie du eigene Sachen anlegst."
+
+2. **Wiederholen** · `header-tutorial-icon` · spotlight
+   *Fier:* „Wenn du was vergisst oder eine andere Tour machen willst — der Tutorial-Knopf oben ist dein Anlaufpunkt. Da kannst du jede Tour einzeln wiederholen."
+
+3. **Profil-Menü als Backup** · `profile-menu` · spotlight
+   *Fier:* „Im Profil-Menü findest du auch 'Einführung wiederholen' — falls du den Knopf oben mal nicht findest."
+
+4. **Testmodus beenden** · `testmode-exit-button` · spotlight
+   *Fier:* „Wenn du noch im Testmodus bist (gelber Rahmen): unten rechts 'Testmodus beenden' klicken. Alle Test-Aktionen werden verworfen, du bist wieder im echten System. Bis bald! 👋"
+
+---
+
+## T-Multi-Markt (conditional)
+**Rolle:** alle (User, Admin, Viewer) **wenn** `useStores().data.length > 1` | **Steps:** 3
+
+1. **Markt-Switcher** · `header-store-switcher` · spotlight
+   *Fier:* „Du hast mehrere Märkte. Oben im Header siehst du den Markt-Switcher — der zeigt dir wo du gerade bist."
+
+2. **Wechseln** · `header-store-switcher` · interactive (Validierung: anderer Markt aktiv)
+   *Fier:* „Klick drauf, wähl einen anderen Markt aus."
+
+3. **Effekt** · `masterlist-context-line` · spotlight
+   *Fier:* „Die ganze App schaltet jetzt um — du siehst Listen, Werbung, Benutzer dieses Markts. Beim Zurückwechseln sieht der erste Markt wieder genauso aus wie vorher."
+
 
 Alle 13 Touren + 1 Conditional-Tour ausgearbeitet. Bitte durchlesen und Feedback pro Tour geben:
 - ✅ passt

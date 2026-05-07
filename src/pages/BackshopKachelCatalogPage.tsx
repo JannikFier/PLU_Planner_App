@@ -3,10 +3,15 @@
 import { useMemo, useState, useCallback } from 'react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
-import { FileDown, Loader2 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { FileDown, Loader2, Search } from 'lucide-react'
 import { useCurrentStore } from '@/hooks/useCurrentStore'
 import { useBackshopMasterListDisplayBundle } from '@/hooks/useBackshopMasterListDisplayBundle'
-import { buildBackshopKachelWarengruppeBlocks } from '@/lib/backshop-kachel-groups'
+import {
+  buildBackshopKachelWarengruppeBlocks,
+  filterBackshopKachelCatalogSourceItems,
+  filterDisplayItemsForKachelSearch,
+} from '@/lib/backshop-kachel-groups'
 import { BackshopKachelGrid } from '@/components/backshop/BackshopKachelGrid'
 import {
   BackshopMasterListItemsErrorCard,
@@ -35,18 +40,34 @@ export function BackshopKachelCatalogPage() {
   } = bundle
 
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [kachelSearchQuery, setKachelSearchQuery] = useState('')
 
   const standLabel = useMemo(
     () => format(new Date(), "dd.MM.yyyy 'um' HH:mm 'Uhr'", { locale: de }),
     [],
   )
 
-  const blocks = useMemo(
-    () => buildBackshopKachelWarengruppeBlocks(displayItems, { excludeOffers: true }),
+  const kachelSourceItems = useMemo(
+    () => filterBackshopKachelCatalogSourceItems(displayItems),
     [displayItems],
   )
 
-  const totalTiles = useMemo(() => blocks.reduce((n, b) => n + b.items.length, 0), [blocks])
+  const pdfBlocks = useMemo(
+    () => buildBackshopKachelWarengruppeBlocks(kachelSourceItems, { excludeOffers: false }),
+    [kachelSourceItems],
+  )
+
+  const visibleBlocks = useMemo(() => {
+    const filtered = filterDisplayItemsForKachelSearch(kachelSourceItems, kachelSearchQuery)
+    return buildBackshopKachelWarengruppeBlocks(filtered, { excludeOffers: false })
+  }, [kachelSourceItems, kachelSearchQuery])
+
+  const totalTiles = useMemo(() => pdfBlocks.reduce((n, b) => n + b.items.length, 0), [pdfBlocks])
+
+  const visibleTileCount = useMemo(
+    () => visibleBlocks.reduce((n, b) => n + b.items.length, 0),
+    [visibleBlocks],
+  )
 
   const kwHint = useMemo(() => {
     if (!listVersion) return null
@@ -70,7 +91,7 @@ export function BackshopKachelCatalogPage() {
         storeName: storeName ?? 'Markt',
         standLabel: standForPdf,
         kwHint,
-        blocks,
+        blocks: pdfBlocks,
         sourceArtNrByPlu,
       })
       const url = URL.createObjectURL(blob)
@@ -86,7 +107,7 @@ export function BackshopKachelCatalogPage() {
     } finally {
       setPdfBusy(false)
     }
-  }, [blocks, kwHint, sourceArtNrByPlu, storeName, totalTiles])
+  }, [pdfBlocks, kwHint, sourceArtNrByPlu, storeName, totalTiles])
 
   const pdfDisabled = isLoading || snapshotInvalid || hasNoVersion || totalTiles === 0 || pdfBusy
 
@@ -147,7 +168,31 @@ export function BackshopKachelCatalogPage() {
         )}
 
         {!isLoading && itemsError == null && !hasNoVersion && !snapshotInvalid && totalTiles > 0 && (
-          <BackshopKachelGrid blocks={blocks} sourceArtNrByPlu={sourceArtNrByPlu} />
+          <div className="space-y-4">
+            <div className="relative max-w-md">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                type="search"
+                value={kachelSearchQuery}
+                onChange={(e) => setKachelSearchQuery(e.target.value)}
+                placeholder="PLU oder Artikel suchen…"
+                className="pl-9"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="Kachel-Katalog durchsuchen"
+              />
+            </div>
+            {visibleTileCount === 0 ? (
+              <p className="text-sm text-muted-foreground rounded-lg border bg-muted/30 p-6 text-center">
+                Kein Treffer für diese Suche. Passe den Suchbegriff an oder leere das Feld.
+              </p>
+            ) : (
+              <BackshopKachelGrid blocks={visibleBlocks} sourceArtNrByPlu={sourceArtNrByPlu} />
+            )}
+          </div>
         )}
       </div>
     </DashboardLayout>

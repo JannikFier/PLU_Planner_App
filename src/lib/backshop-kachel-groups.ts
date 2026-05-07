@@ -39,3 +39,25 @@ export function buildBackshopKachelWarengruppeBlocks(
   }
   return blocks
 }
+
+/** Basisliste für Kachel-Katalog und PDF: ohne Werbungs-/Angebotszeilen. */
+export function filterBackshopKachelCatalogSourceItems(displayItems: DisplayItem[]): DisplayItem[] {
+  return displayItems.filter((i) => !i.is_offer)
+}
+
+/**
+ * Echtzeit-Filter für die Kachel-Ansicht: PLU oder Anzeigename (Groß-/Kleinschreibung egal).
+ * Leerer Query → unveränderte Eingabeliste.
+ */
+export function filterDisplayItemsForKachelSearch(
+  displayItems: DisplayItem[],
+  rawQuery: string,
+): DisplayItem[] {
+  const q = rawQuery.trim().toLowerCase()
+  if (!q) return displayItems
+  return displayItems.filter((item) => {
+    const plu = item.plu.toLowerCase()
+    const name = (item.display_name ?? '').toLowerCase()
+    return plu.includes(q) || name.includes(q)
+  })
+}

@@ -1,23 +1,27 @@
 // Vollseite: Produkte umbenennen (Backshop)
 
-import { useMemo } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { RenameProductsPickerContent } from '@/components/plu/RenameProductsPickerContent'
 import { resolvePickerBackTarget } from '@/lib/picker-back-navigation'
-import { useActiveBackshopVersion } from '@/hooks/useActiveBackshopVersion'
-import { useBackshopPLUData } from '@/hooks/useBackshopPLUData'
-import { useBackshopBlocks } from '@/hooks/useBackshopBlocks'
-import { useBackshopLayoutSettings } from '@/hooks/useBackshopLayoutSettings'
-import { useBackshopRenamedItems } from '@/hooks/useBackshopRenamedItems'
-import { buildNameBlockOverrideMap } from '@/lib/block-override-utils'
-import {
-  useStoreBackshopBlockOrder,
-  useStoreBackshopNameBlockOverrides,
-} from '@/hooks/useStoreBackshopBlockLayout'
+import { useBackshopMasterListDisplayBundle } from '@/hooks/useBackshopMasterListDisplayBundle'
 import type { BackshopMasterPLUItem, Block } from '@/types/database'
-import { useStoreListCarryoverRows } from '@/hooks/useStoreListCarryover'
-import { carryoverBackshopRowToMasterItem } from '@/lib/carryover-master-snapshot'
+import { backshopRenamePickerMastersFromDisplayOrder } from '@/lib/backshop-rename-picker-scope'
+
+const RENAME_LIST_SCOPE_STORAGE_KEY = 'backshop-rename-picker-scope'
+
+type BackshopRenameListScope = 'my_list' | 'all_products'
+
+function readStoredRenameListScope(): BackshopRenameListScope {
+  try {
+    const v = localStorage.getItem(RENAME_LIST_SCOPE_STORAGE_KEY)
+    if (v === 'my_list' || v === 'all_products') return v
+  } catch {
+    /* ignore */
+  }
+  return 'my_list'
+}
 
 export function PickRenameBackshopPage() {
   const location = useLocation()
@@ -29,53 +33,48 @@ export function PickRenameBackshopPage() {
     [pathname, location.state],
   )
 
-  const { data: activeVersion } = useActiveBackshopVersion()
-  const { data: masterItems = [] } = useBackshopPLUData(activeVersion?.id)
-  const { data: blocks = [] } = useBackshopBlocks()
-  const { data: layoutSettings } = useBackshopLayoutSettings()
-  const { data: globalRenamed = [] } = useBackshopRenamedItems()
-  const { data: backshopCarryoverRows = [] } = useStoreListCarryoverRows('backshop', activeVersion?.id)
-  const { data: storeBackshopBlockOrder = [] } = useStoreBackshopBlockOrder()
-  const { data: storeBackshopNameOverrides = [] } = useStoreBackshopNameBlockOverrides()
-  const nameBlockOverrides = useMemo(
-    () => buildNameBlockOverrideMap(storeBackshopNameOverrides),
-    [storeBackshopNameOverrides],
-  )
+  const bundle = useBackshopMasterListDisplayBundle()
+
+  const [renameListScope, setRenameListScope] = useState<BackshopRenameListScope>(readStoredRenameListScope)
+
+  const persistRenameListScope = useCallback((scope: BackshopRenameListScope) => {
+    setRenameListScope(scope)
+    try {
+      localStorage.setItem(RENAME_LIST_SCOPE_STORAGE_KEY, scope)
+    } catch {
+      /* ignore */
+    }
+  }, [])
 
   const renameDialogListLayout = useMemo(
     () => ({
-      sortMode: (layoutSettings?.sort_mode ?? 'ALPHABETICAL') as 'ALPHABETICAL' | 'BY_BLOCK',
-      blocks: blocks as Block[],
-      storeBlockOrder: storeBackshopBlockOrder,
-      nameBlockOverrides,
+      sortMode: bundle.sortMode,
+      blocks: bundle.blocks as Block[],
+      storeBlockOrder: bundle.storeBackshopBlockOrder,
+      nameBlockOverrides: bundle.nameBlockOverrides,
     }),
-    [layoutSettings?.sort_mode, blocks, storeBackshopBlockOrder, nameBlockOverrides],
+    [bundle.sortMode, bundle.blocks, bundle.storeBackshopBlockOrder, bundle.nameBlockOverrides],
   )
-
-  const flowDirection = (layoutSettings?.flow_direction ?? 'ROW_BY_ROW') as 'ROW_BY_ROW' | 'COLUMN_FIRST'
-  const dialogFontSizes = {
-    header: layoutSettings?.font_header_px ?? 32,
-    column: layoutSettings?.font_column_px ?? 18,
-    product: layoutSettings?.font_product_px ?? 18,
-  }
-
-  const carryoverMastersIncluded = useMemo(() => {
-    if (!activeVersion?.id) return [] as BackshopMasterPLUItem[]
-    return backshopCarryoverRows
-      .filter((r) => r.market_include)
-      .map((r) => carryoverBackshopRowToMasterItem(r, activeVersion.id))
-  }, [backshopCarryoverRows, activeVersion])
 
   const masterByPluForRenamed = useMemo(() => {
     const m = new Map<string, BackshopMasterPLUItem>()
-    for (const item of masterItems) m.set(item.plu, item)
-    for (const c of carryoverMastersIncluded) {
+    for (const item of bundle.masterScopeItems) m.set(item.plu, item)
+    for (const c of bundle.carryoverMasterScoped) {
       if (!m.has(c.plu)) m.set(c.plu, c)
     }
     return m
-  }, [masterItems, carryoverMastersIncluded])
+  }, [bundle.masterScopeItems, bundle.carryoverMasterScoped])
 
-  const searchableItemsForRename = useMemo(() => Array.from(masterByPluForRenamed.values()), [masterByPluForRenamed])
+  const fullSearchableList = useMemo(() => Array.from(masterByPluForRenamed.values()), [masterByPluForRenamed])
+
+  const searchableItemsForRename = useMemo(() => {
+    if (renameListScope !== 'my_list' || bundle.isLoading) return fullSearchableList
+    return backshopRenamePickerMastersFromDisplayOrder(
+      bundle.displayItems,
+      bundle.masterScopeItems,
+      bundle.carryoverMasterScoped,
+    )
+  }, [fullSearchableList, renameListScope, bundle.isLoading, bundle.displayItems, bundle.masterScopeItems, bundle.carryoverMasterScoped])
 
   return (
     <DashboardLayout>
@@ -83,11 +82,13 @@ export function PickRenameBackshopPage() {
         <RenameProductsPickerContent
           searchableItems={searchableItemsForRename}
           listType="backshop"
-          displayMode={(layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'}
-          renamedOverrides={globalRenamed.map((r) => ({ plu: r.plu, display_name: r.display_name }))}
+          displayMode={bundle.displayMode}
+          renamedOverrides={bundle.renamedItems.map((r) => ({ plu: r.plu, display_name: r.display_name }))}
           listLayout={renameDialogListLayout}
-          flowDirection={flowDirection}
-          fontSizes={dialogFontSizes}
+          flowDirection={bundle.flowDirection}
+          fontSizes={bundle.fontSizes}
+          renameListScope={renameListScope}
+          onRenameListScopeChange={persistRenameListScope}
           dataTour="backshop-renamed-add-dialog"
           renameDialogSubmitDataTour="backshop-renamed-add-dialog-submit"
           onCancel={() => navigate(backPath)}

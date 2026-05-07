@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import type { DisplayItem } from '@/types/plu'
-import { buildBackshopKachelWarengruppeBlocks } from '@/lib/backshop-kachel-groups'
+import {
+  buildBackshopKachelWarengruppeBlocks,
+  filterBackshopKachelCatalogSourceItems,
+  filterDisplayItemsForKachelSearch,
+} from '@/lib/backshop-kachel-groups'
 
 function minimalItem(partial: Partial<DisplayItem> & Pick<DisplayItem, 'plu' | 'display_name'>): DisplayItem {
   return {
@@ -54,5 +58,43 @@ describe('buildBackshopKachelWarengruppeBlocks', () => {
       { excludeOffers: false },
     )
     expect(blocks[0]?.label).toBe('Ohne Warengruppe')
+  })
+})
+
+describe('filterBackshopKachelCatalogSourceItems', () => {
+  it('entfernt Angebotszeilen', () => {
+    const out = filterBackshopKachelCatalogSourceItems([
+      minimalItem({ plu: '1', display_name: 'A', is_offer: true }),
+      minimalItem({ plu: '2', display_name: 'B' }),
+    ])
+    expect(out.map((i) => i.plu)).toEqual(['2'])
+  })
+})
+
+describe('filterDisplayItemsForKachelSearch', () => {
+  const items = [
+    minimalItem({ plu: '81356', display_name: 'Anno' }),
+    minimalItem({ plu: '99999', display_name: 'Bergbauernbrot' }),
+  ]
+
+  it('liefert bei leerem Query alle Items', () => {
+    expect(filterDisplayItemsForKachelSearch(items, '')).toEqual(items)
+    expect(filterDisplayItemsForKachelSearch(items, '   ')).toEqual(items)
+  })
+
+  it('findet nach PLU-Teilstring', () => {
+    expect(filterDisplayItemsForKachelSearch(items, '135').map((i) => i.plu)).toEqual(['81356'])
+  })
+
+  it('findet nach Anzeigename', () => {
+    expect(filterDisplayItemsForKachelSearch(items, 'berg').map((i) => i.plu)).toEqual(['99999'])
+  })
+
+  it('ignoriert Gross-Kleinschreibung', () => {
+    expect(filterDisplayItemsForKachelSearch(items, 'BERG').map((i) => i.plu)).toEqual(['99999'])
+  })
+
+  it('liefert leeres Array wenn nichts passt', () => {
+    expect(filterDisplayItemsForKachelSearch(items, 'xyz')).toEqual([])
   })
 })

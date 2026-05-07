@@ -98,6 +98,8 @@ export interface BackshopMasterListDisplayBundle {
   displayItems: DisplayItem[]
   stats: PLUStats
   sortMode: 'ALPHABETICAL' | 'BY_BLOCK'
+  /** Anzeige der PLU-Tabelle: zusammen vs. Stück/Gewicht getrennt (Backshop: nur alphabetisch vs. Warengruppen). */
+  displayMode: 'MIXED' | 'SEPARATED'
   flowDirection: 'ROW_BY_ROW' | 'COLUMN_FIRST'
   fontSizes: { header: number; column: number; product: number }
   blocks: Block[]
@@ -362,6 +364,7 @@ export function useBackshopMasterListDisplayBundle(): BackshopMasterListDisplayB
   )
 
   const sortMode = layoutSettings?.sort_mode ?? 'ALPHABETICAL'
+  const displayMode = (layoutSettings?.display_mode ?? 'MIXED') as 'MIXED' | 'SEPARATED'
   const flowDirection = layoutSettings?.flow_direction ?? 'ROW_BY_ROW'
   const fontSizes = {
     header: layoutSettings?.font_header_px ?? 32,
@@ -444,6 +447,7 @@ export function useBackshopMasterListDisplayBundle(): BackshopMasterListDisplayB
     displayItems,
     stats,
     sortMode,
+    displayMode,
     flowDirection,
     fontSizes,
     blocks,

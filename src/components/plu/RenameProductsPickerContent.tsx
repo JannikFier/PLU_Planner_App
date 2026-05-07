@@ -201,6 +201,9 @@ export interface RenameProductsPickerContentProps {
   renameDialogDataTour?: string
   /** Optional: Tutorial-Anker am inneren RenameDialog Speichern-Button */
   renameDialogSubmitDataTour?: string
+  /** Nur Backshop: Umschalter „Meine Liste“ / „Alle Produkte“ (beide setzen, sonst keine UI). */
+  renameListScope?: 'my_list' | 'all_products'
+  onRenameListScopeChange?: (scope: 'my_list' | 'all_products') => void
   /** Zurück zur Liste (Abbrechen / Fertig) */
   onCancel: () => void
 }
@@ -216,9 +219,13 @@ export function RenameProductsPickerContent({
   dataTour,
   renameDialogDataTour,
   renameDialogSubmitDataTour,
+  renameListScope,
+  onRenameListScopeChange,
   onCancel,
 }: RenameProductsPickerContentProps) {
   const listKind = listType === 'backshop' ? 'backshop' : 'obst'
+  const showBackshopListScopeControls =
+    listType === 'backshop' && renameListScope != null && onRenameListScopeChange != null
   const flowDirection =
     flowDirectionProp ?? (listKind === 'backshop' ? 'ROW_BY_ROW' : 'COLUMN_FIRST')
   const fontSizes = fontSizesProp ?? (listKind === 'backshop' ? DEFAULT_FONT_BACKSHOP : DEFAULT_FONT_OBST)
@@ -352,26 +359,67 @@ export function RenameProductsPickerContent({
           <h2 className="text-xl font-semibold tracking-tight">Produkte umbenennen</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Suche nach PLU oder Name, dann klicke auf den Stift, um den Anzeigenamen zu ändern.
+            {showBackshopListScopeControls ? (
+              <>
+                {' '}
+                Unter „Meine Liste“ siehst du nur Artikel, die auf deiner Backshop-Liste angezeigt werden
+                (wie in der PLU-Tabelle).
+              </>
+            ) : null}
           </p>
         </div>
 
-        <div className="relative shrink-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="PLU oder Name eingeben…"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="pl-9"
-            aria-label="Suche"
-          />
+        <div
+          className={cn(
+            'shrink-0',
+            showBackshopListScopeControls ? 'flex flex-wrap items-center gap-2 justify-between' : undefined,
+          )}
+          data-testid={showBackshopListScopeControls ? 'backshop-rename-list-scope' : undefined}
+        >
+          <div className={cn('relative min-w-0', showBackshopListScopeControls ? 'flex-1' : 'w-full')}>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="search"
+              placeholder="PLU oder Name eingeben…"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="pl-9 w-full min-w-0"
+              aria-label="Suche"
+            />
+          </div>
+          {showBackshopListScopeControls ? (
+            <div className="flex shrink-0 rounded-md border border-border bg-muted/40 p-0.5" role="group" aria-label="Artikelumfang">
+              <Button
+                type="button"
+                size="sm"
+                variant={renameListScope === 'my_list' ? 'default' : 'ghost'}
+                className="h-8 px-2.5 text-xs sm:text-sm"
+                onClick={() => onRenameListScopeChange!('my_list')}
+              >
+                Meine Liste
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={renameListScope === 'all_products' ? 'default' : 'ghost'}
+                className="h-8 px-2.5 text-xs sm:text-sm"
+                onClick={() => onRenameListScopeChange!('all_products')}
+              >
+                Alle Produkte
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         <div className="border rounded-lg overflow-hidden flex flex-1 min-h-0 flex-col md:min-h-[400px]">
           {filteredItems.length === 0 ? (
             <div className="flex-1 flex items-center justify-center p-8">
               <p className="text-sm text-muted-foreground text-center">
-                {searchText.trim() ? 'Keine Treffer.' : 'Keine Produkte in dieser Version.'}
+                {searchText.trim()
+                  ? 'Keine Treffer.'
+                  : showBackshopListScopeControls && renameListScope === 'my_list'
+                    ? 'Keine Artikel aus deiner Liste. Mit „Alle Produkte“ den vollen Katalog durchsuchen.'
+                    : 'Keine Produkte in dieser Version.'}
               </p>
             </div>
           ) : (

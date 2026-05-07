@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { getBackshopRuleFilteredMasterRows } from '@/lib/backshop-visibility-diff'
-import type { BackshopMasterPLUItem } from '@/types/database'
+import type { BackshopMasterPLUItem, Block } from '@/types/database'
 import type { BackshopDisplayListInput } from '@/lib/layout-engine'
 
 function row(
@@ -52,5 +52,31 @@ describe('getBackshopRuleFilteredMasterRows', () => {
     const pluSources = ruleFilteredRows.map((r) => `${r.plu}|${r.source ?? 'edeka'}`)
     expect(pluSources).toContain('2|edeka')
     expect(pluSources).not.toContain('1|harry')
+  })
+
+  it('liefert visibleCustomPluSet nur für in der Liste vorkommende eigene Produkte', () => {
+    const customOnly: BackshopDisplayListInput = {
+      ...base,
+      masterItems: [],
+      blocks: [{ id: 'b1', name: 'Brot' } as Block],
+      customProducts: [
+        { id: 'c1', plu: '99', name: 'Eigenes Brot', image_url: '', block_id: 'b1' },
+      ],
+      hiddenPLUs: new Set(),
+    }
+    const onlyCustom = getBackshopRuleFilteredMasterRows(customOnly, new Set())
+    expect(onlyCustom.visibleCustomPluSet.has('99')).toBe(true)
+
+    const masterAndCustom: BackshopDisplayListInput = {
+      ...base,
+      masterItems: [row({ id: 'm1', plu: '1', source: 'harry', block_id: 'b1' })],
+      blocks: [{ id: 'b1', name: 'Brot' } as Block],
+      customProducts: [
+        { id: 'c2', plu: '1', name: 'Eigen mit gleicher PLU', image_url: '', block_id: 'b1' },
+      ],
+      hiddenPLUs: new Set(),
+    }
+    const both = getBackshopRuleFilteredMasterRows(masterAndCustom, new Set())
+    expect(both.visibleCustomPluSet.has('1')).toBe(false)
   })
 })
